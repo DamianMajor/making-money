@@ -1,0 +1,24 @@
+Role: You are a game developer building an educational side-scroller.
+Framework: Vanilla JavaScript, HTML5 Canvas, and CSS.
+Optimization: Optimized for iPad/Tablet (Touch only, no keyboard).
+1. Core Gameplay & Input:
+• Movement: Divide the screen into two invisible touch zones. Touching the left 50% moves the player left; touching the right 50% moves them right.
+• Interaction: A large, stylized "INTERACT" button in the bottom-right corner. It should only be clickable/visible when the player is overlapping with an NPC.
+• Camera: A horizontal side-scrolling camera that follows the player.
+2. Visuals & UI:
+• Placeholder Art: Player (Blue Rect), Stone-worker (Green Rect), Fisherman (Orange Rect), Village Elder (White Rect).
+• Dialogue Box: A dedicated, non-transparent box at the bottom 20% of the screen.
+• The Stone Tablet (HUD): A stone-textured box in the top-right. It starts empty. It must have columns for NAME and DEBT.
+3. The Narrative Script:
+• Initial State: The player needs a 'Sharp Stone'.
+• The Promise: Player interacts with the Stone-worker. Stone-worker: "I’ll give you the stone, but you owe me a fish later. I’ll remember." (Inventory updates: +1 Stone).
+• The Task: Player interacts with the Fisherman. Fisherman: "Here is your Fish. Go settle your debt." (Inventory updates: +1 Fish).
+• The Dispute: Player returns to Stone-worker. Upon contact, Stone-worker triggers dialogue: "Wait! I remember saying I wanted TWO fish. And that fish is too small. You still owe me!"
+• The Elder's Intervention: After the dispute dialogue, the Village Elder walks into the center of the frame from the top background.
+• The Solution: Elder: "Stop! There have been too many disputes in our village lately. Nobody’s memory can be trusted. From now on, we use this Stone Tablet."
+• The Ledger: The Stone Tablet HUD updates to show: [PLAYER] | [1 FISH].
+• The Resolution: Stone-worker looks at HUD. Stone-worker: "The stone does not forget. I see the record. The deal is settled."
+4. Technical Requirements:
+• No keydown listeners. Use touchstart or mousedown.
+• Use requestAnimationFrame for smooth 60fps movement.
+• Ensure the canvas handles resizing for different tablet aspect ratios.

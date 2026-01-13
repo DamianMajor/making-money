@@ -242,13 +242,18 @@ export class VillageLedgerGame {
   
   private processTouchStart(clientX: number, clientY: number): void {
     const rect = this.canvas.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    // Scale coordinates to match canvas internal dimensions
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
     
-    // Check if touching interact button
-    if (this.state.showInteractButton && this.isInteractButtonTouched(x, y)) {
-      this.handleInteraction();
-      return;
+    // Check if touching interact button FIRST (before any other handling)
+    if (this.state.showInteractButton && this.interactButtonOpacity > 0.5) {
+      if (this.isInteractButtonTouched(x, y)) {
+        this.handleInteraction();
+        return;
+      }
     }
     
     // Check if touching dialogue to advance
@@ -263,7 +268,7 @@ export class VillageLedgerGame {
       return;
     }
     
-    // Movement touch
+    // Movement touch - only if not touching button area
     this.touchActive = true;
     this.touchX = x;
     this.updateMoveDirection(x);
@@ -272,7 +277,8 @@ export class VillageLedgerGame {
   private processTouchMove(clientX: number): void {
     if (!this.touchActive) return;
     const rect = this.canvas.getBoundingClientRect();
-    const x = clientX - rect.left;
+    const scaleX = this.canvas.width / rect.width;
+    const x = (clientX - rect.left) * scaleX;
     this.touchX = x;
     this.updateMoveDirection(x);
   }
@@ -283,10 +289,13 @@ export class VillageLedgerGame {
   }
   
   private isInteractButtonTouched(x: number, y: number): boolean {
-    const btnX = this.canvas.width - this.interactButtonSize - 32;
-    const btnY = this.canvas.height - this.dialogueBoxHeight - this.interactButtonSize - 48;
-    return x >= btnX && x <= btnX + this.interactButtonSize && 
-           y >= btnY && y <= btnY + this.interactButtonSize;
+    const size = this.interactButtonSize;
+    const btnX = this.canvas.width - size - 32;
+    const btnY = this.canvas.height - this.dialogueBoxHeight - size - 48;
+    // Add padding around button for easier touch targeting
+    const padding = 20;
+    return x >= btnX - padding && x <= btnX + size + padding && 
+           y >= btnY - padding && y <= btnY + size + padding;
   }
   
   private handleInteraction(): void {

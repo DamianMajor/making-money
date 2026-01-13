@@ -20,9 +20,12 @@ Preferred communication style: Simple, everyday language.
 ### Game Engine Design
 - Custom vanilla JavaScript game engine using `requestAnimationFrame` for 60fps rendering
 - Touch-only input system - screen divided into left/right zones for movement
-- State machine for narrative progression through game phases
+- Player speed: 200 units/second, interaction range: 200 units (tablet-friendly)
+- State machine for narrative progression: initial → got_stone → got_fish → dispute → elder_entering → solution → ledger_shown → resolved
 - Character system with placeholder colored rectangles (Blue=Player, Green=Stone-worker, Orange=Fisherman, White=Elder)
 - HUD displays a "Stone Tablet" ledger tracking debts/promises
+- Dialogue system with typewriter effect using "Press Start 2P" retro font
+- INTERACT button with 200ms fade transition in bottom-right corner
 
 ### Backend Architecture
 - **Express.js** server with TypeScript

@@ -30,10 +30,19 @@ Preferred communication style: Simple, everyday language.
 ### World Layout (3500px wide)
 - **x=100** - Player Home (starting position)
 - **x=700** - Woodcutter (FIRST NPC - needs Sharp Stone for broken axe)
-- **x=1600** - Village Elder / Stone Tablet (center of town)
-- **x=2000** - Berry Bush (for foraging berries)
+- **x=1520** - Village Elder (separate from Stone Tablet)
+- **x=1600** - Stone Tablet / Village Center marker
+- **x=2000** - Berry Bush (for foraging berries, gated until Fisherman gives fish)
 - **x=2500** - Stone-worker (gives stone, owes fish)
 - **x=3200** - Fisherman (gives fish, owes 3 berries)
+
+### Brawl Trigger System
+The brawl trigger uses requirement-based checking (not phase-based):
+- **loop === 1** (only in first loop)
+- **inventory.fish >= 1** (player has fish)
+- **inventory.berries >= 3** (player has 3 berries)
+- **player.x within 200px of Village Center (x=1600)**
+This ensures the brawl triggers when all requirements are met, not just based on phase state.
 
 ### Two-Loop Game State System
 The game uses a "Groundhog Day" narrative structure with two loops:

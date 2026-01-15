@@ -177,7 +177,7 @@ export class VillageLedgerGame {
     this.villageElder = {
       id: 'villageElder',
       name: 'VILLAGE ELDER',
-      x: 1600, // Village Center with Stone Tablet
+      x: 1520, // Left of Stone Tablet (at x=1600)
       y: 0,
       width: 60,
       height: 85,
@@ -648,7 +648,13 @@ export class VillageLedgerGame {
   private handleBerryBushInteraction(): void {
     const phase = this.state.phase;
     
-    if (phase === 'got_fish' || phase === 'need_berries' || phase === 'loop2_got_fish' || phase === 'loop2_need_berries') {
+    // Per specification: Berry Bush should only allow collection after Fisherman gives fish
+    // This prevents the player from "breaking" the narrative order
+    const hasFish = this.state.inventory.fish >= 1;
+    const validPhase = phase === 'got_fish' || phase === 'need_berries' || 
+                       phase === 'loop2_got_fish' || phase === 'loop2_need_berries';
+    
+    if (hasFish && validPhase) {
       if (this.state.inventory.berries < 3) {
         this.state.inventory.berries++;
         this.showInventoryPopup(`+1 BERRY (${this.state.inventory.berries}/3)`);
@@ -675,6 +681,7 @@ export class VillageLedgerGame {
         ]);
       }
     } else {
+      // Gating message: berries are not needed until Fisherman asks for them
       this.queueDialogue([
         {
           speaker: 'YOU',
@@ -895,11 +902,21 @@ export class VillageLedgerGame {
       this.interactButtonOpacity = Math.max(0, this.interactButtonOpacity - dt * fadeSpeed);
     }
 
-    // Check for LOOP 1 CONFRONTATION - player returns to Village Center with berries
-    // Trigger when player is within 250 units of Village Center (larger range for tablet-friendly gameplay)
-    if (this.state.phase === 'got_berries' && 
-        Math.abs(this.player.x - this.villageCenterX) < 250 && 
-        !this.state.showBrawl && !this.state.currentDialogue) {
+    // REQUIREMENT-BASED BRAWL TRIGGER (per specification)
+    // Trigger brawl when: player has fish AND berries AND is on verbal promise path (got_berries phase)
+    // AND is within 200px of Village Center. This happens in Loop 1 automatically,
+    // or in Loop 2 if player chose verbal promise instead of ledger.
+    const isVerbalPromisePath = this.state.phase === 'got_berries';
+    const hasRequirements = this.state.inventory.fish >= 1 && 
+                            this.state.inventory.berries >= 3;
+    const nearVillageCenter = Math.abs(this.player.x - this.villageCenterX) < 200;
+    const canTrigger = !this.state.showBrawl && 
+                       !this.state.currentDialogue && 
+                       this.state.phase !== 'confrontation' && 
+                       this.state.phase !== 'brawl' && 
+                       this.state.phase !== 'fail';
+    
+    if (isVerbalPromisePath && hasRequirements && nearVillageCenter && canTrigger) {
       this.triggerConfrontation();
     }
 

@@ -1,23 +1,14 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
-import { VillageLedgerGame, GameState } from '@/lib/gameEngine';
+import { useEffect, useRef, useCallback } from 'react';
+import { VillageLedgerGame } from '@/lib/gameEngine';
 
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<VillageLedgerGame | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [showInteractButton, setShowInteractButton] = useState(false);
 
   const handleResize = useCallback(() => {
     if (gameRef.current) {
       gameRef.current.resize();
-    }
-  }, []);
-
-  const handleInteract = useCallback((e: React.TouchEvent | React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (gameRef.current) {
-      gameRef.current.triggerInteraction();
     }
   }, []);
 
@@ -28,11 +19,6 @@ export default function Game() {
     // Initialize game
     gameRef.current = new VillageLedgerGame(canvas);
     gameRef.current.start();
-
-    // Listen for state changes
-    gameRef.current.onStateChange = (state: GameState) => {
-      setShowInteractButton(state.showInteractButton && !state.currentDialogue);
-    };
 
     // Handle resize
     window.addEventListener('resize', handleResize);
@@ -78,40 +64,6 @@ export default function Game() {
           VILLAGE LEDGER
         </span>
       </div>
-      
-      {showInteractButton && (
-        <button
-          className="absolute touch-none select-none"
-          style={{
-            bottom: 'calc(20% + 48px)',
-            right: '32px',
-            width: '100px',
-            height: '100px',
-            maxWidth: '12vw',
-            maxHeight: '12vw',
-            minWidth: '80px',
-            minHeight: '80px',
-            background: 'linear-gradient(180deg, #22C55E 0%, #16A34A 100%)',
-            border: '4px solid #15803D',
-            borderRadius: '16px',
-            color: '#FFFFFF',
-            fontFamily: '"Open Sans", sans-serif',
-            fontWeight: 'bold',
-            fontSize: '16px',
-            cursor: 'pointer',
-            zIndex: 100,
-            touchAction: 'none',
-            WebkitTouchCallout: 'none',
-            WebkitUserSelect: 'none',
-            userSelect: 'none'
-          }}
-          onTouchStart={handleInteract}
-          onMouseDown={handleInteract}
-          data-testid="button-interact"
-        >
-          INTERACT
-        </button>
-      )}
     </div>
   );
 }

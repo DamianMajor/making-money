@@ -33,10 +33,11 @@ interface LedgerEntry {
 }
 
 interface GameState {
-  phase: 'initial' | 'got_stone' | 'got_fish' | 'dispute' | 'elder_entering' | 'solution' | 'ledger_shown' | 'resolved';
+  phase: 'intro' | 'need_stone' | 'got_stone' | 'got_fish' | 'dispute' | 'blocked' | 'elder_solution' | 'ledger_created' | 'return_to_stoneworker' | 'woodcutter_deal' | 'walk_to_elder' | 'ledger_updated' | 'got_wood' | 'quiz' | 'complete';
   inventory: {
     stone: number;
     fish: number;
+    wood: number;
   };
   ledgerEntries: LedgerEntry[];
   dialogueQueue: DialogueLine[];
@@ -46,6 +47,11 @@ interface GameState {
   nearbyNPC: Character | null;
   elderEntranceProgress: number;
   playerMood: 'neutral' | 'happy' | 'angry';
+  stoneWorkerBlocking: boolean;
+  showHUD: boolean;
+  quizAnswers: number[];
+  showQuiz: boolean;
+  showSuccess: boolean;
 }
 
 // Game Engine Class
@@ -55,8 +61,8 @@ export class VillageLedgerGame {
   private animationId: number | null = null;
   private lastTime: number = 0;
 
-  // World dimensions
-  private worldWidth: number = 2400;
+  // World dimensions - expanded for full narrative
+  private worldWidth: number = 3500;
   private groundHeight: number = 100;
 
   // Camera
@@ -78,6 +84,11 @@ export class VillageLedgerGame {
   private stoneWorker: Character;
   private fisherman: Character;
   private villageElder: Character;
+  private woodcutter: Character;
+
+  // Location markers
+  private playerHomeX: number = 100;
+  private villageCenterX: number = 350; // Elder is between Home and Stone-worker
 
   // Game state
   private state: GameState;
@@ -121,11 +132,11 @@ export class VillageLedgerGame {
       this.faceImages[mood] = img;
     });
 
-    // Initialize player
+    // Initialize player at home (far left)
     this.player = {
       id: 'player',
       name: 'PLAYER',
-      x: 200,
+      x: 100, // Player Home position
       y: 0,
       width: 50,
       height: 70,
@@ -136,7 +147,8 @@ export class VillageLedgerGame {
       bobDirection: 1
     };
 
-    // Initialize NPCs
+    // Initialize NPCs - positioned according to new world layout
+    // X: 100 (Home) -> 600 (Stone-worker) -> 1500 (Elder/Village Center) -> 2400 (Fisherman) -> 3200 (Woodcutter)
     this.stoneWorker = {
       id: 'stoneWorker',
       name: 'STONE-WORKER',
@@ -151,10 +163,24 @@ export class VillageLedgerGame {
       bobDirection: 1
     };
 
+    this.villageElder = {
+      id: 'villageElder',
+      name: 'VILLAGE ELDER',
+      x: 350, // Village Center - between Home and Stone-worker so player can reach during dispute
+      y: 0,
+      width: 60,
+      height: 85,
+      color: '#F8FAFC',
+      outlineColor: '#64748B',
+      visible: true, // Always visible at Village Center
+      bobOffset: 0,
+      bobDirection: 1
+    };
+
     this.fisherman = {
       id: 'fisherman',
       name: 'FISHERMAN',
-      x: 1200,
+      x: 2400,
       y: 0,
       width: 50,
       height: 70,
@@ -165,26 +191,26 @@ export class VillageLedgerGame {
       bobDirection: 1
     };
 
-    this.villageElder = {
-      id: 'villageElder',
-      name: 'VILLAGE ELDER',
-      x: 900,
-      y: -200,
-      width: 60,
-      height: 85,
-      color: '#F8FAFC',
-      outlineColor: '#64748B',
-      visible: false,
+    this.woodcutter = {
+      id: 'woodcutter',
+      name: 'WOODCUTTER',
+      x: 3200,
+      y: 0,
+      width: 55,
+      height: 75,
+      color: '#8B4513', // Brown for wood theme
+      outlineColor: '#5D2E0C',
+      visible: true,
       bobOffset: 0,
       bobDirection: 1
     };
 
-    this.npcs = [this.stoneWorker, this.fisherman, this.villageElder];
+    this.npcs = [this.stoneWorker, this.villageElder, this.fisherman, this.woodcutter];
 
     // Initialize game state
     this.state = {
-      phase: 'initial',
-      inventory: { stone: 0, fish: 0 },
+      phase: 'intro',
+      inventory: { stone: 0, fish: 0, wood: 0 },
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -192,18 +218,32 @@ export class VillageLedgerGame {
       showInteractButton: false,
       nearbyNPC: null,
       elderEntranceProgress: 0,
-      playerMood: 'neutral'
+      playerMood: 'neutral',
+      stoneWorkerBlocking: false,
+      showHUD: false,
+      quizAnswers: [],
+      showQuiz: false,
+      showSuccess: false
     };
 
-  ['neutral', 'happy', 'angry'].forEach(mood => {
-    const img = new Image();
-    img.src = `/assets/${mood}.PNG`;
-    this.faceImages[mood] = img;
-  });
+    // Trigger intro dialogue immediately
+    setTimeout(() => this.triggerIntro(), 500);
 
     // Setup event listeners
     this.setupEventListeners();
     this.resize();
+  }
+
+  private triggerIntro(): void {
+    this.queueDialogue([
+      {
+        speaker: 'YOU',
+        text: "A storm is coming. I need Wood from the Woodcutter to reinforce my shelter before nightfall.",
+        onComplete: () => {
+          this.state.phase = 'need_stone';
+        }
+      }
+    ]);
   }
 
   private setupEventListeners(): void {
@@ -266,6 +306,18 @@ export class VillageLedgerGame {
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
 
+    // Handle quiz touches
+    if (this.state.showQuiz) {
+      this.handleQuizTouch(x, y);
+      return;
+    }
+
+    // Handle success screen touches
+    if (this.state.showSuccess) {
+      this.handleSuccessTouch(x, y);
+      return;
+    }
+
     // Check if touching interact button FIRST (before any other handling)
     if (this.state.showInteractButton && this.interactButtonOpacity > 0.5) {
       if (this.isInteractButtonTouched(x, y)) {
@@ -327,22 +379,75 @@ export class VillageLedgerGame {
       this.handleFishermanInteraction();
     } else if (npc.id === 'villageElder') {
       this.handleElderInteraction();
+    } else if (npc.id === 'woodcutter') {
+      this.handleWoodcutterInteraction();
     }
 
     this.notifyStateChange();
   }
 
-  private handleStoneWorkerInteraction(): void {
-    if (this.state.phase === 'initial') {
+  private handleWoodcutterInteraction(): void {
+    if (this.state.phase === 'need_stone') {
+      // Player needs sharp stone first
+      this.queueDialogue([
+        {
+          speaker: 'WOODCUTTER',
+          text: "I can give you Wood, but I need a Sharp Stone to cut it. Get one from the Stone-worker!"
+        }
+      ]);
+    } else if (this.state.phase === 'ledger_created') {
+      // After ledger is created, Woodcutter makes new deal
+      this.queueDialogue([
+        {
+          speaker: 'WOODCUTTER',
+          text: "I'll give you the Wood, but you must promise to bring me Berries tomorrow.",
+          onComplete: () => {
+            this.state.phase = 'woodcutter_deal';
+          }
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "Let's go to the Elder first so we don't argue like you and the Stone-worker!",
+          onComplete: () => {
+            this.state.phase = 'walk_to_elder';
+          }
+        }
+      ]);
+    } else if (this.state.phase === 'ledger_updated') {
+      // Give wood after ledger updated
       this.setMood('happy');
       this.queueDialogue([
         {
+          speaker: 'WOODCUTTER',
+          text: "The debt is secure on the stone. Here is your Wood!",
+          onComplete: () => {
+            this.state.inventory.wood = 1;
+            this.state.phase = 'got_wood';
+            this.showInventoryPopup('+1 WOOD');
+          }
+        }
+      ]);
+    } else {
+      this.queueDialogue([
+        {
+          speaker: 'WOODCUTTER',
+          text: "I'm busy. Come back when you've sorted things out!"
+        }
+      ]);
+    }
+  }
+
+  private handleStoneWorkerInteraction(): void {
+    if (this.state.phase === 'need_stone') {
+      // First interaction - gives stone, demands fish
+      this.queueDialogue([
+        {
           speaker: 'STONE-WORKER',
-          text: "I'll give you the stone, but you owe me a fish later. I'll remember.",
+          text: "I'll give you the Sharp Stone, but you owe me a Fish later. I'll remember.",
           onComplete: () => {
             this.state.inventory.stone = 1;
             this.state.phase = 'got_stone';
-            this.showInventoryPopup('+1 STONE');
+            this.showInventoryPopup('+1 SHARP STONE');
           }
         }
       ]);
@@ -354,27 +459,49 @@ export class VillageLedgerGame {
         }
       ]);
     } else if (this.state.phase === 'got_fish') {
+      // THE DISPUTE - Stone-worker refuses fish
       this.setMood('angry');
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
-          text: "Wait! I remember saying I wanted TWO fish. And that fish is too small. You still owe me!",
+          text: "Wait! I remember the deal being TWO fish. You're trying to cheat me!",
           onComplete: () => {
             this.state.phase = 'dispute';
-            this.state.phase = 'elder_entering';
-            this.villageElder.visible = true;
+            this.state.stoneWorkerBlocking = true;
           }
         }
       ]);
-    } else if (this.state.phase === 'ledger_shown') {
+    } else if (this.state.phase === 'dispute' || this.state.phase === 'blocked') {
+      // Stone-worker is blocking
+      this.setMood('angry');
+      this.queueDialogue([
+        {
+          speaker: 'STONE-WORKER',
+          text: "I'm not letting you pass until this is settled! Go talk to the Elder."
+        }
+      ]);
+    } else if (this.state.phase === 'return_to_stoneworker') {
+      // After Elder carved the ledger
       this.setMood('happy');
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
-          text: "The stone does not forget. I see the record. The deal is settled.",
+          text: "Let me check the wall... I see the record. The deal was 1 fish. I apologize.",
           onComplete: () => {
-            this.state.phase = 'resolved';
+            this.state.stoneWorkerBlocking = false;
+            this.state.phase = 'ledger_created';
           }
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "You may pass. The stone does not lie."
+        }
+      ]);
+    } else {
+      this.queueDialogue([
+        {
+          speaker: 'STONE-WORKER',
+          text: "Good luck with your shelter!"
         }
       ]);
     }
@@ -382,11 +509,12 @@ export class VillageLedgerGame {
 
   private handleFishermanInteraction(): void {
     if (this.state.phase === 'got_stone') {
+      // Give fish
       this.setMood('happy');
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "Here is your Fish. Go settle your debt.",
+          text: "Here is your Fish. Go settle your debt with the Stone-worker.",
           onComplete: () => {
             this.state.inventory.fish = 1;
             this.state.phase = 'got_fish';
@@ -394,7 +522,7 @@ export class VillageLedgerGame {
           }
         }
       ]);
-    } else if (this.state.phase === 'initial') {
+    } else if (this.state.phase === 'need_stone') {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
@@ -408,21 +536,69 @@ export class VillageLedgerGame {
           text: "You already have a fish. Go settle your debt with the Stone-worker!"
         }
       ]);
+    } else {
+      this.queueDialogue([
+        {
+          speaker: 'FISHERMAN',
+          text: "Good luck with your work!"
+        }
+      ]);
     }
   }
 
   private handleElderInteraction(): void {
-    if (this.state.phase === 'solution') {
+    if (this.state.phase === 'dispute' || this.state.phase === 'blocked') {
+      // Elder provides solution
       this.setMood('happy');
       this.queueDialogue([
         {
           speaker: 'VILLAGE ELDER',
-          text: "The Stone Tablet will keep our records. Look at it now - the truth is preserved.",
+          text: "I heard about your dispute. This happens too often in our village.",
           onComplete: () => {
-            this.state.ledgerEntries = [{ name: 'PLAYER', debt: '1 FISH' }];
-            this.state.phase = 'ledger_shown';
-            this.hudGlow = 1;
+            this.state.phase = 'elder_solution';
           }
+        },
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "I will carve the truth into this rock. It will be our Stone Tablet - a shared, immutable record.",
+          onComplete: () => {
+            this.state.ledgerEntries = [{ name: 'PLAYER', debt: '1 FISH | SETTLED' }];
+            this.state.showHUD = true;
+            this.hudGlow = 1;
+            this.state.phase = 'return_to_stoneworker';
+          }
+        }
+      ]);
+    } else if (this.state.phase === 'walk_to_elder') {
+      // Recording the Woodcutter deal
+      this.setMood('happy');
+      this.queueDialogue([
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "A new deal? Let me add it to the Stone Tablet.",
+          onComplete: () => {
+            this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 BASKET OF BERRIES | OWED' });
+            this.hudGlow = 1;
+            this.state.phase = 'ledger_updated';
+          }
+        },
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "There. Now both of you can trust this agreement. Go get your Wood!"
+        }
+      ]);
+    } else if (this.state.phase === 'need_stone') {
+      this.queueDialogue([
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "I sense trouble brewing in the village... but you have work to do first."
+        }
+      ]);
+    } else {
+      this.queueDialogue([
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "The Stone Tablet preserves the truth for all to see."
         }
       ]);
     }
@@ -477,10 +653,9 @@ export class VillageLedgerGame {
     const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
     this.player.y = groundY - this.player.height;
 
+    // All NPCs are now at ground level (including Elder who is always visible)
     this.npcs.forEach(npc => {
-      if (npc.id !== 'villageElder') {
-        npc.y = groundY - npc.height;
-      }
+      npc.y = groundY - npc.height;
     });
   }
 
@@ -584,41 +759,15 @@ export class VillageLedgerGame {
       this.interactButtonOpacity = Math.max(0, this.interactButtonOpacity - dt * fadeSpeed);
     }
 
-    // Update elder entrance
-    if (this.state.phase === 'elder_entering') {
-      this.state.elderEntranceProgress += dt * 1.2;
+    // Check if player is blocked by Stone-worker
+    if (this.state.stoneWorkerBlocking && this.player.x > this.stoneWorker.x - 100) {
+      this.player.x = this.stoneWorker.x - 100;
+    }
 
-      const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
-      const startY = -200;
-      const endY = groundY - this.villageElder.height;
-
-      // Ease out animation
-      const t = Math.min(1, this.state.elderEntranceProgress);
-      const easeOut = 1 - Math.pow(1 - t, 3);
-      this.villageElder.y = startY + (endY - startY) * easeOut;
-
-      // Center elder between player and stone worker
-      const centerX = (this.player.x + this.stoneWorker.x) / 2;
-      this.villageElder.x = centerX;
-
-      if (t >= 1) {
-        this.state.phase = 'solution';
-        this.queueDialogue([
-          {
-            speaker: 'VILLAGE ELDER',
-            text: "Stop! There have been too many disputes in our village lately. Nobody's memory can be trusted.",
-          },
-          {
-            speaker: 'VILLAGE ELDER',
-            text: "From now on, we use this Stone Tablet to keep records.",
-            onComplete: () => {
-              this.state.ledgerEntries = [{ name: 'PLAYER', debt: '1 FISH' }];
-              this.state.phase = 'ledger_shown';
-              this.hudGlow = 1;
-            }
-          }
-        ]);
-      }
+    // Check if player returned home with wood - trigger quiz
+    if (this.state.phase === 'got_wood' && this.player.x <= this.playerHomeX + 50) {
+      this.state.phase = 'quiz';
+      this.state.showQuiz = true;
     }
   }
 
@@ -676,11 +825,74 @@ export class VillageLedgerGame {
       this.drawInventoryPopup(ctx);
     }
 
+    // Draw location markers (Player Home and Village Center)
+    this.drawLocationMarkers(ctx, groundY);
+
     // Draw UI elements
-    this.drawStoneTabletHUD(ctx);
+    if (this.state.showHUD) {
+      this.drawStoneTabletHUD(ctx);
+    }
     this.drawDialogueBox(ctx);
     this.drawInteractButton(ctx);
     this.drawTouchZoneIndicator(ctx);
+
+    // Draw quiz overlay if active
+    if (this.state.showQuiz) {
+      this.drawQuizOverlay(ctx);
+    }
+
+    // Draw success screen if complete
+    if (this.state.showSuccess) {
+      this.drawSuccessScreen(ctx);
+    }
+  }
+
+  private drawLocationMarkers(ctx: CanvasRenderingContext2D, groundY: number): void {
+    // Player Home marker (at x=100)
+    const homeScreenX = this.playerHomeX - this.cameraX;
+    if (homeScreenX > -100 && homeScreenX < this.canvas.width + 100) {
+      // Draw a simple house shape
+      ctx.fillStyle = '#4A3728';
+      ctx.fillRect(homeScreenX - 30, groundY - 60, 60, 60);
+      ctx.fillStyle = '#6B4423';
+      ctx.beginPath();
+      ctx.moveTo(homeScreenX - 40, groundY - 60);
+      ctx.lineTo(homeScreenX, groundY - 100);
+      ctx.lineTo(homeScreenX + 40, groundY - 60);
+      ctx.fill();
+      // Door
+      ctx.fillStyle = '#2D1F14';
+      ctx.fillRect(homeScreenX - 10, groundY - 35, 20, 35);
+      // Label
+      ctx.font = `10px ${this.retroFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#FFF';
+      ctx.fillText('HOME', homeScreenX, groundY - 110);
+    }
+
+    // Village Center / Elder's Rock marker (at x=1500)
+    const centerScreenX = this.villageCenterX - this.cameraX;
+    if (centerScreenX > -100 && centerScreenX < this.canvas.width + 100) {
+      // Draw a large blank rock
+      ctx.fillStyle = '#8B8B8B';
+      ctx.beginPath();
+      ctx.moveTo(centerScreenX - 50, groundY);
+      ctx.lineTo(centerScreenX - 60, groundY - 80);
+      ctx.lineTo(centerScreenX - 30, groundY - 120);
+      ctx.lineTo(centerScreenX + 30, groundY - 110);
+      ctx.lineTo(centerScreenX + 55, groundY - 70);
+      ctx.lineTo(centerScreenX + 45, groundY);
+      ctx.fill();
+      // Rock texture lines
+      ctx.strokeStyle = '#6B6B6B';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(centerScreenX - 40, groundY - 60);
+      ctx.lineTo(centerScreenX + 20, groundY - 55);
+      ctx.moveTo(centerScreenX - 20, groundY - 90);
+      ctx.lineTo(centerScreenX + 30, groundY - 85);
+      ctx.stroke();
+    }
   }
 
   private drawBackground(ctx: CanvasRenderingContext2D): void {
@@ -941,20 +1153,39 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
       let hint = '';
       switch (this.state.phase) {
-        case 'initial':
-          hint = 'Find the Stone-worker...';
+        case 'intro':
+          hint = 'A storm approaches...';
+          break;
+        case 'need_stone':
+          hint = 'Find the Woodcutter to the east...';
           break;
         case 'got_stone':
-          hint = 'Visit the Fisherman...';
+          hint = 'Get a Fish from the Fisherman...';
           break;
         case 'got_fish':
-          hint = 'Return to Stone-worker...';
+          hint = 'Return the Fish to Stone-worker...';
           break;
-        case 'ledger_shown':
-          hint = 'Talk to Stone-worker...';
+        case 'dispute':
+        case 'blocked':
+          hint = 'Talk to the Elder at Village Center...';
           break;
-        case 'resolved':
-          hint = 'Dispute settled!';
+        case 'return_to_stoneworker':
+          hint = 'Show Stone-worker the ledger...';
+          break;
+        case 'ledger_created':
+          hint = 'Get Wood from the Woodcutter...';
+          break;
+        case 'walk_to_elder':
+          hint = 'Visit the Elder with Woodcutter...';
+          break;
+        case 'ledger_updated':
+          hint = 'Return to Woodcutter for Wood...';
+          break;
+        case 'got_wood':
+          hint = 'Return home with the Wood!';
+          break;
+        case 'complete':
+          hint = 'Congratulations!';
           break;
         default:
           hint = 'Touch left/right to move';
@@ -1037,8 +1268,238 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     window.removeEventListener('resize', this.resize.bind(this));
   }
 
-private setMood(mood: 'neutral' | 'happy' | 'angry') {
-  this.state.playerMood = mood;
-  this.notifyStateChange();
-}
+  private setMood(mood: 'neutral' | 'happy' | 'angry') {
+    this.state.playerMood = mood;
+    this.notifyStateChange();
+  }
+
+  // Quiz questions
+  private quizQuestions = [
+    {
+      question: "Why was the Stone-worker angry?",
+      options: ["A: He forgot the deal", "B: He didn't like fish"],
+      correct: 0
+    },
+    {
+      question: "What is the main benefit of the Stone Ledger?",
+      options: ["A: It's pretty", "B: It is a shared, immutable record"],
+      correct: 1
+    },
+    {
+      question: "Why did the Woodcutter trust you at the end?",
+      options: ["A: Because the debt was recorded publicly", "B: Because he is nice"],
+      correct: 0
+    }
+  ];
+
+  private currentQuizQuestion: number = 0;
+  private quizButtonAreas: { x: number; y: number; w: number; h: number; option: number }[] = [];
+
+  private drawQuizOverlay(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+
+    // Dark overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(0, 0, w, h);
+
+    // Quiz card
+    const cardW = Math.min(600, w - 60);
+    const cardH = 400;
+    const cardX = (w - cardW) / 2;
+    const cardY = (h - cardH) / 2;
+
+    // Card background
+    ctx.fillStyle = '#C9B896';
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Title
+    ctx.font = `16px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#3D2914';
+    ctx.fillText('KNOWLEDGE SCROLL', w / 2, cardY + 40);
+
+    // Question
+    const q = this.quizQuestions[this.currentQuizQuestion];
+    ctx.font = `12px ${this.retroFont}`;
+    ctx.fillStyle = '#3D2914';
+    
+    // Wrap question text
+    const words = q.question.split(' ');
+    let line = '';
+    let lineY = cardY + 90;
+    const maxWidth = cardW - 60;
+    
+    for (const word of words) {
+      const testLine = line + word + ' ';
+      if (ctx.measureText(testLine).width > maxWidth && line !== '') {
+        ctx.fillText(line.trim(), w / 2, lineY);
+        line = word + ' ';
+        lineY += 28;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line.trim(), w / 2, lineY);
+
+    // Options as buttons
+    this.quizButtonAreas = [];
+    const btnW = cardW - 80;
+    const btnH = 60;
+    const btnX = cardX + 40;
+
+    q.options.forEach((option, i) => {
+      const btnY = cardY + 160 + i * 80;
+      
+      // Button background
+      ctx.fillStyle = '#A89080';
+      ctx.beginPath();
+      ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+      ctx.fill();
+      ctx.strokeStyle = '#6B5344';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Button text
+      ctx.font = `10px ${this.retroFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#FFF';
+      ctx.fillText(option, btnX + btnW / 2, btnY + btnH / 2 + 4);
+
+      // Store button area for touch detection
+      this.quizButtonAreas.push({ x: btnX, y: btnY, w: btnW, h: btnH, option: i });
+    });
+
+    // Progress indicator
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = '#6B5344';
+    ctx.fillText(`Question ${this.currentQuizQuestion + 1} of ${this.quizQuestions.length}`, w / 2, cardY + cardH - 30);
+  }
+
+  private handleQuizTouch(x: number, y: number): void {
+    for (const btn of this.quizButtonAreas) {
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.state.quizAnswers.push(btn.option);
+        
+        if (this.currentQuizQuestion < this.quizQuestions.length - 1) {
+          this.currentQuizQuestion++;
+        } else {
+          // Quiz complete
+          this.state.showQuiz = false;
+          this.state.showSuccess = true;
+          this.state.phase = 'complete';
+        }
+        break;
+      }
+    }
+  }
+
+  private drawSuccessScreen(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+
+    // Dark overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.fillRect(0, 0, w, h);
+
+    // Success card
+    const cardW = Math.min(500, w - 60);
+    const cardH = 350;
+    const cardX = (w - cardW) / 2;
+    const cardY = (h - cardH) / 2;
+
+    // Card background
+    ctx.fillStyle = '#C9B896';
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Title
+    ctx.font = `20px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#22C55E';
+    ctx.fillText('SUCCESS!', w / 2, cardY + 60);
+
+    // Score calculation
+    let correct = 0;
+    this.state.quizAnswers.forEach((answer, i) => {
+      if (answer === this.quizQuestions[i].correct) correct++;
+    });
+
+    ctx.font = `12px ${this.retroFont}`;
+    ctx.fillStyle = '#3D2914';
+    ctx.fillText(`You answered ${correct} of ${this.quizQuestions.length} correctly!`, w / 2, cardY + 120);
+
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillText('You learned about the importance of', w / 2, cardY + 170);
+    ctx.fillText('record-keeping and trust in trade.', w / 2, cardY + 195);
+
+    // Play Again button
+    const btnW = 200;
+    const btnH = 50;
+    const btnX = (w - btnW) / 2;
+    const btnY = cardY + 250;
+
+    ctx.fillStyle = '#22C55E';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#15803D';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.font = `12px ${this.retroFont}`;
+    ctx.fillStyle = '#FFF';
+    ctx.fillText('PLAY AGAIN', w / 2, btnY + btnH / 2 + 4);
+
+    // Store play again button area
+    this.playAgainButton = { x: btnX, y: btnY, w: btnW, h: btnH };
+  }
+
+  private playAgainButton: { x: number; y: number; w: number; h: number } | null = null;
+
+  private handleSuccessTouch(x: number, y: number): void {
+    if (this.playAgainButton) {
+      const btn = this.playAgainButton;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.resetGame();
+      }
+    }
+  }
+
+  private resetGame(): void {
+    // Reset all game state
+    this.player.x = 100;
+    this.state = {
+      phase: 'intro',
+      inventory: { stone: 0, fish: 0, wood: 0 },
+      ledgerEntries: [],
+      dialogueQueue: [],
+      currentDialogue: null,
+      dialogueComplete: false,
+      showInteractButton: false,
+      nearbyNPC: null,
+      elderEntranceProgress: 0,
+      playerMood: 'neutral',
+      stoneWorkerBlocking: false,
+      showHUD: false,
+      quizAnswers: [],
+      showQuiz: false,
+      showSuccess: false
+    };
+    this.currentQuizQuestion = 0;
+    this.playAgainButton = null;
+    this.quizButtonAreas = [];
+    
+    // Trigger intro again
+    setTimeout(() => this.triggerIntro(), 500);
+  }
 }

@@ -1,0 +1,55 @@
+Replit Planner Prompt: The Village Ledger - Full Narrative & Assessment Loop
+Objective: Build a complete educational side-scroller. The game must demonstrate the transition from unreliable barter/memory to a stable ledger system, ending with a knowledge check.
+
+1. The Context (Intro & Goal)
+Opening Scene: The player starts at their home (far left). A dialogue box triggers immediately: "A storm is coming. I need Wood from the Woodcutter to reinforce my shelter before nightfall."
+
+The World Map: Scale to 3500px.
+
+X: 100 (Player Home) -> X: 600 (Stone-worker) -> X: 1500 (Village Center/Elder/Blank Rock) -> X: 2400 (Fisherman) -> X: 3200 (Woodcutter).
+
+2. The Barter Grind (Social Friction)
+Interaction Chain:
+
+Woodcutter: Needs a Sharp Stone to give you Wood.
+
+Stone-worker: Gives you a Sharp Stone but demands a Fish later as payment. (Player face: neutral.PNG)
+
+Fisherman: Gives you the Fish. (Player face: happy.PNG for 2 seconds).
+
+The Dispute: Upon returning to the Stone-worker, he refuses to accept the fish. Dialogue: "I remember the deal being TWO fish. You're trying to cheat me!"
+
+The Betrayal: Player face swaps to angry.PNG. The Stone-worker blocks the path to the Woodcutter.
+
+3. The Solution & Successful Implementation
+The Elder: The player visits the Elder at the blank rock. The Elder "carves" the truth: [PLAYER | 1 FISH | SETTLED].
+
+The HUD: The Stone Tablet HUD appears in the corner only after this.
+
+Validation: Player returns to Stone-worker. He checks the wall and lets you pass.
+
+New "Successful" Interaction: * To get the Wood, the Woodcutter now says: "I'll give you the wood, but you must promise to bring me Berries tomorrow. Let’s go to the Elder first so we don't argue like you and the Stone-worker."
+
+The player and Woodcutter walk to the Elder. A new line is added to the Ledger: [PLAYER | 1 BASKET OF BERRIES | OWED].
+
+The Woodcutter gives the Wood immediately because the debt is "secure" on the stone.
+
+4. The Final Loop & Quiz
+The Return: The player walks back to their Home (X: 100) with the Wood.
+
+The Quiz: Upon reaching home, a "Knowledge Scroll" UI pops up with 3 questions:
+
+Why was the Stone-worker angry? (A: He forgot the deal / B: He didn't like fish)
+
+What is the main benefit of the Stone Ledger? (A: It's pretty / B: It is a shared, immutable record)
+
+Why did the Woodcutter trust you at the end? (A: Because the debt was recorded publicly / B: Because he is nice)
+
+Restart Mechanic: After the quiz, show a "Success" screen with a "Play Again" button that resets the gameState to initial.
+
+5. Technical Guardrails
+Preserve Faces: Do not break the setMood logic for neutral, happy, and angry.
+
+Camera: Ensure smooth interpolation as the player moves across the now-larger 3500px world.
+
+Asset Safety: Do not rename or move the /assets/ folder.

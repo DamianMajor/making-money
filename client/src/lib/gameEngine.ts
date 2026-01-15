@@ -334,6 +334,7 @@ export class VillageLedgerGame {
 
   private handleStoneWorkerInteraction(): void {
     if (this.state.phase === 'initial') {
+      this.setMood('happy');
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
@@ -346,7 +347,6 @@ export class VillageLedgerGame {
         }
       ]);
     } else if (this.state.phase === 'got_stone') {
-      // Player has stone but no fish yet - remind them
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
@@ -354,19 +354,20 @@ export class VillageLedgerGame {
         }
       ]);
     } else if (this.state.phase === 'got_fish') {
+      this.setMood('angry');
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
           text: "Wait! I remember saying I wanted TWO fish. And that fish is too small. You still owe me!",
           onComplete: () => {
             this.state.phase = 'dispute';
-            // Trigger elder entrance immediately after dispute dialogue
             this.state.phase = 'elder_entering';
             this.villageElder.visible = true;
           }
         }
       ]);
     } else if (this.state.phase === 'ledger_shown') {
+      this.setMood('happy');
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
@@ -381,6 +382,7 @@ export class VillageLedgerGame {
 
   private handleFishermanInteraction(): void {
     if (this.state.phase === 'got_stone') {
+      this.setMood('happy');
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',

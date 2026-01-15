@@ -30,19 +30,34 @@ Preferred communication style: Simple, everyday language.
 ### World Layout (3500px wide)
 - **x=100** - Player Home (starting position)
 - **x=700** - Woodcutter (FIRST NPC - needs Sharp Stone for broken axe)
-- **x=1520** - Village Elder (separate from Stone Tablet)
+- **x=1480** - Village Elder (separate from Stone Tablet, with spacing)
 - **x=1600** - Stone Tablet / Village Center marker
 - **x=2000** - Berry Bush (for foraging berries, gated until Fisherman gives fish)
-- **x=2500** - Stone-worker (gives stone, owes fish)
-- **x=3200** - Fisherman (gives fish, owes 3 berries)
+- **x=2500** - Stone-worker (gives stone, owes fish) - has originalX for reset
+- **x=3200** - Fisherman (gives fish, owes 3 berries) - has originalX for reset
+
+### NPC Movement System
+NPCs can walk toward a target position (targetX property):
+- Stone-worker and Fisherman have `originalX` to store their starting positions
+- After giving items, NPCs set `targetX` to Village Center and walk there at 80 units/second
+- This ensures NPCs are gathered at town center when player returns with berries
+- On game reset or Loop 2 start, NPCs return to original positions
 
 ### Brawl Trigger System
 The brawl trigger uses requirement-based checking (not phase-based):
-- **loop === 1** (only in first loop)
+- **phase === 'got_berries'** (verbal promise path)
 - **inventory.fish >= 1** (player has fish)
 - **inventory.berries >= 3** (player has 3 berries)
 - **player.x within 200px of Village Center (x=1600)**
-This ensures the brawl triggers when all requirements are met, not just based on phase state.
+This ensures the brawl triggers when all requirements are met on the verbal promise path.
+
+### Confrontation Dialogue Flow
+The confrontation is a staged payment sequence:
+1. Player says "Stone-worker! I'm here with your fish, as promised."
+2. Stone-worker disputes: "One fish?! I clearly remember TWO fish!"
+3. Player tries to pay Fisherman with berries
+4. Fisherman disputes: "Three berries? I'm certain you promised SIX!"
+5. Player protests, leading to brawl animation
 
 ### Two-Loop Game State System
 The game uses a "Groundhog Day" narrative structure with two loops:

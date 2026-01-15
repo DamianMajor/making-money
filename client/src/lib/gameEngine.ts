@@ -19,6 +19,8 @@ interface Character {
   visible: boolean;
   bobOffset: number;
   bobDirection: number;
+  targetX?: number; // For NPC movement toward town center
+  originalX?: number; // Store original position for reset
 }
 
 interface DialogueLine {
@@ -177,7 +179,7 @@ export class VillageLedgerGame {
     this.villageElder = {
       id: 'villageElder',
       name: 'VILLAGE ELDER',
-      x: 1520, // Left of Stone Tablet (at x=1600)
+      x: 1480, // Left of Stone Tablet (at x=1600) - more spacing
       y: 0,
       width: 60,
       height: 85,
@@ -213,7 +215,8 @@ export class VillageLedgerGame {
       outlineColor: '#374151',
       visible: true,
       bobOffset: 0,
-      bobDirection: 1
+      bobDirection: 1,
+      originalX: 2500
     };
 
     this.fisherman = {
@@ -227,7 +230,8 @@ export class VillageLedgerGame {
       outlineColor: '#C2410C',
       visible: true,
       bobOffset: 0,
-      bobDirection: 1
+      bobDirection: 1,
+      originalX: 3200
     };
 
     this.npcs = [this.woodcutter, this.villageElder, this.berryBush, this.stoneWorker, this.fisherman];
@@ -496,11 +500,13 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
-          text: "I'll give you this Sharp Stone, but you owe me a Fish later. I'll remember.",
+          text: "I'll give you this Sharp Stone, but you owe me a Fish. Get it from the Fisherman, then meet me at the town center to settle up.",
           onComplete: () => {
             this.state.inventory.stone = 1;
             this.state.phase = 'got_stone';
             this.showInventoryPopup('+1 SHARP STONE');
+            // Start walking to town center
+            this.stoneWorker.targetX = this.villageCenterX + 50;
           }
         }
       ]);
@@ -516,11 +522,13 @@ export class VillageLedgerGame {
             this.queueDialogue([
               {
                 speaker: 'STONE-WORKER',
-                text: "Very well, I'll remember. Here's the stone.",
+                text: "Very well, I'll remember. Get the fish from the Fisherman, then meet me at the town center.",
                 onComplete: () => {
                   this.state.inventory.stone = 1;
                   this.state.phase = 'got_stone'; // Will lead to brawl
                   this.showInventoryPopup('+1 SHARP STONE');
+                  // Start walking to town center
+                  this.stoneWorker.targetX = this.villageCenterX + 50;
                 }
               }
             ]);
@@ -575,11 +583,13 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "Take the fish, but you owe me 3 Berries later. I'll remember!",
+          text: "Take the fish, but you owe me 3 Berries. Pick them from the bush to the west, then meet me at the town center!",
           onComplete: () => {
             this.state.inventory.fish = 1;
             this.state.phase = 'got_fish';
             this.showInventoryPopup('+1 FISH');
+            // Start walking to town center (slower start than Stone-worker)
+            this.fisherman.targetX = this.villageCenterX + 100;
           }
         }
       ]);
@@ -595,11 +605,13 @@ export class VillageLedgerGame {
             this.queueDialogue([
               {
                 speaker: 'FISHERMAN',
-                text: "Alright, I'll remember. Here's the fish.",
+                text: "Alright, I'll remember. Pick the berries from the bush, then meet me at the town center!",
                 onComplete: () => {
                   this.state.inventory.fish = 1;
                   this.state.phase = 'got_fish'; // Will lead to brawl
                   this.showInventoryPopup('+1 FISH');
+                  // Start walking to town center
+                  this.fisherman.targetX = this.villageCenterX + 100;
                 }
               }
             ]);
@@ -841,9 +853,24 @@ export class VillageLedgerGame {
       this.player.bobOffset = Math.sin(this.bobTimer * 0.5) * 1;
     }
 
-    // Update NPC bobs
+    // Update NPC bobs and movement toward targets
+    const npcSpeed = 80; // NPCs walk slower than player
     this.npcs.forEach((npc, i) => {
       npc.bobOffset = Math.sin(this.bobTimer * 0.5 + i * 1.5) * 1.5;
+      
+      // Move NPC toward target if set
+      if (npc.targetX !== undefined) {
+        const diff = npc.targetX - npc.x;
+        if (Math.abs(diff) > 5) {
+          npc.x += Math.sign(diff) * npcSpeed * dt;
+          // Walking bob animation
+          npc.bobOffset = Math.sin(this.bobTimer * 2 + i) * 3;
+        } else {
+          // Arrived at target - clear it
+          npc.x = npc.targetX;
+          npc.targetX = undefined;
+        }
+      }
     });
 
     // Update camera
@@ -940,18 +967,28 @@ export class VillageLedgerGame {
   private triggerConfrontation(): void {
     this.state.phase = 'confrontation';
     this.setMood('angry');
+    
+    // Staged payment sequence - player attempts to pay each person
     this.queueDialogue([
       {
-        speaker: 'STONE-WORKER',
-        text: "Wait! I remember the deal being TWO fish! You're trying to cheat me!"
+        speaker: 'YOU',
+        text: "Stone-worker! I'm here with your fish, as promised."
       },
       {
-        speaker: 'FISHERMAN',
-        text: "And I'm certain you promised me SIX berries, not three!"
+        speaker: 'STONE-WORKER',
+        text: "One fish?! I clearly remember you promising me TWO fish! Are you trying to cheat me?"
       },
       {
         speaker: 'YOU',
-        text: "But... that's not what we agreed!",
+        text: "What? No! It was one fish! Fisherman, tell him - here are your 3 berries."
+      },
+      {
+        speaker: 'FISHERMAN',
+        text: "Three berries? I'm certain you promised me SIX! You're both trying to swindle me!"
+      },
+      {
+        speaker: 'YOU',
+        text: "This is madness! Those weren't the deals we made!",
         onComplete: () => {
           this.state.phase = 'brawl';
           this.state.showBrawl = true;
@@ -1107,7 +1144,9 @@ export class VillageLedgerGame {
     const w = this.canvas.width;
     const h = this.canvas.height;
     const centerX = w / 2;
-    const centerY = h / 2 - 50;
+    // Position brawl on the ground (above dialogue box, at character level)
+    const groundY = h - this.groundHeight - this.dialogueBoxHeight;
+    const centerY = groundY - 60; // Just above ground level
 
     // Animate the dust cloud size
     const t = this.state.brawlTimer;
@@ -1944,6 +1983,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.playAgainButton = null;
     this.quizButtonAreas = [];
     
+    // Reset NPC positions to original locations
+    this.stoneWorker.x = this.stoneWorker.originalX || 2500;
+    this.stoneWorker.targetX = undefined;
+    this.fisherman.x = this.fisherman.originalX || 3200;
+    this.fisherman.targetX = undefined;
+    
     // Trigger intro again
     setTimeout(() => this.triggerIntro(), 500);
   }
@@ -1973,6 +2018,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       showChoice: false,
       choiceOptions: []
     };
+    
+    // Reset NPC positions to original locations
+    this.stoneWorker.x = this.stoneWorker.originalX || 2500;
+    this.stoneWorker.targetX = undefined;
+    this.fisherman.x = this.fisherman.originalX || 3200;
+    this.fisherman.targetX = undefined;
     
     setTimeout(() => this.triggerIntro(), 500);
   }

@@ -1,0 +1,66 @@
+Project Overview: The Village Ledger (Educational Game)
+The Objective: We are building a "Social Friction" simulator. The game’s goal is to teach the player that human memory is an unreliable system for tracking debt. We achieve this through a "Groundhog Day" loop:
+
+Loop 1 (Failure): The player relies on verbal promises. Memory fails, gaslighting occurs, and the village descends into a brawl.
+
+Loop 2 (Success): The player learns to use the Village Elder’s Stone Tablet as a "Shared Immutable Ledger" to record debts as they are made, preventing conflict.
+
+Replit Planner Instructions
+1. World Map & Character Layout
+Scale the world to 3500px wide. Set the positions as follows:
+
+X: 100 – Player Home (Starting Point).
+
+X: 700 – Woodcutter (The primary goal: Player needs wood for their roof).
+
+X: 1600 – Village Elder & Blank Stone Tablet (The center of town).
+
+X: 2500 – Stone-worker (The source of tools).
+
+X: 3200 – Fisherman (The source of food).
+
+2. Loop 1: The "Memory Failure" Narrative
+The player must walk the chain of command without a ledger:
+
+Start: Player visits Woodcutter. Woodcutter: "My axe is broken! I need a Sharp Stone from the Stone-worker to give you wood."
+
+The Stone-worker: Player visits Stone-worker. He gives the stone on a promise: "I'll give you this stone, but you owe me a fish later."
+
+The Fisherman: Player visits Fisherman. He gives the fish on a promise: "Take the fish, but you owe me 3 Berries later."
+
+Foraging: Player must find a Berry Bush (new sprite) and interact with it 3 times to gather berries.
+
+The Brawl: When the player returns to the Village Center (X: 1600), the Stone-worker and Fisherman intercept.
+
+The Gaslighting: Stone-worker: "I remember the deal being 2 fish!" Fisherman: "Wait, wasn't it 6 berries you promised?"
+
+The Conflict: Trigger a Looney Tunes "Smoke Cloud" animation (with arms/legs popping out) in the center of town.
+
+Fail Screen: Show a message: "The village collapsed because memory cannot be trusted. Try again, but this time, find a way to record your debts."
+
+3. Loop 2: The "Ledger Solution"
+Upon restarting, the player has "knowledge" of the system:
+
+The Elder's Hint: Change Elder's initial dialogue to: "I write my ideas on this Stone Tablet so I never forget. It is the only truth in this village."
+
+The Choice Mechanic: When interacting with the Stone-worker or Fisherman to make a deal, provide a Multiple Choice Dialogue:
+
+"I promise to pay you later." (Leads to the brawl again).
+
+"Let's go to the Elder and record this debt on the Stone first." (The Winning Path).
+
+Ledger Mechanics: If the player chooses to record the debt, the Stone Tablet HUD (top right) appears and updates with: [NPC NAME | DEBT | OWED].
+
+Success: When the player returns with the goods, the NPC checks the Ledger. Dialogue: "The Stone does not lie. The deal is settled."
+
+4. Visuals & Final Assessment
+JibJab Faces: Maintain use of neutral.PNG, happy.PNG, and angry.PNG for the player character.
+
+Sprint: (Optional) Enable a "Sprint" mode in Loop 2 to reward the player for progressing.
+
+End Game: Once the Woodcutter finally gives the wood, trigger a 3-Question Quiz about why the ledger was necessary.
+
+Restart Button: Include a "Try Again" button that resets the game state.
+
+Why we are doing this (For the Planner):
+We are shifting the Woodcutter to the beginning to set the "Need" immediately. We are replacing the Fisherman's "free fish" with a requirement for berries to create a longer chain of debt. The Looney Tunes fight serves as a humorous but clear indicator of a "System Failure."

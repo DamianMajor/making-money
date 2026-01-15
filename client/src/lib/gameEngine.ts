@@ -33,11 +33,15 @@ interface LedgerEntry {
 }
 
 interface GameState {
-  phase: 'intro' | 'need_stone' | 'got_stone' | 'got_fish' | 'dispute' | 'blocked' | 'elder_solution' | 'ledger_created' | 'return_to_stoneworker' | 'woodcutter_deal' | 'walk_to_elder' | 'ledger_updated' | 'got_wood' | 'quiz' | 'complete';
+  // Loop 1: intro -> need_wood -> need_stone -> got_stone -> need_fish -> got_fish -> need_berries -> got_berries -> confrontation -> brawl -> fail
+  // Loop 2: Same but with choice to record debts -> success path
+  phase: 'intro' | 'need_wood' | 'need_stone' | 'got_stone' | 'need_fish' | 'got_fish' | 'need_berries' | 'got_berries' | 'confrontation' | 'brawl' | 'fail' | 'loop2_intro' | 'loop2_need_wood' | 'loop2_need_stone' | 'loop2_got_stone' | 'loop2_need_fish' | 'loop2_got_fish' | 'loop2_need_berries' | 'loop2_got_berries' | 'loop2_return' | 'got_wood' | 'quiz' | 'complete';
+  loop: 1 | 2;
   inventory: {
     stone: number;
     fish: number;
     wood: number;
+    berries: number;
   };
   ledgerEntries: LedgerEntry[];
   dialogueQueue: DialogueLine[];
@@ -47,11 +51,15 @@ interface GameState {
   nearbyNPC: Character | null;
   elderEntranceProgress: number;
   playerMood: 'neutral' | 'happy' | 'angry';
-  stoneWorkerBlocking: boolean;
   showHUD: boolean;
   quizAnswers: number[];
   showQuiz: boolean;
   showSuccess: boolean;
+  showFail: boolean;
+  showBrawl: boolean;
+  brawlTimer: number;
+  showChoice: boolean;
+  choiceOptions: { text: string; action: () => void }[];
 }
 
 // Game Engine Class
@@ -85,10 +93,12 @@ export class VillageLedgerGame {
   private fisherman: Character;
   private villageElder: Character;
   private woodcutter: Character;
+  private berryBush: Character;
 
-  // Location markers
+  // Location markers - NEW LAYOUT
+  // X: 100 (Home) -> 700 (Woodcutter) -> 1600 (Elder/Village Center) -> 2000 (Berry Bush) -> 2500 (Stone-worker) -> 3200 (Fisherman)
   private playerHomeX: number = 100;
-  private villageCenterX: number = 350; // Elder is between Home and Stone-worker
+  private villageCenterX: number = 1600;
 
   // Game state
   private state: GameState;
@@ -147,54 +157,13 @@ export class VillageLedgerGame {
       bobDirection: 1
     };
 
-    // Initialize NPCs - positioned according to new world layout
-    // X: 100 (Home) -> 600 (Stone-worker) -> 1500 (Elder/Village Center) -> 2400 (Fisherman) -> 3200 (Woodcutter)
-    this.stoneWorker = {
-      id: 'stoneWorker',
-      name: 'STONE-WORKER',
-      x: 600,
-      y: 0,
-      width: 50,
-      height: 70,
-      color: '#22C55E',
-      outlineColor: '#166534',
-      visible: true,
-      bobOffset: 0,
-      bobDirection: 1
-    };
-
-    this.villageElder = {
-      id: 'villageElder',
-      name: 'VILLAGE ELDER',
-      x: 350, // Village Center - between Home and Stone-worker so player can reach during dispute
-      y: 0,
-      width: 60,
-      height: 85,
-      color: '#F8FAFC',
-      outlineColor: '#64748B',
-      visible: true, // Always visible at Village Center
-      bobOffset: 0,
-      bobDirection: 1
-    };
-
-    this.fisherman = {
-      id: 'fisherman',
-      name: 'FISHERMAN',
-      x: 2400,
-      y: 0,
-      width: 50,
-      height: 70,
-      color: '#F97316',
-      outlineColor: '#C2410C',
-      visible: true,
-      bobOffset: 0,
-      bobDirection: 1
-    };
-
+    // Initialize NPCs - NEW WORLD LAYOUT
+    // X: 100 (Home) -> 700 (Woodcutter) -> 1600 (Elder) -> 2000 (Berry Bush) -> 2500 (Stone-worker) -> 3200 (Fisherman)
+    
     this.woodcutter = {
       id: 'woodcutter',
       name: 'WOODCUTTER',
-      x: 3200,
+      x: 700,
       y: 0,
       width: 55,
       height: 75,
@@ -205,12 +174,69 @@ export class VillageLedgerGame {
       bobDirection: 1
     };
 
-    this.npcs = [this.stoneWorker, this.villageElder, this.fisherman, this.woodcutter];
+    this.villageElder = {
+      id: 'villageElder',
+      name: 'VILLAGE ELDER',
+      x: 1600, // Village Center with Stone Tablet
+      y: 0,
+      width: 60,
+      height: 85,
+      color: '#F8FAFC',
+      outlineColor: '#64748B',
+      visible: true,
+      bobOffset: 0,
+      bobDirection: 1
+    };
+
+    this.berryBush = {
+      id: 'berryBush',
+      name: 'BERRY BUSH',
+      x: 2000,
+      y: 0,
+      width: 70,
+      height: 50,
+      color: '#22C55E', // Green bush
+      outlineColor: '#DC2626', // Red berries
+      visible: true,
+      bobOffset: 0,
+      bobDirection: 1
+    };
+
+    this.stoneWorker = {
+      id: 'stoneWorker',
+      name: 'STONE-WORKER',
+      x: 2500,
+      y: 0,
+      width: 50,
+      height: 70,
+      color: '#6B7280', // Gray for stone
+      outlineColor: '#374151',
+      visible: true,
+      bobOffset: 0,
+      bobDirection: 1
+    };
+
+    this.fisherman = {
+      id: 'fisherman',
+      name: 'FISHERMAN',
+      x: 3200,
+      y: 0,
+      width: 50,
+      height: 70,
+      color: '#F97316',
+      outlineColor: '#C2410C',
+      visible: true,
+      bobOffset: 0,
+      bobDirection: 1
+    };
+
+    this.npcs = [this.woodcutter, this.villageElder, this.berryBush, this.stoneWorker, this.fisherman];
 
     // Initialize game state
     this.state = {
       phase: 'intro',
-      inventory: { stone: 0, fish: 0, wood: 0 },
+      loop: 1,
+      inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -219,11 +245,15 @@ export class VillageLedgerGame {
       nearbyNPC: null,
       elderEntranceProgress: 0,
       playerMood: 'neutral',
-      stoneWorkerBlocking: false,
       showHUD: false,
       quizAnswers: [],
       showQuiz: false,
-      showSuccess: false
+      showSuccess: false,
+      showFail: false,
+      showBrawl: false,
+      brawlTimer: 0,
+      showChoice: false,
+      choiceOptions: []
     };
 
     // Trigger intro dialogue immediately
@@ -235,15 +265,28 @@ export class VillageLedgerGame {
   }
 
   private triggerIntro(): void {
-    this.queueDialogue([
-      {
-        speaker: 'YOU',
-        text: "A storm is coming. I need Wood from the Woodcutter to reinforce my shelter before nightfall.",
-        onComplete: () => {
-          this.state.phase = 'need_stone';
+    if (this.state.loop === 1) {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "A storm is coming! I need Wood from the Woodcutter to fix my roof before nightfall.",
+          onComplete: () => {
+            this.state.phase = 'need_wood';
+          }
         }
-      }
-    ]);
+      ]);
+    } else {
+      // Loop 2 intro - player has knowledge
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "Wait... this feels familiar. The storm is coming again. This time, I should find a way to record my debts!",
+          onComplete: () => {
+            this.state.phase = 'loop2_need_wood';
+          }
+        }
+      ]);
+    }
   }
 
   private setupEventListeners(): void {
@@ -305,6 +348,23 @@ export class VillageLedgerGame {
     const scaleY = this.canvas.height / rect.height;
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
+
+    // Handle fail screen touches
+    if (this.state.showFail) {
+      this.handleFailTouch(x, y);
+      return;
+    }
+
+    // Handle choice dialogue touches
+    if (this.state.showChoice) {
+      this.handleChoiceTouch(x, y);
+      return;
+    }
+
+    // Handle brawl animation - just wait
+    if (this.state.showBrawl) {
+      return;
+    }
 
     // Handle quiz touches
     if (this.state.showQuiz) {
@@ -373,53 +433,43 @@ export class VillageLedgerGame {
 
     const npc = this.state.nearbyNPC;
 
-    if (npc.id === 'stoneWorker') {
+    if (npc.id === 'woodcutter') {
+      this.handleWoodcutterInteraction();
+    } else if (npc.id === 'villageElder') {
+      this.handleElderInteraction();
+    } else if (npc.id === 'berryBush') {
+      this.handleBerryBushInteraction();
+    } else if (npc.id === 'stoneWorker') {
       this.handleStoneWorkerInteraction();
     } else if (npc.id === 'fisherman') {
       this.handleFishermanInteraction();
-    } else if (npc.id === 'villageElder') {
-      this.handleElderInteraction();
-    } else if (npc.id === 'woodcutter') {
-      this.handleWoodcutterInteraction();
     }
 
     this.notifyStateChange();
   }
 
+  // ============ LOOP 1 & 2: WOODCUTTER ============
   private handleWoodcutterInteraction(): void {
-    if (this.state.phase === 'need_stone') {
-      // Player needs sharp stone first
+    const phase = this.state.phase;
+    
+    // LOOP 1: First visit - needs sharp stone
+    if (phase === 'need_wood' || phase === 'loop2_need_wood') {
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
-          text: "I can give you Wood, but I need a Sharp Stone to cut it. Get one from the Stone-worker!"
-        }
-      ]);
-    } else if (this.state.phase === 'ledger_created') {
-      // After ledger is created, Woodcutter makes new deal
-      this.queueDialogue([
-        {
-          speaker: 'WOODCUTTER',
-          text: "I'll give you the Wood, but you must promise to bring me Berries tomorrow.",
+          text: "My axe is broken! I need a Sharp Stone from the Stone-worker to give you Wood.",
           onComplete: () => {
-            this.state.phase = 'woodcutter_deal';
-          }
-        },
-        {
-          speaker: 'WOODCUTTER',
-          text: "Let's go to the Elder first so we don't argue like you and the Stone-worker!",
-          onComplete: () => {
-            this.state.phase = 'walk_to_elder';
+            this.state.phase = this.state.loop === 1 ? 'need_stone' : 'loop2_need_stone';
           }
         }
       ]);
-    } else if (this.state.phase === 'ledger_updated') {
-      // Give wood after ledger updated
+    } else if (phase === 'loop2_return') {
+      // LOOP 2 SUCCESS: Give wood after all debts settled via ledger
       this.setMood('happy');
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
-          text: "The debt is secure on the stone. Here is your Wood!",
+          text: "The Stone Tablet shows all debts are settled. Here is your Wood!",
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.state.phase = 'got_wood';
@@ -431,19 +481,22 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
-          text: "I'm busy. Come back when you've sorted things out!"
+          text: "I still need that Sharp Stone to cut the wood for you!"
         }
       ]);
     }
   }
 
+  // ============ LOOP 1 & 2: STONE-WORKER ============
   private handleStoneWorkerInteraction(): void {
-    if (this.state.phase === 'need_stone') {
-      // First interaction - gives stone, demands fish
+    const phase = this.state.phase;
+    
+    // LOOP 1: Give stone on verbal promise
+    if (phase === 'need_stone') {
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
-          text: "I'll give you the Sharp Stone, but you owe me a Fish later. I'll remember.",
+          text: "I'll give you this Sharp Stone, but you owe me a Fish later. I'll remember.",
           onComplete: () => {
             this.state.inventory.stone = 1;
             this.state.phase = 'got_stone';
@@ -451,70 +504,78 @@ export class VillageLedgerGame {
           }
         }
       ]);
-    } else if (this.state.phase === 'got_stone') {
+    } 
+    // LOOP 2: Offer choice to record or promise
+    else if (phase === 'loop2_need_stone') {
+      this.state.showChoice = true;
+      this.state.choiceOptions = [
+        {
+          text: "I promise to pay you a fish later.",
+          action: () => {
+            this.state.showChoice = false;
+            this.queueDialogue([
+              {
+                speaker: 'STONE-WORKER',
+                text: "Very well, I'll remember. Here's the stone.",
+                onComplete: () => {
+                  this.state.inventory.stone = 1;
+                  this.state.phase = 'got_stone'; // Will lead to brawl
+                  this.showInventoryPopup('+1 SHARP STONE');
+                }
+              }
+            ]);
+          }
+        },
+        {
+          text: "Let's record this on the Elder's Stone Tablet first.",
+          action: () => {
+            this.state.showChoice = false;
+            this.queueDialogue([
+              {
+                speaker: 'STONE-WORKER',
+                text: "A wise choice! Meet me at the Elder's tablet.",
+                onComplete: () => {
+                  this.state.inventory.stone = 1;
+                  this.state.phase = 'loop2_got_stone';
+                  this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 FISH | OWED TO STONE-WORKER' });
+                  this.state.showHUD = true;
+                  this.hudGlow = 1;
+                  this.showInventoryPopup('+1 SHARP STONE');
+                }
+              }
+            ]);
+          }
+        }
+      ];
+    }
+    else if (phase === 'got_stone' || phase === 'loop2_got_stone') {
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
           text: "You still owe me a fish! Go see the Fisherman to the east."
         }
       ]);
-    } else if (this.state.phase === 'got_fish') {
-      // THE DISPUTE - Stone-worker refuses fish
-      this.setMood('angry');
+    } 
+    else {
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
-          text: "Wait! I remember the deal being TWO fish. You're trying to cheat me!",
-          onComplete: () => {
-            this.state.phase = 'dispute';
-            this.state.stoneWorkerBlocking = true;
-          }
-        }
-      ]);
-    } else if (this.state.phase === 'dispute' || this.state.phase === 'blocked') {
-      // Stone-worker is blocking
-      this.setMood('angry');
-      this.queueDialogue([
-        {
-          speaker: 'STONE-WORKER',
-          text: "I'm not letting you pass until this is settled! Go talk to the Elder."
-        }
-      ]);
-    } else if (this.state.phase === 'return_to_stoneworker') {
-      // After Elder carved the ledger
-      this.setMood('happy');
-      this.queueDialogue([
-        {
-          speaker: 'STONE-WORKER',
-          text: "Let me check the wall... I see the record. The deal was 1 fish. I apologize.",
-          onComplete: () => {
-            this.state.stoneWorkerBlocking = false;
-            this.state.phase = 'ledger_created';
-          }
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "You may pass. The stone does not lie."
-        }
-      ]);
-    } else {
-      this.queueDialogue([
-        {
-          speaker: 'STONE-WORKER',
-          text: "Good luck with your shelter!"
+          text: "Good luck with your work!"
         }
       ]);
     }
   }
 
+  // ============ LOOP 1 & 2: FISHERMAN ============
   private handleFishermanInteraction(): void {
-    if (this.state.phase === 'got_stone') {
-      // Give fish
-      this.setMood('happy');
+    const phase = this.state.phase;
+    
+    // LOOP 1: Give fish on verbal promise
+    if (phase === 'got_stone') {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "Here is your Fish. Go settle your debt with the Stone-worker.",
+          text: "Take the fish, but you owe me 3 Berries later. I'll remember!",
           onComplete: () => {
             this.state.inventory.fish = 1;
             this.state.phase = 'got_fish';
@@ -522,21 +583,58 @@ export class VillageLedgerGame {
           }
         }
       ]);
-    } else if (this.state.phase === 'need_stone') {
+    }
+    // LOOP 2: Offer choice
+    else if (phase === 'loop2_got_stone') {
+      this.state.showChoice = true;
+      this.state.choiceOptions = [
+        {
+          text: "I promise to pay you 3 berries later.",
+          action: () => {
+            this.state.showChoice = false;
+            this.queueDialogue([
+              {
+                speaker: 'FISHERMAN',
+                text: "Alright, I'll remember. Here's the fish.",
+                onComplete: () => {
+                  this.state.inventory.fish = 1;
+                  this.state.phase = 'got_fish'; // Will lead to brawl
+                  this.showInventoryPopup('+1 FISH');
+                }
+              }
+            ]);
+          }
+        },
+        {
+          text: "Let's record this on the Stone Tablet first.",
+          action: () => {
+            this.state.showChoice = false;
+            this.queueDialogue([
+              {
+                speaker: 'FISHERMAN',
+                text: "Smart thinking! The stone never lies.",
+                onComplete: () => {
+                  this.state.inventory.fish = 1;
+                  this.state.phase = 'loop2_got_fish';
+                  this.state.ledgerEntries.push({ name: 'PLAYER', debt: '3 BERRIES | OWED TO FISHERMAN' });
+                  this.hudGlow = 1;
+                  this.showInventoryPopup('+1 FISH');
+                }
+              }
+            ]);
+          }
+        }
+      ];
+    }
+    else if (phase === 'loop2_got_fish') {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "You look like you need something. Talk to the Stone-worker to the west first!"
+          text: "Go find some berries in the bushes to the west, then settle your debts!"
         }
       ]);
-    } else if (this.state.phase === 'got_fish') {
-      this.queueDialogue([
-        {
-          speaker: 'FISHERMAN',
-          text: "You already have a fish. Go settle your debt with the Stone-worker!"
-        }
-      ]);
-    } else {
+    }
+    else {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
@@ -546,55 +644,93 @@ export class VillageLedgerGame {
     }
   }
 
-  private handleElderInteraction(): void {
-    if (this.state.phase === 'dispute' || this.state.phase === 'blocked') {
-      // Elder provides solution
-      this.setMood('happy');
-      this.queueDialogue([
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "I heard about your dispute. This happens too often in our village.",
-          onComplete: () => {
-            this.state.phase = 'elder_solution';
-          }
-        },
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "I will carve the truth into this rock. It will be our Stone Tablet - a shared, immutable record.",
-          onComplete: () => {
-            this.state.ledgerEntries = [{ name: 'PLAYER', debt: '1 FISH | SETTLED' }];
-            this.state.showHUD = true;
-            this.hudGlow = 1;
-            this.state.phase = 'return_to_stoneworker';
-          }
+  // ============ BERRY BUSH INTERACTION ============
+  private handleBerryBushInteraction(): void {
+    const phase = this.state.phase;
+    
+    if (phase === 'got_fish' || phase === 'need_berries' || phase === 'loop2_got_fish' || phase === 'loop2_need_berries') {
+      if (this.state.inventory.berries < 3) {
+        this.state.inventory.berries++;
+        this.showInventoryPopup(`+1 BERRY (${this.state.inventory.berries}/3)`);
+        
+        if (this.state.inventory.berries >= 3) {
+          this.queueDialogue([
+            {
+              speaker: 'YOU',
+              text: "I have 3 berries now! Time to head back and settle my debts.",
+              onComplete: () => {
+                // Check if player is on ledger path (loop2_* phases) or verbal promise path
+                const isLedgerPath = phase === 'loop2_got_fish' || phase === 'loop2_need_berries';
+                this.state.phase = isLedgerPath ? 'loop2_got_berries' : 'got_berries';
+              }
+            }
+          ]);
         }
-      ]);
-    } else if (this.state.phase === 'walk_to_elder') {
-      // Recording the Woodcutter deal
-      this.setMood('happy');
-      this.queueDialogue([
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "A new deal? Let me add it to the Stone Tablet.",
-          onComplete: () => {
-            this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 BASKET OF BERRIES | OWED' });
-            this.hudGlow = 1;
-            this.state.phase = 'ledger_updated';
+      } else {
+        this.queueDialogue([
+          {
+            speaker: 'YOU',
+            text: "I have enough berries already."
           }
-        },
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "There. Now both of you can trust this agreement. Go get your Wood!"
-        }
-      ]);
-    } else if (this.state.phase === 'need_stone') {
-      this.queueDialogue([
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "I sense trouble brewing in the village... but you have work to do first."
-        }
-      ]);
+        ]);
+      }
     } else {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "These berries look delicious, but I don't need them right now."
+        }
+      ]);
+    }
+  }
+
+  private handleElderInteraction(): void {
+    const phase = this.state.phase;
+    
+    // Loop 1: Generic hint about the tablet
+    if (this.state.loop === 1 && (phase === 'need_wood' || phase === 'need_stone' || phase === 'got_stone' || phase === 'got_fish' || phase === 'need_berries')) {
+      this.queueDialogue([
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "I write my ideas on this Stone Tablet so I never forget. It is the only truth in this village."
+        }
+      ]);
+    }
+    // Loop 2: More helpful hint
+    else if (this.state.loop === 2 && (phase === 'loop2_need_wood' || phase === 'loop2_need_stone')) {
+      this.queueDialogue([
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "Wise one, you've learned from the past. Use the Stone Tablet to record your debts as you make them!"
+        }
+      ]);
+    }
+    // Loop 2: Player returns with berries and ledger entries
+    else if (phase === 'loop2_got_berries') {
+      this.setMood('happy');
+      this.queueDialogue([
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "Let me check the Stone Tablet... All debts are recorded clearly here.",
+          onComplete: () => {
+            // Mark all debts as settled
+            this.state.ledgerEntries = this.state.ledgerEntries.map(e => ({
+              ...e,
+              debt: e.debt.replace('OWED', 'SETTLED')
+            }));
+            this.hudGlow = 1;
+          }
+        },
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "The Stone does not lie. Your debts are settled! Return to the Woodcutter.",
+          onComplete: () => {
+            this.state.phase = 'loop2_return';
+          }
+        }
+      ]);
+    }
+    else {
       this.queueDialogue([
         {
           speaker: 'VILLAGE ELDER',
@@ -759,9 +895,12 @@ export class VillageLedgerGame {
       this.interactButtonOpacity = Math.max(0, this.interactButtonOpacity - dt * fadeSpeed);
     }
 
-    // Check if player is blocked by Stone-worker
-    if (this.state.stoneWorkerBlocking && this.player.x > this.stoneWorker.x - 100) {
-      this.player.x = this.stoneWorker.x - 100;
+    // Check for LOOP 1 CONFRONTATION - player returns to Village Center with berries
+    // Trigger when player is within 250 units of Village Center (larger range for tablet-friendly gameplay)
+    if (this.state.phase === 'got_berries' && 
+        Math.abs(this.player.x - this.villageCenterX) < 250 && 
+        !this.state.showBrawl && !this.state.currentDialogue) {
+      this.triggerConfrontation();
     }
 
     // Check if player returned home with wood - trigger quiz
@@ -769,6 +908,40 @@ export class VillageLedgerGame {
       this.state.phase = 'quiz';
       this.state.showQuiz = true;
     }
+
+    // Update brawl animation timer
+    if (this.state.showBrawl) {
+      this.state.brawlTimer += dt;
+      if (this.state.brawlTimer > 4) {
+        this.state.showBrawl = false;
+        this.state.showFail = true;
+        this.state.phase = 'fail';
+      }
+    }
+  }
+
+  private triggerConfrontation(): void {
+    this.state.phase = 'confrontation';
+    this.setMood('angry');
+    this.queueDialogue([
+      {
+        speaker: 'STONE-WORKER',
+        text: "Wait! I remember the deal being TWO fish! You're trying to cheat me!"
+      },
+      {
+        speaker: 'FISHERMAN',
+        text: "And I'm certain you promised me SIX berries, not three!"
+      },
+      {
+        speaker: 'YOU',
+        text: "But... that's not what we agreed!",
+        onComplete: () => {
+          this.state.phase = 'brawl';
+          this.state.showBrawl = true;
+          this.state.brawlTimer = 0;
+        }
+      }
+    ]);
   }
 
   private render(): void {
@@ -836,6 +1009,21 @@ export class VillageLedgerGame {
     this.drawInteractButton(ctx);
     this.drawTouchZoneIndicator(ctx);
 
+    // Draw choice dialogue if active
+    if (this.state.showChoice) {
+      this.drawChoiceDialogue(ctx);
+    }
+
+    // Draw brawl animation if active
+    if (this.state.showBrawl) {
+      this.drawBrawlAnimation(ctx);
+    }
+
+    // Draw fail screen
+    if (this.state.showFail) {
+      this.drawFailScreen(ctx);
+    }
+
     // Draw quiz overlay if active
     if (this.state.showQuiz) {
       this.drawQuizOverlay(ctx);
@@ -844,6 +1032,224 @@ export class VillageLedgerGame {
     // Draw success screen if complete
     if (this.state.showSuccess) {
       this.drawSuccessScreen(ctx);
+    }
+  }
+
+  private drawChoiceDialogue(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+
+    // Semi-transparent overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, w, h);
+
+    // Choice card
+    const cardW = Math.min(500, w - 60);
+    const cardH = 200;
+    const cardX = (w - cardW) / 2;
+    const cardY = (h - cardH) / 2;
+
+    ctx.fillStyle = '#C9B896';
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Title
+    ctx.font = `12px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#3D2914';
+    ctx.fillText('How will you seal this deal?', w / 2, cardY + 35);
+
+    // Draw choice buttons
+    this.choiceButtonAreas = [];
+    this.state.choiceOptions.forEach((option, i) => {
+      const btnW = cardW - 40;
+      const btnH = 50;
+      const btnX = cardX + 20;
+      const btnY = cardY + 55 + i * 65;
+
+      ctx.fillStyle = i === 0 ? '#DC2626' : '#22C55E'; // Red for promise, Green for ledger
+      ctx.beginPath();
+      ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+      ctx.fill();
+
+      ctx.font = `10px ${this.retroFont}`;
+      ctx.fillStyle = '#FFF';
+      ctx.fillText(option.text, w / 2, btnY + btnH / 2 + 4);
+
+      this.choiceButtonAreas.push({ x: btnX, y: btnY, w: btnW, h: btnH, index: i });
+    });
+  }
+
+  private choiceButtonAreas: { x: number; y: number; w: number; h: number; index: number }[] = [];
+
+  private drawBrawlAnimation(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const centerX = w / 2;
+    const centerY = h / 2 - 50;
+
+    // Animate the dust cloud size
+    const t = this.state.brawlTimer;
+    const cloudSize = 80 + Math.sin(t * 10) * 20;
+    const rotation = t * 3;
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(rotation);
+
+    // Main dust cloud (Looney Tunes style)
+    ctx.fillStyle = '#D4C4A8';
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const angle = (i / 8) * Math.PI * 2;
+      const r = cloudSize + Math.sin(t * 15 + i) * 15;
+      const x = Math.cos(angle) * r * 0.8;
+      const y = Math.sin(angle) * r * 0.6;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Animated limbs popping out
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    
+    // Arm 1
+    const arm1Angle = Math.sin(t * 8) * 0.5;
+    ctx.save();
+    ctx.rotate(arm1Angle);
+    ctx.beginPath();
+    ctx.moveTo(cloudSize * 0.6, 0);
+    ctx.lineTo(cloudSize * 1.2, 0);
+    ctx.stroke();
+    ctx.restore();
+
+    // Arm 2
+    ctx.save();
+    ctx.rotate(Math.PI + Math.sin(t * 9 + 1) * 0.5);
+    ctx.beginPath();
+    ctx.moveTo(cloudSize * 0.6, 0);
+    ctx.lineTo(cloudSize * 1.1, 0);
+    ctx.stroke();
+    ctx.restore();
+
+    // Leg 1
+    ctx.save();
+    ctx.rotate(Math.PI * 0.5 + Math.sin(t * 7) * 0.4);
+    ctx.beginPath();
+    ctx.moveTo(cloudSize * 0.5, 0);
+    ctx.lineTo(cloudSize * 1.0, 0);
+    ctx.stroke();
+    ctx.restore();
+
+    // Leg 2
+    ctx.save();
+    ctx.rotate(Math.PI * 1.5 + Math.sin(t * 11 + 2) * 0.4);
+    ctx.beginPath();
+    ctx.moveTo(cloudSize * 0.5, 0);
+    ctx.lineTo(cloudSize * 1.0, 0);
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+
+    // Comic effects - stars and action words
+    ctx.font = `16px ${this.retroFont}`;
+    ctx.fillStyle = '#DC2626';
+    ctx.textAlign = 'center';
+    const effects = ['POW!', 'BAM!', 'CRASH!'];
+    const effectIndex = Math.floor(t * 3) % 3;
+    ctx.fillText(effects[effectIndex], centerX + Math.sin(t * 5) * 50, centerY - 100);
+  }
+
+  private drawFailScreen(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+
+    // Dark overlay
+    ctx.fillStyle = 'rgba(139, 0, 0, 0.9)';
+    ctx.fillRect(0, 0, w, h);
+
+    // Fail card
+    const cardW = Math.min(550, w - 60);
+    const cardH = 380;
+    const cardX = (w - cardW) / 2;
+    const cardY = (h - cardH) / 2;
+
+    ctx.fillStyle = '#2D1810';
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#DC2626';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    // Title
+    ctx.font = `20px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#DC2626';
+    ctx.fillText('VILLAGE IN CHAOS!', w / 2, cardY + 50);
+
+    // Message
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = '#F5F5F5';
+    const lines = [
+      "Memory cannot be trusted.",
+      "Without a written record,",
+      "everyone remembered the deals",
+      "differently.",
+      "",
+      "Try again, but this time,",
+      "find a way to RECORD your debts!"
+    ];
+    lines.forEach((line, i) => {
+      ctx.fillText(line, w / 2, cardY + 100 + i * 28);
+    });
+
+    // Try Again button
+    const btnW = 220;
+    const btnH = 50;
+    const btnX = (w - btnW) / 2;
+    const btnY = cardY + cardH - 80;
+
+    ctx.fillStyle = '#22C55E';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+    ctx.fill();
+
+    ctx.font = `12px ${this.retroFont}`;
+    ctx.fillStyle = '#FFF';
+    ctx.fillText('TRY AGAIN', w / 2, btnY + btnH / 2 + 4);
+
+    this.failRetryButton = { x: btnX, y: btnY, w: btnW, h: btnH };
+  }
+
+  private failRetryButton: { x: number; y: number; w: number; h: number } | null = null;
+
+  private handleFailTouch(x: number, y: number): void {
+    if (this.failRetryButton) {
+      const btn = this.failRetryButton;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.startLoop2();
+      }
+    }
+  }
+
+  private handleChoiceTouch(x: number, y: number): void {
+    for (const btn of this.choiceButtonAreas) {
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        const option = this.state.choiceOptions[btn.index];
+        if (option && option.action) {
+          option.action();
+        }
+        break;
+      }
     }
   }
 
@@ -1154,36 +1560,53 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       let hint = '';
       switch (this.state.phase) {
         case 'intro':
+        case 'loop2_intro':
           hint = 'A storm approaches...';
           break;
+        case 'need_wood':
+        case 'loop2_need_wood':
+          hint = 'Visit the Woodcutter nearby...';
+          break;
         case 'need_stone':
-          hint = 'Find the Woodcutter to the east...';
+        case 'loop2_need_stone':
+          hint = 'Find the Stone-worker to the east...';
           break;
         case 'got_stone':
+        case 'loop2_got_stone':
           hint = 'Get a Fish from the Fisherman...';
           break;
+        case 'need_fish':
+        case 'loop2_need_fish':
+          hint = 'Visit the Fisherman...';
+          break;
         case 'got_fish':
-          hint = 'Return the Fish to Stone-worker...';
+        case 'loop2_got_fish':
+          hint = 'Find berries in the bushes...';
           break;
-        case 'dispute':
-        case 'blocked':
-          hint = 'Talk to the Elder at Village Center...';
+        case 'need_berries':
+        case 'loop2_need_berries':
+          hint = 'Collect 3 berries from the bush...';
           break;
-        case 'return_to_stoneworker':
-          hint = 'Show Stone-worker the ledger...';
+        case 'got_berries':
+          hint = 'Return to Village Center...';
           break;
-        case 'ledger_created':
-          hint = 'Get Wood from the Woodcutter...';
+        case 'loop2_got_berries':
+          hint = 'Visit the Elder to settle debts...';
           break;
-        case 'walk_to_elder':
-          hint = 'Visit the Elder with Woodcutter...';
+        case 'loop2_return':
+          hint = 'Return to the Woodcutter...';
           break;
-        case 'ledger_updated':
-          hint = 'Return to Woodcutter for Wood...';
+        case 'confrontation':
+        case 'brawl':
+          hint = 'Oh no! A fight is breaking out!';
+          break;
+        case 'fail':
+          hint = 'Memory failed. Try again!';
           break;
         case 'got_wood':
           hint = 'Return home with the Wood!';
           break;
+        case 'quiz':
         case 'complete':
           hint = 'Congratulations!';
           break;
@@ -1480,7 +1903,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.player.x = 100;
     this.state = {
       phase: 'intro',
-      inventory: { stone: 0, fish: 0, wood: 0 },
+      loop: 1,
+      inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -1489,17 +1913,50 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       nearbyNPC: null,
       elderEntranceProgress: 0,
       playerMood: 'neutral',
-      stoneWorkerBlocking: false,
       showHUD: false,
       quizAnswers: [],
       showQuiz: false,
-      showSuccess: false
+      showSuccess: false,
+      showFail: false,
+      showBrawl: false,
+      brawlTimer: 0,
+      showChoice: false,
+      choiceOptions: []
     };
     this.currentQuizQuestion = 0;
     this.playAgainButton = null;
     this.quizButtonAreas = [];
     
     // Trigger intro again
+    setTimeout(() => this.triggerIntro(), 500);
+  }
+
+  // Start Loop 2 after fail screen
+  private startLoop2(): void {
+    this.player.x = 100;
+    this.state = {
+      phase: 'loop2_intro',
+      loop: 2,
+      inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
+      ledgerEntries: [],
+      dialogueQueue: [],
+      currentDialogue: null,
+      dialogueComplete: false,
+      showInteractButton: false,
+      nearbyNPC: null,
+      elderEntranceProgress: 0,
+      playerMood: 'neutral',
+      showHUD: false,
+      quizAnswers: [],
+      showQuiz: false,
+      showSuccess: false,
+      showFail: false,
+      showBrawl: false,
+      brawlTimer: 0,
+      showChoice: false,
+      choiceOptions: []
+    };
+    
     setTimeout(() => this.triggerIntro(), 500);
   }
 }

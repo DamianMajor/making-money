@@ -21,11 +21,37 @@ Preferred communication style: Simple, everyday language.
 - Custom vanilla JavaScript game engine using `requestAnimationFrame` for 60fps rendering
 - Touch-only input system - screen divided into left/right zones for movement
 - Player speed: 200 units/second, interaction range: 200 units (tablet-friendly)
-- State machine for narrative progression: initial → got_stone → got_fish → dispute → elder_entering → solution → ledger_shown → resolved
-- Character system with placeholder colored rectangles (Blue=Player, Green=Stone-worker, Orange=Fisherman, White=Elder)
+- Character system with placeholder colored rectangles (Blue=Player, Brown=Woodcutter, Gray=Stone-worker, Orange=Fisherman, White=Elder)
 - HUD displays a "Stone Tablet" ledger tracking debts/promises
 - Dialogue system with typewriter effect using "Press Start 2P" retro font
 - INTERACT button with 200ms fade transition in bottom-right corner
+- Multiple choice dialogue system with red/green color-coded buttons
+
+### World Layout (3500px wide)
+- **x=100** - Player Home (starting position)
+- **x=700** - Woodcutter (FIRST NPC - needs Sharp Stone for broken axe)
+- **x=1600** - Village Elder / Stone Tablet (center of town)
+- **x=2000** - Berry Bush (for foraging berries)
+- **x=2500** - Stone-worker (gives stone, owes fish)
+- **x=3200** - Fisherman (gives fish, owes 3 berries)
+
+### Two-Loop Game State System
+The game uses a "Groundhog Day" narrative structure with two loops:
+
+**Loop 1 (Failure Path):**
+1. `intro` → `need_wood` - Storm approaching, need wood from Woodcutter
+2. `need_wood` → `need_stone` - Woodcutter's axe broken, need Sharp Stone
+3. `need_stone` → `got_stone` - Stone-worker gives stone on verbal promise (owes fish)
+4. `got_stone` → `got_fish` - Fisherman gives fish on verbal promise (owes 3 berries)
+5. `got_fish` → `got_berries` - Collect 3 berries from Berry Bush
+6. `got_berries` → `confrontation` → `brawl` → `fail` - Return to Village Center triggers gaslighting dispute and brawl
+
+**Loop 2 (Success Path):**
+1. Same flow but with choice dialogue offering "verbal promise" vs "record on Stone Tablet"
+2. Recording debts on the ledger prevents gaslighting
+3. Elder settles debts peacefully using the ledger
+4. Quiz tests player's understanding
+5. Success screen with educational message
 
 ### Backend Architecture
 - **Express.js** server with TypeScript

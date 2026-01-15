@@ -1,0 +1,61 @@
+Project: The Burden of Memory (Educational Game)
+High-Level Overview
+We are building an interactive narrative that teaches the historical and social necessity of Ledgers.
+
+The Conflict: Human memory is subjective and prone to "gaslighting" or honest mistakes.
+
+The Resolution: A shared, immutable record (The Stone Tablet) prevents social friction and allows trade to function smoothly.
+
+The Mechanic: A "Groundhog Day" loop. The player must fail once to experience the "Social Friction" (the brawl), which then unlocks the knowledge to succeed in the second loop by using the ledger proactively.
+
+1. Critical Technical Fixes (Address the "Hiccups")
+The Elder's Position: Move the Village Elder (X: 1600) to the left of the Stone Tablet sprite. Ensure they do not overlap. The Elder should be visible and interactable separately from the Stone Tablet HUD.
+
+The "Brawl" Trigger Logic: Instead of a linear sequence, use a Requirement Check. The brawl should trigger in Loop 1 if the following are true:
+
+state.loop === 1
+
+player.inventory.fish >= 1
+
+player.inventory.berries >= 3
+
+player.x is within 200px of the Village Center (X: 1600).
+
+Berry Bush Logic: The bush should remain "Delicious but unnecessary" until the Fisherman specifically asks for berries. This prevents the player from "breaking" the narrative order.
+
+2. The Narrative Chain (Updated)
+Start (The Need): Player starts at Home (X: 100). Needs wood.
+
+Woodcutter (The Lock): (X: 700). He says: "I need a Sharp Stone to cut this wood."
+
+Stone-worker (The Key): (X: 2500). He says: "I'll give you the stone, but you owe me a fish later."
+
+Fisherman (The Trade): (X: 3200). He says: "I'll give you the fish, but you owe me 3 berries."
+
+Berry Bush (The Labor): (X: 2000). Player gathers 3 berries.
+
+3. The Failure vs. Success Loops
+Loop 1: The Verbal Promise (Failure)
+When the player meets the requirements (Fish + Berries) and walks past the Elder, the Stone-worker and Fisherman run to the center.
+
+Gaslighting Dialogue: * Stone-worker: "I remember the deal being TWO fish!" * Fisherman: "Wasn't it SIX berries you promised?"
+
+The Brawl: Trigger the "Smoke Cloud" animation. Reset the game with the "Memory Failed" message.
+
+Loop 2: The Ledger (Success)
+The Elder's Hint: "I write my ideas on this Stone so I never forget. It is the only truth here."
+
+The Choice: When the Stone-worker and Fisherman ask for a promise, the player gets a Choice Menu:
+
+"I promise to pay later." (Triggers Loop 1 fail).
+
+"Let's record this on the Stone Tablet first." (Winning Path).
+
+Outcome: With the ledger recorded, the NPCs check the stone and say: "The Stone does not lie. We are settled."
+
+4. Final Assessment & UI
+The Quiz: After getting the Wood from the Woodcutter in Loop 2, trigger a 3-question quiz on the benefits of a ledger (Permanence, Objectivity, Trust).
+
+Restart Button: Always available after a Fail or Success state.
+
+Developer's Note to Replit: Please refactor the update() loop to check for the brawl conditions constantly, rather than relying on a linear state.phase progression. Ensure the villageElder sprite is drawn at X: 1520 and the stoneTablet at X: 1600.

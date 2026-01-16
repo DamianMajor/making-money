@@ -57,9 +57,21 @@ Loop 1 brawl trigger uses requirement-based checking:
 - **player.x within 200px of Village Center (x=1600)**
 
 Loop 2 settlement is handled by the Village Elder at the Stone Tablet:
-- **Both debts recorded** → Elder settles all debts peacefully → quiz → success
+- **Both debts recorded** → Elder settles all debts peacefully → celebration animation → quiz → success
 - **Some debts recorded** → Elder settles recorded debts, unrecorded debts cause dispute → brawl
 - **No debts recorded** → Full confrontation/brawl like Loop 1
+
+### Celebration Animation
+When Elder successfully settles all recorded debts, a 3-second celebration plays:
+- Confetti particles in 5 colors (gold, red, teal, purple, green) falling across screen
+- Musical notes (♪ ♫) bouncing above NPCs at Village Center
+- "DEBTS SETTLED!" text pulsing in green with black outline at top of screen
+
+### Home/Roof Repair System
+- Player's hut starts with a visible dark hole in the roof
+- After obtaining wood, player can interact with home to fix the roof
+- Fixing roof: consumes wood, shows patched roof graphic, triggers happy mood
+- After repair, a reminder prompts player to settle outstanding debts (if any)
 
 ### NPC Interaction Range
 - Increased to 250 units for tablet-friendly interaction

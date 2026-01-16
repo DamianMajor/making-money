@@ -48,6 +48,9 @@ interface GameState {
   };
   // Track roof repair state
   roofRepaired: boolean;
+  // Track if player ever obtained wood/stone (separate from current inventory)
+  obtainedWood: boolean;
+  obtainedStone: boolean;
   // Track which debts are recorded on the Stone Tablet (Loop 2 only)
   woodcutterDebtRecorded: boolean;
   stoneWorkerDebtRecorded: boolean;
@@ -60,6 +63,7 @@ interface GameState {
   nearbyLocation: 'home' | null; // Track if player is near home
   elderEntranceProgress: number;
   playerMood: 'neutral' | 'happy' | 'angry';
+  moodTimer: number; // Timer to auto-reset mood to neutral
   showHUD: boolean;
   quizAnswers: number[];
   showQuiz: boolean;
@@ -69,6 +73,8 @@ interface GameState {
   brawlTimer: number;
   showCelebration: boolean; // Dance animation when debts settled
   celebrationTimer: number;
+  showNightTransition: boolean; // Nighttime transition before quiz
+  nightTransitionTimer: number;
   showChoice: boolean;
   choiceOptions: { text: string; action: () => void }[];
 }
@@ -252,6 +258,8 @@ export class VillageLedgerGame {
       loop: 1,
       inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
       roofRepaired: false,
+      obtainedWood: false,
+      obtainedStone: false,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
@@ -263,6 +271,7 @@ export class VillageLedgerGame {
       nearbyLocation: null,
       elderEntranceProgress: 0,
       playerMood: 'neutral',
+      moodTimer: 0,
       showHUD: false,
       quizAnswers: [],
       showQuiz: false,
@@ -272,6 +281,8 @@ export class VillageLedgerGame {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
+      showNightTransition: false,
+      nightTransitionTimer: 0,
       showChoice: false,
       choiceOptions: []
     };
@@ -385,6 +396,11 @@ export class VillageLedgerGame {
     if (this.state.showBrawl) {
       return;
     }
+    
+    // Block input during night transition (cutscene)
+    if (this.state.showNightTransition) {
+      return;
+    }
 
     // Handle quiz touches
     if (this.state.showQuiz) {
@@ -417,6 +433,43 @@ export class VillageLedgerGame {
         return;
       }
     }
+    
+    // Check if tapping directly on an NPC, home, or berry bush
+    // Only allow direct tap if player is within interaction range (250 units)
+    const tappedTarget = this.getTappedInteractable(x, y);
+    if (tappedTarget) {
+      const interactionRange = 250;
+      let inRange = false;
+      
+      if (tappedTarget === 'home') {
+        inRange = Math.abs(this.player.x - this.playerHomeX) < interactionRange;
+        if (inRange) {
+          this.handleHomeInteraction();
+          return;
+        }
+      } else {
+        // Check if player is within range of the NPC
+        inRange = Math.abs(this.player.x - tappedTarget.x) < interactionRange;
+        if (inRange) {
+          if (tappedTarget.id === 'woodcutter') {
+            this.handleWoodcutterInteraction();
+            return;
+          } else if (tappedTarget.id === 'villageElder') {
+            this.handleElderInteraction();
+            return;
+          } else if (tappedTarget.id === 'berryBush') {
+            this.handleBerryBushInteraction();
+            return;
+          } else if (tappedTarget.id === 'stoneWorker') {
+            this.handleStoneWorkerInteraction();
+            return;
+          } else if (tappedTarget.id === 'fisherman') {
+            this.handleFishermanInteraction();
+            return;
+          }
+        }
+      }
+    }
 
     // Movement touch - only if not touching button area
     this.touchActive = true;
@@ -446,6 +499,39 @@ export class VillageLedgerGame {
     const padding = 20;
     return x >= btnX - padding && x <= btnX + size + padding && 
            y >= btnY - padding && y <= btnY + size + padding;
+  }
+  
+  // Check if player tapped directly on an NPC, home hut, or berry bush
+  private getTappedInteractable(x: number, y: number): Character | 'home' | null {
+    const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
+    
+    // Check if tapping on home hut (at playerHomeX = 100)
+    const homeScreenX = this.playerHomeX - this.cameraX;
+    const homeHitbox = { x: homeScreenX - 50, y: groundY - 120, width: 100, height: 120 };
+    if (x >= homeHitbox.x && x <= homeHitbox.x + homeHitbox.width &&
+        y >= homeHitbox.y && y <= homeHitbox.y + homeHitbox.height) {
+      return 'home';
+    }
+    
+    // Check each NPC with a generous tap hitbox
+    for (const npc of this.npcs) {
+      if (!npc.visible) continue;
+      const npcScreenX = npc.x - this.cameraX;
+      const npcY = npc.y + npc.bobOffset;
+      // Generous hitbox for tap targeting
+      const hitbox = {
+        x: npcScreenX - npc.width / 2 - 20,
+        y: npcY - 20,
+        width: npc.width + 40,
+        height: npc.height + 40
+      };
+      if (x >= hitbox.x && x <= hitbox.x + hitbox.width &&
+          y >= hitbox.y && y <= hitbox.y + hitbox.height) {
+        return npc;
+      }
+    }
+    
+    return null;
   }
 
   private handleInteraction(): void {
@@ -548,6 +634,7 @@ export class VillageLedgerGame {
           text: "Take this Wood for your roof now. Just bring me a Sharp Stone and 1 Fish later. Meet me at the Town Center to settle up!",
           onComplete: () => {
             this.state.inventory.wood = 1;
+            this.state.obtainedWood = true;
             this.showInventoryPopup('+1 WOOD');
             this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
@@ -571,6 +658,7 @@ export class VillageLedgerGame {
                 text: "Very well, I'll remember. Take the wood now and meet me at the Town Center!",
                 onComplete: () => {
                   this.state.inventory.wood = 1;
+                  this.state.obtainedWood = true;
                   this.showInventoryPopup('+1 WOOD');
                   this.setMood('happy');
                   this.state.phase = 'loop2_got_wood'; // Stay on Loop 2 path for partial recording
@@ -592,6 +680,7 @@ export class VillageLedgerGame {
                 text: "A wise choice! Take the wood, and we'll mark it on the Elder's tablet.",
                 onComplete: () => {
                   this.state.inventory.wood = 1;
+                  this.state.obtainedWood = true;
                   this.showInventoryPopup('+1 WOOD');
                   this.setMood('happy');
                   this.state.phase = 'loop2_got_wood';
@@ -626,12 +715,21 @@ export class VillageLedgerGame {
         }
       ]);
     }
-    // Player has everything, ready to settle
-    else if (phase === 'got_fish_ready_settle' || phase === 'loop2_got_fish') {
+    // Player has everything, ready to settle (Loop 1)
+    else if (phase === 'got_fish_ready_settle') {
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
           text: "You have everything! Meet me at the Town Center to settle your debt!"
+        }
+      ]);
+    }
+    // Loop 2: Redirect to Elder at Village Center
+    else if (phase === 'loop2_got_fish') {
+      this.queueDialogue([
+        {
+          speaker: 'WOODCUTTER',
+          text: "Go speak with the Village Elder at the Stone Tablet to settle our debts properly!"
         }
       ]);
     }
@@ -671,6 +769,7 @@ export class VillageLedgerGame {
           text: "Need a stone? Here, take it. You owe me 2 Fish for my work. We'll settle up at the Town Center!",
           onComplete: () => {
             this.state.inventory.stone = 1;
+            this.state.obtainedStone = true;
             this.state.phase = 'got_stone_need_fish';
             this.showInventoryPopup('+1 SHARP STONE');
             this.setMood('happy');
@@ -694,6 +793,7 @@ export class VillageLedgerGame {
                 text: "Very well, I'll remember. Get the fish from the Fisherman, then meet me at the Town Center.",
                 onComplete: () => {
                   this.state.inventory.stone = 1;
+                  this.state.obtainedStone = true;
                   this.state.phase = 'loop2_got_stone'; // Stay on Loop 2 path for partial recording
                   // Note: stoneWorkerDebtRecorded stays FALSE (verbal promise)
                   this.showInventoryPopup('+1 SHARP STONE');
@@ -715,6 +815,7 @@ export class VillageLedgerGame {
                 text: "A wise choice! Meet me at the Elder's tablet.",
                 onComplete: () => {
                   this.state.inventory.stone = 1;
+                  this.state.obtainedStone = true;
                   this.state.phase = 'loop2_got_stone';
                   this.state.stoneWorkerDebtRecorded = true;
                   this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
@@ -739,11 +840,20 @@ export class VillageLedgerGame {
       ]);
     }
     // Player has fish, ready to settle
-    else if (phase === 'got_fish_ready_settle' || phase === 'loop2_got_fish') {
+    else if (phase === 'got_fish_ready_settle') {
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
           text: "You have the Fish! Head to the Town Center to settle your debt!"
+        }
+      ]);
+    }
+    // Loop 2: Redirect to Elder at Village Center
+    else if (phase === 'loop2_got_fish') {
+      this.queueDialogue([
+        {
+          speaker: 'STONE-WORKER',
+          text: "Go speak with the Village Elder at the Stone Tablet to settle our debts properly!"
         }
       ]);
     }
@@ -758,16 +868,16 @@ export class VillageLedgerGame {
   }
 
   // ============ LOOP 1 & 2: FISHERMAN ============
-  // Fisherman only trades berries for fish AFTER player has initiated debts (has wood AND stone)
+  // Fisherman only trades berries for fish AFTER player has initiated debts (obtained wood AND stone)
   private handleFishermanInteraction(): void {
     const phase = this.state.phase;
     
     // Check if player has items
     const hasBerries = this.state.inventory.berries >= 3;
     const alreadyHasFish = this.state.inventory.fish >= 3;
-    const hasWood = this.state.inventory.wood >= 1;
-    const hasStone = this.state.inventory.stone >= 1;
-    const debtsInitiated = hasWood && hasStone;
+    // Use obtainedWood/obtainedStone flags instead of current inventory
+    // This allows fish trade even if wood was used to fix the roof
+    const debtsInitiated = this.state.obtainedWood && this.state.obtainedStone;
     
     // Player already has fish
     if (alreadyHasFish) {
@@ -1114,10 +1224,16 @@ export class VillageLedgerGame {
       this.triggerConfrontation();
     }
 
-    // Check if player completed Loop 2 successfully - trigger quiz
-    if (this.state.phase === 'complete_success' && this.player.x <= this.playerHomeX + 50) {
-      this.state.phase = 'quiz';
-      this.state.showQuiz = true;
+    // Check if player completed Loop 2 successfully - trigger night transition
+    if (this.state.phase === 'complete_success' && this.player.x <= this.playerHomeX + 50 && !this.state.showNightTransition) {
+      // Auto-fix roof if not already repaired
+      if (!this.state.roofRepaired) {
+        this.state.roofRepaired = true;
+        this.setMood('happy');
+      }
+      // Start night transition animation
+      this.state.showNightTransition = true;
+      this.state.nightTransitionTimer = 0;
     }
 
     // Update brawl animation timer
@@ -1136,6 +1252,26 @@ export class VillageLedgerGame {
       // Celebration lasts 3 seconds
       if (this.state.celebrationTimer > 3) {
         this.state.showCelebration = false;
+      }
+    }
+    
+    // Update mood timer - auto-return to neutral after 2 seconds
+    if (this.state.playerMood !== 'neutral' && this.state.moodTimer > 0) {
+      this.state.moodTimer -= dt;
+      if (this.state.moodTimer <= 0) {
+        this.state.playerMood = 'neutral';
+        this.state.moodTimer = 0;
+      }
+    }
+    
+    // Update night transition animation timer
+    if (this.state.showNightTransition) {
+      this.state.nightTransitionTimer += dt;
+      // Night transition lasts 4 seconds, then show quiz
+      if (this.state.nightTransitionTimer > 4) {
+        this.state.showNightTransition = false;
+        this.state.phase = 'quiz';
+        this.state.showQuiz = true;
       }
     }
   }
@@ -1347,6 +1483,11 @@ export class VillageLedgerGame {
     if (this.state.showCelebration) {
       this.drawCelebrationAnimation(ctx);
     }
+    
+    // Draw night transition animation if active
+    if (this.state.showNightTransition) {
+      this.drawNightTransition(ctx);
+    }
 
     // Draw fail screen
     if (this.state.showFail) {
@@ -1423,9 +1564,9 @@ export class VillageLedgerGame {
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const centerY = groundY - 60; // Just above ground level
 
-    // Animate the dust cloud size - LARGER to cover all 3 participants
+    // Animate the dust cloud size - MUCH LARGER to cover player + all 3 NPCs
     const t = this.state.brawlTimer;
-    const cloudSize = 150 + Math.sin(t * 10) * 30;
+    const cloudSize = 220 + Math.sin(t * 10) * 40;
     const rotation = t * 3;
 
     ctx.save();
@@ -1554,6 +1695,97 @@ export class VillageLedgerGame {
     const celebY = 80 + Math.sin(t * 5) * 10;
     ctx.strokeText('DEBTS SETTLED!', w / 2, celebY);
     ctx.fillText('DEBTS SETTLED!', w / 2, celebY);
+  }
+  
+  private drawNightTransition(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const t = this.state.nightTransitionTimer;
+    
+    // Fade from day to night over first 2 seconds
+    const fadeProgress = Math.min(1, t / 2);
+    const nightAlpha = fadeProgress * 0.7; // Max 70% dark overlay
+    
+    // Draw dark overlay
+    ctx.fillStyle = `rgba(10, 20, 50, ${nightAlpha})`;
+    ctx.fillRect(0, 0, w, h);
+    
+    // Draw moon (fades in)
+    if (fadeProgress > 0.3) {
+      const moonAlpha = Math.min(1, (fadeProgress - 0.3) / 0.7);
+      const moonX = w * 0.8;
+      const moonY = 80;
+      const moonRadius = 40;
+      
+      ctx.save();
+      ctx.globalAlpha = moonAlpha;
+      
+      // Moon glow
+      const moonGlow = ctx.createRadialGradient(moonX, moonY, moonRadius * 0.5, moonX, moonY, moonRadius * 2);
+      moonGlow.addColorStop(0, 'rgba(255, 255, 200, 0.5)');
+      moonGlow.addColorStop(1, 'rgba(255, 255, 200, 0)');
+      ctx.fillStyle = moonGlow;
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, moonRadius * 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Moon body
+      ctx.fillStyle = '#FFFACD';
+      ctx.beginPath();
+      ctx.arc(moonX, moonY, moonRadius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Moon craters
+      ctx.fillStyle = 'rgba(200, 190, 150, 0.3)';
+      ctx.beginPath();
+      ctx.arc(moonX - 10, moonY - 5, 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(moonX + 15, moonY + 10, 6, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.restore();
+    }
+    
+    // Draw stars (fade in after moon)
+    if (fadeProgress > 0.5) {
+      const starAlpha = Math.min(1, (fadeProgress - 0.5) / 0.5);
+      ctx.save();
+      ctx.globalAlpha = starAlpha;
+      
+      // Twinkling stars
+      for (let i = 0; i < 30; i++) {
+        const starX = (i * 73.7) % (w * 0.9) + w * 0.05;
+        const starY = (i * 41.3) % (h * 0.4) + 20;
+        const twinkle = Math.sin(t * 5 + i * 0.5) * 0.3 + 0.7;
+        const starSize = (1 + (i % 3)) * twinkle;
+        
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(starX, starY, starSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      ctx.restore();
+    }
+    
+    // Draw "THE END OF A GOOD DAY" text after transition
+    if (t > 2) {
+      const textAlpha = Math.min(1, (t - 2) / 1);
+      ctx.save();
+      ctx.globalAlpha = textAlpha;
+      ctx.font = `20px ${this.retroFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#FFD700';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 3;
+      ctx.strokeText('A PEACEFUL NIGHT...', w / 2, h / 2 - 20);
+      ctx.fillText('A PEACEFUL NIGHT...', w / 2, h / 2 - 20);
+      ctx.font = `14px ${this.retroFont}`;
+      ctx.strokeText('Your roof is repaired. Your debts are settled.', w / 2, h / 2 + 20);
+      ctx.fillText('Your roof is repaired. Your debts are settled.', w / 2, h / 2 + 20);
+      ctx.restore();
+    }
   }
 
   private drawFailScreen(ctx: CanvasRenderingContext2D): void {
@@ -1782,8 +2014,11 @@ export class VillageLedgerGame {
     }
 
     // Mid background - village buildings
+    // Reduce number of huts when camera is far right (near fisherman) to feel more remote
     ctx.fillStyle = '#A89080';
-    for (let i = 0; i < 8; i++) {
+    const cameraProgress = this.cameraX / this.worldWidth; // 0 to 1
+    const maxHuts = cameraProgress > 0.6 ? 3 : 8; // Fewer huts near fisherman
+    for (let i = 0; i < maxHuts; i++) {
       const x = (i * 300 - this.cameraX * 0.4) % (w + 300) - 150;
       const buildingWidth = 60 + (i % 3) * 20;
       const buildingHeight = 50 + (i % 2) * 30;
@@ -2146,6 +2381,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   private setMood(mood: 'neutral' | 'happy' | 'angry') {
     this.state.playerMood = mood;
+    // Set timer for auto-reset to neutral (2 seconds for happy, no timer for angry/neutral)
+    if (mood === 'happy') {
+      this.state.moodTimer = 2;
+    } else {
+      this.state.moodTimer = 0;
+    }
     this.notifyStateChange();
   }
 
@@ -2359,6 +2600,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       loop: 1,
       inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
       roofRepaired: false,
+      obtainedWood: false,
+      obtainedStone: false,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
@@ -2370,6 +2613,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       nearbyLocation: null,
       elderEntranceProgress: 0,
       playerMood: 'neutral',
+      moodTimer: 0,
       showHUD: false,
       quizAnswers: [],
       showQuiz: false,
@@ -2379,6 +2623,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
+      showNightTransition: false,
+      nightTransitionTimer: 0,
       showChoice: false,
       choiceOptions: []
     };
@@ -2406,6 +2652,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       loop: 2,
       inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
       roofRepaired: false,
+      obtainedWood: false,
+      obtainedStone: false,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
@@ -2417,6 +2665,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       nearbyLocation: null,
       elderEntranceProgress: 0,
       playerMood: 'neutral',
+      moodTimer: 0,
       showHUD: false,
       quizAnswers: [],
       showQuiz: false,
@@ -2426,6 +2675,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
+      showNightTransition: false,
+      nightTransitionTimer: 0,
       showChoice: false,
       choiceOptions: []
     };

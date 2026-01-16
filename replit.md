@@ -73,8 +73,33 @@ When Elder successfully settles all recorded debts, a 3-second celebration plays
 - Fixing roof: consumes wood, shows patched roof graphic, triggers happy mood
 - After repair, a reminder prompts player to settle outstanding debts (if any)
 
-### NPC Interaction Range
+### NPC Interaction Range & Direct Tap
 - Increased to 250 units for tablet-friendly interaction
+- Players can tap directly on NPCs, home hut, or berry bush to interact (within range)
+- This provides an alternative to the INTERACT button for easier touch targeting
+
+### Happy Face Timer
+- Happy mood (happy.png) triggers when receiving items, fixing roof, or settling debts
+- Automatically returns to neutral after 2 seconds via moodTimer
+
+### Night Transition Animation
+When player completes Loop 2 successfully and returns home:
+- Roof auto-repairs if not already fixed
+- 4-second night transition plays:
+  - Day-to-night fade (70% dark overlay)
+  - Moon with glow and craters fades in
+  - 30 twinkling stars appear
+  - "A PEACEFUL NIGHT..." text
+- Then quiz begins
+
+### Brawl Animation
+- Large dust cloud (size 220) covers player + all 3 NPCs
+- POW/BAM/CRASH text cycling above
+- Lasts 4 seconds before fail screen
+
+### Background Parallax
+- Fewer background huts appear when camera is far right (>60% of world)
+- Makes fisherman area feel more remote/outside village
 
 ### Confrontation Dialogue Flow (Credit-First)
 The confrontation is a dispute over inflated debts:

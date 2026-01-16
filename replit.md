@@ -47,7 +47,7 @@ NPCs can walk toward a target position (targetX property):
 The brawl trigger uses requirement-based checking:
 - **phase === 'got_fish_ready_settle'** (verbal promise path after trading with Fisherman)
 - **inventory.stone >= 1** (player has stone to give Woodcutter)
-- **inventory.fish >= 2** (player has 2 fish from Fisherman trade)
+- **inventory.fish >= 3** (player has 3 fish from Fisherman trade: 1 for Woodcutter + 2 for Stone-worker)
 - **player.x within 200px of Village Center (x=1600)**
 This ensures the brawl triggers when the player has all items needed to settle debts.
 
@@ -67,11 +67,11 @@ The game uses a "Credit-First" design where NPCs give items on credit immediatel
 
 **Loop 1 (Failure Path - Verbal Promises):**
 1. `intro` → `need_wood` - Storm approaching, need wood from Woodcutter
-2. `need_wood` → `got_wood_need_stone` - Woodcutter gives WOOD immediately, creates debt (Sharp Stone + 1 Fish)
-3. `got_wood_need_stone` → `got_stone_need_fish` - Stone-worker gives STONE immediately, creates debt (2 Fish)
+2. `need_wood` → `got_wood_need_stone` - Woodcutter gives WOOD immediately, creates debt (Sharp Stone + 1 Fish), walks to Town Center
+3. `got_wood_need_stone` → `got_stone_need_fish` - Stone-worker gives STONE immediately, creates debt (2 Fish), walks to Town Center
 4. Player collects 3 berries from Berry Bush (available anytime - no gating)
-5. `got_stone_need_fish` → `got_fish_ready_settle` - Fisherman TRADES 3 berries for 2 fish (direct exchange)
-6. `got_fish_ready_settle` → `confrontation` → `brawl` → `fail` - Return to Village Center triggers gaslighting dispute where NPCs claim higher debts than agreed
+5. `got_stone_need_fish` → `got_fish_ready_settle` - Fisherman TRADES 3 berries for 3 fish (1 for Woodcutter + 2 for Stone-worker), walks to Town Center
+6. `got_fish_ready_settle` → `confrontation` → `brawl` → `fail` - Return to Village Center triggers gaslighting dispute where all NPCs are present and claim higher debts than agreed
 
 **Loop 2 (Success Path - Stone Tablet Recording):**
 1. Same flow but with choice dialogue offering "verbal promise" vs "record on Stone Tablet"

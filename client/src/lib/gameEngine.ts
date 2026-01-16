@@ -464,11 +464,13 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
-          text: "Take this Wood for your roof now. Just bring me a Sharp Stone and 1 Fish later to settle the debt!",
+          text: "Take this Wood for your roof now. Just bring me a Sharp Stone and 1 Fish later. Meet me at the Town Center to settle up!",
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.showInventoryPopup('+1 WOOD');
             this.state.phase = 'got_wood_need_stone';
+            // Start walking to town center
+            this.woodcutter.targetX = this.villageCenterX - 50;
           }
         }
       ]);
@@ -484,11 +486,13 @@ export class VillageLedgerGame {
             this.queueDialogue([
               {
                 speaker: 'WOODCUTTER',
-                text: "Very well, I'll remember. Take the wood now and settle up later!",
+                text: "Very well, I'll remember. Take the wood now and meet me at the Town Center!",
                 onComplete: () => {
                   this.state.inventory.wood = 1;
                   this.showInventoryPopup('+1 WOOD');
                   this.state.phase = 'got_wood_need_stone'; // Will lead to brawl
+                  // Start walking to town center
+                  this.woodcutter.targetX = this.villageCenterX - 50;
                 }
               }
             ]);
@@ -632,7 +636,7 @@ export class VillageLedgerGame {
   }
 
   // ============ LOOP 1 & 2: FISHERMAN ============
-  // CREDIT-FIRST: Direct trade - exchanges 3 Berries for 2 Fish
+  // CREDIT-FIRST: Direct trade - exchanges 3 Berries for 3 Fish
   private handleFishermanInteraction(): void {
     const phase = this.state.phase;
     
@@ -645,11 +649,11 @@ export class VillageLedgerGame {
         this.queueDialogue([
           {
             speaker: 'FISHERMAN',
-            text: "Ah, 3 lovely berries! Here are 2 Fish in exchange. Now go settle your debts at the Town Center!",
+            text: "Ah, 3 lovely berries! Here are 3 Fish in exchange. Now go settle your debts at the Town Center!",
             onComplete: () => {
               this.state.inventory.berries -= 3;
-              this.state.inventory.fish = 2;
-              this.showInventoryPopup('+2 FISH (-3 BERRIES)');
+              this.state.inventory.fish = 3;
+              this.showInventoryPopup('+3 FISH (-3 BERRIES)');
               // Set phase based on path
               if (phase === 'loop2_got_stone') {
                 this.state.phase = 'loop2_got_fish';
@@ -665,7 +669,7 @@ export class VillageLedgerGame {
         this.queueDialogue([
           {
             speaker: 'FISHERMAN',
-            text: "I'll trade you 2 Fish for 3 Berries. Find them at the berry bush to the west!"
+            text: "I'll trade you 3 Fish for 3 Berries. Find them at the berry bush to the west!"
           }
         ]);
       }
@@ -942,12 +946,12 @@ export class VillageLedgerGame {
     }
 
     // CREDIT-FIRST BRAWL TRIGGER
-    // Trigger brawl when: player has stone + 2 fish AND is on verbal promise path (got_fish_ready_settle)
+    // Trigger brawl when: player has stone + 3 fish AND is on verbal promise path (got_fish_ready_settle)
     // AND is within 200px of Village Center. This happens in Loop 1 automatically,
     // or in Loop 2 if player chose verbal promise instead of ledger.
     const isVerbalPromisePath = this.state.phase === 'got_fish_ready_settle';
     const hasRequirements = this.state.inventory.stone >= 1 && 
-                            this.state.inventory.fish >= 2;
+                            this.state.inventory.fish >= 3;
     const nearVillageCenter = Math.abs(this.player.x - this.villageCenterX) < 200;
     const canTrigger = !this.state.showBrawl && 
                        !this.state.currentDialogue && 

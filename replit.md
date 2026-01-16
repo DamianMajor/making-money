@@ -43,39 +43,47 @@ NPCs can walk toward a target position (targetX property):
 - This ensures NPCs are gathered at town center when player returns with berries
 - On game reset or Loop 2 start, NPCs return to original positions
 
-### Brawl Trigger System
-The brawl trigger uses requirement-based checking (not phase-based):
-- **phase === 'got_berries'** (verbal promise path)
-- **inventory.fish >= 1** (player has fish)
-- **inventory.berries >= 3** (player has 3 berries)
+### Brawl Trigger System (Credit-First)
+The brawl trigger uses requirement-based checking:
+- **phase === 'got_fish_ready_settle'** (verbal promise path after trading with Fisherman)
+- **inventory.stone >= 1** (player has stone to give Woodcutter)
+- **inventory.fish >= 2** (player has 2 fish from Fisherman trade)
 - **player.x within 200px of Village Center (x=1600)**
-This ensures the brawl triggers when all requirements are met on the verbal promise path.
+This ensures the brawl triggers when the player has all items needed to settle debts.
 
-### Confrontation Dialogue Flow
-The confrontation is a staged payment sequence:
-1. Player says "Stone-worker! I'm here with your fish, as promised."
-2. Stone-worker disputes: "One fish?! I clearly remember TWO fish!"
-3. Player tries to pay Fisherman with berries
-4. Fisherman disputes: "Three berries? I'm certain you promised SIX!"
-5. Player protests, leading to brawl animation
+### NPC Interaction Range
+- Increased to 250 units for tablet-friendly interaction
 
-### Two-Loop Game State System
-The game uses a "Groundhog Day" narrative structure with two loops:
+### Confrontation Dialogue Flow (Credit-First)
+The confrontation is a dispute over inflated debts:
+1. Woodcutter demands: "Give me my Sharp Stone and the 3 Fish you promised!"
+2. Player protests: "3 Fish?! I only promised you 1 Fish!"
+3. Stone-worker claims: "I was promised 4 Fish for my stone!"
+4. Player protests: "It was only 2 Fish! You're all lying!"
+5. Woodcutter: "Enough! You're trying to cheat us all!" → brawl animation
 
-**Loop 1 (Failure Path):**
+### Two-Loop Game State System (Credit-First Design)
+The game uses a "Credit-First" design where NPCs give items on credit immediately, creating social contracts (debts) that the player must eventually fulfill.
+
+**Loop 1 (Failure Path - Verbal Promises):**
 1. `intro` → `need_wood` - Storm approaching, need wood from Woodcutter
-2. `need_wood` → `need_stone` - Woodcutter's axe broken, need Sharp Stone
-3. `need_stone` → `got_stone` - Stone-worker gives stone on verbal promise (owes fish)
-4. `got_stone` → `got_fish` - Fisherman gives fish on verbal promise (owes 3 berries)
-5. `got_fish` → `got_berries` - Collect 3 berries from Berry Bush
-6. `got_berries` → `confrontation` → `brawl` → `fail` - Return to Village Center triggers gaslighting dispute and brawl
+2. `need_wood` → `got_wood_need_stone` - Woodcutter gives WOOD immediately, creates debt (Sharp Stone + 1 Fish)
+3. `got_wood_need_stone` → `got_stone_need_fish` - Stone-worker gives STONE immediately, creates debt (2 Fish)
+4. Player collects 3 berries from Berry Bush (available anytime - no gating)
+5. `got_stone_need_fish` → `got_fish_ready_settle` - Fisherman TRADES 3 berries for 2 fish (direct exchange)
+6. `got_fish_ready_settle` → `confrontation` → `brawl` → `fail` - Return to Village Center triggers gaslighting dispute where NPCs claim higher debts than agreed
 
-**Loop 2 (Success Path):**
+**Loop 2 (Success Path - Stone Tablet Recording):**
 1. Same flow but with choice dialogue offering "verbal promise" vs "record on Stone Tablet"
 2. Recording debts on the ledger prevents gaslighting
-3. Elder settles debts peacefully using the ledger
-4. Quiz tests player's understanding
+3. Elder settles debts peacefully using the recorded entries
+4. `loop2_return` → `complete_success` → Quiz tests player's understanding
 5. Success screen with educational message
+
+**Key Design Principles:**
+- Items given on CREDIT (not earned through tasks) - creates trust-based social contract
+- Berry Bush always interactable - prevents backtracking fatigue
+- Conflict happens during Settlement Phase at Town Center - makes brawl a result of failed memory/gaslighting
 
 ### Backend Architecture
 - **Express.js** server with TypeScript

@@ -37,7 +37,7 @@ interface LedgerEntry {
 interface GameState {
   // CREDIT-FIRST FLOW:
   // Loop 1: intro -> need_wood -> got_wood_need_stone -> got_stone_need_fish -> (collect berries) -> got_fish_ready_settle -> confrontation -> brawl -> fail
-  // Loop 2: Same but with choice to record debts on Stone Tablet -> success path
+  // Loop 2: Same but with choice to record debts on Stone Tablet -> success path (partial recording = partial conflict)
   phase: 'intro' | 'need_wood' | 'got_wood_need_stone' | 'got_stone_need_fish' | 'got_fish_ready_settle' | 'confrontation' | 'brawl' | 'fail' | 'loop2_intro' | 'loop2_need_wood' | 'loop2_got_wood' | 'loop2_got_stone' | 'loop2_got_fish' | 'loop2_got_berries' | 'loop2_return' | 'complete_success' | 'quiz' | 'complete';
   loop: 1 | 2;
   inventory: {
@@ -46,6 +46,9 @@ interface GameState {
     wood: number;
     berries: number;
   };
+  // Track which debts are recorded on the Stone Tablet (Loop 2 only)
+  woodcutterDebtRecorded: boolean;
+  stoneWorkerDebtRecorded: boolean;
   ledgerEntries: LedgerEntry[];
   dialogueQueue: DialogueLine[];
   currentDialogue: DialogueLine | null;
@@ -243,6 +246,8 @@ export class VillageLedgerGame {
       phase: 'intro',
       loop: 1,
       inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
+      woodcutterDebtRecorded: false,
+      stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -490,7 +495,8 @@ export class VillageLedgerGame {
                 onComplete: () => {
                   this.state.inventory.wood = 1;
                   this.showInventoryPopup('+1 WOOD');
-                  this.state.phase = 'got_wood_need_stone'; // Will lead to brawl
+                  this.state.phase = 'loop2_got_wood'; // Stay on Loop 2 path for partial recording
+                  // Note: woodcutterDebtRecorded stays FALSE (verbal promise)
                   // Start walking to town center
                   this.woodcutter.targetX = this.villageCenterX - 50;
                 }
@@ -510,6 +516,7 @@ export class VillageLedgerGame {
                   this.state.inventory.wood = 1;
                   this.showInventoryPopup('+1 WOOD');
                   this.state.phase = 'loop2_got_wood';
+                  this.state.woodcutterDebtRecorded = true;
                   this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
                   this.state.showHUD = true;
                   this.hudGlow = 1;
@@ -526,6 +533,24 @@ export class VillageLedgerGame {
         {
           speaker: 'WOODCUTTER',
           text: "Remember, you owe me a Sharp Stone and 1 Fish! Visit the Stone-worker to the east."
+        }
+      ]);
+    }
+    // Player has stone but still needs fish
+    else if (phase === 'got_stone_need_fish' || phase === 'loop2_got_stone') {
+      this.queueDialogue([
+        {
+          speaker: 'WOODCUTTER',
+          text: "You have my Stone! Now get my 1 Fish from the Fisherman, then meet me at the Town Center!"
+        }
+      ]);
+    }
+    // Player has everything, ready to settle
+    else if (phase === 'got_fish_ready_settle' || phase === 'loop2_got_fish') {
+      this.queueDialogue([
+        {
+          speaker: 'WOODCUTTER',
+          text: "You have everything! Meet me at the Town Center to settle your debt!"
         }
       ]);
     }
@@ -546,7 +571,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
-          text: "Good luck with your work!"
+          text: "Hello traveler! I can help you with wood if you need it."
         }
       ]);
     }
@@ -587,7 +612,8 @@ export class VillageLedgerGame {
                 text: "Very well, I'll remember. Get the fish from the Fisherman, then meet me at the Town Center.",
                 onComplete: () => {
                   this.state.inventory.stone = 1;
-                  this.state.phase = 'got_stone_need_fish'; // Will lead to brawl
+                  this.state.phase = 'loop2_got_stone'; // Stay on Loop 2 path for partial recording
+                  // Note: stoneWorkerDebtRecorded stays FALSE (verbal promise)
                   this.showInventoryPopup('+1 SHARP STONE');
                   // Start walking to town center
                   this.stoneWorker.targetX = this.villageCenterX + 50;
@@ -607,6 +633,7 @@ export class VillageLedgerGame {
                 onComplete: () => {
                   this.state.inventory.stone = 1;
                   this.state.phase = 'loop2_got_stone';
+                  this.state.stoneWorkerDebtRecorded = true;
                   this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
                   this.hudGlow = 1;
                   this.showInventoryPopup('+1 SHARP STONE');
@@ -621,73 +648,77 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
-          text: "You still owe me 2 fish! Trade berries with the Fisherman to get them."
+          text: "You still owe me 2 Fish! Trade berries with the Fisherman to get them."
         }
       ]);
-    } 
+    }
+    // Player has fish, ready to settle
+    else if (phase === 'got_fish_ready_settle' || phase === 'loop2_got_fish') {
+      this.queueDialogue([
+        {
+          speaker: 'STONE-WORKER',
+          text: "You have the Fish! Head to the Town Center to settle your debt!"
+        }
+      ]);
+    }
     else {
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
-          text: "Good luck with your work!"
+          text: "Hello! I craft stones for tools. Come back if you need one."
         }
       ]);
     }
   }
 
   // ============ LOOP 1 & 2: FISHERMAN ============
-  // CREDIT-FIRST: Direct trade - exchanges 3 Berries for 3 Fish
+  // CREDIT-FIRST: Direct trade - exchanges 3 Berries for 3 Fish (available anytime!)
   private handleFishermanInteraction(): void {
     const phase = this.state.phase;
     
     // Check if player has berries to trade
     const hasBerries = this.state.inventory.berries >= 3;
+    const alreadyHasFish = this.state.inventory.fish >= 3;
     
-    // LOOP 1 & 2: Trade berries for fish
-    if (phase === 'got_stone_need_fish' || phase === 'loop2_got_stone') {
-      if (hasBerries) {
-        this.queueDialogue([
-          {
-            speaker: 'FISHERMAN',
-            text: "Ah, 3 lovely berries! Here are 3 Fish in exchange. Now go settle your debts at the Town Center!",
-            onComplete: () => {
-              this.state.inventory.berries -= 3;
-              this.state.inventory.fish = 3;
-              this.showInventoryPopup('+3 FISH (-3 BERRIES)');
-              // Set phase based on path
-              if (phase === 'loop2_got_stone') {
-                this.state.phase = 'loop2_got_fish';
-              } else {
-                this.state.phase = 'got_fish_ready_settle';
-              }
-              // Start walking to town center
-              this.fisherman.targetX = this.villageCenterX + 100;
-            }
-          }
-        ]);
-      } else {
-        this.queueDialogue([
-          {
-            speaker: 'FISHERMAN',
-            text: "I'll trade you 3 Fish for 3 Berries. Find them at the berry bush to the west!"
-          }
-        ]);
-      }
-    }
-    // Player already traded
-    else if (phase === 'got_fish_ready_settle' || phase === 'loop2_got_fish') {
+    // Player already has fish
+    if (alreadyHasFish) {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "You have your fish! Now head to the Town Center to settle your debts."
+          text: "You already have your fish! Go settle your debts."
         }
       ]);
     }
+    // Fisherman will trade anytime player has 3 berries (he doesn't care about other dealings)
+    else if (hasBerries) {
+      this.queueDialogue([
+        {
+          speaker: 'FISHERMAN',
+          text: "Ah, 3 lovely berries! Here are 3 Fish in exchange.",
+          onComplete: () => {
+            this.state.inventory.berries -= 3;
+            this.state.inventory.fish = 3;
+            this.showInventoryPopup('+3 FISH (-3 BERRIES)');
+            // Only update phase if player is ready (has stone already)
+            if (phase === 'got_stone_need_fish') {
+              this.state.phase = 'got_fish_ready_settle';
+              // Walk to town center only if debts are owed
+              this.fisherman.targetX = this.villageCenterX + 100;
+            } else if (phase === 'loop2_got_stone') {
+              this.state.phase = 'loop2_got_fish';
+              this.fisherman.targetX = this.villageCenterX + 100;
+            }
+            // If player trades berries early (before getting stone), just give fish but don't change phase
+          }
+        }
+      ]);
+    }
+    // No berries - hint to get some
     else {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "Hello there! I trade fish for berries if you need any."
+          text: "I'll trade you 3 Fish for 3 Berries. Find them at the berry bush to the west!"
         }
       ]);
     }
@@ -742,28 +773,40 @@ export class VillageLedgerGame {
     }
     // Loop 2: Player returns with fish ready to settle via ledger
     else if (phase === 'loop2_got_fish') {
-      this.setMood('happy');
-      this.queueDialogue([
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "Let me check the Stone Tablet... All debts are recorded clearly here.",
-          onComplete: () => {
-            // Mark all debts as settled
-            this.state.ledgerEntries = this.state.ledgerEntries.map(e => ({
-              ...e,
-              debt: e.debt.replace('OWED', 'SETTLED')
-            }));
-            this.hudGlow = 1;
+      const bothRecorded = this.state.woodcutterDebtRecorded && this.state.stoneWorkerDebtRecorded;
+      const noneRecorded = !this.state.woodcutterDebtRecorded && !this.state.stoneWorkerDebtRecorded;
+      
+      if (bothRecorded) {
+        // ALL RECORDED - Peaceful settlement
+        this.setMood('happy');
+        this.queueDialogue([
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "Let me check the Stone Tablet... All debts are recorded clearly here.",
+            onComplete: () => {
+              // Mark all debts as settled
+              this.state.ledgerEntries = this.state.ledgerEntries.map(e => ({
+                ...e,
+                debt: e.debt.replace('OWED', 'SETTLED')
+              }));
+              this.hudGlow = 1;
+            }
+          },
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "The Stone does not lie. Your debts are settled! Return to the Woodcutter.",
+            onComplete: () => {
+              this.state.phase = 'loop2_return';
+            }
           }
-        },
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "The Stone does not lie. Your debts are settled! Return to the Woodcutter.",
-          onComplete: () => {
-            this.state.phase = 'loop2_return';
-          }
-        }
-      ]);
+        ]);
+      } else if (noneRecorded) {
+        // NONE RECORDED - Full confrontation like Loop 1
+        this.triggerConfrontation();
+      } else {
+        // PARTIAL RECORDING - Settle recorded debts, dispute unrecorded ones
+        this.triggerPartialSettlement();
+      }
     }
     else {
       this.queueDialogue([
@@ -1016,6 +1059,98 @@ export class VillageLedgerGame {
     ]);
   }
 
+  // PARTIAL SETTLEMENT: Some debts recorded, others not
+  // Only unrecorded debts cause conflict
+  private triggerPartialSettlement(): void {
+    this.state.phase = 'confrontation';
+    
+    const dialogueLines: DialogueLine[] = [];
+    
+    // First, Elder settles recorded debts peacefully
+    dialogueLines.push({
+      speaker: 'VILLAGE ELDER',
+      text: "Let me check the Stone Tablet... I see some debts recorded here."
+    });
+    
+    // Settle recorded debts
+    if (this.state.woodcutterDebtRecorded) {
+      dialogueLines.push({
+        speaker: 'VILLAGE ELDER',
+        text: "The Woodcutter's debt is recorded: 1 Stone + 1 Fish. This is settled fairly.",
+        onComplete: () => {
+          this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
+            e.debt.includes('WOODCUTTER') ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+          );
+          this.hudGlow = 1;
+        }
+      });
+      dialogueLines.push({
+        speaker: 'WOODCUTTER',
+        text: "The Stone Tablet speaks true. Thank you for your honesty!"
+      });
+    }
+    
+    if (this.state.stoneWorkerDebtRecorded) {
+      dialogueLines.push({
+        speaker: 'VILLAGE ELDER',
+        text: "The Stone-worker's debt is recorded: 2 Fish. This is settled fairly.",
+        onComplete: () => {
+          this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
+            e.debt.includes('STONE-WORKER') ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+          );
+          this.hudGlow = 1;
+        }
+      });
+      dialogueLines.push({
+        speaker: 'STONE-WORKER',
+        text: "The Stone Tablet speaks true. Thank you for your honesty!"
+      });
+    }
+    
+    // Now the unrecorded debts cause dispute
+    dialogueLines.push({
+      speaker: 'VILLAGE ELDER',
+      text: "But wait... there are debts not recorded on the tablet!"
+    });
+    
+    if (!this.state.woodcutterDebtRecorded) {
+      this.setMood('angry');
+      dialogueLines.push({
+        speaker: 'WOODCUTTER',
+        text: "You owe me 3 Fish and a Stone! I clearly remember!"
+      });
+      dialogueLines.push({
+        speaker: 'YOU',
+        text: "That's not true! I only promised 1 Fish!"
+      });
+    }
+    
+    if (!this.state.stoneWorkerDebtRecorded) {
+      this.setMood('angry');
+      dialogueLines.push({
+        speaker: 'STONE-WORKER',
+        text: "You owe me 4 Fish! I remember the deal clearly!"
+      });
+      dialogueLines.push({
+        speaker: 'YOU',
+        text: "No! It was only 2 Fish! You're lying!"
+      });
+    }
+    
+    // Brawl triggered by unrecorded debts
+    dialogueLines.push({
+      speaker: 'VILLAGE ELDER',
+      text: "Without a record, there is no way to know the truth...",
+      onComplete: () => {
+        this.state.phase = 'brawl';
+        this.state.showBrawl = true;
+        this.state.brawlTimer = 0;
+      }
+    });
+    
+    this.queueDialogue(dialogueLines);
+  }
+
   private render(): void {
     const ctx = this.ctx;
     const w = this.canvas.width;
@@ -1055,23 +1190,23 @@ export class VillageLedgerGame {
     }
     ctx.stroke();
 
-    // Draw NPCs
+    // Draw location markers FIRST (behind characters) - Stone Tablet and Home
+    this.drawLocationMarkers(ctx, groundY);
+
+    // Draw NPCs (in front of location markers)
     this.npcs.forEach(npc => {
       if (npc.visible) {
         this.drawCharacter(ctx, npc);
       }
     });
 
-    // Draw player
+    // Draw player (in front of NPCs and markers)
     this.drawCharacter(ctx, this.player);
 
     // Draw inventory popup
     if (this.inventoryPopup) {
       this.drawInventoryPopup(ctx);
     }
-
-    // Draw location markers (Player Home and Village Center)
-    this.drawLocationMarkers(ctx, groundY);
 
     // Draw UI elements
     if (this.state.showHUD) {
@@ -1967,6 +2102,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       phase: 'intro',
       loop: 1,
       inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
+      woodcutterDebtRecorded: false,
+      stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -2008,6 +2145,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       phase: 'loop2_intro',
       loop: 2,
       inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
+      woodcutterDebtRecorded: false,
+      stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,

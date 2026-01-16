@@ -75,8 +75,11 @@ The game uses a "Credit-First" design where NPCs give items on credit immediatel
 
 **Loop 2 (Success Path - Stone Tablet Recording):**
 1. Same flow but with choice dialogue offering "verbal promise" vs "record on Stone Tablet"
-2. Recording debts on the ledger prevents gaslighting
-3. Elder settles debts peacefully using the recorded entries
+2. Partial recording is supported - player can record some debts but not others
+3. Settlement outcomes based on recording:
+   - ALL debts recorded → Elder settles peacefully → quiz → success
+   - SOME debts recorded → Elder settles recorded debts peacefully, unrecorded debts cause dispute → brawl
+   - NO debts recorded → full confrontation/brawl like Loop 1
 4. `loop2_return` → `complete_success` → Quiz tests player's understanding
 5. Success screen with educational message
 

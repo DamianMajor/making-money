@@ -44,12 +44,16 @@ NPCs can walk toward a target position (targetX property):
 - On game reset or Loop 2 start, NPCs return to original positions
 
 ### Brawl Trigger System (Credit-First)
-The brawl trigger uses requirement-based checking:
+Loop 1 brawl trigger uses requirement-based checking:
 - **phase === 'got_fish_ready_settle'** (verbal promise path after trading with Fisherman)
 - **inventory.stone >= 1** (player has stone to give Woodcutter)
 - **inventory.fish >= 3** (player has 3 fish from Fisherman trade: 1 for Woodcutter + 2 for Stone-worker)
 - **player.x within 200px of Village Center (x=1600)**
-This ensures the brawl triggers when the player has all items needed to settle debts.
+
+Loop 2 settlement is handled by the Village Elder at the Stone Tablet:
+- **Both debts recorded** → Elder settles all debts peacefully → quiz → success
+- **Some debts recorded** → Elder settles recorded debts, unrecorded debts cause dispute → brawl
+- **No debts recorded** → Full confrontation/brawl like Loop 1
 
 ### NPC Interaction Range
 - Increased to 250 units for tablet-friendly interaction

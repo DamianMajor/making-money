@@ -36,10 +36,12 @@ interface LedgerEntry {
 
 interface GameState {
   // CREDIT-FIRST FLOW:
-  // Loop 1: intro -> need_wood -> got_wood_need_stone -> got_stone_need_fish -> (collect berries) -> got_fish_ready_settle -> confrontation -> brawl -> fail
+  // Loop 1: intro -> need_wood -> escorting_woodcutter -> got_wood_need_stone -> escorting_stoneworker -> got_stone_need_fish -> (collect berries) -> got_fish_ready_settle -> confrontation -> brawl -> fail
   // Loop 2: Same but with choice to record debts on Stone Tablet -> success path (partial recording = partial conflict)
-  phase: 'intro' | 'need_wood' | 'got_wood_need_stone' | 'got_stone_need_fish' | 'got_fish_ready_settle' | 'confrontation' | 'brawl' | 'fail' | 'loop2_intro' | 'loop2_need_wood' | 'loop2_got_wood' | 'loop2_got_stone' | 'loop2_got_fish' | 'loop2_got_berries' | 'loop2_return' | 'complete_success' | 'quiz' | 'complete';
+  phase: 'intro' | 'need_wood' | 'escorting_woodcutter' | 'got_wood_need_stone' | 'escorting_stoneworker' | 'got_stone_need_fish' | 'got_fish_ready_settle' | 'confrontation' | 'brawl' | 'fail' | 'loop2_intro' | 'loop2_need_wood' | 'loop2_escorting_woodcutter' | 'loop2_got_wood' | 'loop2_escorting_stoneworker' | 'loop2_got_stone' | 'loop2_got_fish' | 'loop2_got_berries' | 'loop2_return' | 'complete_success' | 'quiz' | 'complete';
   loop: 1 | 2;
+  // Track escort state - NPC following player to tablet
+  escortingNPC: 'woodcutter' | 'stoneworker' | null;
   inventory: {
     stone: number;
     fish: number;
@@ -260,6 +262,7 @@ export class VillageLedgerGame {
       roofRepaired: false,
       obtainedWood: false,
       obtainedStone: false,
+      escortingNPC: null,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
@@ -438,11 +441,11 @@ export class VillageLedgerGame {
     // Only allow direct tap if player is within interaction range (250 units)
     const tappedTarget = this.getTappedInteractable(x, y);
     if (tappedTarget) {
-      const interactionRange = 250;
+      const interactionRange = 180;
       let inRange = false;
       
       if (tappedTarget === 'home') {
-        inRange = Math.abs(this.player.x - this.playerHomeX) < interactionRange;
+        inRange = Math.abs(this.player.x - this.playerHomeX) < 120;
         if (inRange) {
           this.handleHomeInteraction();
           return;
@@ -599,15 +602,36 @@ export class VillageLedgerGame {
       }
     ]);
     
-    // Check if player still has outstanding debts
+    // Check if debts are already settled (Loop 2 success path)
+    const debtsSettled = this.state.phase === 'loop2_return' || 
+                         this.state.phase === 'complete_success' || 
+                         this.state.phase === 'complete';
+    
+    // If debts are settled, trigger night transition and quiz
+    if (debtsSettled && this.state.loop === 2) {
+      setTimeout(() => {
+        if (!this.state.currentDialogue && !this.state.showNightTransition) {
+          // Start night transition, then quiz
+          this.state.showNightTransition = true;
+          this.state.nightTransitionTimer = 0;
+          setTimeout(() => {
+            this.state.showNightTransition = false;
+            this.state.showQuiz = true;
+            this.state.phase = 'quiz';
+          }, 4000);
+        }
+      }, 2000);
+      return;
+    }
+    
+    // Check if player still has outstanding debts (Loop 1 or Loop 2 not yet settled)
     const hasOutstandingDebts = this.state.ledgerEntries.some(e => e.debt.includes('OWED'));
     const isLoop1 = this.state.loop === 1;
-    const needsToSettleDebts = isLoop1 || hasOutstandingDebts || 
-      (this.state.phase !== 'complete_success' && this.state.phase !== 'complete');
+    const needsToSettleDebts = isLoop1 || hasOutstandingDebts;
     
     // Prompt to settle debts if roof is now fixed but debts outstanding
     // Only show reminder if no dialogue is currently active to avoid interrupting
-    if (needsToSettleDebts && this.state.inventory.stone >= 0) {
+    if (needsToSettleDebts) {
       setTimeout(() => {
         if (!this.state.currentDialogue) {
           this.queueDialogue([
@@ -622,29 +646,57 @@ export class VillageLedgerGame {
   }
 
   // ============ LOOP 1 & 2: WOODCUTTER ============
-  // CREDIT-FIRST: Gives WOOD immediately on first talk, creates debt for Sharp Stone + 1 Fish
+  // ESCORT FLOW: NPC accompanies player to tablet, records debt, THEN gives item
   private handleWoodcutterInteraction(): void {
     const phase = this.state.phase;
     
-    // LOOP 1: First visit - gives wood on credit
+    // LOOP 1: First visit - start escort to tablet
     if (phase === 'need_wood') {
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
-          text: "Take this Wood for your roof now. Just bring me a Sharp Stone and 1 Fish later. Meet me at the Town Center to settle up!",
+          text: "I can give you wood for your roof! But first, let's walk to the Stone Tablet together to record our agreement. I'll walk with you!",
           onComplete: () => {
-            this.state.inventory.wood = 1;
-            this.state.obtainedWood = true;
-            this.showInventoryPopup('+1 WOOD');
-            this.setMood('happy');
-            this.state.phase = 'got_wood_need_stone';
-            // Start walking to town center
-            this.woodcutter.targetX = this.villageCenterX - 50;
+            this.state.phase = 'escorting_woodcutter';
+            this.state.escortingNPC = 'woodcutter';
+            // NPC will follow player via escort behavior in update loop
           }
         }
       ]);
-    } 
-    // LOOP 2: First visit - offer choice to record debt
+    }
+    // Arrived at tablet - record debt and give wood
+    else if (phase === 'escorting_woodcutter') {
+      // Check if both player and woodcutter are at village center
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
+      const woodcutterAtCenter = Math.abs(this.woodcutter.x - this.villageCenterX) < 150;
+      
+      if (playerAtCenter && woodcutterAtCenter) {
+        this.queueDialogue([
+          {
+            speaker: 'WOODCUTTER',
+            text: "Good, we're at the Stone Tablet. I'll give you Wood now. You owe me a Sharp Stone and 1 Fish!",
+            onComplete: () => {
+              this.state.inventory.wood = 1;
+              this.state.obtainedWood = true;
+              this.showInventoryPopup('+1 WOOD');
+              this.setMood('happy');
+              this.state.phase = 'got_wood_need_stone';
+              this.state.escortingNPC = null;
+              // Stay at center
+              this.woodcutter.targetX = this.villageCenterX - 50;
+            }
+          }
+        ]);
+      } else {
+        this.queueDialogue([
+          {
+            speaker: 'WOODCUTTER',
+            text: "Let's keep walking to the Stone Tablet at the Village Center!"
+          }
+        ]);
+      }
+    }
+    // LOOP 2: First visit - offer choice
     else if (phase === 'loop2_need_wood') {
       this.state.showChoice = true;
       this.state.choiceOptions = [
@@ -655,16 +707,12 @@ export class VillageLedgerGame {
             this.queueDialogue([
               {
                 speaker: 'WOODCUTTER',
-                text: "Very well, I'll remember. Take the wood now and meet me at the Town Center!",
+                text: "Very well, let's walk to the Village Center together. I'll give you the wood there.",
                 onComplete: () => {
-                  this.state.inventory.wood = 1;
-                  this.state.obtainedWood = true;
-                  this.showInventoryPopup('+1 WOOD');
-                  this.setMood('happy');
-                  this.state.phase = 'loop2_got_wood'; // Stay on Loop 2 path for partial recording
+                  this.state.phase = 'loop2_escorting_woodcutter';
+                  this.state.escortingNPC = 'woodcutter';
                   // Note: woodcutterDebtRecorded stays FALSE (verbal promise)
-                  // Start walking to town center
-                  this.woodcutter.targetX = this.villageCenterX - 50;
+                  // NPC will follow player via escort behavior
                 }
               }
             ]);
@@ -677,25 +725,56 @@ export class VillageLedgerGame {
             this.queueDialogue([
               {
                 speaker: 'WOODCUTTER',
-                text: "A wise choice! Take the wood, and we'll mark it on the Elder's tablet.",
+                text: "A wise choice! Let's walk to the Stone Tablet together and record our agreement.",
                 onComplete: () => {
-                  this.state.inventory.wood = 1;
-                  this.state.obtainedWood = true;
-                  this.showInventoryPopup('+1 WOOD');
-                  this.setMood('happy');
-                  this.state.phase = 'loop2_got_wood';
-                  this.state.woodcutterDebtRecorded = true;
-                  this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
-                  this.state.showHUD = true;
-                  this.hudGlow = 1;
-                  // Walk to village center
-                  this.woodcutter.targetX = this.villageCenterX - 50;
+                  this.state.phase = 'loop2_escorting_woodcutter';
+                  this.state.escortingNPC = 'woodcutter';
+                  this.state.woodcutterDebtRecorded = true; // Will record on tablet
+                  // NPC will follow player via escort behavior
                 }
               }
             ]);
           }
         }
       ];
+    }
+    // Loop 2: Arrived at tablet during escort
+    else if (phase === 'loop2_escorting_woodcutter') {
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
+      const woodcutterAtCenter = Math.abs(this.woodcutter.x - this.villageCenterX) < 150;
+      
+      if (playerAtCenter && woodcutterAtCenter) {
+        const recorded = this.state.woodcutterDebtRecorded;
+        this.queueDialogue([
+          {
+            speaker: 'WOODCUTTER',
+            text: recorded 
+              ? "Good, the debt is now recorded on the Stone Tablet. Here's your Wood!"
+              : "We're at the center. Here's your Wood. Remember, you owe me a Sharp Stone and 1 Fish!",
+            onComplete: () => {
+              this.state.inventory.wood = 1;
+              this.state.obtainedWood = true;
+              this.showInventoryPopup('+1 WOOD');
+              this.setMood('happy');
+              this.state.phase = 'loop2_got_wood';
+              this.state.escortingNPC = null;
+              if (recorded) {
+                this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
+                this.state.showHUD = true;
+                this.hudGlow = 1;
+              }
+              this.woodcutter.targetX = this.villageCenterX - 50;
+            }
+          }
+        ]);
+      } else {
+        this.queueDialogue([
+          {
+            speaker: 'WOODCUTTER',
+            text: "Let's keep walking to the Stone Tablet at the Village Center!"
+          }
+        ]);
+      }
     }
     // Player has wood but hasn't returned with stone+fish yet 
     else if (phase === 'got_wood_need_stone' || phase === 'loop2_got_wood') {
@@ -757,28 +836,54 @@ export class VillageLedgerGame {
   }
 
   // ============ LOOP 1 & 2: STONE-WORKER ============
-  // CREDIT-FIRST: Gives SHARP STONE immediately, creates debt for 2 Fish
+  // ESCORT FLOW: NPC accompanies player to tablet, records debt, THEN gives item
   private handleStoneWorkerInteraction(): void {
     const phase = this.state.phase;
     
-    // LOOP 1: Give stone on verbal promise (owes 2 fish)
+    // LOOP 1: First visit - start escort to tablet
     if (phase === 'got_wood_need_stone') {
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
-          text: "Need a stone? Here, take it. You owe me 2 Fish for my work. We'll settle up at the Town Center!",
+          text: "Need a sharp stone? Let's walk to the Stone Tablet together first. I'll walk with you!",
           onComplete: () => {
-            this.state.inventory.stone = 1;
-            this.state.obtainedStone = true;
-            this.state.phase = 'got_stone_need_fish';
-            this.showInventoryPopup('+1 SHARP STONE');
-            this.setMood('happy');
-            // Start walking to town center
-            this.stoneWorker.targetX = this.villageCenterX + 50;
+            this.state.phase = 'escorting_stoneworker';
+            this.state.escortingNPC = 'stoneworker';
+            // NPC will follow player via escort behavior
           }
         }
       ]);
-    } 
+    }
+    // Arrived at tablet - record debt and give stone
+    else if (phase === 'escorting_stoneworker') {
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
+      const stoneWorkerAtCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 150;
+      
+      if (playerAtCenter && stoneWorkerAtCenter) {
+        this.queueDialogue([
+          {
+            speaker: 'STONE-WORKER',
+            text: "Good, we're at the Stone Tablet. Here's your Sharp Stone! You owe me 2 Fish!",
+            onComplete: () => {
+              this.state.inventory.stone = 1;
+              this.state.obtainedStone = true;
+              this.showInventoryPopup('+1 SHARP STONE');
+              this.setMood('happy');
+              this.state.phase = 'got_stone_need_fish';
+              this.state.escortingNPC = null;
+              this.stoneWorker.targetX = this.villageCenterX + 50;
+            }
+          }
+        ]);
+      } else {
+        this.queueDialogue([
+          {
+            speaker: 'STONE-WORKER',
+            text: "Let's keep walking to the Stone Tablet at the Village Center!"
+          }
+        ]);
+      }
+    }
     // LOOP 2: Offer choice to record or promise
     else if (phase === 'loop2_got_wood') {
       this.state.showChoice = true;
@@ -790,16 +895,12 @@ export class VillageLedgerGame {
             this.queueDialogue([
               {
                 speaker: 'STONE-WORKER',
-                text: "Very well, I'll remember. Get the fish from the Fisherman, then meet me at the Town Center.",
+                text: "Very well, let's walk to the Village Center. I'll give you the stone there.",
                 onComplete: () => {
-                  this.state.inventory.stone = 1;
-                  this.state.obtainedStone = true;
-                  this.state.phase = 'loop2_got_stone'; // Stay on Loop 2 path for partial recording
+                  this.state.phase = 'loop2_escorting_stoneworker';
+                  this.state.escortingNPC = 'stoneworker';
                   // Note: stoneWorkerDebtRecorded stays FALSE (verbal promise)
-                  this.showInventoryPopup('+1 SHARP STONE');
-                  this.setMood('happy');
-                  // Start walking to town center
-                  this.stoneWorker.targetX = this.villageCenterX + 50;
+                  // NPC will follow player via escort behavior
                 }
               }
             ]);
@@ -812,24 +913,55 @@ export class VillageLedgerGame {
             this.queueDialogue([
               {
                 speaker: 'STONE-WORKER',
-                text: "A wise choice! Meet me at the Elder's tablet.",
+                text: "A wise choice! Let's walk to the Stone Tablet together.",
                 onComplete: () => {
-                  this.state.inventory.stone = 1;
-                  this.state.obtainedStone = true;
-                  this.state.phase = 'loop2_got_stone';
-                  this.state.stoneWorkerDebtRecorded = true;
-                  this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
-                  this.hudGlow = 1;
-                  this.showInventoryPopup('+1 SHARP STONE');
-                  this.setMood('happy');
-                  // Start walking to town center
-                  this.stoneWorker.targetX = this.villageCenterX + 50;
+                  this.state.phase = 'loop2_escorting_stoneworker';
+                  this.state.escortingNPC = 'stoneworker';
+                  this.state.stoneWorkerDebtRecorded = true; // Will record on tablet
+                  // NPC will follow player via escort behavior
                 }
               }
             ]);
           }
         }
       ];
+    }
+    // Loop 2: Arrived at tablet during escort
+    else if (phase === 'loop2_escorting_stoneworker') {
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
+      const stoneWorkerAtCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 150;
+      
+      if (playerAtCenter && stoneWorkerAtCenter) {
+        const recorded = this.state.stoneWorkerDebtRecorded;
+        this.queueDialogue([
+          {
+            speaker: 'STONE-WORKER',
+            text: recorded 
+              ? "Good, the debt is now recorded. Here's your Sharp Stone!"
+              : "We're at the center. Here's your Sharp Stone. Remember, you owe me 2 Fish!",
+            onComplete: () => {
+              this.state.inventory.stone = 1;
+              this.state.obtainedStone = true;
+              this.showInventoryPopup('+1 SHARP STONE');
+              this.setMood('happy');
+              this.state.phase = 'loop2_got_stone';
+              this.state.escortingNPC = null;
+              if (recorded) {
+                this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
+                this.hudGlow = 1;
+              }
+              this.stoneWorker.targetX = this.villageCenterX + 50;
+            }
+          }
+        ]);
+      } else {
+        this.queueDialogue([
+          {
+            speaker: 'STONE-WORKER',
+            text: "Let's keep walking to the Stone Tablet at the Village Center!"
+          }
+        ]);
+      }
     }
     else if (phase === 'got_stone_need_fish' || phase === 'loop2_got_stone') {
       this.queueDialogue([
@@ -1126,8 +1258,24 @@ export class VillageLedgerGame {
     this.npcs.forEach((npc, i) => {
       npc.bobOffset = Math.sin(this.bobTimer * 0.5 + i * 1.5) * 1.5;
       
-      // Move NPC toward target if set
-      if (npc.targetX !== undefined) {
+      // ESCORT BEHAVIOR: NPC follows player during escort phases
+      const isEscortingWoodcutter = (this.state.phase === 'escorting_woodcutter' || this.state.phase === 'loop2_escorting_woodcutter') && npc.id === 'woodcutter';
+      const isEscortingStoneworker = (this.state.phase === 'escorting_stoneworker' || this.state.phase === 'loop2_escorting_stoneworker') && npc.id === 'stoneWorker';
+      
+      if (isEscortingWoodcutter || isEscortingStoneworker) {
+        // Simple escort: NPC always moves toward its target position at the village center
+        const npcTargetX = isEscortingWoodcutter ? this.villageCenterX - 50 : this.villageCenterX + 50;
+        const diff = npcTargetX - npc.x;
+        
+        if (Math.abs(diff) > 5) {
+          // Move toward center at a speed that matches player
+          const escortSpeed = 180; // Faster than player to ensure arrival
+          npc.x += Math.sign(diff) * escortSpeed * dt;
+          npc.bobOffset = Math.sin(this.bobTimer * 2 + i) * 3;
+        }
+      }
+      // Move NPC toward target if set (non-escort movement)
+      else if (npc.targetX !== undefined) {
         const diff = npc.targetX - npc.x;
         if (Math.abs(diff) > 5) {
           npc.x += Math.sign(diff) * npcSpeed * dt;
@@ -1153,7 +1301,7 @@ export class VillageLedgerGame {
 
     // Check if near home
     const distToHome = Math.abs(this.player.x - this.playerHomeX);
-    if (distToHome <= 150) {
+    if (distToHome <= 120) {
       this.state.nearbyLocation = 'home';
       this.state.showInteractButton = true;
     }
@@ -1162,7 +1310,7 @@ export class VillageLedgerGame {
     for (const npc of this.npcs) {
       if (!npc.visible) continue;
       const dist = Math.abs(this.player.x - npc.x);
-      if (dist <= 250) { // Large range for tablet-friendly interaction (increased from 200)
+      if (dist <= 180) { // Reduced range for more precise targeting
         this.state.nearbyNPC = npc;
         this.state.showInteractButton = true;
         break;
@@ -1206,6 +1354,25 @@ export class VillageLedgerGame {
       this.interactButtonOpacity = Math.max(0, this.interactButtonOpacity - dt * fadeSpeed);
     }
 
+    // ESCORT ARRIVAL TRIGGER
+    // Auto-trigger dialogue when player arrives at village center during escort phases
+    const escortPhases = ['escorting_woodcutter', 'escorting_stoneworker', 'loop2_escorting_woodcutter', 'loop2_escorting_stoneworker'];
+    if (escortPhases.includes(this.state.phase) && !this.state.currentDialogue) {
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
+      
+      if (this.state.phase === 'escorting_woodcutter' || this.state.phase === 'loop2_escorting_woodcutter') {
+        const woodcutterAtCenter = Math.abs(this.woodcutter.x - this.villageCenterX) < 150;
+        if (playerAtCenter && woodcutterAtCenter) {
+          this.handleWoodcutterInteraction();
+        }
+      } else if (this.state.phase === 'escorting_stoneworker' || this.state.phase === 'loop2_escorting_stoneworker') {
+        const stoneWorkerAtCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 150;
+        if (playerAtCenter && stoneWorkerAtCenter) {
+          this.handleStoneWorkerInteraction();
+        }
+      }
+    }
+    
     // CREDIT-FIRST BRAWL TRIGGER
     // Trigger brawl when: player has stone + 3 fish AND is on verbal promise path (got_fish_ready_settle)
     // AND is within 200px of Village Center. This happens in Loop 1 automatically,
@@ -1559,7 +1726,8 @@ export class VillageLedgerGame {
   private drawBrawlAnimation(ctx: CanvasRenderingContext2D): void {
     const w = this.canvas.width;
     const h = this.canvas.height;
-    const centerX = w / 2;
+    // Shift brawl to the left to cover clustered NPCs at village center
+    const centerX = w / 2 - 80;
     // Position brawl on the ground (above dialogue box, at character level)
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const centerY = groundY - 60; // Just above ground level
@@ -2014,11 +2182,18 @@ export class VillageLedgerGame {
     }
 
     // Mid background - village buildings
-    // Reduce number of huts when camera is far right (near fisherman) to feel more remote
-    ctx.fillStyle = '#A89080';
+    // Fade huts gradually as camera moves right (near fisherman) to feel more remote
     const cameraProgress = this.cameraX / this.worldWidth; // 0 to 1
-    const maxHuts = cameraProgress > 0.6 ? 3 : 8; // Fewer huts near fisherman
-    for (let i = 0; i < maxHuts; i++) {
+    // Calculate fade: full opacity (1.0) until 40%, then fade to 0.2 by 80%
+    let hutOpacity = 1.0;
+    if (cameraProgress > 0.4) {
+      hutOpacity = Math.max(0.15, 1.0 - (cameraProgress - 0.4) * 2.125); // Fades from 1.0 to 0.15
+    }
+    
+    ctx.save();
+    ctx.globalAlpha = hutOpacity;
+    ctx.fillStyle = '#A89080';
+    for (let i = 0; i < 8; i++) {
       const x = (i * 300 - this.cameraX * 0.4) % (w + 300) - 150;
       const buildingWidth = 60 + (i % 3) * 20;
       const buildingHeight = 50 + (i % 2) * 30;
@@ -2035,6 +2210,7 @@ export class VillageLedgerGame {
       ctx.fill();
       ctx.fillStyle = '#A89080';
     }
+    ctx.restore();
 
     // Near decorative elements
     ctx.fillStyle = '#6B8E5E';
@@ -2334,12 +2510,37 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.lineWidth = 4;
     ctx.stroke();
 
+    // Determine the target name to display
+    let targetName = '';
+    if (this.state.nearbyNPC) {
+      // Get friendly name for display
+      switch (this.state.nearbyNPC.id) {
+        case 'woodcutter': targetName = 'Woodcutter'; break;
+        case 'stoneWorker': targetName = 'Stone-worker'; break;
+        case 'fisherman': targetName = 'Fisherman'; break;
+        case 'villageElder': targetName = 'Elder'; break;
+        case 'berryBush': targetName = 'Berry Bush'; break;
+        default: targetName = this.state.nearbyNPC.name;
+      }
+    } else if (this.state.nearbyLocation === 'home') {
+      targetName = 'Home';
+    }
+
     // Text - using bold rounded sans-serif for button (per design guidelines)
-    ctx.font = `bold 20px ${this.uiFont}`;
+    ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('INTERACT', x + size / 2, y + size / 2);
+    
+    // Draw "INTERACT" text
+    ctx.font = `bold 18px ${this.uiFont}`;
+    ctx.fillText('INTERACT', x + size / 2, y + size / 2 - 10);
+    
+    // Draw target name below in smaller text
+    if (targetName) {
+      ctx.font = `bold 12px ${this.uiFont}`;
+      ctx.fillText(`(${targetName})`, x + size / 2, y + size / 2 + 12);
+    }
+    
     ctx.textBaseline = 'alphabetic';
 
     ctx.restore();
@@ -2602,6 +2803,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       roofRepaired: false,
       obtainedWood: false,
       obtainedStone: false,
+      escortingNPC: null,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
@@ -2654,6 +2856,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       roofRepaired: false,
       obtainedWood: false,
       obtainedStone: false,
+      escortingNPC: null,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
       ledgerEntries: [],

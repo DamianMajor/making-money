@@ -74,9 +74,10 @@ When Elder successfully settles all recorded debts, a 3-second celebration plays
 - After repair, a reminder prompts player to settle outstanding debts (if any)
 
 ### NPC Interaction Range & Direct Tap
-- Increased to 250 units for tablet-friendly interaction
+- NPC interaction range: 180 units (reduced for more precise targeting)
+- Home interaction range: 120 units
 - Players can tap directly on NPCs, home hut, or berry bush to interact (within range)
-- This provides an alternative to the INTERACT button for easier touch targeting
+- INTERACT button shows target name: "INTERACT (Woodcutter)", "INTERACT (Home)", etc.
 
 ### Happy Face Timer
 - Happy mood (happy.png) triggers when receiving items, fixing roof, or settling debts
@@ -95,10 +96,12 @@ When player completes Loop 2 successfully and returns home:
 ### Brawl Animation
 - Large dust cloud (size 220) covers player + all 3 NPCs
 - POW/BAM/CRASH text cycling above
+- Positioned 80px left of center to cover clustered NPCs
 - Lasts 4 seconds before fail screen
 
 ### Background Parallax
-- Fewer background huts appear when camera is far right (>60% of world)
+- Background huts fade gradually as camera moves right (not sudden cutoff)
+- Full opacity until 40% across world, then fades to 15% by 80%
 - Makes fisherman area feel more remote/outside village
 
 ### Confrontation Dialogue Flow (Credit-First)
@@ -109,21 +112,47 @@ The confrontation is a dispute over inflated debts:
 4. Player protests: "It was only 2 Fish! You're all lying!"
 5. Woodcutter: "Enough! You're trying to cheat us all!" → brawl animation
 
-### Two-Loop Game State System (Credit-First Design)
-The game uses a "Credit-First" design where NPCs give items on credit immediately, creating social contracts (debts) that the player must eventually fulfill.
+### NPC Movement System
+NPCs can walk toward a target position (targetX property):
+- Woodcutter and Stone-worker have `originalX` to store their starting positions
+- After giving items on credit, Woodcutter and Stone-worker set `targetX` to Village Center and walk there at 80 units/second
+- Fisherman stays at his fishing hole (does NOT walk to center)
+- This ensures NPCs are gathered at town center when player returns with fish
+- On game reset or Loop 2 start, NPCs return to original positions
+
+### Escort Behavior
+During escort phases, NPCs move directly toward the Village Center:
+- NPC moves at 180 units/second toward its target position
+- Woodcutter target: x=1550 (left of center)
+- Stone-worker target: x=1650 (right of center)
+- Movement starts immediately when escort phase begins
+- NPC arrives at center independently of player position
+
+### Escort Auto-Trigger
+When both player AND NPC are within 150 units of Village Center:
+- If no dialogue active, auto-trigger fires
+- Queues delivery dialogue: "Good, we're at the Stone Tablet..."
+- onComplete gives item (+1 WOOD or +1 STONE popup)
+- Sets happy mood, advances phase
+
+### Two-Loop Game State System (Escort-to-Tablet Design)
+The game uses an "Escort Flow" design where NPCs walk with the player to the Stone Tablet first, record the agreement, and THEN give items.
 
 **Loop 1 (Failure Path - Verbal Promises):**
 1. `intro` → `need_wood` - Storm approaching, need wood from Woodcutter
-2. `need_wood` → `got_wood_need_stone` - Woodcutter gives WOOD immediately, creates debt (Sharp Stone + 1 Fish), walks to Town Center
-3. `got_wood_need_stone` → `got_stone_need_fish` - Stone-worker gives STONE immediately, creates debt (2 Fish), walks to Town Center
-4. Player collects 3 berries from Berry Bush (available anytime - no gating)
-5. `got_stone_need_fish` → `got_fish_ready_settle` - Fisherman TRADES 3 berries for 3 fish (1 for Woodcutter + 2 for Stone-worker), walks to Town Center
-6. `got_fish_ready_settle` → `confrontation` → `brawl` → `fail` - Return to Village Center triggers gaslighting dispute where all NPCs are present and claim higher debts than agreed
+2. `need_wood` → `escorting_woodcutter` - Woodcutter says "Let's walk to the tablet together"
+3. `escorting_woodcutter` → `got_wood_need_stone` - At tablet, Woodcutter gives WOOD, creates verbal debt
+4. `got_wood_need_stone` → `escorting_stoneworker` - Stone-worker says "Let's walk to the tablet"
+5. `escorting_stoneworker` → `got_stone_need_fish` - At tablet, Stone-worker gives STONE, creates verbal debt
+6. Player collects 3 berries from Berry Bush (available anytime - no gating)
+7. `got_stone_need_fish` → `got_fish_ready_settle` - Fisherman TRADES 3 berries for 3 fish
+8. `got_fish_ready_settle` → `confrontation` → `brawl` → `fail` - NPCs claim higher debts than agreed
 
 **Loop 2 (Success Path - Stone Tablet Recording):**
-1. Same flow but with choice dialogue offering "verbal promise" vs "record on Stone Tablet"
-2. Partial recording is supported - player can record some debts but not others
-3. Settlement outcomes based on recording:
+1. Same escort flow but with choice dialogue offering "verbal promise" vs "record on Stone Tablet"
+2. Items given AFTER walking to tablet (not immediately)
+3. Partial recording is supported - player can record some debts but not others
+4. Settlement outcomes based on recording:
    - ALL debts recorded → Elder settles peacefully → quiz → success
    - SOME debts recorded → Elder settles recorded debts peacefully, unrecorded debts cause dispute → brawl
    - NO debts recorded → full confrontation/brawl like Loop 1

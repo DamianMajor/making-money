@@ -46,6 +46,8 @@ interface GameState {
     wood: number;
     berries: number;
   };
+  // Track roof repair state
+  roofRepaired: boolean;
   // Track which debts are recorded on the Stone Tablet (Loop 2 only)
   woodcutterDebtRecorded: boolean;
   stoneWorkerDebtRecorded: boolean;
@@ -55,6 +57,7 @@ interface GameState {
   dialogueComplete: boolean;
   showInteractButton: boolean;
   nearbyNPC: Character | null;
+  nearbyLocation: 'home' | null; // Track if player is near home
   elderEntranceProgress: number;
   playerMood: 'neutral' | 'happy' | 'angry';
   showHUD: boolean;
@@ -64,6 +67,8 @@ interface GameState {
   showFail: boolean;
   showBrawl: boolean;
   brawlTimer: number;
+  showCelebration: boolean; // Dance animation when debts settled
+  celebrationTimer: number;
   showChoice: boolean;
   choiceOptions: { text: string; action: () => void }[];
 }
@@ -246,6 +251,7 @@ export class VillageLedgerGame {
       phase: 'intro',
       loop: 1,
       inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
+      roofRepaired: false,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
@@ -254,6 +260,7 @@ export class VillageLedgerGame {
       dialogueComplete: false,
       showInteractButton: false,
       nearbyNPC: null,
+      nearbyLocation: null,
       elderEntranceProgress: 0,
       playerMood: 'neutral',
       showHUD: false,
@@ -263,6 +270,8 @@ export class VillageLedgerGame {
       showFail: false,
       showBrawl: false,
       brawlTimer: 0,
+      showCelebration: false,
+      celebrationTimer: 0,
       showChoice: false,
       choiceOptions: []
     };
@@ -440,23 +449,90 @@ export class VillageLedgerGame {
   }
 
   private handleInteraction(): void {
-    if (!this.state.nearbyNPC) return;
+    // Handle NPC interactions first
+    if (this.state.nearbyNPC) {
+      const npc = this.state.nearbyNPC;
 
-    const npc = this.state.nearbyNPC;
-
-    if (npc.id === 'woodcutter') {
-      this.handleWoodcutterInteraction();
-    } else if (npc.id === 'villageElder') {
-      this.handleElderInteraction();
-    } else if (npc.id === 'berryBush') {
-      this.handleBerryBushInteraction();
-    } else if (npc.id === 'stoneWorker') {
-      this.handleStoneWorkerInteraction();
-    } else if (npc.id === 'fisherman') {
-      this.handleFishermanInteraction();
+      if (npc.id === 'woodcutter') {
+        this.handleWoodcutterInteraction();
+      } else if (npc.id === 'villageElder') {
+        this.handleElderInteraction();
+      } else if (npc.id === 'berryBush') {
+        this.handleBerryBushInteraction();
+      } else if (npc.id === 'stoneWorker') {
+        this.handleStoneWorkerInteraction();
+      } else if (npc.id === 'fisherman') {
+        this.handleFishermanInteraction();
+      }
+    }
+    // Handle location interactions
+    else if (this.state.nearbyLocation === 'home') {
+      this.handleHomeInteraction();
     }
 
     this.notifyStateChange();
+  }
+
+  // ============ HOME / HUT INTERACTION ============
+  private handleHomeInteraction(): void {
+    const hasWood = this.state.inventory.wood >= 1;
+    
+    // Roof already repaired
+    if (this.state.roofRepaired) {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "My roof is fixed now. It will hold through the storm!"
+        }
+      ]);
+      return;
+    }
+    
+    // No wood yet - can't repair
+    if (!hasWood) {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "I need to get Wood from the Woodcutter to fix this hole in my roof."
+        }
+      ]);
+      return;
+    }
+    
+    // Has wood - can repair!
+    this.queueDialogue([
+      {
+        speaker: 'YOU',
+        text: "I'll use this wood to fix the hole in my roof!",
+        onComplete: () => {
+          this.state.roofRepaired = true;
+          this.state.inventory.wood = 0;
+          this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
+          this.setMood('happy');
+        }
+      }
+    ]);
+    
+    // Check if player still has outstanding debts
+    const hasOutstandingDebts = this.state.ledgerEntries.some(e => e.debt.includes('OWED'));
+    const isLoop1 = this.state.loop === 1;
+    const needsToSettleDebts = isLoop1 || hasOutstandingDebts || 
+      (this.state.phase !== 'complete_success' && this.state.phase !== 'complete');
+    
+    // Prompt to settle debts if roof is now fixed but debts outstanding
+    // Only show reminder if no dialogue is currently active to avoid interrupting
+    if (needsToSettleDebts && this.state.inventory.stone >= 0) {
+      setTimeout(() => {
+        if (!this.state.currentDialogue) {
+          this.queueDialogue([
+            {
+              speaker: 'YOU',
+              text: "Roof is fixed! But I still need to settle my debts with the villagers. I should head to the Village Center."
+            }
+          ]);
+        }
+      }, 2000);
+    }
   }
 
   // ============ LOOP 1 & 2: WOODCUTTER ============
@@ -473,6 +549,7 @@ export class VillageLedgerGame {
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.showInventoryPopup('+1 WOOD');
+            this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
             // Start walking to town center
             this.woodcutter.targetX = this.villageCenterX - 50;
@@ -495,6 +572,7 @@ export class VillageLedgerGame {
                 onComplete: () => {
                   this.state.inventory.wood = 1;
                   this.showInventoryPopup('+1 WOOD');
+                  this.setMood('happy');
                   this.state.phase = 'loop2_got_wood'; // Stay on Loop 2 path for partial recording
                   // Note: woodcutterDebtRecorded stays FALSE (verbal promise)
                   // Start walking to town center
@@ -515,11 +593,14 @@ export class VillageLedgerGame {
                 onComplete: () => {
                   this.state.inventory.wood = 1;
                   this.showInventoryPopup('+1 WOOD');
+                  this.setMood('happy');
                   this.state.phase = 'loop2_got_wood';
                   this.state.woodcutterDebtRecorded = true;
                   this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
                   this.state.showHUD = true;
                   this.hudGlow = 1;
+                  // Walk to village center
+                  this.woodcutter.targetX = this.villageCenterX - 50;
                 }
               }
             ]);
@@ -592,6 +673,7 @@ export class VillageLedgerGame {
             this.state.inventory.stone = 1;
             this.state.phase = 'got_stone_need_fish';
             this.showInventoryPopup('+1 SHARP STONE');
+            this.setMood('happy');
             // Start walking to town center
             this.stoneWorker.targetX = this.villageCenterX + 50;
           }
@@ -615,6 +697,7 @@ export class VillageLedgerGame {
                   this.state.phase = 'loop2_got_stone'; // Stay on Loop 2 path for partial recording
                   // Note: stoneWorkerDebtRecorded stays FALSE (verbal promise)
                   this.showInventoryPopup('+1 SHARP STONE');
+                  this.setMood('happy');
                   // Start walking to town center
                   this.stoneWorker.targetX = this.villageCenterX + 50;
                 }
@@ -637,6 +720,9 @@ export class VillageLedgerGame {
                   this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
                   this.hudGlow = 1;
                   this.showInventoryPopup('+1 SHARP STONE');
+                  this.setMood('happy');
+                  // Start walking to town center
+                  this.stoneWorker.targetX = this.villageCenterX + 50;
                 }
               }
             ]);
@@ -711,6 +797,7 @@ export class VillageLedgerGame {
             this.state.inventory.berries -= 3;
             this.state.inventory.fish = 3;
             this.showInventoryPopup('+3 FISH (-3 BERRIES)');
+            this.setMood('happy');
             // Update phase based on current loop
             if (phase === 'got_stone_need_fish') {
               this.state.phase = 'got_fish_ready_settle';
@@ -806,6 +893,9 @@ export class VillageLedgerGame {
             text: "The Stone does not lie. Your debts are settled! Return to the Woodcutter.",
             onComplete: () => {
               this.state.phase = 'loop2_return';
+              // Trigger celebration dance!
+              this.state.showCelebration = true;
+              this.state.celebrationTimer = 0;
             }
           }
         ]);
@@ -946,10 +1036,19 @@ export class VillageLedgerGame {
     this.cameraTargetX = Math.max(0, Math.min(this.worldWidth - this.canvas.width, this.cameraTargetX));
     this.cameraX += (this.cameraTargetX - this.cameraX) * this.cameraSmoothing;
 
-    // Check NPC proximity
+    // Check NPC and location proximity
     this.state.nearbyNPC = null;
+    this.state.nearbyLocation = null;
     this.state.showInteractButton = false;
 
+    // Check if near home
+    const distToHome = Math.abs(this.player.x - this.playerHomeX);
+    if (distToHome <= 150) {
+      this.state.nearbyLocation = 'home';
+      this.state.showInteractButton = true;
+    }
+
+    // Check NPCs (prioritize NPC over location)
     for (const npc of this.npcs) {
       if (!npc.visible) continue;
       const dist = Math.abs(this.player.x - npc.x);
@@ -1028,6 +1127,15 @@ export class VillageLedgerGame {
         this.state.showBrawl = false;
         this.state.showFail = true;
         this.state.phase = 'fail';
+      }
+    }
+    
+    // Update celebration animation timer
+    if (this.state.showCelebration) {
+      this.state.celebrationTimer += dt;
+      // Celebration lasts 3 seconds
+      if (this.state.celebrationTimer > 3) {
+        this.state.showCelebration = false;
       }
     }
   }
@@ -1234,6 +1342,11 @@ export class VillageLedgerGame {
     if (this.state.showBrawl) {
       this.drawBrawlAnimation(ctx);
     }
+    
+    // Draw celebration animation if active
+    if (this.state.showCelebration) {
+      this.drawCelebrationAnimation(ctx);
+    }
 
     // Draw fail screen
     if (this.state.showFail) {
@@ -1310,9 +1423,9 @@ export class VillageLedgerGame {
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const centerY = groundY - 60; // Just above ground level
 
-    // Animate the dust cloud size
+    // Animate the dust cloud size - LARGER to cover all 3 participants
     const t = this.state.brawlTimer;
-    const cloudSize = 80 + Math.sin(t * 10) * 20;
+    const cloudSize = 150 + Math.sin(t * 10) * 30;
     const rotation = t * 3;
 
     ctx.save();
@@ -1384,6 +1497,63 @@ export class VillageLedgerGame {
     const effects = ['POW!', 'BAM!', 'CRASH!'];
     const effectIndex = Math.floor(t * 3) % 3;
     ctx.fillText(effects[effectIndex], centerX + Math.sin(t * 5) * 50, centerY - 100);
+  }
+
+  private drawCelebrationAnimation(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const groundY = h - this.groundHeight - this.dialogueBoxHeight;
+    const t = this.state.celebrationTimer;
+    
+    // Draw confetti particles
+    const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#9B59B6', '#2ECC71'];
+    for (let i = 0; i < 30; i++) {
+      const seed = i * 137.5;
+      const x = (seed * 7.3 + t * 100) % w;
+      const y = ((seed * 3.7 + t * 150) % (groundY - 100)) + 50;
+      const size = 4 + (i % 3) * 2;
+      const colorIndex = i % confettiColors.length;
+      const rotation = t * (5 + i % 3);
+      
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rotation);
+      ctx.fillStyle = confettiColors[colorIndex];
+      ctx.fillRect(-size / 2, -size / 2, size, size);
+      ctx.restore();
+    }
+    
+    // Draw dancing NPCs indicator - bouncing motion for NPCs at village center
+    // Get the screen positions for NPCs at center
+    const woodcutterScreenX = this.woodcutter.x - this.cameraX;
+    const stoneWorkerScreenX = this.stoneWorker.x - this.cameraX;
+    const elderScreenX = this.villageElder.x - this.cameraX;
+    
+    // Draw musical notes above dancing characters
+    ctx.font = '20px Arial';
+    ctx.fillStyle = '#FFD700';
+    const noteY = groundY - 120;
+    
+    // Animate notes
+    const bounce = Math.sin(t * 10) * 10;
+    
+    if (Math.abs(this.woodcutter.x - this.villageCenterX) < 100) {
+      ctx.fillText('♪', woodcutterScreenX + Math.sin(t * 8) * 15, noteY + bounce);
+    }
+    if (Math.abs(this.stoneWorker.x - this.villageCenterX) < 100) {
+      ctx.fillText('♫', stoneWorkerScreenX + Math.sin(t * 9 + 1) * 15, noteY - bounce);
+    }
+    ctx.fillText('♪', elderScreenX + Math.sin(t * 7 + 2) * 15, noteY + bounce * 0.5);
+    
+    // Center "CELEBRATION!" text
+    ctx.font = `24px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#22C55E';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    const celebY = 80 + Math.sin(t * 5) * 10;
+    ctx.strokeText('DEBTS SETTLED!', w / 2, celebY);
+    ctx.fillText('DEBTS SETTLED!', w / 2, celebY);
   }
 
   private drawFailScreen(ctx: CanvasRenderingContext2D): void {
@@ -1478,12 +1648,39 @@ export class VillageLedgerGame {
       // Draw a simple house shape
       ctx.fillStyle = '#4A3728';
       ctx.fillRect(homeScreenX - 30, groundY - 60, 60, 60);
+      
+      // Draw roof
       ctx.fillStyle = '#6B4423';
       ctx.beginPath();
       ctx.moveTo(homeScreenX - 40, groundY - 60);
       ctx.lineTo(homeScreenX, groundY - 100);
       ctx.lineTo(homeScreenX + 40, groundY - 60);
       ctx.fill();
+      
+      // Draw hole in roof if not repaired
+      if (!this.state.roofRepaired) {
+        // Hole in the roof (dark opening)
+        ctx.fillStyle = '#1a0f08';
+        ctx.beginPath();
+        ctx.ellipse(homeScreenX + 10, groundY - 75, 15, 10, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+        // Jagged edges for the hole
+        ctx.strokeStyle = '#4A3020';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(homeScreenX + 10, groundY - 75, 16, 11, -0.3, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        // Patch on the roof (lighter wood color)
+        ctx.fillStyle = '#8B6B4F';
+        ctx.beginPath();
+        ctx.ellipse(homeScreenX + 10, groundY - 75, 15, 10, -0.3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#5D4E37';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      
       // Door
       ctx.fillStyle = '#2D1F14';
       ctx.fillRect(homeScreenX - 10, groundY - 35, 20, 35);
@@ -2161,6 +2358,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       phase: 'intro',
       loop: 1,
       inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
+      roofRepaired: false,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
@@ -2169,6 +2367,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       dialogueComplete: false,
       showInteractButton: false,
       nearbyNPC: null,
+      nearbyLocation: null,
       elderEntranceProgress: 0,
       playerMood: 'neutral',
       showHUD: false,
@@ -2178,6 +2377,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       showFail: false,
       showBrawl: false,
       brawlTimer: 0,
+      showCelebration: false,
+      celebrationTimer: 0,
       showChoice: false,
       choiceOptions: []
     };
@@ -2204,6 +2405,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       phase: 'loop2_intro',
       loop: 2,
       inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
+      roofRepaired: false,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
       ledgerEntries: [],
@@ -2212,6 +2414,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       dialogueComplete: false,
       showInteractButton: false,
       nearbyNPC: null,
+      nearbyLocation: null,
       elderEntranceProgress: 0,
       playerMood: 'neutral',
       showHUD: false,
@@ -2221,6 +2424,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       showFail: false,
       showBrawl: false,
       brawlTimer: 0,
+      showCelebration: false,
+      celebrationTimer: 0,
       showChoice: false,
       choiceOptions: []
     };

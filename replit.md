@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
 - Multiple choice dialogue system with red/green color-coded buttons
 
 ### World Layout (3500px wide)
-- **x=100** - Player Home (starting position)
+- **x=100** - Player Home (starting position, has hole in roof that can be fixed with wood)
 - **x=700** - Woodcutter (FIRST NPC - needs Sharp Stone for broken axe)
 - **x=1480** - Village Elder (separate from Stone Tablet, with spacing)
 - **x=1600** - Stone Tablet / Village Center marker

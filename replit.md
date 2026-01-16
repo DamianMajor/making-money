@@ -34,14 +34,20 @@ Preferred communication style: Simple, everyday language.
 - **x=1600** - Stone Tablet / Village Center marker
 - **x=2000** - Berry Bush (for foraging berries, gated until Fisherman gives fish)
 - **x=2500** - Stone-worker (gives stone, owes fish) - has originalX for reset
-- **x=3200** - Fisherman (gives fish, owes 3 berries) - has originalX for reset
+- **x=3200** - Fisherman (trades berries for fish, has fishing pole and pond) - stays at fishing hole, no walking to center
 
 ### NPC Movement System
 NPCs can walk toward a target position (targetX property):
-- Stone-worker and Fisherman have `originalX` to store their starting positions
-- After giving items, NPCs set `targetX` to Village Center and walk there at 80 units/second
-- This ensures NPCs are gathered at town center when player returns with berries
+- Woodcutter and Stone-worker have `originalX` to store their starting positions
+- After giving items on credit, Woodcutter and Stone-worker set `targetX` to Village Center and walk there at 80 units/second
+- Fisherman stays at his fishing hole (does NOT walk to center)
+- This ensures NPCs are gathered at town center when player returns with fish
 - On game reset or Loop 2 start, NPCs return to original positions
+
+### Fisherman Gating
+- Fisherman only trades berries for fish AFTER player has initiated debts (has wood AND stone)
+- Before debts initiated: "I'm still fishing... haven't caught anything yet!"
+- This prevents players from getting fish early and bypassing the intended game flow
 
 ### Brawl Trigger System (Credit-First)
 Loop 1 brawl trigger uses requirement-based checking:

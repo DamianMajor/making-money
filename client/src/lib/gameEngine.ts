@@ -672,13 +672,16 @@ export class VillageLedgerGame {
   }
 
   // ============ LOOP 1 & 2: FISHERMAN ============
-  // CREDIT-FIRST: Direct trade - exchanges 3 Berries for 3 Fish (available anytime!)
+  // Fisherman only trades berries for fish AFTER player has initiated debts (has wood AND stone)
   private handleFishermanInteraction(): void {
     const phase = this.state.phase;
     
-    // Check if player has berries to trade
+    // Check if player has items
     const hasBerries = this.state.inventory.berries >= 3;
     const alreadyHasFish = this.state.inventory.fish >= 3;
+    const hasWood = this.state.inventory.wood >= 1;
+    const hasStone = this.state.inventory.stone >= 1;
+    const debtsInitiated = hasWood && hasStone;
     
     // Player already has fish
     if (alreadyHasFish) {
@@ -689,7 +692,16 @@ export class VillageLedgerGame {
         }
       ]);
     }
-    // Fisherman will trade anytime player has 3 berries (he doesn't care about other dealings)
+    // Debts not yet initiated - Fisherman hasn't caught anything yet
+    else if (!debtsInitiated) {
+      this.queueDialogue([
+        {
+          speaker: 'FISHERMAN',
+          text: "I'd love to trade berries for fish! But I'm still fishing... haven't caught anything yet!"
+        }
+      ]);
+    }
+    // Debts initiated AND has berries - trade!
     else if (hasBerries) {
       this.queueDialogue([
         {
@@ -699,21 +711,18 @@ export class VillageLedgerGame {
             this.state.inventory.berries -= 3;
             this.state.inventory.fish = 3;
             this.showInventoryPopup('+3 FISH (-3 BERRIES)');
-            // Only update phase if player is ready (has stone already)
+            // Update phase based on current loop
             if (phase === 'got_stone_need_fish') {
               this.state.phase = 'got_fish_ready_settle';
-              // Walk to town center only if debts are owed
-              this.fisherman.targetX = this.villageCenterX + 100;
             } else if (phase === 'loop2_got_stone') {
               this.state.phase = 'loop2_got_fish';
-              this.fisherman.targetX = this.villageCenterX + 100;
             }
-            // If player trades berries early (before getting stone), just give fish but don't change phase
+            // Fisherman stays at his fishing hole - no walking to town center
           }
         }
       ]);
     }
-    // No berries - hint to get some
+    // Debts initiated but no berries - hint to get some
     else {
       this.queueDialogue([
         {
@@ -1507,6 +1516,56 @@ export class VillageLedgerGame {
       ctx.moveTo(centerScreenX - 20, groundY - 90);
       ctx.lineTo(centerScreenX + 30, groundY - 85);
       ctx.stroke();
+    }
+    
+    // Fishing Hole / Pond at Fisherman's location (x=3200)
+    const fishingHoleX = 3200;
+    const pondScreenX = fishingHoleX - this.cameraX;
+    if (pondScreenX > -150 && pondScreenX < this.canvas.width + 150) {
+      // Draw pond/water
+      ctx.fillStyle = '#4A90B8';
+      ctx.beginPath();
+      ctx.ellipse(pondScreenX - 40, groundY + 5, 70, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Pond edge/bank
+      ctx.strokeStyle = '#5D4E37';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(pondScreenX - 40, groundY + 5, 72, 22, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Water ripples
+      ctx.strokeStyle = '#6BB5D8';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(pondScreenX - 50, groundY, 20, 6, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(pondScreenX - 25, groundY + 8, 15, 4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Fishing pole (held by Fisherman, angled over pond)
+      ctx.strokeStyle = '#8B6914';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(pondScreenX + 30, groundY - 50); // Held at character level
+      ctx.lineTo(pondScreenX - 30, groundY - 80); // Tip extends over water
+      ctx.stroke();
+      
+      // Fishing line
+      ctx.strokeStyle = '#AAA';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pondScreenX - 30, groundY - 80); // From pole tip
+      ctx.lineTo(pondScreenX - 35, groundY - 5);  // Down to water
+      ctx.stroke();
+      
+      // Float/bobber
+      ctx.fillStyle = '#FF4444';
+      ctx.beginPath();
+      ctx.arc(pondScreenX - 35, groundY - 5, 4, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 

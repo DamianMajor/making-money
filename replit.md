@@ -81,7 +81,7 @@ When Elder successfully settles all recorded debts, a 3-second celebration plays
 
 ### Happy Face Timer
 - Happy mood (happy.png) triggers when receiving items, fixing roof, or settling debts
-- Automatically returns to neutral after 2 seconds via moodTimer
+- Automatically returns to neutral after 3 seconds via moodTimer (extended from 2s)
 
 ### Night Transition Animation
 When player completes Loop 2 successfully and returns home:
@@ -104,20 +104,24 @@ When player completes Loop 2 successfully and returns home:
 - Full opacity until 40% across world, then fades to 15% by 80%
 - Makes fisherman area feel more remote/outside village
 
-### Confrontation Dialogue Flow (Credit-First)
-The confrontation is a dispute over inflated debts:
-1. Woodcutter demands: "Give me my Sharp Stone and the 3 Fish you promised!"
-2. Player protests: "3 Fish?! I only promised you 1 Fish!"
-3. Stone-worker claims: "I was promised 4 Fish for my stone!"
-4. Player protests: "It was only 2 Fish! You're all lying!"
-5. Woodcutter: "Enough! You're trying to cheat us all!" → brawl animation
+### Loop 1 Settlement Phase (Interaction-Based Confrontation)
+The settlement phase requires player to interact with each NPC:
+1. Player arrives at Village Center with items → auto-transition to `settlement` phase
+2. NPCs move to Village Center (Woodcutter left, Stone-worker right)
+3. Player taps Woodcutter → Woodcutter claims 3 Fish (inflated from 1) → player protests → `woodcutterDisputed = true`
+4. Player taps Stone-worker → Stone-worker claims 4 Fish (inflated from 2) → player protests → `stoneworkerDisputed = true`
+5. Player taps Elder → Elder tries to check Stone Tablet → finds no records → Woodcutter triggers brawl
+6. Fail screen displays lesson about written records being essential
+
+State tracking: `woodcutterDisputed` and `stoneworkerDisputed` flags
+Dynamic hints guide player through each step of settlement
 
 ### NPC Movement System
 NPCs can walk toward a target position (targetX property):
 - Woodcutter and Stone-worker have `originalX` to store their starting positions
 - After giving items on credit, Woodcutter and Stone-worker set `targetX` to Village Center and walk there at 80 units/second
+- During settlement phase: NPCs move to flank player (Woodcutter to x-100, Stone-worker to x+100 after disputes)
 - Fisherman stays at his fishing hole (does NOT walk to center)
-- This ensures NPCs are gathered at town center when player returns with fish
 - On game reset or Loop 2 start, NPCs return to original positions
 
 ### Two-Loop Game State System
@@ -129,7 +133,8 @@ NPCs give items immediately on credit with verbal promises. No escort to tablet.
 3. `got_wood_need_stone` → `got_stone_need_fish` - Stone-worker gives STONE immediately, walks to center
 4. Player collects 3 berries from Berry Bush
 5. `got_stone_need_fish` → `got_fish_ready_settle` - Fisherman TRADES 3 berries for 3 fish
-6. `got_fish_ready_settle` → `confrontation` → `brawl` → `fail` - NPCs claim higher debts than agreed (gaslighting)
+6. `got_fish_ready_settle` → `settlement` - Player interacts with each NPC individually
+7. `settlement` → `confrontation` → `brawl` → `fail` - Elder mediation fails, brawl triggered
 
 **Loop 2 (Success Path - Escort-to-Tablet Recording):**
 NPCs offer a choice: verbal promise OR walk to Stone Tablet together to record the debt.

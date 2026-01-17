@@ -36,11 +36,11 @@ interface LedgerEntry {
 
 interface GameState {
   // CREDIT-FIRST FLOW:
-  // Loop 1: intro -> need_wood -> escorting_woodcutter -> got_wood_need_stone -> escorting_stoneworker -> got_stone_need_fish -> (collect berries) -> got_fish_ready_settle -> confrontation -> brawl -> fail
+  // Loop 1: intro -> need_wood -> got_wood_need_stone -> got_stone_need_fish -> (collect berries) -> got_fish_ready_settle -> settlement -> confrontation -> brawl -> fail
   // Loop 2: Same but with choice to record debts on Stone Tablet -> success path (partial recording = partial conflict)
-  phase: 'intro' | 'need_wood' | 'escorting_woodcutter' | 'got_wood_need_stone' | 'escorting_stoneworker' | 'got_stone_need_fish' | 'got_fish_ready_settle' | 'confrontation' | 'brawl' | 'fail' | 'loop2_intro' | 'loop2_need_wood' | 'loop2_escorting_woodcutter' | 'loop2_got_wood' | 'loop2_escorting_stoneworker' | 'loop2_got_stone' | 'loop2_got_fish' | 'loop2_got_berries' | 'loop2_return' | 'complete_success' | 'quiz' | 'complete';
+  phase: 'intro' | 'need_wood' | 'got_wood_need_stone' | 'got_stone_need_fish' | 'got_fish_ready_settle' | 'settlement' | 'confrontation' | 'brawl' | 'fail' | 'loop2_intro' | 'loop2_need_wood' | 'loop2_escorting_woodcutter' | 'loop2_got_wood' | 'loop2_escorting_stoneworker' | 'loop2_got_stone' | 'loop2_got_fish' | 'loop2_got_berries' | 'loop2_return' | 'complete_success' | 'quiz' | 'complete';
   loop: 1 | 2;
-  // Track escort state - NPC following player to tablet
+  // Track escort state - NPC following player to tablet (Loop 2 only)
   escortingNPC: 'woodcutter' | 'stoneworker' | null;
   inventory: {
     stone: number;
@@ -56,6 +56,9 @@ interface GameState {
   // Track which debts are recorded on the Stone Tablet (Loop 2 only)
   woodcutterDebtRecorded: boolean;
   stoneWorkerDebtRecorded: boolean;
+  // Loop 1 settlement disputes - track who has been confronted
+  woodcutterDisputed: boolean;
+  stoneworkerDisputed: boolean;
   ledgerEntries: LedgerEntry[];
   dialogueQueue: DialogueLine[];
   currentDialogue: DialogueLine | null;
@@ -265,6 +268,8 @@ export class VillageLedgerGame {
       escortingNPC: null,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
+      woodcutterDisputed: false,
+      stoneworkerDisputed: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -775,6 +780,40 @@ export class VillageLedgerGame {
         }
       ]);
     }
+    // LOOP 1 SETTLEMENT: Player tries to settle - Woodcutter claims inflated debt
+    else if (phase === 'settlement' && !this.state.woodcutterDisputed) {
+      // Woodcutter steps to the left to confront player
+      this.woodcutter.targetX = this.villageCenterX - 100;
+      this.queueDialogue([
+        {
+          speaker: 'WOODCUTTER',
+          text: "Finally! Give me my Sharp Stone and the 3 Fish you promised!",
+          onComplete: () => {
+            this.setMood('angry');
+          }
+        },
+        {
+          speaker: 'YOU',
+          text: "3 Fish?! I only promised you 1 Fish along with the stone!"
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "You're lying! I remember clearly - you said 3 Fish!",
+          onComplete: () => {
+            this.state.woodcutterDisputed = true;
+          }
+        }
+      ]);
+    }
+    // After Woodcutter dispute
+    else if (phase === 'settlement' && this.state.woodcutterDisputed) {
+      this.queueDialogue([
+        {
+          speaker: 'WOODCUTTER',
+          text: "I know what you promised! 3 Fish, not 1! Talk to the Stone-worker too!"
+        }
+      ]);
+    }
     // Loop 2: Redirect to Elder at Village Center
     else if (phase === 'loop2_got_fish') {
       this.queueDialogue([
@@ -926,6 +965,40 @@ export class VillageLedgerGame {
         }
       ]);
     }
+    // LOOP 1 SETTLEMENT: Player tries to settle - Stone-worker claims inflated debt
+    else if (phase === 'settlement' && !this.state.stoneworkerDisputed) {
+      // Stone-worker steps to the right to confront player
+      this.stoneWorker.targetX = this.villageCenterX + 100;
+      this.queueDialogue([
+        {
+          speaker: 'STONE-WORKER',
+          text: "And where are my 4 Fish?! You promised me 4 Fish for that stone!",
+          onComplete: () => {
+            this.setMood('angry');
+          }
+        },
+        {
+          speaker: 'YOU',
+          text: "4 Fish?! I said 2 Fish! You're making that up!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "I never make things up! You owe me 4 Fish!",
+          onComplete: () => {
+            this.state.stoneworkerDisputed = true;
+          }
+        }
+      ]);
+    }
+    // After Stone-worker dispute
+    else if (phase === 'settlement' && this.state.stoneworkerDisputed) {
+      this.queueDialogue([
+        {
+          speaker: 'STONE-WORKER',
+          text: "You owe me 4 Fish! Maybe the Elder can sort this out!"
+        }
+      ]);
+    }
     // Loop 2: Redirect to Elder at Village Center
     else if (phase === 'loop2_got_fish') {
       this.queueDialogue([
@@ -1045,6 +1118,61 @@ export class VillageLedgerGame {
           text: "I write my ideas on this Stone Tablet so I never forget. It is the only truth in this village."
         }
       ]);
+    }
+    // LOOP 1 SETTLEMENT: Elder tries to mediate after both disputes
+    else if (phase === 'settlement') {
+      if (this.state.woodcutterDisputed && this.state.stoneworkerDisputed) {
+        // Both have disputed - Elder tries to help but can't
+        this.queueDialogue([
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "What is all this shouting about? Let me try to help..."
+          },
+          {
+            speaker: 'WOODCUTTER',
+            text: "This person owes me 3 Fish! Not 1!"
+          },
+          {
+            speaker: 'STONE-WORKER',
+            text: "And they owe ME 4 Fish! Not 2!"
+          },
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "Calm down, all of you! Let me check the Stone Tablet for the truth..."
+          },
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "But... there is nothing written here. No record of these debts.",
+            onComplete: () => {
+              this.setMood('angry');
+            }
+          },
+          {
+            speaker: 'WOODCUTTER',
+            text: "Enough talk! You're trying to cheat us all!",
+            onComplete: () => {
+              // Trigger the brawl
+              this.state.phase = 'confrontation';
+              this.state.showBrawl = true;
+              this.state.brawlTimer = 0;
+            }
+          }
+        ]);
+      } else if (!this.state.woodcutterDisputed) {
+        this.queueDialogue([
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "It seems there is a dispute brewing. Speak with the Woodcutter first."
+          }
+        ]);
+      } else if (!this.state.stoneworkerDisputed) {
+        this.queueDialogue([
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "The Woodcutter seems upset. You should also speak with the Stone-worker."
+          }
+        ]);
+      }
     }
     // Loop 2: More helpful hint (before player has recorded debts)
     else if (this.state.loop === 2 && (phase === 'loop2_need_wood' || phase === 'loop2_got_wood')) {
@@ -1319,13 +1447,41 @@ export class VillageLedgerGame {
       }
     }
     
-    // CREDIT-FIRST BRAWL TRIGGER
-    // Trigger brawl when: player has stone + 3 fish AND is on verbal promise path (got_fish_ready_settle)
-    // AND is within 200px of Village Center. This happens in Loop 1 automatically,
-    // or in Loop 2 if player chose verbal promise instead of ledger.
-    const isVerbalPromisePath = this.state.phase === 'got_fish_ready_settle';
-    const hasRequirements = this.state.inventory.stone >= 1 && 
-                            this.state.inventory.fish >= 3;
+    // LOOP 1: Auto-transition to settlement phase when player arrives at Village Center with items
+    // The actual confrontation is triggered by interacting with NPCs in settlement phase
+    if (this.state.loop === 1 && this.state.phase === 'got_fish_ready_settle') {
+      const nearVillageCenter = Math.abs(this.player.x - this.villageCenterX) < 200;
+      const hasRequirements = this.state.inventory.stone >= 1 && this.state.inventory.fish >= 3;
+      if (nearVillageCenter && hasRequirements && !this.state.currentDialogue) {
+        this.state.phase = 'settlement';
+        // Move NPCs to village center area for the confrontation
+        this.woodcutter.targetX = this.villageCenterX - 50;
+        this.stoneWorker.targetX = this.villageCenterX + 50;
+      }
+    }
+    
+    // Move NPCs during settlement phase
+    if (this.state.phase === 'settlement') {
+      // Woodcutter moves toward target
+      if (this.woodcutter.targetX !== null) {
+        const dx = this.woodcutter.targetX - this.woodcutter.x;
+        if (Math.abs(dx) > 5) {
+          this.woodcutter.x += Math.sign(dx) * 80 * dt;
+        }
+      }
+      // Stone-worker moves toward target
+      if (this.stoneWorker.targetX !== null) {
+        const dx = this.stoneWorker.targetX - this.stoneWorker.x;
+        if (Math.abs(dx) > 5) {
+          this.stoneWorker.x += Math.sign(dx) * 80 * dt;
+        }
+      }
+    }
+    
+    // LOOP 2: Verbal promise path auto-trigger brawl (unchanged behavior for Loop 2)
+    const isLoop2VerbalPath = this.state.loop === 2 && this.state.phase === 'loop2_got_fish' && 
+                              !this.state.woodcutterDebtRecorded && !this.state.stoneWorkerDebtRecorded;
+    const hasRequirements = this.state.inventory.stone >= 1 && this.state.inventory.fish >= 3;
     const nearVillageCenter = Math.abs(this.player.x - this.villageCenterX) < 200;
     const canTrigger = !this.state.showBrawl && 
                        !this.state.currentDialogue && 
@@ -1333,7 +1489,7 @@ export class VillageLedgerGame {
                        this.state.phase !== 'brawl' && 
                        this.state.phase !== 'fail';
     
-    if (isVerbalPromisePath && hasRequirements && nearVillageCenter && canTrigger) {
+    if (isLoop2VerbalPath && hasRequirements && nearVillageCenter && canTrigger) {
       this.triggerConfrontation();
     }
 
@@ -2400,6 +2556,15 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         case 'got_fish_ready_settle':
           hint = 'Return to Village Center to settle debts...';
           break;
+        case 'settlement':
+          if (!this.state.woodcutterDisputed) {
+            hint = 'Talk to the Woodcutter about your debt...';
+          } else if (!this.state.stoneworkerDisputed) {
+            hint = 'Talk to the Stone-worker about your debt...';
+          } else {
+            hint = 'Ask the Elder to help settle the dispute...';
+          }
+          break;
         case 'loop2_got_fish':
           hint = 'Visit the Elder to settle debts...';
           break;
@@ -2528,9 +2693,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   private setMood(mood: 'neutral' | 'happy' | 'angry') {
     this.state.playerMood = mood;
-    // Set timer for auto-reset to neutral (2 seconds for happy, no timer for angry/neutral)
+    // Set timer for auto-reset to neutral (3 seconds for happy, no timer for angry/neutral)
     if (mood === 'happy') {
-      this.state.moodTimer = 2;
+      this.state.moodTimer = 3; // Extended from 2 to 3 seconds
+      console.log('MOOD: Set to happy, timer=3');
     } else {
       this.state.moodTimer = 0;
     }
@@ -2752,6 +2918,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       escortingNPC: null,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
+      woodcutterDisputed: false,
+      stoneworkerDisputed: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -2805,6 +2973,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       escortingNPC: null,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
+      woodcutterDisputed: false,
+      stoneworkerDisputed: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,

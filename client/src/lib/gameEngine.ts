@@ -650,51 +650,23 @@ export class VillageLedgerGame {
   private handleWoodcutterInteraction(): void {
     const phase = this.state.phase;
     
-    // LOOP 1: First visit - start escort to tablet
+    // LOOP 1: Give wood immediately on credit (verbal promise) - no escort
     if (phase === 'need_wood') {
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
-          text: "I can give you wood for your roof! But first, let's walk to the Stone Tablet together to record our agreement. I'll walk with you!",
+          text: "A storm is coming? Here, take this wood for your roof! You owe me a Sharp Stone and 1 Fish. I'll meet you at the Village Center later.",
           onComplete: () => {
-            this.state.phase = 'escorting_woodcutter';
-            this.state.escortingNPC = 'woodcutter';
-            // NPC will follow player via escort behavior in update loop
+            this.state.inventory.wood = 1;
+            this.state.obtainedWood = true;
+            this.showInventoryPopup('+1 WOOD');
+            this.setMood('happy');
+            this.state.phase = 'got_wood_need_stone';
+            // Woodcutter walks to village center
+            this.woodcutter.targetX = this.villageCenterX - 50;
           }
         }
       ]);
-    }
-    // Arrived at tablet - record debt and give wood
-    else if (phase === 'escorting_woodcutter') {
-      // Check if both player and woodcutter are at village center
-      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
-      const woodcutterAtCenter = Math.abs(this.woodcutter.x - this.villageCenterX) < 150;
-      
-      if (playerAtCenter && woodcutterAtCenter) {
-        this.queueDialogue([
-          {
-            speaker: 'WOODCUTTER',
-            text: "Good, we're at the Stone Tablet. I'll give you Wood now. You owe me a Sharp Stone and 1 Fish!",
-            onComplete: () => {
-              this.state.inventory.wood = 1;
-              this.state.obtainedWood = true;
-              this.showInventoryPopup('+1 WOOD');
-              this.setMood('happy');
-              this.state.phase = 'got_wood_need_stone';
-              this.state.escortingNPC = null;
-              // Stay at center
-              this.woodcutter.targetX = this.villageCenterX - 50;
-            }
-          }
-        ]);
-      } else {
-        this.queueDialogue([
-          {
-            speaker: 'WOODCUTTER',
-            text: "Let's keep walking to the Stone Tablet at the Village Center!"
-          }
-        ]);
-      }
     }
     // LOOP 2: First visit - offer choice
     else if (phase === 'loop2_need_wood') {
@@ -840,49 +812,23 @@ export class VillageLedgerGame {
   private handleStoneWorkerInteraction(): void {
     const phase = this.state.phase;
     
-    // LOOP 1: First visit - start escort to tablet
+    // LOOP 1: Give stone immediately on credit (verbal promise) - no escort
     if (phase === 'got_wood_need_stone') {
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
-          text: "Need a sharp stone? Let's walk to the Stone Tablet together first. I'll walk with you!",
+          text: "Need a sharp stone for the Woodcutter's axe? Here you go! You owe me 2 Fish. I'll meet you at the Village Center later.",
           onComplete: () => {
-            this.state.phase = 'escorting_stoneworker';
-            this.state.escortingNPC = 'stoneworker';
-            // NPC will follow player via escort behavior
+            this.state.inventory.stone = 1;
+            this.state.obtainedStone = true;
+            this.showInventoryPopup('+1 SHARP STONE');
+            this.setMood('happy');
+            this.state.phase = 'got_stone_need_fish';
+            // Stone-worker walks to village center
+            this.stoneWorker.targetX = this.villageCenterX + 50;
           }
         }
       ]);
-    }
-    // Arrived at tablet - record debt and give stone
-    else if (phase === 'escorting_stoneworker') {
-      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
-      const stoneWorkerAtCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 150;
-      
-      if (playerAtCenter && stoneWorkerAtCenter) {
-        this.queueDialogue([
-          {
-            speaker: 'STONE-WORKER',
-            text: "Good, we're at the Stone Tablet. Here's your Sharp Stone! You owe me 2 Fish!",
-            onComplete: () => {
-              this.state.inventory.stone = 1;
-              this.state.obtainedStone = true;
-              this.showInventoryPopup('+1 SHARP STONE');
-              this.setMood('happy');
-              this.state.phase = 'got_stone_need_fish';
-              this.state.escortingNPC = null;
-              this.stoneWorker.targetX = this.villageCenterX + 50;
-            }
-          }
-        ]);
-      } else {
-        this.queueDialogue([
-          {
-            speaker: 'STONE-WORKER',
-            text: "Let's keep walking to the Stone Tablet at the Village Center!"
-          }
-        ]);
-      }
     }
     // LOOP 2: Offer choice to record or promise
     else if (phase === 'loop2_got_wood') {
@@ -1258,9 +1204,9 @@ export class VillageLedgerGame {
     this.npcs.forEach((npc, i) => {
       npc.bobOffset = Math.sin(this.bobTimer * 0.5 + i * 1.5) * 1.5;
       
-      // ESCORT BEHAVIOR: NPC follows player during escort phases
-      const isEscortingWoodcutter = (this.state.phase === 'escorting_woodcutter' || this.state.phase === 'loop2_escorting_woodcutter') && npc.id === 'woodcutter';
-      const isEscortingStoneworker = (this.state.phase === 'escorting_stoneworker' || this.state.phase === 'loop2_escorting_stoneworker') && npc.id === 'stoneWorker';
+      // LOOP 2 ESCORT BEHAVIOR: NPC follows player during Loop 2 escort phases
+      const isEscortingWoodcutter = this.state.phase === 'loop2_escorting_woodcutter' && npc.id === 'woodcutter';
+      const isEscortingStoneworker = this.state.phase === 'loop2_escorting_stoneworker' && npc.id === 'stoneWorker';
       
       if (isEscortingWoodcutter || isEscortingStoneworker) {
         // Simple escort: NPC always moves toward its target position at the village center
@@ -1354,18 +1300,18 @@ export class VillageLedgerGame {
       this.interactButtonOpacity = Math.max(0, this.interactButtonOpacity - dt * fadeSpeed);
     }
 
-    // ESCORT ARRIVAL TRIGGER
-    // Auto-trigger dialogue when player arrives at village center during escort phases
-    const escortPhases = ['escorting_woodcutter', 'escorting_stoneworker', 'loop2_escorting_woodcutter', 'loop2_escorting_stoneworker'];
+    // LOOP 2 ESCORT ARRIVAL TRIGGER
+    // Auto-trigger dialogue when player arrives at village center during Loop 2 escort phases
+    const escortPhases = ['loop2_escorting_woodcutter', 'loop2_escorting_stoneworker'];
     if (escortPhases.includes(this.state.phase) && !this.state.currentDialogue) {
       const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
       
-      if (this.state.phase === 'escorting_woodcutter' || this.state.phase === 'loop2_escorting_woodcutter') {
+      if (this.state.phase === 'loop2_escorting_woodcutter') {
         const woodcutterAtCenter = Math.abs(this.woodcutter.x - this.villageCenterX) < 150;
         if (playerAtCenter && woodcutterAtCenter) {
           this.handleWoodcutterInteraction();
         }
-      } else if (this.state.phase === 'escorting_stoneworker' || this.state.phase === 'loop2_escorting_stoneworker') {
+      } else if (this.state.phase === 'loop2_escorting_stoneworker') {
         const stoneWorkerAtCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 150;
         if (playerAtCenter && stoneWorkerAtCenter) {
           this.handleStoneWorkerInteraction();

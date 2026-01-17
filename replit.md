@@ -120,44 +120,36 @@ NPCs can walk toward a target position (targetX property):
 - This ensures NPCs are gathered at town center when player returns with fish
 - On game reset or Loop 2 start, NPCs return to original positions
 
-### Escort Behavior
-During escort phases, NPCs move directly toward the Village Center:
+### Two-Loop Game State System
+
+**Loop 1 (Failure Path - Credit-First, Verbal Promises):**
+NPCs give items immediately on credit with verbal promises. No escort to tablet.
+1. `intro` → `need_wood` - Storm approaching, need wood from Woodcutter
+2. `need_wood` → `got_wood_need_stone` - Woodcutter gives WOOD immediately, walks to village center
+3. `got_wood_need_stone` → `got_stone_need_fish` - Stone-worker gives STONE immediately, walks to center
+4. Player collects 3 berries from Berry Bush
+5. `got_stone_need_fish` → `got_fish_ready_settle` - Fisherman TRADES 3 berries for 3 fish
+6. `got_fish_ready_settle` → `confrontation` → `brawl` → `fail` - NPCs claim higher debts than agreed (gaslighting)
+
+**Loop 2 (Success Path - Escort-to-Tablet Recording):**
+NPCs offer a choice: verbal promise OR walk to Stone Tablet together to record the debt.
+1. `loop2_need_wood` - Player chooses: "verbal promise" or "record on Stone Tablet"
+2. If "record": NPC escorts player to Village Center, records debt, THEN gives item
+3. `loop2_escorting_woodcutter` / `loop2_escorting_stoneworker` - Escort phases
+4. Partial recording supported - can record some debts but not others
+5. Settlement outcomes based on what was recorded:
+   - ALL debts recorded → Elder settles peacefully → quiz → success
+   - SOME debts recorded → Elder settles recorded, unrecorded cause dispute → brawl
+   - NO debts recorded → full confrontation/brawl like Loop 1
+6. `loop2_return` → `complete_success` → Quiz tests understanding
+
+### Loop 2 Escort Behavior
+During Loop 2 escort phases, NPCs move directly toward the Village Center:
 - NPC moves at 180 units/second toward its target position
 - Woodcutter target: x=1550 (left of center)
 - Stone-worker target: x=1650 (right of center)
-- Movement starts immediately when escort phase begins
-- NPC arrives at center independently of player position
-
-### Escort Auto-Trigger
-When both player AND NPC are within 150 units of Village Center:
-- If no dialogue active, auto-trigger fires
-- Queues delivery dialogue: "Good, we're at the Stone Tablet..."
-- onComplete gives item (+1 WOOD or +1 STONE popup)
-- Sets happy mood, advances phase
-
-### Two-Loop Game State System (Escort-to-Tablet Design)
-The game uses an "Escort Flow" design where NPCs walk with the player to the Stone Tablet first, record the agreement, and THEN give items.
-
-**Loop 1 (Failure Path - Verbal Promises):**
-1. `intro` → `need_wood` - Storm approaching, need wood from Woodcutter
-2. `need_wood` → `escorting_woodcutter` - Woodcutter says "Let's walk to the tablet together"
-3. `escorting_woodcutter` → `got_wood_need_stone` - At tablet, Woodcutter gives WOOD, creates verbal debt
-4. `got_wood_need_stone` → `escorting_stoneworker` - Stone-worker says "Let's walk to the tablet"
-5. `escorting_stoneworker` → `got_stone_need_fish` - At tablet, Stone-worker gives STONE, creates verbal debt
-6. Player collects 3 berries from Berry Bush (available anytime - no gating)
-7. `got_stone_need_fish` → `got_fish_ready_settle` - Fisherman TRADES 3 berries for 3 fish
-8. `got_fish_ready_settle` → `confrontation` → `brawl` → `fail` - NPCs claim higher debts than agreed
-
-**Loop 2 (Success Path - Stone Tablet Recording):**
-1. Same escort flow but with choice dialogue offering "verbal promise" vs "record on Stone Tablet"
-2. Items given AFTER walking to tablet (not immediately)
-3. Partial recording is supported - player can record some debts but not others
-4. Settlement outcomes based on recording:
-   - ALL debts recorded → Elder settles peacefully → quiz → success
-   - SOME debts recorded → Elder settles recorded debts peacefully, unrecorded debts cause dispute → brawl
-   - NO debts recorded → full confrontation/brawl like Loop 1
-4. `loop2_return` → `complete_success` → Quiz tests player's understanding
-5. Success screen with educational message
+- Auto-trigger fires when both player AND NPC are within 150 units of center
+- Delivery dialogue queues, item given after dialogue advances
 
 **Key Design Principles:**
 - Items given on CREDIT (not earned through tasks) - creates trust-based social contract

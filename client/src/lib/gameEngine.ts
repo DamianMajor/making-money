@@ -62,6 +62,11 @@ interface GameState {
   // Loop 2 direct settlement tracking
   woodcutterSettled: boolean;
   stoneWorkerSettled: boolean;
+  // Pending dispute flags - show choice after dialogue
+  pendingWoodcutterDispute: boolean;
+  pendingStoneWorkerDispute: boolean;
+  // Elder has verified debts at tablet - NPCs accept payment without dispute
+  elderVerified: boolean;
   ledgerEntries: LedgerEntry[];
   dialogueQueue: DialogueLine[];
   currentDialogue: DialogueLine | null;
@@ -284,6 +289,9 @@ export class VillageLedgerGame {
       stoneworkerDisputed: false,
       woodcutterSettled: false,
       stoneWorkerSettled: false,
+      pendingWoodcutterDispute: false,
+      pendingStoneWorkerDispute: false,
+      elderVerified: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -879,10 +887,9 @@ export class VillageLedgerGame {
         }
       ]);
     }
-    // Loop 2: Direct settlement attempt - player can try to settle directly
+    // Loop 2: Direct settlement attempt - NPC always disputes first
     else if (phase === 'loop2_got_fish' || phase === 'loop2_verify_at_tablet') {
       const hasFishForWoodcutter = this.state.inventory.fish >= 1;
-      const debtRecorded = this.state.woodcutterDebtRecorded;
       
       if (!hasFishForWoodcutter) {
         this.queueDialogue([
@@ -894,111 +901,49 @@ export class VillageLedgerGame {
         return;
       }
       
-      // Offer to settle directly
-      this.state.showChoice = true;
-      this.state.choiceOptions = [
-        {
-          text: "Here's 1 Fish I owe you for the wood.",
-          action: () => {
-            this.state.showChoice = false;
-            if (debtRecorded) {
-              // Debt was recorded - NPC agrees!
-              this.state.inventory.fish -= 1;
-              this.setMood('happy');
-              this.queueDialogue([
-                {
-                  speaker: 'WOODCUTTER',
-                  text: "Yes, the Stone Tablet confirms you owe me 1 Fish. Thank you for your honesty!",
-                  onComplete: () => {
-                    // Mark woodcutter debt as settled
-                    this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
-                      e.name === 'Woodcutter' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
-                    );
-                    this.hudGlow = 1;
-                    this.state.woodcutterSettled = true;
-                    this.checkAllDebtsSettled();
-                  }
-                }
-              ]);
-            } else {
-              // Debt was NOT recorded - NPC disputes (gaslighting)
-              this.setMood('angry');
-              this.queueDialogue([
-                {
-                  speaker: 'WOODCUTTER',
-                  text: "1 Fish?! You promised me 3 Fish for that wood! Are you trying to cheat me?!",
-                  onComplete: () => {
-                    // Offer to verify at tablet
-                    this.state.showChoice = true;
-                    this.state.choiceOptions = [
-                      {
-                        text: "Let's check the Stone Tablet together!",
-                        action: () => {
-                          this.state.showChoice = false;
-                          this.queueDialogue([
-                            {
-                              speaker: 'WOODCUTTER',
-                              text: "Fine! The Tablet will prove I'm right! Let's go!",
-                              onComplete: () => {
-                                // Walk to tablet together - trigger Elder interaction
-                                this.state.phase = 'loop2_verify_at_tablet';
-                                this.woodcutter.targetX = this.villageCenterX - 50;
-                              }
-                            }
-                          ]);
-                        }
-                      },
-                      {
-                        text: "Fine, take 3 Fish then...",
-                        action: () => {
-                          this.state.showChoice = false;
-                          // Player gives in to gaslighting - bad ending potential
-                          if (this.state.inventory.fish >= 3) {
-                            this.state.inventory.fish -= 3;
-                            this.queueDialogue([
-                              {
-                                speaker: 'WOODCUTTER',
-                                text: "That's more like it!",
-                                onComplete: () => {
-                                  this.state.woodcutterSettled = true;
-                                  this.checkAllDebtsSettled();
-                                }
-                              }
-                            ]);
-                          } else {
-                            this.queueDialogue([
-                              {
-                                speaker: 'YOU',
-                                text: "I don't have 3 Fish... Let's check the Stone Tablet!",
-                                onComplete: () => {
-                                  this.state.phase = 'loop2_verify_at_tablet';
-                                  this.woodcutter.targetX = this.villageCenterX - 50;
-                                }
-                              }
-                            ]);
-                          }
-                        }
-                      }
-                    ];
-                  }
-                }
-              ]);
+      // If already settled, just confirm
+      if (this.state.woodcutterSettled) {
+        this.queueDialogue([
+          {
+            speaker: 'WOODCUTTER',
+            text: "We're all settled! Thanks for being honest."
+          }
+        ]);
+        return;
+      }
+      
+      // If Elder has verified, NPC accepts payment without dispute
+      if (this.state.elderVerified && this.state.woodcutterDebtRecorded) {
+        this.state.inventory.fish -= 1;
+        this.setMood('happy');
+        this.queueDialogue([
+          {
+            speaker: 'WOODCUTTER',
+            text: "The Elder has spoken. 1 Fish it is - thank you!",
+            onComplete: () => {
+              this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
+                e.name === 'Woodcutter' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+              );
+              this.hudGlow = 1;
+              this.state.woodcutterSettled = true;
+              this.checkAllDebtsSettled();
             }
           }
-        },
+        ]);
+        return;
+      }
+      
+      // NPC disputes - triggers verification need
+      this.setMood('angry');
+      this.queueDialogue([
         {
-          text: "I'll settle with the Village Elder first.",
-          action: () => {
-            this.state.showChoice = false;
-            this.queueDialogue([
-              {
-                speaker: 'WOODCUTTER',
-                text: "Very well! The Elder and the Stone Tablet will sort everything out."
-              }
-            ]);
-          }
+          speaker: 'WOODCUTTER',
+          text: "1 Fish?! I remember you promised me 3 Fish for that wood! Are you trying to cheat me?!"
         }
-      ];
+      ]);
+      
+      // Show choice after dispute dialogue ends
+      this.state.pendingWoodcutterDispute = true;
     }
     // Loop 2 SUCCESS: Debts settled via ledger
     else if (phase === 'loop2_return') {
@@ -1176,10 +1121,9 @@ export class VillageLedgerGame {
         }
       ]);
     }
-    // Loop 2: Direct settlement attempt - player can try to settle directly
+    // Loop 2: Direct settlement attempt - NPC always disputes first
     else if (phase === 'loop2_got_fish' || phase === 'loop2_verify_at_tablet') {
       const hasFishForStoneworker = this.state.inventory.fish >= 2;
-      const debtRecorded = this.state.stoneWorkerDebtRecorded;
       
       if (!hasFishForStoneworker) {
         this.queueDialogue([
@@ -1191,111 +1135,49 @@ export class VillageLedgerGame {
         return;
       }
       
-      // Offer to settle directly
-      this.state.showChoice = true;
-      this.state.choiceOptions = [
-        {
-          text: "Here's 2 Fish I owe you for the stone.",
-          action: () => {
-            this.state.showChoice = false;
-            if (debtRecorded) {
-              // Debt was recorded - NPC agrees!
-              this.state.inventory.fish -= 2;
-              this.setMood('happy');
-              this.queueDialogue([
-                {
-                  speaker: 'STONE-WORKER',
-                  text: "Yes, the Stone Tablet confirms you owe me 2 Fish. Thank you for your honesty!",
-                  onComplete: () => {
-                    // Mark stoneworker debt as settled
-                    this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
-                      e.name === 'Stone-worker' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
-                    );
-                    this.hudGlow = 1;
-                    this.state.stoneWorkerSettled = true;
-                    this.checkAllDebtsSettled();
-                  }
-                }
-              ]);
-            } else {
-              // Debt was NOT recorded - NPC disputes (gaslighting)
-              this.setMood('angry');
-              this.queueDialogue([
-                {
-                  speaker: 'STONE-WORKER',
-                  text: "2 Fish?! You promised me 4 Fish for that stone! Are you trying to cheat me?!",
-                  onComplete: () => {
-                    // Offer to verify at tablet
-                    this.state.showChoice = true;
-                    this.state.choiceOptions = [
-                      {
-                        text: "Let's check the Stone Tablet together!",
-                        action: () => {
-                          this.state.showChoice = false;
-                          this.queueDialogue([
-                            {
-                              speaker: 'STONE-WORKER',
-                              text: "Fine! The Tablet will prove I'm right! Let's go!",
-                              onComplete: () => {
-                                // Walk to tablet together - trigger Elder interaction
-                                this.state.phase = 'loop2_verify_at_tablet';
-                                this.stoneWorker.targetX = this.villageCenterX + 50;
-                              }
-                            }
-                          ]);
-                        }
-                      },
-                      {
-                        text: "Fine, take 4 Fish then...",
-                        action: () => {
-                          this.state.showChoice = false;
-                          // Player gives in to gaslighting - bad ending potential
-                          if (this.state.inventory.fish >= 4) {
-                            this.state.inventory.fish -= 4;
-                            this.queueDialogue([
-                              {
-                                speaker: 'STONE-WORKER',
-                                text: "That's more like it!",
-                                onComplete: () => {
-                                  this.state.stoneWorkerSettled = true;
-                                  this.checkAllDebtsSettled();
-                                }
-                              }
-                            ]);
-                          } else {
-                            this.queueDialogue([
-                              {
-                                speaker: 'YOU',
-                                text: "I don't have 4 Fish... Let's check the Stone Tablet!",
-                                onComplete: () => {
-                                  this.state.phase = 'loop2_verify_at_tablet';
-                                  this.stoneWorker.targetX = this.villageCenterX + 50;
-                                }
-                              }
-                            ]);
-                          }
-                        }
-                      }
-                    ];
-                  }
-                }
-              ]);
+      // If already settled, just confirm
+      if (this.state.stoneWorkerSettled) {
+        this.queueDialogue([
+          {
+            speaker: 'STONE-WORKER',
+            text: "We're all settled! Thanks for being honest."
+          }
+        ]);
+        return;
+      }
+      
+      // If Elder has verified, NPC accepts payment without dispute
+      if (this.state.elderVerified && this.state.stoneWorkerDebtRecorded) {
+        this.state.inventory.fish -= 2;
+        this.setMood('happy');
+        this.queueDialogue([
+          {
+            speaker: 'STONE-WORKER',
+            text: "The Elder has spoken. 2 Fish it is - thank you!",
+            onComplete: () => {
+              this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
+                e.name === 'Stone-worker' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+              );
+              this.hudGlow = 1;
+              this.state.stoneWorkerSettled = true;
+              this.checkAllDebtsSettled();
             }
           }
-        },
+        ]);
+        return;
+      }
+      
+      // NPC disputes - triggers verification need
+      this.setMood('angry');
+      this.queueDialogue([
         {
-          text: "I'll settle with the Village Elder first.",
-          action: () => {
-            this.state.showChoice = false;
-            this.queueDialogue([
-              {
-                speaker: 'STONE-WORKER',
-                text: "Very well! The Elder and the Stone Tablet will sort everything out."
-              }
-            ]);
-          }
+          speaker: 'STONE-WORKER',
+          text: "2 Fish?! I remember you promised me 4 Fish for that stone! Are you trying to cheat me?!"
         }
-      ];
+      ]);
+      
+      // Show choice after dispute dialogue ends
+      this.state.pendingStoneWorkerDispute = true;
     }
     else {
       this.queueDialogue([
@@ -1482,32 +1364,42 @@ export class VillageLedgerGame {
       const noneRecorded = !this.state.woodcutterDebtRecorded && !this.state.stoneWorkerDebtRecorded;
       
       if (bothRecorded) {
-        // ALL RECORDED - Peaceful settlement
+        // ALL RECORDED - Elder confirms, but player must still deliver items
         this.setMood('happy');
-        this.queueDialogue([
-          {
-            speaker: 'VILLAGE ELDER',
-            text: "Let me check the Stone Tablet... All debts are recorded clearly here.",
-            onComplete: () => {
-              // Mark all debts as settled
-              this.state.ledgerEntries = this.state.ledgerEntries.map(e => ({
-                ...e,
-                debt: e.debt.replace('OWED', 'SETTLED')
-              }));
-              this.hudGlow = 1;
+        
+        // Check if player has already delivered to both NPCs
+        if (this.state.woodcutterSettled && this.state.stoneWorkerSettled) {
+          // Already delivered - trigger celebration!
+          this.queueDialogue([
+            {
+              speaker: 'VILLAGE ELDER',
+              text: "All debts are paid and recorded. Peace is restored to our village!",
+              onComplete: () => {
+                this.state.phase = 'loop2_return';
+                this.state.showCelebration = true;
+                this.state.celebrationTimer = 0;
+              }
             }
-          },
-          {
-            speaker: 'VILLAGE ELDER',
-            text: "The Stone does not lie. Your debts are recorded clearly. Now deliver what you owe!",
-            onComplete: () => {
-              this.state.phase = 'loop2_return';
-              // Trigger celebration dance!
-              this.state.showCelebration = true;
-              this.state.celebrationTimer = 0;
+          ]);
+        } else {
+          // Elder verifies debts - player must deliver to NPCs
+          // Mark as Elder-verified so NPCs accept without dispute
+          this.state.elderVerified = true;
+          this.queueDialogue([
+            {
+              speaker: 'VILLAGE ELDER',
+              text: "Let me check the Stone Tablet... All debts are recorded clearly here."
+            },
+            {
+              speaker: 'VILLAGE ELDER',
+              text: "Woodcutter: 1 Fish. Stone-worker: 2 Fish. The truth is carved in stone!"
+            },
+            {
+              speaker: 'VILLAGE ELDER',
+              text: "Now go and deliver what you owe. The Stone Tablet has spoken!"
             }
-          }
-        ]);
+          ]);
+        }
       } else if (noneRecorded) {
         // NONE RECORDED - Full confrontation like Loop 1
         this.triggerConfrontation();
@@ -1661,6 +1553,112 @@ export class VillageLedgerGame {
     this.advanceDialogue();
   }
 
+  private showWoodcutterDisputeChoice(): void {
+    const debtRecorded = this.state.woodcutterDebtRecorded;
+    this.state.showChoice = true;
+    this.state.choiceOptions = [
+      {
+        text: "Let's check the Stone Tablet together!",
+        action: () => {
+          this.state.showChoice = false;
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "Fine! The Tablet will prove I'm right! Let's go!",
+              onComplete: () => {
+                this.state.phase = 'loop2_verify_at_tablet';
+                this.woodcutter.targetX = this.villageCenterX - 50;
+              }
+            }
+          ]);
+        }
+      },
+      {
+        text: "Fine, I'll give you 3 Fish...",
+        action: () => {
+          this.state.showChoice = false;
+          if (this.state.inventory.fish >= 3) {
+            this.state.inventory.fish -= 3;
+            this.queueDialogue([
+              {
+                speaker: 'WOODCUTTER',
+                text: "That's more like it!",
+                onComplete: () => {
+                  this.state.woodcutterSettled = true;
+                  this.checkAllDebtsSettled();
+                }
+              }
+            ]);
+          } else {
+            this.queueDialogue([
+              {
+                speaker: 'YOU',
+                text: "I don't have 3 Fish... Let's check the Stone Tablet!",
+                onComplete: () => {
+                  this.state.phase = 'loop2_verify_at_tablet';
+                  this.woodcutter.targetX = this.villageCenterX - 50;
+                }
+              }
+            ]);
+          }
+        }
+      }
+    ];
+  }
+
+  private showStoneWorkerDisputeChoice(): void {
+    const debtRecorded = this.state.stoneWorkerDebtRecorded;
+    this.state.showChoice = true;
+    this.state.choiceOptions = [
+      {
+        text: "Let's check the Stone Tablet together!",
+        action: () => {
+          this.state.showChoice = false;
+          this.queueDialogue([
+            {
+              speaker: 'STONE-WORKER',
+              text: "Fine! The Tablet will prove I'm right! Let's go!",
+              onComplete: () => {
+                this.state.phase = 'loop2_verify_at_tablet';
+                this.stoneWorker.targetX = this.villageCenterX + 50;
+              }
+            }
+          ]);
+        }
+      },
+      {
+        text: "Fine, I'll give you 4 Fish...",
+        action: () => {
+          this.state.showChoice = false;
+          if (this.state.inventory.fish >= 4) {
+            this.state.inventory.fish -= 4;
+            this.queueDialogue([
+              {
+                speaker: 'STONE-WORKER',
+                text: "That's more like it!",
+                onComplete: () => {
+                  this.state.stoneWorkerSettled = true;
+                  this.checkAllDebtsSettled();
+                }
+              }
+            ]);
+          } else {
+            this.queueDialogue([
+              {
+                speaker: 'YOU',
+                text: "I don't have 4 Fish... Let's check the Stone Tablet!",
+                onComplete: () => {
+                  this.state.phase = 'loop2_verify_at_tablet';
+                  this.stoneWorker.targetX = this.villageCenterX + 50;
+                }
+              }
+            ]);
+          }
+        }
+      }
+    ];
+  }
+
   private advanceDialogue(): void {
     if (this.state.currentDialogue?.onComplete) {
       this.state.currentDialogue.onComplete();
@@ -1674,7 +1672,17 @@ export class VillageLedgerGame {
     } else {
       this.state.currentDialogue = null;
       this.state.dialogueComplete = false;
-      this.setMood('neutral');
+      
+      // Check for pending disputes that need choice display
+      if (this.state.pendingWoodcutterDispute) {
+        this.state.pendingWoodcutterDispute = false;
+        this.showWoodcutterDisputeChoice();
+      } else if (this.state.pendingStoneWorkerDispute) {
+        this.state.pendingStoneWorkerDispute = false;
+        this.showStoneWorkerDisputeChoice();
+      } else {
+        this.setMood('neutral');
+      }
     }
 
     this.notifyStateChange();
@@ -2244,6 +2252,11 @@ export class VillageLedgerGame {
 
     // Draw player (in front of NPCs and markers)
     this.drawCharacter(ctx, this.player);
+
+    // Draw destination marker (subtle visual feedback for tap-to-walk)
+    if (this.autoWalkTarget && this.autoWalkTarget.type === 'location') {
+      this.drawDestinationMarker(ctx, groundY);
+    }
 
     // Draw inventory popup
     if (this.inventoryPopup) {
@@ -2985,6 +2998,38 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillText(this.inventoryPopup.text, screenX, screenY);
   }
 
+  private drawDestinationMarker(ctx: CanvasRenderingContext2D, groundY: number): void {
+    if (!this.autoWalkTarget) return;
+    
+    const screenX = this.autoWalkTarget.x - this.cameraX;
+    const markerY = groundY - 5;
+    
+    // Pulsing animation
+    const pulse = 0.5 + Math.sin(Date.now() * 0.005) * 0.3;
+    
+    // Draw subtle circle marker
+    ctx.beginPath();
+    ctx.arc(screenX, markerY, 8, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 215, 0, ${pulse * 0.4})`; // Golden, semi-transparent
+    ctx.fill();
+    
+    // Draw ring around circle
+    ctx.beginPath();
+    ctx.arc(screenX, markerY, 10, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 215, 0, ${pulse * 0.6})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Draw small footprint icon (simple dots)
+    ctx.fillStyle = `rgba(139, 115, 85, ${pulse * 0.8})`;
+    ctx.beginPath();
+    ctx.ellipse(screenX - 3, markerY - 2, 2, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(screenX + 3, markerY + 2, 2, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   private drawStoneTabletHUD(ctx: CanvasRenderingContext2D): void {
     const x = this.canvas.width - this.hudWidth - 24;
     const y = 24;
@@ -3519,6 +3564,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stoneworkerDisputed: false,
       woodcutterSettled: false,
       stoneWorkerSettled: false,
+      pendingWoodcutterDispute: false,
+      pendingStoneWorkerDispute: false,
+      elderVerified: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -3578,6 +3626,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stoneworkerDisputed: false,
       woodcutterSettled: false,
       stoneWorkerSettled: false,
+      pendingWoodcutterDispute: false,
+      pendingStoneWorkerDispute: false,
+      elderVerified: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,

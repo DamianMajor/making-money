@@ -92,6 +92,7 @@ Two movement modes:
 - When within 25 units of target, interaction triggers automatically
 - Clicking elsewhere cancels current auto-walk and sets new destination
 - No visible left/right buttons - movement is intuitive via touch zones
+- **Destination Marker**: Golden pulsing circle with footprint icon appears at walk destination for visual feedback
 
 ### Happy Face Timer
 - Happy mood (happy.png) triggers when receiving items, fixing roof, or settling debts
@@ -171,14 +172,22 @@ NPCs offer a choice: verbal promise OR walk to Stone Tablet together to record t
 2. If "record": NPC escorts player to Village Center, records debt, THEN gives item
 3. `loop2_escorting_woodcutter` / `loop2_escorting_stoneworker` - Escort phases
 4. Partial recording supported - can record some debts but not others
-5. `loop2_got_fish` - Direct settlement option: Player can try settling with Woodcutter/Stoneworker directly
-   - If debt was recorded → NPC agrees to correct amount
-   - If debt was NOT recorded → NPC disputes (gaslighting), offers to verify at tablet together
-6. `loop2_verify_at_tablet` - Trustless verification: Elder checks tablet, proves truth
+5. `loop2_got_fish` - Two settlement paths:
+   **Path A: NPC-First (player approaches NPC before Elder)**
+   - NPCs ALWAYS dispute first ("I remember 3 Fish, not 1!")
+   - Player choices: "Check Stone Tablet together" or "Give in to demand"
+   - If "Check tablet": Goes to Elder for verification → tablet proves truth
+   
+   **Path B: Elder-First (player approaches Elder before NPCs)**
+   - Elder verifies debts at tablet: "All debts recorded clearly"
+   - Sets `elderVerified = true`, tells player to deliver items
+   - Player visits NPCs who now accept payment without dispute
+   
+6. `loop2_verify_at_tablet` - Trustless verification: Elder checks tablet
    - Recorded debts verified → NPC admits error, accepts correct payment
    - Unrecorded debts → No proof exists, dispute escalates to brawl
 7. Settlement outcomes based on what was recorded:
-   - ALL debts recorded → Elder settles peacefully → quiz → success
+   - ALL debts recorded → Elder confirms → player delivers to NPCs → celebration → quiz → success
    - SOME debts recorded → Elder settles recorded, unrecorded cause dispute → brawl
    - NO debts recorded → full confrontation/brawl like Loop 1
 8. `loop2_return` → `complete_success` → Quiz tests understanding

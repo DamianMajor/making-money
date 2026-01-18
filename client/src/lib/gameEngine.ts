@@ -861,8 +861,8 @@ export class VillageLedgerGame {
             this.showInventoryPopup('+1 WOOD');
             this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
-            // Woodcutter walks to village center
-            this.woodcutter.targetX = this.villageCenterX - 100;
+            // Woodcutter walks to village center (right of Elder to avoid overlap)
+            this.woodcutter.targetX = this.villageCenterX + 50;
           }
         }
       ]);
@@ -934,7 +934,7 @@ export class VillageLedgerGame {
                 this.state.showHUD = true;
                 this.hudGlow = 1;
               }
-              this.woodcutter.targetX = this.villageCenterX - 100;
+              this.woodcutter.targetX = this.villageCenterX + 50;
             }
           }
         ]);
@@ -976,8 +976,8 @@ export class VillageLedgerGame {
     }
     // LOOP 1 SETTLEMENT: Player tries to settle - Woodcutter claims inflated debt
     else if (phase === 'settlement' && !this.state.woodcutterDisputed) {
-      // Woodcutter steps to the left to confront player
-      this.woodcutter.targetX = this.villageCenterX - 100;
+      // Woodcutter steps to position (right of Elder to avoid overlap)
+      this.woodcutter.targetX = this.villageCenterX + 50;
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
@@ -1247,6 +1247,46 @@ export class VillageLedgerGame {
     }
     // Loop 2: Direct settlement attempt - NPC always disputes first
     else if (phase === 'loop2_got_fish' || phase === 'loop2_verify_at_tablet') {
+      // If already settled, just confirm
+      if (this.state.stoneWorkerSettled) {
+        this.queueDialogue([
+          {
+            speaker: 'STONE-WORKER',
+            text: "We're all settled! Thanks for being honest."
+          }
+        ]);
+        return;
+      }
+      
+      // If player agreed to give in to inflated demand, handle that payment
+      if (this.state.gaveInToStoneWorker) {
+        const needsFish = 4;
+        if (this.state.inventory.fish >= needsFish) {
+          this.state.inventory.fish -= needsFish;
+          this.setMood('happy');
+          this.queueDialogue([
+            {
+              speaker: 'STONE-WORKER',
+              text: "That's all 4 Fish! Debt settled.",
+              onComplete: () => {
+                this.state.stoneWorkerSettled = true;
+                if (this.state.woodcutterSettled) {
+                  this.checkAllDebtsSettled();
+                }
+              }
+            }
+          ]);
+        } else {
+          this.queueDialogue([
+            {
+              speaker: 'STONE-WORKER',
+              text: `You agreed to pay 4 Fish, but you only have ${this.state.inventory.fish}. Get more from the Fisherman!`
+            }
+          ]);
+        }
+        return;
+      }
+      
       const hasFishForStoneworker = this.state.inventory.fish >= 2;
       
       if (!hasFishForStoneworker) {
@@ -1259,18 +1299,6 @@ export class VillageLedgerGame {
         return;
       }
       
-      // If already settled, just confirm
-      if (this.state.stoneWorkerSettled) {
-        this.queueDialogue([
-          {
-            speaker: 'STONE-WORKER',
-            text: "We're all settled! Thanks for being honest."
-          }
-        ]);
-        return;
-      }
-      
-      // If Elder has verified, NPC accepts payment without dispute
       // If tablet verified (directly or via Elder), NPC accepts payment without dispute
       if (this.state.elderVerified && this.state.stoneWorkerDebtRecorded) {
         this.state.inventory.fish -= 2;
@@ -1326,8 +1354,22 @@ export class VillageLedgerGame {
     // This allows fish trade even if wood was used to fix the roof
     const debtsInitiated = this.state.obtainedWood && this.state.obtainedStone;
     
-    // Player already has fish
-    if (alreadyHasFish) {
+    // Loop 2: Extra fish available after giving in to Stone-worker - CHECK THIS FIRST
+    if (this.state.extraFishAvailable && this.state.inventory.berries >= 1) {
+      this.state.inventory.berries -= 1;
+      this.state.inventory.fish += 1;
+      this.state.extraFishAvailable = false; // Only one extra fish
+      this.showInventoryPopup('+1 FISH (-1 BERRY)');
+      this.setMood('happy');
+      this.queueDialogue([
+        {
+          speaker: 'FISHERMAN',
+          text: "I only have 1 Fish left to trade. Here, 1 Berry for 1 Fish. That's all I have!"
+        }
+      ]);
+    }
+    // Player already has fish (and no extra fish needed)
+    else if (alreadyHasFish) {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
@@ -1366,17 +1408,12 @@ export class VillageLedgerGame {
         }
       ]);
     }
-    // Loop 2: Extra fish available after giving in to Stone-worker
-    else if (this.state.extraFishAvailable && this.state.inventory.berries >= 1) {
-      this.state.inventory.berries -= 1;
-      this.state.inventory.fish += 1;
-      this.state.extraFishAvailable = false; // Only one extra fish
-      this.showInventoryPopup('+1 FISH');
-      this.setMood('happy');
+    // Extra fish was set but no berries to trade
+    else if (this.state.extraFishAvailable && this.state.inventory.berries < 1) {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "I managed to catch one more fish! Here, 1 Berry for 1 Fish. That's all I have left though."
+          text: "I have 1 extra Fish, but you need at least 1 Berry to trade! Check the berry bush."
         }
       ]);
     }
@@ -1816,6 +1853,9 @@ export class VillageLedgerGame {
         action: () => {
           this.state.showChoice = false;
           
+          // Mark that player agreed to give in (even if they don't have enough fish yet)
+          this.state.gaveInToStoneWorker = true;
+          
           // Check if already gave in to Woodcutter - can only afford one inflated demand
           if (this.state.gaveInToWoodcutter && this.state.inventory.fish < 4) {
             // Not enough fish after giving in to Woodcutter - triggers failure
@@ -1839,9 +1879,7 @@ export class VillageLedgerGame {
           
           if (this.state.inventory.fish >= 4) {
             this.state.inventory.fish -= 4;
-            this.state.gaveInToStoneWorker = true;
             this.state.extraBerryAvailable = true; // Extra berry spawns
-            this.state.extraFishAvailable = true; // Fisherman has 1 more fish
             this.queueDialogue([
               {
                 speaker: 'STONE-WORKER',
@@ -1856,7 +1894,9 @@ export class VillageLedgerGame {
               }
             ]);
           } else {
-            // Not enough fish - direct to berry bush for more berries
+            // Not enough fish - enable extra berry and fish trade, then direct to berry bush
+            this.state.extraBerryAvailable = true; // Extra berry spawns at bush
+            this.state.extraFishAvailable = true; // Fisherman has 1 more fish to trade
             this.queueDialogue([
               {
                 speaker: 'YOU',
@@ -1864,7 +1904,7 @@ export class VillageLedgerGame {
               },
               {
                 speaker: 'STONE-WORKER',
-                text: "Then go pick more berries and trade them! The Berry Bush is to the west. I'll be waiting!"
+                text: "Then go pick more berries and trade them! The Berry Bush is to the west. The Fisherman has 1 Fish left. I'll be waiting!"
               }
             ]);
           }
@@ -2135,9 +2175,9 @@ export class VillageLedgerGame {
       const hasRequirements = this.state.inventory.stone >= 1 && this.state.inventory.fish >= 3;
       if (nearVillageCenter && hasRequirements && !this.state.currentDialogue) {
         this.state.phase = 'settlement';
-        // Move NPCs to village center area for the confrontation (wider spacing)
-        this.woodcutter.targetX = this.villageCenterX - 100;
-        this.stoneWorker.targetX = this.villageCenterX + 100;
+        // Move NPCs to village center area for the confrontation (woodcutter right to avoid Elder overlap)
+        this.woodcutter.targetX = this.villageCenterX + 50;
+        this.stoneWorker.targetX = this.villageCenterX + 150;
       }
     }
     
@@ -3358,26 +3398,30 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const padding = 12;
     const iconSize = 24;
     const spacing = 8;
-    let xPos = padding;
     const yPos = padding;
     
     // Only show items that have been introduced
-    const items: { icon: string; count: number; color: string; introduced: boolean }[] = [
-      { icon: '🪨', count: this.state.inventory.stone, color: '#6B7280', introduced: this.state.stoneIntroduced },
-      { icon: '🐟', count: this.state.inventory.fish, color: '#3B82F6', introduced: this.state.fishIntroduced },
-      { icon: '🫐', count: this.state.inventory.berries, color: '#DC2626', introduced: this.state.berriesIntroduced }
+    const items: { count: number; color: string; introduced: boolean }[] = [
+      { count: this.state.inventory.stone, color: '#6B7280', introduced: this.state.stoneIntroduced },
+      { count: this.state.inventory.fish, color: '#3B82F6', introduced: this.state.fishIntroduced },
+      { count: this.state.inventory.berries, color: '#DC2626', introduced: this.state.berriesIntroduced }
     ];
     
     const introducedItems = items.filter(item => item.introduced);
     if (introducedItems.length === 0) return;
     
-    // Background panel
+    // Background panel - positioned to the left of the Stone Tablet HUD (top right area)
     const panelWidth = introducedItems.length * (iconSize + spacing + 20) + padding;
     const panelHeight = iconSize + padding * 1.5;
     
+    // Position to the left of Stone Tablet HUD (which is at canvas.width - hudWidth - 24)
+    const stoneTabletHudX = this.canvas.width - this.hudWidth - 24;
+    const panelX = stoneTabletHudX - panelWidth - 12; // 12px gap from Stone Tablet HUD
+    let xPos = panelX + padding / 2;
+    
     ctx.fillStyle = 'rgba(139, 115, 85, 0.85)';
     ctx.beginPath();
-    ctx.roundRect(xPos - 4, yPos - 4, panelWidth, panelHeight, 8);
+    ctx.roundRect(panelX, yPos - 4, panelWidth, panelHeight, 8);
     ctx.fill();
     ctx.strokeStyle = '#5D4837';
     ctx.lineWidth = 2;
@@ -3430,11 +3474,42 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
 
     if (this.state.currentDialogue) {
+      // Draw speaker portrait on the left
+      const portraitSize = 60;
+      const portraitX = 20;
+      const portraitY = y + (h - portraitSize) / 2;
+      const textStartX = portraitX + portraitSize + 20; // Text starts after portrait
+      
+      // Get speaker color based on who is speaking
+      const speakerColors: Record<string, { bg: string; outline: string }> = {
+        'WOODCUTTER': { bg: '#8B4513', outline: '#5D2E0C' },
+        'STONE-WORKER': { bg: '#6B7280', outline: '#374151' },
+        'FISHERMAN': { bg: '#F97316', outline: '#C2410C' },
+        'VILLAGE ELDER': { bg: '#F8FAFC', outline: '#64748B' },
+        'YOU': { bg: '#3B82F6', outline: '#FFFFFF' },
+      };
+      
+      const colors = speakerColors[this.state.currentDialogue.speaker] || { bg: '#6B7280', outline: '#374151' };
+      
+      // Draw portrait background (rounded square)
+      ctx.fillStyle = colors.bg;
+      ctx.strokeStyle = colors.outline;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(portraitX, portraitY, portraitSize, portraitSize, 8);
+      ctx.fill();
+      ctx.stroke();
+      
+      // Draw simple face on portrait
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.fillRect(portraitX + 15, portraitY + 18, 10, 10); // Left eye
+      ctx.fillRect(portraitX + portraitSize - 25, portraitY + 18, 10, 10); // Right eye
+      
       // Speaker name - using retro font at proper size (16px per guidelines)
       ctx.font = `16px ${this.retroFont}`;
       ctx.textAlign = 'left';
       ctx.fillStyle = '#C9B896';
-      ctx.fillText(`[${this.state.currentDialogue.speaker}]`, 32, y + 36);
+      ctx.fillText(`[${this.state.currentDialogue.speaker}]`, textStartX, y + 36);
 
       // Dialogue text with typewriter effect - using retro font at 16-18px per guidelines
       const displayText = this.state.currentDialogue.text.substring(0, this.dialogueCharIndex);
@@ -3442,7 +3517,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillStyle = '#F5F5DC';
 
       // Word wrap - adjusted for retro font spacing with 1.6 line height
-      const maxWidth = w - 100;
+      const maxWidth = w - textStartX - 50;
       const words = displayText.split(' ');
       let line = '';
       let lineY = y + 70;
@@ -3452,14 +3527,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         const testLine = line + word + ' ';
         const metrics = ctx.measureText(testLine);
         if (metrics.width > maxWidth && line !== '') {
-          ctx.fillText(line.trim(), 32, lineY);
+          ctx.fillText(line.trim(), textStartX, lineY);
           line = word + ' ';
           lineY += lineHeight;
         } else {
           line = testLine;
         }
       }
-      ctx.fillText(line.trim(), 32, lineY);
+      ctx.fillText(line.trim(), textStartX, lineY);
 
       // Continue indicator
       if (this.state.dialogueComplete) {

@@ -222,7 +222,7 @@ export class VillageLedgerGame {
     this.villageElder = {
       id: 'villageElder',
       name: 'VILLAGE ELDER',
-      x: 2500, // Swapped with Stone-worker - now in far area
+      x: 1480, // Near Stone Tablet - original position
       y: 0,
       width: 60,
       height: 85,
@@ -250,7 +250,7 @@ export class VillageLedgerGame {
     this.stoneWorker = {
       id: 'stoneWorker',
       name: 'STONE-WORKER',
-      x: 1480, // Swapped with Village Elder - now near Stone Tablet
+      x: 2500, // Original position - far from village center
       y: 0,
       width: 50,
       height: 70,
@@ -259,7 +259,7 @@ export class VillageLedgerGame {
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 1480
+      originalX: 2500
     };
 
     this.fisherman = {
@@ -1028,7 +1028,7 @@ export class VillageLedgerGame {
         this.queueDialogue([
           {
             speaker: 'WOODCUTTER',
-            text: "The Elder has spoken. 1 Fish it is - thank you!",
+            text: "The Tablet shows the true record - 1 Fish it is. Thank you!",
             onComplete: () => {
               this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
                 e.name === 'Woodcutter' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
@@ -1262,7 +1262,7 @@ export class VillageLedgerGame {
         this.queueDialogue([
           {
             speaker: 'STONE-WORKER',
-            text: "The Elder has spoken. 2 Fish it is - thank you!",
+            text: "The Tablet shows the true record - 2 Fish it is. Thank you!",
             onComplete: () => {
               this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
                 e.name === 'Stone-worker' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
@@ -1742,14 +1742,15 @@ export class VillageLedgerGame {
               }
             ]);
           } else {
+            // Not enough fish - tell player they need more
             this.queueDialogue([
               {
                 speaker: 'YOU',
-                text: "I don't have 3 Fish... Let's check the Stone Tablet!",
-                onComplete: () => {
-                  this.state.phase = 'loop2_verify_at_tablet';
-                  this.woodcutter.targetX = this.villageCenterX - 50;
-                }
+                text: "I don't have 3 Fish right now..."
+              },
+              {
+                speaker: 'WOODCUTTER',
+                text: "Then go get more! I'll be waiting!"
               }
             ]);
           }
@@ -1822,14 +1823,15 @@ export class VillageLedgerGame {
               }
             ]);
           } else {
+            // Not enough fish - direct to berry bush for more berries
             this.queueDialogue([
               {
                 speaker: 'YOU',
-                text: "I don't have 4 Fish... Let's check the Stone Tablet!",
-                onComplete: () => {
-                  this.state.phase = 'loop2_verify_at_tablet';
-                  this.stoneWorker.targetX = this.villageCenterX + 50;
-                }
+                text: "I don't have 4 Fish right now..."
+              },
+              {
+                speaker: 'STONE-WORKER',
+                text: "Then go pick more berries and trade them! The Berry Bush is to the west. I'll be waiting!"
               }
             ]);
           }
@@ -3793,7 +3795,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Reset NPC positions to original locations
     this.woodcutter.x = this.woodcutter.originalX || 700;
     this.woodcutter.targetX = undefined;
-    this.stoneWorker.x = this.stoneWorker.originalX || 1480;
+    this.stoneWorker.x = this.stoneWorker.originalX || 2500;
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3200;
     this.fisherman.targetX = undefined;
@@ -3855,7 +3857,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Reset NPC positions to original locations
     this.woodcutter.x = this.woodcutter.originalX || 700;
     this.woodcutter.targetX = undefined;
-    this.stoneWorker.x = this.stoneWorker.originalX || 1480;
+    this.stoneWorker.x = this.stoneWorker.originalX || 2500;
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3200;
     this.fisherman.targetX = undefined;

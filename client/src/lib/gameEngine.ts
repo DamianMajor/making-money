@@ -67,13 +67,18 @@ interface GameState {
   pendingStoneWorkerDispute: boolean;
   // Elder has verified debts at tablet - NPCs accept payment without dispute
   elderVerified: boolean;
+  // Track if player gave in to inflated demands (leads to failure path)
+  gaveInToWoodcutter: boolean;
+  gaveInToStoneWorker: boolean;
+  // Extra berry spawns after giving in - allows getting 1 more fish but not enough for both
+  extraBerryAvailable: boolean;
   ledgerEntries: LedgerEntry[];
   dialogueQueue: DialogueLine[];
   currentDialogue: DialogueLine | null;
   dialogueComplete: boolean;
   showInteractButton: boolean;
   nearbyNPC: Character | null;
-  nearbyLocation: 'home' | null; // Track if player is near home
+  nearbyLocation: 'home' | 'stoneTablet' | null; // Track if player is near home or Stone Tablet
   elderEntranceProgress: number;
   playerMood: 'neutral' | 'happy' | 'angry';
   moodTimer: number; // Timer to auto-reset mood to neutral
@@ -157,7 +162,7 @@ export class VillageLedgerGame {
   private moodTimer: number = 0;
   
   // Auto-walk feature: player walks to clicked target and interacts
-  private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush' | 'location'; id?: string } | null = null;
+  private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush' | 'stoneTablet' | 'location'; id?: string } | null = null;
 
   // Font constants (retro monospace for dialogue/HUD)
   private readonly retroFont: string = '"Press Start 2P", monospace';
@@ -217,7 +222,7 @@ export class VillageLedgerGame {
     this.villageElder = {
       id: 'villageElder',
       name: 'VILLAGE ELDER',
-      x: 1480, // Left of Stone Tablet (at x=1600) - more spacing
+      x: 2500, // Swapped with Stone-worker - now in far area
       y: 0,
       width: 60,
       height: 85,
@@ -245,7 +250,7 @@ export class VillageLedgerGame {
     this.stoneWorker = {
       id: 'stoneWorker',
       name: 'STONE-WORKER',
-      x: 2500,
+      x: 1480, // Swapped with Village Elder - now near Stone Tablet
       y: 0,
       width: 50,
       height: 70,
@@ -254,7 +259,7 @@ export class VillageLedgerGame {
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 2500
+      originalX: 1480
     };
 
     this.fisherman = {
@@ -292,6 +297,9 @@ export class VillageLedgerGame {
       pendingWoodcutterDispute: false,
       pendingStoneWorkerDispute: false,
       elderVerified: false,
+      gaveInToWoodcutter: false,
+      gaveInToStoneWorker: false,
+      extraBerryAvailable: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -498,6 +506,19 @@ export class VillageLedgerGame {
           this.touchActive = false;
           return;
         }
+      } else if (tappedTarget === 'stoneTablet') {
+        const inRange = Math.abs(this.player.x - this.villageCenterX) < interactionRange;
+        if (inRange) {
+          this.handleStoneTabletInteraction();
+          this.autoWalkTarget = null;
+          return;
+        } else {
+          // Set auto-walk target to Stone Tablet, clear manual movement
+          this.autoWalkTarget = { x: this.villageCenterX, type: 'stoneTablet' };
+          this.moveDirection = 0;
+          this.touchActive = false;
+          return;
+        }
       } else {
         // Check if player is within range of the NPC
         const inRange = Math.abs(this.player.x - tappedTarget.x) < interactionRange;
@@ -570,9 +591,9 @@ export class VillageLedgerGame {
            y >= btnY - padding && y <= btnY + size + padding;
   }
   
-  // Check if player tapped directly on an NPC, home hut, or berry bush
+  // Check if player tapped directly on an NPC, home hut, stone tablet, or berry bush
   // Prioritizes the NPC closest to the player when multiple hitboxes overlap
-  private getTappedInteractable(x: number, y: number): Character | 'home' | null {
+  private getTappedInteractable(x: number, y: number): Character | 'home' | 'stoneTablet' | null {
     const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
     
     // Check if tapping on home hut (at playerHomeX = 100)
@@ -581,6 +602,14 @@ export class VillageLedgerGame {
     if (x >= homeHitbox.x && x <= homeHitbox.x + homeHitbox.width &&
         y >= homeHitbox.y && y <= homeHitbox.y + homeHitbox.height) {
       return 'home';
+    }
+    
+    // Check if tapping on Stone Tablet (at villageCenterX = 1600)
+    const tabletScreenX = this.villageCenterX - this.cameraX;
+    const tabletHitbox = { x: tabletScreenX - 40, y: groundY - 100, width: 80, height: 100 };
+    if (x >= tabletHitbox.x && x <= tabletHitbox.x + tabletHitbox.width &&
+        y >= tabletHitbox.y && y <= tabletHitbox.y + tabletHitbox.height) {
+      return 'stoneTablet';
     }
     
     // Collect all NPCs whose hitbox contains the tap point
@@ -635,6 +664,9 @@ export class VillageLedgerGame {
     // Handle location interactions
     else if (this.state.nearbyLocation === 'home') {
       this.handleHomeInteraction();
+    }
+    else if (this.state.nearbyLocation === 'stoneTablet') {
+      this.handleStoneTabletInteraction();
     }
 
     this.notifyStateChange();
@@ -721,6 +753,83 @@ export class VillageLedgerGame {
         }
       }, 2000);
     }
+  }
+
+  // ============ STONE TABLET INTERACTION ============
+  // Trustless verification - player can check the tablet directly without Elder
+  private handleStoneTabletInteraction(): void {
+    const phase = this.state.phase;
+    
+    // Only relevant in Loop 2 after debts have been incurred
+    if (this.state.loop !== 2) {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "The Stone Tablet... it's blank. The villagers haven't started using it yet."
+        }
+      ]);
+      return;
+    }
+    
+    // Check if any debts are recorded
+    const hasRecordedDebts = this.state.ledgerEntries.length > 0;
+    
+    if (!hasRecordedDebts) {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "The Stone Tablet is empty. No debts have been recorded here."
+        }
+      ]);
+      return;
+    }
+    
+    // Display all recorded debts
+    const woodcutterEntry = this.state.ledgerEntries.find(e => e.name === 'Woodcutter' || e.debt.includes('WOODCUTTER'));
+    const stoneWorkerEntry = this.state.ledgerEntries.find(e => e.name === 'Stone-worker' || e.debt.includes('STONE-WORKER'));
+    
+    // Build dialogue showing recorded debts
+    const dialogueLines: DialogueLine[] = [
+      {
+        speaker: 'YOU',
+        text: "Let me check the Stone Tablet..."
+      }
+    ];
+    
+    if (woodcutterEntry) {
+      const isSettled = woodcutterEntry.debt.includes('SETTLED');
+      dialogueLines.push({
+        speaker: 'STONE TABLET',
+        text: `Woodcutter: 1 Stone + 1 Fish ${isSettled ? '(SETTLED)' : '(OWED)'}`
+      });
+    }
+    
+    if (stoneWorkerEntry) {
+      const isSettled = stoneWorkerEntry.debt.includes('SETTLED');
+      dialogueLines.push({
+        speaker: 'STONE TABLET',
+        text: `Stone-worker: 2 Fish ${isSettled ? '(SETTLED)' : '(OWED)'}`
+      });
+    }
+    
+    dialogueLines.push({
+      speaker: 'YOU',
+      text: "The truth is carved in stone for all to see!"
+    });
+    
+    // If in verification phase and both debts recorded, allow settlement
+    if (phase === 'loop2_verify_at_tablet' || phase === 'loop2_got_fish') {
+      if (this.state.woodcutterDebtRecorded && this.state.stoneWorkerDebtRecorded) {
+        // Mark as verified - NPCs will accept payment
+        this.state.elderVerified = true;
+        dialogueLines.push({
+          speaker: 'YOU',
+          text: "The Tablet proves the true amounts. Now I can pay what I actually owe!"
+        });
+      }
+    }
+    
+    this.queueDialogue(dialogueLines);
   }
 
   // ============ LOOP 1 & 2: WOODCUTTER ============
@@ -1254,7 +1363,23 @@ export class VillageLedgerGame {
 
   // ============ BERRY BUSH INTERACTION ============
   // CREDIT-FIRST: Always interactable - allows player to pick up to 3 berries at any time
+  // Extra berry spawns after giving in to inflated demand
   private handleBerryBushInteraction(): void {
+    // Check if extra berry is available (after giving in to inflated demand)
+    if (this.state.extraBerryAvailable) {
+      this.state.inventory.berries++;
+      this.state.extraBerryAvailable = false; // Only one extra berry
+      this.showInventoryPopup(`+1 EXTRA BERRY!`);
+      this.setMood('happy');
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "I found one more berry! Maybe I can trade this for another fish..."
+        }
+      ]);
+      return;
+    }
+    
     // Berry bush is now always available (no gating)
     if (this.state.inventory.berries < 3) {
       this.state.inventory.berries++;
@@ -1273,7 +1398,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "I have enough berries already."
+          text: "There are no more berries on this bush."
         }
       ]);
     }
@@ -1577,15 +1702,42 @@ export class VillageLedgerGame {
         text: "Fine, I'll give you 3 Fish...",
         action: () => {
           this.state.showChoice = false;
+          
+          // Check if already gave in to Stone-worker - can only afford one inflated demand
+          if (this.state.gaveInToStoneWorker && this.state.inventory.fish < 3) {
+            // Not enough fish after giving in to Stone-worker - triggers failure
+            this.queueDialogue([
+              {
+                speaker: 'YOU',
+                text: "I... I don't have enough fish left..."
+              },
+              {
+                speaker: 'WOODCUTTER',
+                text: "WHAT?! You paid the Stone-worker but not me?! This is outrageous!"
+              }
+            ]);
+            // Trigger brawl after dialogue
+            setTimeout(() => {
+              this.state.showBrawl = true;
+              this.state.brawlTimer = 0;
+            }, 2000);
+            return;
+          }
+          
           if (this.state.inventory.fish >= 3) {
             this.state.inventory.fish -= 3;
+            this.state.gaveInToWoodcutter = true;
+            this.state.extraBerryAvailable = true; // Extra berry spawns
             this.queueDialogue([
               {
                 speaker: 'WOODCUTTER',
                 text: "That's more like it!",
                 onComplete: () => {
                   this.state.woodcutterSettled = true;
-                  this.checkAllDebtsSettled();
+                  // Don't check all debts settled - player needs to also pay Stone-worker
+                  if (this.state.stoneWorkerSettled) {
+                    this.checkAllDebtsSettled();
+                  }
                 }
               }
             ]);
@@ -1630,15 +1782,42 @@ export class VillageLedgerGame {
         text: "Fine, I'll give you 4 Fish...",
         action: () => {
           this.state.showChoice = false;
+          
+          // Check if already gave in to Woodcutter - can only afford one inflated demand
+          if (this.state.gaveInToWoodcutter && this.state.inventory.fish < 4) {
+            // Not enough fish after giving in to Woodcutter - triggers failure
+            this.queueDialogue([
+              {
+                speaker: 'YOU',
+                text: "I... I don't have enough fish left..."
+              },
+              {
+                speaker: 'STONE-WORKER',
+                text: "WHAT?! You paid the Woodcutter but not me?! This is outrageous!"
+              }
+            ]);
+            // Trigger brawl after dialogue
+            setTimeout(() => {
+              this.state.showBrawl = true;
+              this.state.brawlTimer = 0;
+            }, 2000);
+            return;
+          }
+          
           if (this.state.inventory.fish >= 4) {
             this.state.inventory.fish -= 4;
+            this.state.gaveInToStoneWorker = true;
+            this.state.extraBerryAvailable = true; // Extra berry spawns
             this.queueDialogue([
               {
                 speaker: 'STONE-WORKER',
                 text: "That's more like it!",
                 onComplete: () => {
                   this.state.stoneWorkerSettled = true;
-                  this.checkAllDebtsSettled();
+                  // Don't check all debts settled - player needs to also pay Woodcutter
+                  if (this.state.woodcutterSettled) {
+                    this.checkAllDebtsSettled();
+                  }
                 }
               }
             ]);
@@ -1761,6 +1940,8 @@ export class VillageLedgerGame {
         
         if (targetType === 'home') {
           this.handleHomeInteraction();
+        } else if (targetType === 'stoneTablet') {
+          this.handleStoneTabletInteraction();
         } else if (targetType === 'location') {
           // Just arrived at location, no interaction needed
         } else if (targetId) {
@@ -1835,6 +2016,13 @@ export class VillageLedgerGame {
     const distToHome = Math.abs(this.player.x - this.playerHomeX);
     if (distToHome <= 120) {
       this.state.nearbyLocation = 'home';
+      this.state.showInteractButton = true;
+    }
+    
+    // Check if near Stone Tablet (village center)
+    const distToTablet = Math.abs(this.player.x - this.villageCenterX);
+    if (distToTablet <= 50) {
+      this.state.nearbyLocation = 'stoneTablet';
       this.state.showInteractButton = true;
     }
 
@@ -3297,6 +3485,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       }
     } else if (this.state.nearbyLocation === 'home') {
       targetName = 'Home';
+    } else if (this.state.nearbyLocation === 'stoneTablet') {
+      targetName = 'Stone Tablet';
     }
 
     // Text - using bold rounded sans-serif for button (per design guidelines)
@@ -3567,6 +3757,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       pendingWoodcutterDispute: false,
       pendingStoneWorkerDispute: false,
       elderVerified: false,
+      gaveInToWoodcutter: false,
+      gaveInToStoneWorker: false,
+      extraBerryAvailable: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -3600,7 +3793,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Reset NPC positions to original locations
     this.woodcutter.x = this.woodcutter.originalX || 700;
     this.woodcutter.targetX = undefined;
-    this.stoneWorker.x = this.stoneWorker.originalX || 2500;
+    this.stoneWorker.x = this.stoneWorker.originalX || 1480;
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3200;
     this.fisherman.targetX = undefined;
@@ -3629,6 +3822,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       pendingWoodcutterDispute: false,
       pendingStoneWorkerDispute: false,
       elderVerified: false,
+      gaveInToWoodcutter: false,
+      gaveInToStoneWorker: false,
+      extraBerryAvailable: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -3659,7 +3855,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Reset NPC positions to original locations
     this.woodcutter.x = this.woodcutter.originalX || 700;
     this.woodcutter.targetX = undefined;
-    this.stoneWorker.x = this.stoneWorker.originalX || 2500;
+    this.stoneWorker.x = this.stoneWorker.originalX || 1480;
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3200;
     this.fisherman.targetX = undefined;

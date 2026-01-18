@@ -2,7 +2,7 @@
 
 ## Overview
 
-Village Ledger is an educational side-scrolling game built with HTML5 Canvas and React. The game teaches concepts about record-keeping and trust through a narrative set in an ancient village. Players interact with NPCs (Stone-worker, Fisherman, Village Elder) to experience how a dispute over a promise leads to the invention of a "Stone Tablet" ledger system. The game is optimized for touch-only input on iPad/tablet devices.
+Village Ledger is an educational side-scrolling game designed to teach concepts of record-keeping and trust within a narrative-driven experience. Set in an ancient village, players interact with NPCs to resolve a dispute over a promise, leading to the creation and adoption of a "Stone Tablet" ledger system. The game aims to provide a unique learning experience through engaging gameplay, emphasizing the importance of verifiable records. It is optimized for touch-only input on iPad/tablet devices, targeting a broad audience interested in interactive learning.
 
 ## User Preferences
 
@@ -10,237 +10,48 @@ Preferred communication style: Simple, everyday language.
 
 ## System Architecture
 
-### Frontend Architecture
-- **React SPA** with TypeScript using Vite as the build tool
-- **Wouter** for client-side routing (lightweight alternative to React Router)
-- **TanStack Query** for server state management and API calls
-- **Shadcn/UI** component library built on Radix primitives with Tailwind CSS styling
-- **HTML5 Canvas** for the game rendering engine (`client/src/lib/gameEngine.ts`)
+### Frontend
+- **React SPA** with TypeScript using Vite for building.
+- **Wouter** for client-side routing.
+- **TanStack Query** for server state management.
+- **Shadcn/UI** component library, based on Radix primitives and styled with Tailwind CSS.
+- **HTML5 Canvas** powers the game engine.
 
-### Game Engine Design
-- Custom vanilla JavaScript game engine using `requestAnimationFrame` for 60fps rendering
-- Click-to-walk input system: clicking anywhere sets walk destination, clicking NPCs/items auto-walks and interacts
-- Player speed: 200 units/second, interaction range: 25 units (tight proximity-based)
-- Character system with placeholder colored rectangles (Blue=Player, Brown=Woodcutter, Gray=Stone-worker, Orange=Fisherman, White=Elder)
-- HUD displays a "Stone Tablet" ledger tracking debts/promises
-- Dialogue system with typewriter effect using "Press Start 2P" retro font
-- INTERACT button with 200ms fade transition in bottom-right corner
-- Multiple choice dialogue system with red/green color-coded buttons
-- Background: 6 parallax huts (no transparency fade)
+### Game Engine
+A custom JavaScript game engine provides a 60fps experience with a click-to-walk input system. Key features include:
+- **Interaction Mechanics**: Player movement at 200 units/second, with tight 25-unit interaction ranges for NPCs and objects.
+- **UI Elements**: A "Stone Tablet" HUD tracks debts, a dialogue system features a typewriter effect, and an "INTERACT" button with fade transitions. Multiple-choice dialogue options are color-coded.
+- **World & NPCs**: A 3500px wide world includes distinct locations (Player Home, Woodcutter, Stone-worker, Berry Bush, Village Elder, Fisherman). NPCs (Woodcutter, Stone-worker, Fisherman, Village Elder) have defined movement patterns, with some moving to a central village area for interaction.
+- **Game Progression (Two-Loop System)**:
+    - **Loop 1 (Failure Path)**: Focuses on verbal promises and their failure, leading to disputes and a "brawl" animation scenario. Players experience the consequences of unrecorded agreements.
+    - **Loop 2 (Success Path)**: Introduces the Stone Tablet, allowing players to record debts. NPCs offer choices between verbal promises and recording. This loop explores both "NPC-First" and "Elder-First" settlement approaches, leading to different outcomes based on record-keeping. Escort mechanics ensure debts are recorded at the Stone Tablet.
+- **Core Mechanics**:
+    - **Item Gifting on Credit**: Encourages social contract understanding rather than task-based earning.
+    - **Brawl Trigger System**: Conditional triggers based on game state, inventory, and player location.
+    - **Celebration/Failure Animations**: Visual feedback for game outcomes (confetti, musical notes for success; dust clouds, text for brawl).
+    - **Home/Roof Repair**: A mini-task consuming wood, adding a tangible element of progress.
+    - **Stone Tablet Direct Interaction**: Allows players to verify records independently, emphasizing trustless verification.
+    - **"Give-In" Failure Path**: Introduces mechanics where agreeing to inflated demands leads to further complications, reinforcing the game's lessons.
+    - **Mood System**: Visual "happy face" feedback for positive actions.
+    - **Environmental Transitions**: Night transitions, thunderstorms, and parallax backgrounds enhance immersion.
 
-### World Layout (3500px wide)
-- **x=100** - Player Home (starting position, has hole in roof that can be fixed with wood)
-- **x=700** - Woodcutter (FIRST NPC - needs Sharp Stone for broken axe)
-- **x=1480** - Village Elder (separate from Stone Tablet, with spacing)
-- **x=1600** - Stone Tablet / Village Center marker
-- **x=2000** - Berry Bush (for foraging berries, gated until Fisherman gives fish)
-- **x=2500** - Stone-worker (gives stone, owes fish) - has originalX for reset
-- **x=3200** - Fisherman (trades berries for fish, has fishing pole and pond) - stays at fishing hole, no walking to center
-
-### NPC Movement System
-NPCs can walk toward a target position (targetX property):
-- Woodcutter and Stone-worker have `originalX` to store their starting positions
-- After giving items on credit, Woodcutter and Stone-worker set `targetX` to Village Center (±100 units spacing to avoid overlap) and walk there at 80 units/second
-- Fisherman stays at his fishing hole (does NOT walk to center)
-- This ensures NPCs are gathered at town center when player returns with fish
-- On game reset or Loop 2 start, NPCs return to original positions
-
-### Fisherman Gating
-- Fisherman only trades berries for fish AFTER player has initiated debts (has wood AND stone)
-- Before debts initiated: "I'm still fishing... haven't caught anything yet!"
-- This prevents players from getting fish early and bypassing the intended game flow
-
-### Brawl Trigger System (Credit-First)
-Loop 1 brawl trigger uses requirement-based checking:
-- **phase === 'got_fish_ready_settle'** (verbal promise path after trading with Fisherman)
-- **inventory.stone >= 1** (player has stone to give Woodcutter)
-- **inventory.fish >= 3** (player has 3 fish from Fisherman trade: 1 for Woodcutter + 2 for Stone-worker)
-- **player.x within 200px of Village Center (x=1600)**
-
-Loop 2 settlement is handled by the Village Elder at the Stone Tablet:
-- **Both debts recorded** → Elder settles all debts peacefully → celebration animation → quiz → success
-- **Some debts recorded** → Elder settles recorded debts, unrecorded debts cause dispute → brawl
-- **No debts recorded** → Full confrontation/brawl like Loop 1
-
-### Celebration Animation
-When Elder successfully settles all recorded debts, a 3-second celebration plays:
-- Confetti particles in 5 colors (gold, red, teal, purple, green) falling across screen
-- Musical notes (♪ ♫) bouncing above NPCs at Village Center
-- "DEBTS SETTLED!" text pulsing in green with black outline at top of screen
-
-### Home/Roof Repair System
-- Player's hut starts with a visible dark hole in the roof
-- After obtaining wood, player can interact with home to fix the roof
-- Fixing roof: consumes wood, shows patched roof graphic, triggers happy mood
-- After repair, a reminder prompts player to settle outstanding debts (if any)
-
-### NPC Interaction Range & Direct Tap
-- NPC interaction range: 25 units (small range for natural proximity-based interactions)
-- Home interaction range: 25 units  
-- Players can tap directly on NPCs, home hut, or berry bush to interact
-- If out of range, player auto-walks to target and interacts on arrival (can be interrupted by new tap)
-- When multiple NPC hitboxes overlap, the closest NPC to the player is prioritized
-- INTERACT button shows target name: "INTERACT (Woodcutter)", "INTERACT (Home)", etc.
-- Note: Intro dialogue must be dismissed (tap to advance) before NPC taps register
-
-### Movement System (Click-and-Hold / Click-and-Release)
-Two movement modes:
-1. **Click-and-Hold**: Hold on left/right side of screen for continuous directional movement
-2. **Click-and-Release (Quick Tap)**: Tap anywhere to auto-walk to that exact point
-- Quick tap threshold: 150ms - taps shorter than this walk to point, longer holds move directionally
-- Player walks toward target at 200 units/sec
-- When within 25 units of target, interaction triggers automatically
-- Clicking elsewhere cancels current auto-walk and sets new destination
-- No visible left/right buttons - movement is intuitive via touch zones
-- **Destination Marker**: Golden pulsing circle with footprint icon appears at walk destination for visual feedback
-
-### Happy Face Timer
-- Happy mood (happy.png) triggers when receiving items, fixing roof, or settling debts
-- Automatically returns to neutral after 3 seconds via moodTimer (extended from 2s)
-
-### Night Transition Animation
-When player completes Loop 2 successfully and returns home:
-- Roof auto-repairs if not already fixed
-- 4-second night transition plays:
-  - Day-to-night fade (70% dark overlay)
-  - Moon with glow and craters fades in
-  - 30 twinkling stars appear
-  - "A PEACEFUL NIGHT..." text
-- Then quiz begins
-
-### Brawl Animation
-- Dust cloud (size 180) centered on player's screen position
-- Covers player + Woodcutter + Stoneworker only (NOT Elder)
-- When brawl triggers: Woodcutter and Stoneworker run to player (300 units/sec), Elder steps aside
-- POW/BAM/CRASH text cycling above
-- Lasts 4 seconds before fail screen
-
-### Thunderstorm Animation
-After player returns home with roof fixed in Loop 2:
-- 3.5-second thunderstorm animation plays
-- Dark overlay builds up, lightning flashes at intervals
-- Rain streaks animate across screen
-- "THE STORM!" text appears with lightning effect
-- Dialogue: "Just in time! The storm is here... but my roof is fixed!"
-- Transitions to night scene after thunderstorm
-
-### Happy Mood System
-- Happy face shows when receiving items (wood, stone, fish, berries)
-- Happy face shows when fixing roof
-- Happy face stays active for remainder of Loop 2 after successful settlement
-- Auto-returns to neutral after 3 seconds in normal gameplay
-
-### Background Parallax
-- 6 parallax background huts at full opacity (no transparency fade)
-- Huts maintain consistent visibility across the entire world
-
-### Loop 1 Settlement Phase (Interaction-Based Confrontation)
-The settlement phase requires player to interact with each NPC:
-1. Player arrives at Village Center with items → auto-transition to `settlement` phase
-2. NPCs move to Village Center (Woodcutter left, Stone-worker right)
-3. Player taps Woodcutter → Woodcutter claims 3 Fish (inflated from 1) → player protests → `woodcutterDisputed = true`
-4. Player taps Stone-worker → Stone-worker claims 4 Fish (inflated from 2) → player protests → `stoneworkerDisputed = true`
-5. Player taps Elder → Elder tries to check Stone Tablet → finds no records → Woodcutter triggers brawl
-6. Fail screen displays lesson about written records being essential
-
-State tracking: `woodcutterDisputed` and `stoneworkerDisputed` flags
-Dynamic hints guide player through each step of settlement
-
-### NPC Movement System
-NPCs can walk toward a target position (targetX property):
-- Woodcutter and Stone-worker have `originalX` to store their starting positions
-- After giving items on credit, Woodcutter and Stone-worker set `targetX` to Village Center and walk there at 80 units/second
-- During settlement phase: NPCs move to flank player (Woodcutter to x-100, Stone-worker to x+100 after disputes)
-- Fisherman stays at his fishing hole (does NOT walk to center)
-- On game reset or Loop 2 start, NPCs return to original positions
-
-### Two-Loop Game State System
-
-**Loop 1 (Failure Path - Credit-First, Verbal Promises):**
-NPCs give items immediately on credit with verbal promises. No escort to tablet.
-1. `intro` → `need_wood` - Storm approaching, need wood from Woodcutter
-2. `need_wood` → `got_wood_need_stone` - Woodcutter gives WOOD immediately, walks to village center
-3. `got_wood_need_stone` → `got_stone_need_fish` - Stone-worker gives STONE immediately, walks to center
-4. Player collects 3 berries from Berry Bush
-5. `got_stone_need_fish` → `got_fish_ready_settle` - Fisherman TRADES 3 berries for 3 fish
-6. `got_fish_ready_settle` → `settlement` - Player interacts with each NPC individually
-7. `settlement` → `confrontation` → `brawl` → `fail` - Elder mediation fails, brawl triggered
-
-**Loop 2 (Success Path - Escort-to-Tablet Recording):**
-NPCs offer a choice: verbal promise OR walk to Stone Tablet together to record the debt.
-1. `loop2_need_wood` - Player chooses: "verbal promise" or "record on Stone Tablet"
-2. If "record": NPC escorts player to Village Center, records debt, THEN gives item
-3. `loop2_escorting_woodcutter` / `loop2_escorting_stoneworker` - Escort phases
-4. Partial recording supported - can record some debts but not others
-5. `loop2_got_fish` - Two settlement paths:
-   **Path A: NPC-First (player approaches NPC before Elder)**
-   - NPCs ALWAYS dispute first ("I remember 3 Fish, not 1!")
-   - Player choices: "Check Stone Tablet together" or "Give in to demand"
-   - If "Check tablet": Goes to Elder for verification → tablet proves truth
-   
-   **Path B: Elder-First (player approaches Elder before NPCs)**
-   - Elder verifies debts at tablet: "All debts recorded clearly"
-   - Sets `elderVerified = true`, tells player to deliver items
-   - Player visits NPCs who now accept payment without dispute
-   
-6. `loop2_verify_at_tablet` - Trustless verification: Elder checks tablet
-   - Recorded debts verified → NPC admits error, accepts correct payment
-   - Unrecorded debts → No proof exists, dispute escalates to brawl
-7. Settlement outcomes based on what was recorded:
-   - ALL debts recorded → Elder confirms → player delivers to NPCs → celebration → quiz → success
-   - SOME debts recorded → Elder settles recorded, unrecorded cause dispute → brawl
-   - NO debts recorded → full confrontation/brawl like Loop 1
-8. `loop2_return` → `complete_success` → Quiz tests understanding
-
-### Loop 2 Escort Behavior
-During Loop 2 escort phases, NPCs move directly toward the Village Center:
-- NPC moves at 180 units/second toward its target position
-- Woodcutter target: x=1550 (left of center)
-- Stone-worker target: x=1650 (right of center)
-- Auto-trigger fires when both player AND NPC are within 150 units of center
-- Delivery dialogue queues, item given after dialogue advances
-
-**Key Design Principles:**
-- Items given on CREDIT (not earned through tasks) - creates trust-based social contract
-- Berry Bush always interactable - prevents backtracking fatigue
-- Conflict happens during Settlement Phase at Town Center - makes brawl a result of failed memory/gaslighting
-
-### Backend Architecture
-- **Express.js** server with TypeScript
-- Serves both API routes and static frontend assets
-- In-memory storage implementation with interface for future database integration
-- Vite dev server integration for hot module replacement during development
+### Backend
+- **Express.js** server with TypeScript for API routes and static asset serving.
+- In-memory storage, designed with an interface for future database integration.
+- Vite dev server integration for hot module replacement.
 
 ### Build System
-- **Vite** for frontend bundling with React plugin
-- **esbuild** for server-side TypeScript compilation
-- Custom build script (`script/build.ts`) that bundles frequently-used dependencies to reduce cold start times
-- Output goes to `dist/` directory with static assets in `dist/public/`
+- **Vite** for frontend bundling, **esbuild** for server-side TypeScript.
+- Custom build script (`script/build.ts`) optimizes dependencies for faster cold starts.
 
 ### Design System
-- Retro educational game aesthetic inspired by Oregon Trail and Carmen Sandiego
-- Earth tones and natural materials reflecting ancient civilization theme
-- Typography uses monospace fonts for dialogue, bold sans-serif for UI labels
-- Responsive canvas that handles different tablet aspect ratios
+- Retro educational game aesthetic (Oregon Trail, Carmen Sandiego inspired).
+- Earth tones, natural materials, monospace fonts for dialogue, and bold sans-serif for UI.
+- Responsive canvas design for various tablet aspect ratios.
 
 ## External Dependencies
 
-### Database
-- **PostgreSQL** with Drizzle ORM for database operations
-- Schema defined in `shared/schema.ts` with users table
-- Drizzle Kit for migrations (`drizzle.config.ts`)
-- `connect-pg-simple` for session storage
-
-### UI Libraries
-- **Radix UI** primitives for accessible components
-- **Tailwind CSS** with custom theme configuration
-- **Lucide React** for icons
-- **Embla Carousel** for carousel components
-- **Vaul** for drawer components
-- **cmdk** for command palette
-
-### Utilities
-- **Zod** for schema validation with `drizzle-zod` integration
-- **date-fns** for date formatting
-- **class-variance-authority** for component variants
-- **React Hook Form** with Zod resolver for form handling
+- **Database**: PostgreSQL with Drizzle ORM for database operations and migrations.
+- **Session Management**: `connect-pg-simple` for session storage.
+- **UI Components**: Radix UI (primitives), Tailwind CSS, Lucide React (icons), Embla Carousel, Vaul (drawers), cmdk (command palette).
+- **Utilities**: Zod (schema validation), date-fns (date formatting), class-variance-authority, React Hook Form with Zod resolver.

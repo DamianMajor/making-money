@@ -2147,7 +2147,7 @@ export class VillageLedgerGame {
       try {
         this.state.currentDialogue.onComplete();
       } catch (e) {
-        console.error('Error in dialogue onComplete callback:', e);
+        console.error('Error in dialogue onComplete callback:', e, 'Speaker:', this.state.currentDialogue?.speaker, 'Text:', this.state.currentDialogue?.text?.substring(0, 50));
       }
     }
 
@@ -2186,7 +2186,7 @@ export class VillageLedgerGame {
   // Enforce minimum spacing between NPCs to prevent overlap during village center gatherings
   // Soft collision: NPCs slow down when near each other and avoid Stone Tablet center
   private enforceNPCSpacing(): void {
-    const minVisualSpacing = 60; // Minimum pixels for visual overlap prevention (rendering offset only)
+    const minVisualSpacing = 80; // Minimum pixels for visual overlap prevention (rendering offset only)
     const tabletExclusionRadius = 50; // Keep NPCs away from tablet center for clicking
     const npcs = [this.woodcutter, this.stoneWorker, this.fisherman, this.villageElder];
     
@@ -3459,7 +3459,7 @@ export class VillageLedgerGame {
       // Float/bobber
       ctx.fillStyle = '#FF4444';
       ctx.beginPath();
-      ctx.arc(pondScreenX - 35, groundY - 5 + pondYOffset, 4, 0, Math.PI * 2);
+      ctx.arc(pondScreenX - 45, groundY - 5 + pondYOffset, 4, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -3469,7 +3469,7 @@ export class VillageLedgerGame {
     const fishingHoleX = 3200;
     const pondScreenX = fishingHoleX - this.cameraX - 60; // Same offset as pond
     const pondYOffset = 25;
-    const poleOffsetX = -50; // Move pole 50 pixels to the left
+    const poleOffsetX = -10; // Adjusted pole position (moved right 40 from -50)
     
     if (pondScreenX > -150 && pondScreenX < this.canvas.width + 150) {
       // Fishing pole (held by Fisherman, angled over pond)

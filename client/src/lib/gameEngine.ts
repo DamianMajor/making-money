@@ -74,6 +74,8 @@ interface GameState {
   extraBerryAvailable: boolean;
   // Extra fish available from Fisherman after giving in to Stone-worker (Loop 2 only)
   extraFishAvailable: boolean;
+  // Resources depleted after paying first inflated demand - no more extra resources available
+  resourcesDepleted: boolean;
   // Track when items have been introduced (for inventory display)
   fishIntroduced: boolean;
   stoneIntroduced: boolean;
@@ -307,6 +309,7 @@ export class VillageLedgerGame {
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
       extraFishAvailable: false,
+      resourcesDepleted: false,
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,
@@ -925,6 +928,9 @@ export class VillageLedgerGame {
             onComplete: () => {
               this.state.inventory.wood = 1;
               this.state.obtainedWood = true;
+              // Show wood in inventory HUD
+              this.state.stoneIntroduced = true; // Stone mentioned as owed
+              this.state.fishIntroduced = true; // Fish mentioned as owed
               this.showInventoryPopup('+1 WOOD');
               this.setMood('happy');
               this.state.phase = 'loop2_got_wood';
@@ -1173,6 +1179,9 @@ export class VillageLedgerGame {
             onComplete: () => {
               this.state.inventory.stone = 1;
               this.state.obtainedStone = true;
+              // Ensure stone and fish appear in inventory HUD
+              this.state.stoneIntroduced = true;
+              this.state.fishIntroduced = true;
               this.showInventoryPopup('+1 SHARP STONE');
               this.setMood('happy');
               this.state.phase = 'loop2_got_stone';
@@ -1347,6 +1356,17 @@ export class VillageLedgerGame {
   private handleFishermanInteraction(): void {
     const phase = this.state.phase;
     
+    // Check if resources are depleted (after paying first inflated demand)
+    if (this.state.resourcesDepleted) {
+      this.queueDialogue([
+        {
+          speaker: 'FISHERMAN',
+          text: "Sorry, I'm all out of fish! I've got nothing left to trade."
+        }
+      ]);
+      return;
+    }
+    
     // Check if player has items
     const hasBerries = this.state.inventory.berries >= 3;
     const alreadyHasFish = this.state.inventory.fish >= 3;
@@ -1395,6 +1415,7 @@ export class VillageLedgerGame {
           onComplete: () => {
             this.state.inventory.berries -= 3;
             this.state.inventory.fish = 3;
+            this.state.fishIntroduced = true; // Ensure fish shows in inventory HUD
             this.showInventoryPopup('+3 FISH (-3 BERRIES)');
             this.setMood('happy');
             // Update phase based on current loop
@@ -1433,6 +1454,17 @@ export class VillageLedgerGame {
   // CREDIT-FIRST: Always interactable - allows player to pick up to 3 berries at any time
   // Extra berry spawns after giving in to inflated demand
   private handleBerryBushInteraction(): void {
+    // Check if resources are depleted (after paying first inflated demand)
+    if (this.state.resourcesDepleted) {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "The bush is completely empty now... there are no more berries to pick."
+        }
+      ]);
+      return;
+    }
+    
     // Check if extra berry is available (after giving in to inflated demand)
     if (this.state.extraBerryAvailable) {
       this.state.inventory.berries++;
@@ -1796,7 +1828,11 @@ export class VillageLedgerGame {
           if (this.state.inventory.fish >= 3) {
             this.state.inventory.fish -= 3;
             this.state.gaveInToWoodcutter = true;
-            this.state.extraBerryAvailable = true; // Extra berry spawns
+            // Resources are now depleted - no extra berry or fish available
+            // This makes it impossible to pay Stone-worker's inflated demand later
+            this.state.resourcesDepleted = true;
+            this.state.extraBerryAvailable = false;
+            this.state.extraFishAvailable = false;
             this.queueDialogue([
               {
                 speaker: 'WOODCUTTER',
@@ -1811,7 +1847,9 @@ export class VillageLedgerGame {
               }
             ]);
           } else {
-            // Not enough fish - tell player they need more
+            // Not enough fish - enable extra berry and fish trade
+            this.state.extraBerryAvailable = true; // Extra berry spawns at bush
+            this.state.extraFishAvailable = true; // Fisherman has 1 more fish
             this.queueDialogue([
               {
                 speaker: 'YOU',
@@ -1819,7 +1857,7 @@ export class VillageLedgerGame {
               },
               {
                 speaker: 'WOODCUTTER',
-                text: "Then go get more! I'll be waiting!"
+                text: "Then go pick more berries and trade them! The Berry Bush is to the west. The Fisherman has 1 Fish left. I'll be waiting!"
               }
             ]);
           }
@@ -1879,7 +1917,11 @@ export class VillageLedgerGame {
           
           if (this.state.inventory.fish >= 4) {
             this.state.inventory.fish -= 4;
-            this.state.extraBerryAvailable = true; // Extra berry spawns
+            // Resources are now depleted - no extra berry or fish available
+            // This makes it impossible to pay the Woodcutter's inflated demand later
+            this.state.resourcesDepleted = true;
+            this.state.extraBerryAvailable = false;
+            this.state.extraFishAvailable = false;
             this.queueDialogue([
               {
                 speaker: 'STONE-WORKER',
@@ -1948,6 +1990,38 @@ export class VillageLedgerGame {
       timer: 2,
       y: 0
     };
+  }
+
+  // Enforce minimum spacing between NPCs to prevent overlap during village center gatherings
+  private enforceNPCSpacing(): void {
+    const minSpacing = 60; // Minimum pixels between NPC centers
+    const npcs = [this.woodcutter, this.stoneWorker, this.fisherman, this.villageElder];
+    
+    // Sort NPCs by x position to process in order
+    npcs.sort((a, b) => a.x - b.x);
+    
+    // Push NPCs apart if too close
+    for (let i = 0; i < npcs.length - 1; i++) {
+      for (let j = i + 1; j < npcs.length; j++) {
+        const npc1 = npcs[i];
+        const npc2 = npcs[j];
+        const distance = Math.abs(npc2.x - npc1.x);
+        
+        if (distance < minSpacing) {
+          const overlap = minSpacing - distance;
+          const halfOverlap = overlap / 2;
+          
+          // Push them apart equally
+          if (npc1.x < npc2.x) {
+            npc1.x -= halfOverlap;
+            npc2.x += halfOverlap;
+          } else {
+            npc1.x += halfOverlap;
+            npc2.x -= halfOverlap;
+          }
+        }
+      }
+    }
   }
 
   public resize(): void {
@@ -2076,6 +2150,9 @@ export class VillageLedgerGame {
         }
       }
     });
+    
+    // Apply NPC spacing buffer - prevent NPCs from overlapping each other
+    this.enforceNPCSpacing();
 
     // Update camera
     this.cameraTargetX = this.player.x - this.canvas.width / 2;
@@ -2618,7 +2695,7 @@ export class VillageLedgerGame {
       const btnX = cardX + 20;
       const btnY = cardY + 55 + i * 65;
 
-      ctx.fillStyle = i === 0 ? '#DC2626' : '#22C55E'; // Red for promise, Green for ledger
+      ctx.fillStyle = i === 0 ? '#22C55E' : '#DC2626'; // Green for promise/give-in, Red for ledger
       ctx.beginPath();
       ctx.roundRect(btnX, btnY, btnW, btnH, 8);
       ctx.fill();
@@ -3929,6 +4006,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
       extraFishAvailable: false,
+      resourcesDepleted: false,
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,
@@ -3998,6 +4076,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
       extraFishAvailable: false,
+      resourcesDepleted: false,
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,

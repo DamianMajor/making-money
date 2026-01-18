@@ -83,13 +83,15 @@ When Elder successfully settles all recorded debts, a 3-second celebration plays
 - INTERACT button shows target name: "INTERACT (Woodcutter)", "INTERACT (Home)", etc.
 - Note: Intro dialogue must be dismissed (tap to advance) before NPC taps register
 
-### Auto-Walk System
-- Clicking anywhere on screen sets walk destination; clicking NPCs/items auto-walks and interacts
+### Movement System (Click-and-Hold / Click-and-Release)
+Two movement modes:
+1. **Click-and-Hold**: Hold on left/right side of screen for continuous directional movement
+2. **Click-and-Release (Quick Tap)**: Tap anywhere to auto-walk to that exact point
+- Quick tap threshold: 150ms - taps shorter than this walk to point, longer holds move directionally
 - Player walks toward target at 200 units/sec
 - When within 25 units of target, interaction triggers automatically
 - Clicking elsewhere cancels current auto-walk and sets new destination
-- Movement state (moveDirection, touchActive) cleared when setting target to prevent drift
-- Hitbox detection uses npc.y (set by resize() to groundY - height) for accurate Y alignment
+- No visible left/right buttons - movement is intuitive via touch zones
 
 ### Happy Face Timer
 - Happy mood (happy.png) triggers when receiving items, fixing roof, or settling debts
@@ -169,11 +171,17 @@ NPCs offer a choice: verbal promise OR walk to Stone Tablet together to record t
 2. If "record": NPC escorts player to Village Center, records debt, THEN gives item
 3. `loop2_escorting_woodcutter` / `loop2_escorting_stoneworker` - Escort phases
 4. Partial recording supported - can record some debts but not others
-5. Settlement outcomes based on what was recorded:
+5. `loop2_got_fish` - Direct settlement option: Player can try settling with Woodcutter/Stoneworker directly
+   - If debt was recorded → NPC agrees to correct amount
+   - If debt was NOT recorded → NPC disputes (gaslighting), offers to verify at tablet together
+6. `loop2_verify_at_tablet` - Trustless verification: Elder checks tablet, proves truth
+   - Recorded debts verified → NPC admits error, accepts correct payment
+   - Unrecorded debts → No proof exists, dispute escalates to brawl
+7. Settlement outcomes based on what was recorded:
    - ALL debts recorded → Elder settles peacefully → quiz → success
    - SOME debts recorded → Elder settles recorded, unrecorded cause dispute → brawl
    - NO debts recorded → full confrontation/brawl like Loop 1
-6. `loop2_return` → `complete_success` → Quiz tests understanding
+8. `loop2_return` → `complete_success` → Quiz tests understanding
 
 ### Loop 2 Escort Behavior
 During Loop 2 escort phases, NPCs move directly toward the Village Center:

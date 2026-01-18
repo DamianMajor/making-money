@@ -1042,6 +1042,28 @@ export class VillageLedgerGame {
       const hasFishForWoodcutter = this.state.inventory.fish >= 1;
       
       if (!hasFishForWoodcutter) {
+        // Check if resources are depleted - player can't get more fish, trigger brawl
+        if (this.state.resourcesDepleted || this.state.gaveInToStoneWorker) {
+          this.queueDialogue([
+            {
+              speaker: 'YOU',
+              text: "I... I can't get any more fish. The Fisherman is all out..."
+            },
+            {
+              speaker: 'WOODCUTTER',
+              text: "You paid the Stone-worker and left me with nothing?! This is outrageous!",
+              onComplete: () => {
+                // Trigger brawl
+                this.woodcutter.targetX = this.player.x - 30;
+                this.stoneWorker.targetX = this.player.x + 30;
+                this.villageElder.targetX = this.villageCenterX + 200;
+                this.state.showBrawl = true;
+                this.state.brawlTimer = 0;
+              }
+            }
+          ]);
+          return;
+        }
         this.queueDialogue([
           {
             speaker: 'WOODCUTTER',
@@ -1387,6 +1409,28 @@ export class VillageLedgerGame {
       const hasFishForStoneworker = this.state.inventory.fish >= 2;
       
       if (!hasFishForStoneworker) {
+        // Check if resources are depleted - player can't get more fish, trigger brawl
+        if (this.state.resourcesDepleted || this.state.gaveInToWoodcutter) {
+          this.queueDialogue([
+            {
+              speaker: 'YOU',
+              text: "I... I can't get any more fish. The Fisherman is all out..."
+            },
+            {
+              speaker: 'STONE-WORKER',
+              text: "You paid the Woodcutter and left me with nothing?! This is outrageous!",
+              onComplete: () => {
+                // Trigger brawl
+                this.woodcutter.targetX = this.player.x - 30;
+                this.stoneWorker.targetX = this.player.x + 30;
+                this.villageElder.targetX = this.villageCenterX + 200;
+                this.state.showBrawl = true;
+                this.state.brawlTimer = 0;
+              }
+            }
+          ]);
+          return;
+        }
         this.queueDialogue([
           {
             speaker: 'STONE-WORKER',
@@ -1907,8 +1951,12 @@ export class VillageLedgerGame {
             ]);
             // Trigger brawl after dialogue
             setTimeout(() => {
-              this.state.showBrawl = true;
-              this.state.brawlTimer = 0;
+              try {
+                this.state.showBrawl = true;
+                this.state.brawlTimer = 0;
+              } catch (e) {
+                console.error('Error triggering brawl:', e);
+              }
             }, 2000);
             return;
           }
@@ -2020,8 +2068,12 @@ export class VillageLedgerGame {
             ]);
             // Trigger brawl after dialogue
             setTimeout(() => {
-              this.state.showBrawl = true;
-              this.state.brawlTimer = 0;
+              try {
+                this.state.showBrawl = true;
+                this.state.brawlTimer = 0;
+              } catch (e) {
+                console.error('Error triggering brawl:', e);
+              }
             }, 2000);
             return;
           }
@@ -2130,7 +2182,7 @@ export class VillageLedgerGame {
   // Enforce minimum spacing between NPCs to prevent overlap during village center gatherings
   // Soft collision: NPCs slow down when near each other and avoid Stone Tablet center
   private enforceNPCSpacing(): void {
-    const minVisualSpacing = 40; // Minimum pixels for visual overlap prevention (rendering offset only)
+    const minVisualSpacing = 60; // Minimum pixels for visual overlap prevention (rendering offset only)
     const tabletExclusionRadius = 50; // Keep NPCs away from tablet center for clicking
     const npcs = [this.woodcutter, this.stoneWorker, this.fisherman, this.villageElder];
     
@@ -2211,13 +2263,16 @@ export class VillageLedgerGame {
   }
 
   private gameLoop(): void {
-    const currentTime = performance.now();
-    const deltaTime = (currentTime - this.lastTime) / 1000;
-    this.lastTime = currentTime;
+    try {
+      const currentTime = performance.now();
+      const deltaTime = (currentTime - this.lastTime) / 1000;
+      this.lastTime = currentTime;
 
-    this.update(deltaTime);
-    this.render();
-
+      this.update(deltaTime);
+      this.render();
+    } catch (e) {
+      console.error('Game loop error:', e);
+    }
     this.animationId = requestAnimationFrame(this.gameLoop.bind(this));
   }
 
@@ -2760,6 +2815,9 @@ export class VillageLedgerGame {
 
     // Draw player (in front of NPCs and markers)
     this.drawCharacter(ctx, this.player);
+
+    // Draw fishing pole in front of fisherman
+    this.drawFishingPole(ctx, groundY);
 
     // Draw destination marker (subtle visual feedback for tap-to-walk)
     if (this.autoWalkTarget && this.autoWalkTarget.type === 'location') {
@@ -3394,6 +3452,21 @@ export class VillageLedgerGame {
       ctx.ellipse(pondScreenX - 25, groundY + 8 + pondYOffset, 15, 4, 0, 0, Math.PI * 2);
       ctx.stroke();
       
+      // Float/bobber
+      ctx.fillStyle = '#FF4444';
+      ctx.beginPath();
+      ctx.arc(pondScreenX - 35, groundY - 5 + pondYOffset, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Draw fishing pole in front of fisherman (called after NPCs are drawn)
+  private drawFishingPole(ctx: CanvasRenderingContext2D, groundY: number): void {
+    const fishingHoleX = 3200;
+    const pondScreenX = fishingHoleX - this.cameraX - 60; // Same offset as pond
+    const pondYOffset = 25;
+    
+    if (pondScreenX > -150 && pondScreenX < this.canvas.width + 150) {
       // Fishing pole (held by Fisherman, angled over pond)
       ctx.strokeStyle = '#8B6914';
       ctx.lineWidth = 3;
@@ -3409,12 +3482,6 @@ export class VillageLedgerGame {
       ctx.moveTo(pondScreenX - 30, groundY - 80 + pondYOffset); // From pole tip
       ctx.lineTo(pondScreenX - 35, groundY - 5 + pondYOffset);  // Down to water
       ctx.stroke();
-      
-      // Float/bobber
-      ctx.fillStyle = '#FF4444';
-      ctx.beginPath();
-      ctx.arc(pondScreenX - 35, groundY - 5 + pondYOffset, 4, 0, Math.PI * 2);
-      ctx.fill();
     }
   }
 

@@ -639,7 +639,7 @@ export class VillageLedgerGame {
     }
     
     // Collect all NPCs whose hitbox contains the tap point FIRST (priority over Stone Tablet)
-    const tappedNPCs: { npc: Character; distance: number }[] = [];
+    const tappedNPCs: { npc: Character; distanceToTap: number }[] = [];
     
     for (const npc of this.npcs) {
       if (!npc.visible) continue;
@@ -655,15 +655,17 @@ export class VillageLedgerGame {
       };
       if (x >= hitbox.x && x <= hitbox.x + hitbox.width &&
           y >= hitbox.y && y <= hitbox.y + hitbox.height) {
-        // Calculate distance from player to this NPC
-        const distance = Math.abs(this.player.x - npc.x);
-        tappedNPCs.push({ npc, distance });
+        // Calculate distance from tap point to NPC center (prioritize NPC you're tapping on)
+        const npcCenterX = npcScreenX;
+        const npcCenterY = npcScreenY + npc.height / 2;
+        const distanceToTap = Math.sqrt(Math.pow(x - npcCenterX, 2) + Math.pow(y - npcCenterY, 2));
+        tappedNPCs.push({ npc, distanceToTap });
       }
     }
     
-    // Return the closest NPC to the player (prioritize NPCs over Stone Tablet)
+    // Return the NPC closest to the tap point (the one you're actually clicking on)
     if (tappedNPCs.length > 0) {
-      tappedNPCs.sort((a, b) => a.distance - b.distance);
+      tappedNPCs.sort((a, b) => a.distanceToTap - b.distanceToTap);
       return tappedNPCs[0].npc;
     }
     
@@ -905,7 +907,7 @@ export class VillageLedgerGame {
             this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
             // Woodcutter walks to village center (right of Elder to avoid overlap)
-            this.woodcutter.targetX = this.villageCenterX + 120; // Far enough from Elder
+            this.woodcutter.targetX = this.villageCenterX + 80; // Far enough from Elder
           }
         }
       ]);
@@ -981,7 +983,7 @@ export class VillageLedgerGame {
                 this.state.showHUD = true;
                 this.hudGlow = 1;
               }
-              this.woodcutter.targetX = this.villageCenterX + 120; // Far enough from Elder
+              this.woodcutter.targetX = this.villageCenterX + 80; // Far enough from Elder
             }
           }
         ]);
@@ -1024,7 +1026,7 @@ export class VillageLedgerGame {
     // LOOP 1 SETTLEMENT: Player tries to settle - Woodcutter claims inflated debt
     else if (phase === 'settlement' && !this.state.woodcutterDisputed) {
       // Woodcutter steps to position (right of Elder to avoid overlap)
-      this.woodcutter.targetX = this.villageCenterX + 120;
+      this.woodcutter.targetX = this.villageCenterX + 80;
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
@@ -1231,7 +1233,7 @@ export class VillageLedgerGame {
             this.setMood('happy');
             this.state.phase = 'got_stone_need_fish';
             // Stone-worker walks to village center
-            this.stoneWorker.targetX = this.villageCenterX + 180;
+            this.stoneWorker.targetX = this.villageCenterX + 380;
           }
         }
       ]);
@@ -1305,7 +1307,7 @@ export class VillageLedgerGame {
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
                 this.hudGlow = 1;
               }
-              this.stoneWorker.targetX = this.villageCenterX + 180;
+              this.stoneWorker.targetX = this.villageCenterX + 380;
             }
           }
         ]);
@@ -1346,7 +1348,7 @@ export class VillageLedgerGame {
     // LOOP 1 SETTLEMENT: Player tries to settle - Stone-worker claims inflated debt
     else if (phase === 'settlement' && !this.state.stoneworkerDisputed) {
       // Stone-worker steps to the right to confront player
-      this.stoneWorker.targetX = this.villageCenterX + 100;
+      this.stoneWorker.targetX = this.villageCenterX + 380;
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
@@ -2075,7 +2077,7 @@ export class VillageLedgerGame {
               text: "Fine! The Tablet will prove I'm right! Let's go!",
               onComplete: () => {
                 this.state.phase = 'loop2_verify_at_tablet';
-                this.stoneWorker.targetX = this.villageCenterX + 120;
+                this.stoneWorker.targetX = this.villageCenterX + 380;
               }
             }
           ]);
@@ -2511,8 +2513,8 @@ export class VillageLedgerGame {
       if (nearVillageCenter && hasRequirements && !this.state.currentDialogue) {
         this.state.phase = 'settlement';
         // Move NPCs to village center area for the confrontation (woodcutter right to avoid Elder overlap)
-        this.woodcutter.targetX = this.villageCenterX + 120;
-        this.stoneWorker.targetX = this.villageCenterX + 220;
+        this.woodcutter.targetX = this.villageCenterX + 80;
+        this.stoneWorker.targetX = this.villageCenterX + 380;
       }
     }
     
@@ -2679,7 +2681,7 @@ export class VillageLedgerGame {
           // Woodcutter to the left of Elder
           this.woodcutter.targetX = this.villageCenterX - 130;
           // Stone-worker to the right of tablet
-          this.stoneWorker.targetX = this.villageCenterX + 100;
+          this.stoneWorker.targetX = this.villageCenterX + 380;
           
           this.state.phase = 'brawl';
           this.state.showBrawl = true;
@@ -3819,8 +3821,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
     ctx.fillRect(0, 0, w, h);
     
-    // Popup dimensions - larger than HUD for readability
-    const popupWidth = Math.min(400, w - 60);
+    // Popup dimensions - larger than HUD for readability, wide enough for full debt text
+    const popupWidth = Math.min(520, w - 40);
     const popupHeight = Math.min(500, h - 120);
     const popupX = (w - popupWidth) / 2;
     const popupY = (h - popupHeight) / 2;

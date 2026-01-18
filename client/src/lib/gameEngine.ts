@@ -21,6 +21,7 @@ interface Character {
   bobDirection: number;
   targetX?: number; // For NPC movement toward town center
   originalX?: number; // Store original position for reset
+  renderOffsetX?: number; // Visual offset for soft collision display
 }
 
 interface DialogueLine {
@@ -77,6 +78,7 @@ interface GameState {
   // Resources depleted after paying first inflated demand - no more extra resources available
   resourcesDepleted: boolean;
   // Track when items have been introduced (for inventory display)
+  woodIntroduced: boolean;
   fishIntroduced: boolean;
   stoneIntroduced: boolean;
   berriesIntroduced: boolean;
@@ -310,6 +312,7 @@ export class VillageLedgerGame {
       extraBerryAvailable: false,
       extraFishAvailable: false,
       resourcesDepleted: false,
+      woodIntroduced: false,
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,
@@ -773,12 +776,22 @@ export class VillageLedgerGame {
   private handleStoneTabletInteraction(): void {
     const phase = this.state.phase;
     
-    // Only relevant in Loop 2 after debts have been incurred
+    // Loop 1: Show the tablet with elder wisdom about record-keeping
     if (this.state.loop !== 2) {
+      // Show the Stone Tablet HUD briefly
+      this.state.showHUD = true;
       this.queueDialogue([
         {
           speaker: 'YOU',
           text: "The Stone Tablet... it's blank. The villagers haven't started using it yet."
+        },
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "This tablet holds great power, young one. A promise remembered only by one is easily forgotten by another."
+        },
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "When debts are carved in stone, no one can deny what was agreed. Trust becomes something you can verify, not just believe."
         }
       ]);
       return;
@@ -859,6 +872,7 @@ export class VillageLedgerGame {
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.state.obtainedWood = true;
+            this.state.woodIntroduced = true; // Wood shown in inventory HUD
             this.state.stoneIntroduced = true; // Stone mentioned as payment
             this.state.fishIntroduced = true; // Fish mentioned as payment
             this.showInventoryPopup('+1 WOOD');
@@ -929,6 +943,7 @@ export class VillageLedgerGame {
               this.state.inventory.wood = 1;
               this.state.obtainedWood = true;
               // Show wood in inventory HUD
+              this.state.woodIntroduced = true; // Wood shown in inventory HUD
               this.state.stoneIntroduced = true; // Stone mentioned as owed
               this.state.fishIntroduced = true; // Fish mentioned as owed
               this.showInventoryPopup('+1 WOOD');
@@ -1036,6 +1051,40 @@ export class VillageLedgerGame {
             text: "We're all settled! Thanks for being honest."
           }
         ]);
+        return;
+      }
+      
+      // If player agreed to give in to inflated demand, handle that payment
+      if (this.state.gaveInToWoodcutter) {
+        const needsFish = 3;
+        if (this.state.inventory.fish >= needsFish) {
+          this.state.inventory.fish -= needsFish;
+          // CRITICAL: Resources are now depleted after paying inflated demand
+          // This makes it impossible to gather more resources for Stone-worker's inflated demand
+          this.state.resourcesDepleted = true;
+          this.state.extraBerryAvailable = false;
+          this.state.extraFishAvailable = false;
+          this.setMood('happy');
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "That's all 3 Fish! Debt settled.",
+              onComplete: () => {
+                this.state.woodcutterSettled = true;
+                if (this.state.stoneWorkerSettled) {
+                  this.checkAllDebtsSettled();
+                }
+              }
+            }
+          ]);
+        } else {
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: `You agreed to pay 3 Fish, but you only have ${this.state.inventory.fish}. Get more from the Fisherman!`
+            }
+          ]);
+        }
         return;
       }
       
@@ -1272,6 +1321,11 @@ export class VillageLedgerGame {
         const needsFish = 4;
         if (this.state.inventory.fish >= needsFish) {
           this.state.inventory.fish -= needsFish;
+          // CRITICAL: Resources are now depleted after paying inflated demand
+          // This makes it impossible to gather more resources for Woodcutter's inflated demand
+          this.state.resourcesDepleted = true;
+          this.state.extraBerryAvailable = false;
+          this.state.extraFishAvailable = false;
           this.setMood('happy');
           this.queueDialogue([
             {
@@ -1993,35 +2047,51 @@ export class VillageLedgerGame {
   }
 
   // Enforce minimum spacing between NPCs to prevent overlap during village center gatherings
+  // Soft collision: NPCs slow down when near each other and avoid Stone Tablet center
   private enforceNPCSpacing(): void {
-    const minSpacing = 60; // Minimum pixels between NPC centers
+    const minVisualSpacing = 40; // Minimum pixels for visual overlap prevention (rendering offset only)
+    const tabletExclusionRadius = 50; // Keep NPCs away from tablet center for clicking
     const npcs = [this.woodcutter, this.stoneWorker, this.fisherman, this.villageElder];
     
-    // Sort NPCs by x position to process in order
-    npcs.sort((a, b) => a.x - b.x);
+    // Calculate render offsets for each NPC to prevent visual overlap
+    // This doesn't change their actual x position, just adjusts rendering
+    npcs.forEach(npc => {
+      if (!npc.renderOffsetX) npc.renderOffsetX = 0;
+    });
     
-    // Push NPCs apart if too close
-    for (let i = 0; i < npcs.length - 1; i++) {
-      for (let j = i + 1; j < npcs.length; j++) {
-        const npc1 = npcs[i];
-        const npc2 = npcs[j];
-        const distance = Math.abs(npc2.x - npc1.x);
-        
-        if (distance < minSpacing) {
-          const overlap = minSpacing - distance;
-          const halfOverlap = overlap / 2;
-          
-          // Push them apart equally
-          if (npc1.x < npc2.x) {
-            npc1.x -= halfOverlap;
-            npc2.x += halfOverlap;
-          } else {
-            npc1.x += halfOverlap;
-            npc2.x -= halfOverlap;
-          }
-        }
+    // Sort by x position
+    const sortedNPCs = [...npcs].sort((a, b) => a.x - b.x);
+    
+    // Calculate render offsets to prevent visual overlap
+    for (let i = 0; i < sortedNPCs.length - 1; i++) {
+      const npc1 = sortedNPCs[i];
+      const npc2 = sortedNPCs[i + 1];
+      const distance = Math.abs(npc2.x - npc1.x);
+      
+      if (distance < minVisualSpacing) {
+        // Apply small render offset to spread them visually
+        const offsetNeeded = (minVisualSpacing - distance) / 2;
+        npc1.renderOffsetX = -offsetNeeded;
+        npc2.renderOffsetX = offsetNeeded;
+      } else {
+        // Reset offsets when not overlapping
+        npc1.renderOffsetX = Math.max(0, (npc1.renderOffsetX || 0) * 0.9);
+        npc2.renderOffsetX = Math.max(0, (npc2.renderOffsetX || 0) * 0.9);
       }
     }
+    
+    // Keep NPCs away from Stone Tablet center so it remains clickable
+    npcs.forEach(npc => {
+      const distToTablet = npc.x - this.villageCenterX;
+      if (Math.abs(distToTablet) < tabletExclusionRadius) {
+        // Gently push NPC away from tablet center
+        if (distToTablet < 0) {
+          npc.x -= 2; // Push left
+        } else {
+          npc.x += 2; // Push right
+        }
+      }
+    });
   }
 
   public resize(): void {
@@ -2681,11 +2751,17 @@ export class VillageLedgerGame {
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Title
+    // Detect if this is a settlement dispute (first option mentions "Tablet")
+    // vs procurement deal (first option is a promise)
+    const firstOptionText = this.state.choiceOptions[0]?.text || '';
+    const isSettlementPhase = firstOptionText.toLowerCase().includes('tablet');
+    
+    // Title - different header for settlement vs procurement
     ctx.font = `12px ${this.retroFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#3D2914';
-    ctx.fillText('How will you seal this deal?', w / 2, cardY + 35);
+    const headerText = isSettlementPhase ? 'How will you settle this debt?' : 'How will you seal this deal?';
+    ctx.fillText(headerText, w / 2, cardY + 35);
 
     // Draw choice buttons
     this.choiceButtonAreas = [];
@@ -2695,7 +2771,16 @@ export class VillageLedgerGame {
       const btnX = cardX + 20;
       const btnY = cardY + 55 + i * 65;
 
-      ctx.fillStyle = i === 0 ? '#22C55E' : '#DC2626'; // Green for promise/give-in, Red for ledger
+      // Color logic:
+      // Settlement phase: first option (consult tablet) = GREEN (smart), second (give in) = RED (risky)
+      // Procurement phase: first option (promise) = RED (risky), second (record) = GREEN (smart)
+      let btnColor: string;
+      if (isSettlementPhase) {
+        btnColor = i === 0 ? '#22C55E' : '#DC2626'; // Green for tablet, Red for give-in
+      } else {
+        btnColor = i === 0 ? '#DC2626' : '#22C55E'; // Red for promise, Green for record
+      }
+      ctx.fillStyle = btnColor;
       ctx.beginPath();
       ctx.roundRect(btnX, btnY, btnW, btnH, 8);
       ctx.fill();
@@ -3188,52 +3273,54 @@ export class VillageLedgerGame {
     }
     
     // Fishing Hole / Pond at Fisherman's location (x=3200)
+    // Shifted left by 60px and down by 25px so pond sits below ground horizon
     const fishingHoleX = 3200;
-    const pondScreenX = fishingHoleX - this.cameraX;
+    const pondScreenX = fishingHoleX - this.cameraX - 60; // Shift left
+    const pondYOffset = 25; // Shift down
     if (pondScreenX > -150 && pondScreenX < this.canvas.width + 150) {
       // Draw pond/water
       ctx.fillStyle = '#4A90B8';
       ctx.beginPath();
-      ctx.ellipse(pondScreenX - 40, groundY + 5, 70, 20, 0, 0, Math.PI * 2);
+      ctx.ellipse(pondScreenX - 40, groundY + 5 + pondYOffset, 70, 20, 0, 0, Math.PI * 2);
       ctx.fill();
       
       // Pond edge/bank
       ctx.strokeStyle = '#5D4E37';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.ellipse(pondScreenX - 40, groundY + 5, 72, 22, 0, 0, Math.PI * 2);
+      ctx.ellipse(pondScreenX - 40, groundY + 5 + pondYOffset, 72, 22, 0, 0, Math.PI * 2);
       ctx.stroke();
       
       // Water ripples
       ctx.strokeStyle = '#6BB5D8';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.ellipse(pondScreenX - 50, groundY, 20, 6, 0, 0, Math.PI * 2);
+      ctx.ellipse(pondScreenX - 50, groundY + pondYOffset, 20, 6, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.ellipse(pondScreenX - 25, groundY + 8, 15, 4, 0, 0, Math.PI * 2);
+      ctx.ellipse(pondScreenX - 25, groundY + 8 + pondYOffset, 15, 4, 0, 0, Math.PI * 2);
       ctx.stroke();
       
       // Fishing pole (held by Fisherman, angled over pond)
       ctx.strokeStyle = '#8B6914';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(pondScreenX + 30, groundY - 50); // Held at character level
-      ctx.lineTo(pondScreenX - 30, groundY - 80); // Tip extends over water
+      ctx.moveTo(pondScreenX + 30, groundY - 50 + pondYOffset); // Held at character level
+      ctx.lineTo(pondScreenX - 30, groundY - 80 + pondYOffset); // Tip extends over water
       ctx.stroke();
       
       // Fishing line
       ctx.strokeStyle = '#AAA';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(pondScreenX - 30, groundY - 80); // From pole tip
-      ctx.lineTo(pondScreenX - 35, groundY - 5);  // Down to water
+      ctx.moveTo(pondScreenX - 30, groundY - 80 + pondYOffset); // From pole tip
+      ctx.lineTo(pondScreenX - 35, groundY - 5 + pondYOffset);  // Down to water
       ctx.stroke();
       
       // Float/bobber
       ctx.fillStyle = '#FF4444';
       ctx.beginPath();
-      ctx.arc(pondScreenX - 35, groundY - 5, 4, 0, Math.PI * 2);
+      ctx.arc(pondScreenX - 35, groundY - 5 + pondYOffset, 4, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -3285,7 +3372,9 @@ export class VillageLedgerGame {
   }
 
 private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
-  const screenX = char.x - this.cameraX;
+  // Apply render offset for soft collision visual separation (NPCs only)
+  const renderOffset = char.renderOffsetX || 0;
+  const screenX = char.x - this.cameraX + renderOffset;
   const screenY = char.y + char.bobOffset;
 
   // 1. Draw original shadow
@@ -3478,10 +3567,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const yPos = padding;
     
     // Only show items that have been introduced
-    const items: { count: number; color: string; introduced: boolean }[] = [
-      { count: this.state.inventory.stone, color: '#6B7280', introduced: this.state.stoneIntroduced },
-      { count: this.state.inventory.fish, color: '#3B82F6', introduced: this.state.fishIntroduced },
-      { count: this.state.inventory.berries, color: '#DC2626', introduced: this.state.berriesIntroduced }
+    const items: { count: number; color: string; introduced: boolean; label: string }[] = [
+      { count: this.state.inventory.wood, color: '#8B4513', introduced: this.state.woodIntroduced, label: 'W' },
+      { count: this.state.inventory.stone, color: '#6B7280', introduced: this.state.stoneIntroduced, label: 'S' },
+      { count: this.state.inventory.fish, color: '#3B82F6', introduced: this.state.fishIntroduced, label: 'F' },
+      { count: this.state.inventory.berries, color: '#DC2626', introduced: this.state.berriesIntroduced, label: 'B' }
     ];
     
     const introducedItems = items.filter(item => item.introduced);
@@ -4007,6 +4097,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       extraBerryAvailable: false,
       extraFishAvailable: false,
       resourcesDepleted: false,
+      woodIntroduced: false,
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,
@@ -4077,6 +4168,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       extraBerryAvailable: false,
       extraFishAvailable: false,
       resourcesDepleted: false,
+      woodIntroduced: false,
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,

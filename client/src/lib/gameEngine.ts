@@ -105,6 +105,7 @@ interface GameState {
   nightTransitionTimer: number;
   showThunderstorm: boolean; // Thunderstorm after roof fix
   thunderstormTimer: number;
+  showStoneTabletPopup: boolean; // Popup view of Stone Tablet
   showChoice: boolean;
   choiceOptions: { text: string; action: () => void }[];
 }
@@ -246,7 +247,7 @@ export class VillageLedgerGame {
     this.berryBush = {
       id: 'berryBush',
       name: 'BERRY BUSH',
-      x: 2000,
+      x: 2050,
       y: 0,
       width: 70,
       height: 50,
@@ -260,7 +261,7 @@ export class VillageLedgerGame {
     this.stoneWorker = {
       id: 'stoneWorker',
       name: 'STONE-WORKER',
-      x: 2500, // Original position - far from village center
+      x: 2550, // Original position - far from village center (50 right of before)
       y: 0,
       width: 50,
       height: 70,
@@ -269,7 +270,7 @@ export class VillageLedgerGame {
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 2500
+      originalX: 2550
     };
 
     this.fisherman = {
@@ -339,6 +340,7 @@ export class VillageLedgerGame {
       nightTransitionTimer: 0,
       showThunderstorm: false,
       thunderstormTimer: 0,
+      showStoneTabletPopup: false,
       showChoice: false,
       choiceOptions: []
     };
@@ -449,6 +451,22 @@ export class VillageLedgerGame {
     const scaleY = this.canvas.height / rect.height;
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
+    
+    // Handle Stone Tablet popup - click anywhere to close
+    if (this.state.showStoneTabletPopup) {
+      this.state.showStoneTabletPopup = false;
+      return;
+    }
+    
+    // Check if clicking on Stone Tablet HUD to open popup
+    if (this.state.showHUD) {
+      const hudX = this.canvas.width - this.hudWidth - 24;
+      const hudY = 24;
+      if (x >= hudX && x <= hudX + this.hudWidth && y >= hudY && y <= hudY + this.hudHeight) {
+        this.state.showStoneTabletPopup = true;
+        return;
+      }
+    }
     
     // Handle fail screen touches
     if (this.state.showFail) {
@@ -1131,19 +1149,24 @@ export class VillageLedgerGame {
         return;
       }
       
-      // If tablet verified (directly or via Elder), NPC accepts payment without dispute
-      if (this.state.elderVerified && this.state.woodcutterDebtRecorded) {
-        // Tablet shows the truth - NPC accepts it directly
+      // If Elder verified (directly or via tablet), NPC accepts payment without dispute
+      if (this.state.elderVerified) {
+        // Accept the fair amount
         this.state.inventory.fish -= 1;
         this.setMood('happy');
+        const verificationText = this.state.woodcutterDebtRecorded 
+          ? "The Tablet shows the true record - 1 Fish it is. Thank you!"
+          : "The Elder confirmed the true amount - 1 Fish it is. Thank you!";
         this.queueDialogue([
           {
             speaker: 'WOODCUTTER',
-            text: "The Tablet shows the true record - 1 Fish it is. Thank you!",
+            text: verificationText,
             onComplete: () => {
-              this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
-                e.name === 'Woodcutter' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
-              );
+              if (this.state.woodcutterDebtRecorded) {
+                this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
+                  e.name === 'Woodcutter' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+                );
+              }
               this.hudGlow = 1;
               this.state.woodcutterSettled = true;
               this.checkAllDebtsSettled();
@@ -1305,6 +1328,14 @@ export class VillageLedgerGame {
     }
     // Player has fish, ready to settle
     else if (phase === 'got_fish_ready_settle') {
+      // Check if Stone-worker is at village center - if so, trigger settlement phase
+      const atVillageCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 300;
+      if (atVillageCenter) {
+        // Transition to settlement and trigger confrontation
+        this.state.phase = 'settlement';
+        this.handleStoneWorkerInteraction(); // Re-trigger with new phase
+        return;
+      }
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
@@ -1440,18 +1471,23 @@ export class VillageLedgerGame {
         return;
       }
       
-      // If tablet verified (directly or via Elder), NPC accepts payment without dispute
-      if (this.state.elderVerified && this.state.stoneWorkerDebtRecorded) {
+      // If Elder verified (directly or via tablet), NPC accepts payment without dispute
+      if (this.state.elderVerified) {
         this.state.inventory.fish -= 2;
         this.setMood('happy');
+        const verificationText = this.state.stoneWorkerDebtRecorded 
+          ? "The Tablet shows the true record - 2 Fish it is. Thank you!"
+          : "The Elder confirmed the true amount - 2 Fish it is. Thank you!";
         this.queueDialogue([
           {
             speaker: 'STONE-WORKER',
-            text: "The Tablet shows the true record - 2 Fish it is. Thank you!",
+            text: verificationText,
             onComplete: () => {
-              this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
-                e.name === 'Stone-worker' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
-              );
+              if (this.state.stoneWorkerDebtRecorded) {
+                this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
+                  e.name === 'Stone-worker' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+                );
+              }
               this.hudGlow = 1;
               this.state.stoneWorkerSettled = true;
               this.checkAllDebtsSettled();
@@ -2810,15 +2846,33 @@ export class VillageLedgerGame {
     // Draw location markers FIRST (behind characters) - Stone Tablet and Home
     this.drawLocationMarkers(ctx, groundY);
 
+    // Special z-order handling: player passes BEHIND fisherman near fishing hole
+    // Check if player is in fisherman's area (between fisherman position and pond)
+    const playerNearFisherman = this.player.x > 3100 && this.player.x < 3250;
+    
     // Draw NPCs (in front of location markers)
+    // But fisherman is drawn AFTER player if player is in fisherman's area
     this.npcs.forEach(npc => {
-      if (npc.visible) {
+      if (npc.visible && npc.id !== 'fisherman') {
         this.drawCharacter(ctx, npc);
       }
     });
-
-    // Draw player (in front of NPCs and markers)
-    this.drawCharacter(ctx, this.player);
+    
+    // If player is near fisherman, draw player BEFORE fisherman
+    if (playerNearFisherman) {
+      this.drawCharacter(ctx, this.player);
+      // Draw fisherman (in front of player)
+      if (this.fisherman.visible) {
+        this.drawCharacter(ctx, this.fisherman);
+      }
+    } else {
+      // Draw fisherman
+      if (this.fisherman.visible) {
+        this.drawCharacter(ctx, this.fisherman);
+      }
+      // Draw player (in front of NPCs and markers)
+      this.drawCharacter(ctx, this.player);
+    }
 
     // Draw fishing pole in front of fisherman
     this.drawFishingPole(ctx, groundY);
@@ -2873,6 +2927,11 @@ export class VillageLedgerGame {
       this.drawFailScreen(ctx);
     }
 
+    // Draw Stone Tablet popup if active (on top of everything except quiz)
+    if (this.state.showStoneTabletPopup) {
+      this.drawStoneTabletPopup(ctx);
+    }
+    
     // Draw quiz overlay if active
     if (this.state.showQuiz) {
       this.drawQuizOverlay(ctx);
@@ -3751,6 +3810,111 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
   }
 
+  // Large popup view of Stone Tablet - shown when clicking the HUD
+  private drawStoneTabletPopup(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    
+    // Dark overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+    ctx.fillRect(0, 0, w, h);
+    
+    // Popup dimensions - larger than HUD for readability
+    const popupWidth = Math.min(400, w - 60);
+    const popupHeight = Math.min(500, h - 120);
+    const popupX = (w - popupWidth) / 2;
+    const popupY = (h - popupHeight) / 2;
+    
+    // Stone texture background
+    const stoneGradient = ctx.createLinearGradient(popupX, popupY, popupX + popupWidth, popupY + popupHeight);
+    stoneGradient.addColorStop(0, '#D4C4A8');
+    stoneGradient.addColorStop(0.5, '#C9B896');
+    stoneGradient.addColorStop(1, '#B8A888');
+    ctx.fillStyle = stoneGradient;
+    ctx.beginPath();
+    ctx.roundRect(popupX, popupY, popupWidth, popupHeight, 12);
+    ctx.fill();
+    
+    // Border
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    
+    // Title
+    ctx.font = `bold 24px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#5D4837';
+    ctx.fillText('STONE TABLET', popupX + popupWidth / 2, popupY + 50);
+    
+    // Divider
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(popupX + 30, popupY + 70);
+    ctx.lineTo(popupX + popupWidth - 30, popupY + 70);
+    ctx.stroke();
+    
+    const isLoop1 = this.state.loop === 1;
+    
+    if (isLoop1) {
+      // Display elder wisdom about trustless verification
+      ctx.font = `italic 16px ${this.uiFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#5D4837';
+      
+      const wisdomLines = [
+        '"A promise remembered',
+        'only by one is easily',
+        'forgotten by another."',
+        '',
+        '"When debts are carved',
+        'in stone, no one can',
+        'deny what was agreed."'
+      ];
+      
+      wisdomLines.forEach((line, i) => {
+        ctx.fillText(line, popupX + popupWidth / 2, popupY + 110 + i * 28);
+      });
+    } else {
+      // Loop 2+: Show NAME/DEBT columns
+      ctx.font = `bold 18px ${this.uiFont}`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#6B5344';
+      ctx.fillText('NAME', popupX + 40, popupY + 110);
+      ctx.fillText('DEBT', popupX + popupWidth * 0.55, popupY + 110);
+      
+      // Column divider
+      ctx.beginPath();
+      ctx.moveTo(popupX + popupWidth * 0.5, popupY + 85);
+      ctx.lineTo(popupX + popupWidth * 0.5, popupY + popupHeight - 60);
+      ctx.stroke();
+      
+      // Ledger entries
+      ctx.font = `16px ${this.uiFont}`;
+      ctx.fillStyle = '#5D4837';
+      
+      this.state.ledgerEntries.forEach((entry, i) => {
+        const entryY = popupY + 145 + i * 30;
+        ctx.fillText(entry.name, popupX + 40, entryY);
+        ctx.fillText(entry.debt, popupX + popupWidth * 0.55, entryY);
+      });
+      
+      // Empty state message
+      if (this.state.ledgerEntries.length === 0) {
+        ctx.font = `italic 16px ${this.uiFont}`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#8B7355';
+        ctx.fillText('(No debts recorded)', popupX + popupWidth / 2, popupY + 180);
+      }
+    }
+    
+    // Tap to close instruction
+    ctx.font = `12px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#8B7355';
+    ctx.fillText('Tap anywhere to close', popupX + popupWidth / 2, popupY + popupHeight - 20);
+  }
+
   private drawInventoryHUD(ctx: CanvasRenderingContext2D): void {
     const padding = 12;
     const iconSize = 24;
@@ -3783,12 +3947,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.lineWidth = 2;
     ctx.stroke();
     
-    // Draw each item
+    // Draw each item (offset to center in box)
+    const iconOffsetX = 4; // Move icons slightly right
+    const iconOffsetY = 4; // Move icons slightly down
     items.forEach((item) => {
       // Draw simple colored circle as icon
       ctx.fillStyle = item.color;
       ctx.beginPath();
-      ctx.arc(xPos + iconSize / 2, yPos + iconSize / 2, iconSize / 2 - 2, 0, Math.PI * 2);
+      ctx.arc(xPos + iconSize / 2 + iconOffsetX, yPos + iconSize / 2 + iconOffsetY, iconSize / 2 - 2, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#5D4837';
       ctx.lineWidth = 2;
@@ -3798,7 +3964,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.font = `bold 14px ${this.uiFont}`;
       ctx.fillStyle = '#FFFFFF';
       ctx.textAlign = 'left';
-      ctx.fillText(`${item.count}`, xPos + iconSize + 4, yPos + iconSize / 2 + 5);
+      ctx.fillText(`${item.count}`, xPos + iconSize + 4 + iconOffsetX, yPos + iconSize / 2 + 5 + iconOffsetY);
       
       xPos += iconSize + spacing + 20;
     });
@@ -4321,6 +4487,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       nightTransitionTimer: 0,
       showThunderstorm: false,
       thunderstormTimer: 0,
+      showStoneTabletPopup: false,
       showChoice: false,
       choiceOptions: []
     };
@@ -4392,6 +4559,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       nightTransitionTimer: 0,
       showThunderstorm: false,
       thunderstormTimer: 0,
+      showStoneTabletPopup: false,
       showChoice: false,
       choiceOptions: []
     };

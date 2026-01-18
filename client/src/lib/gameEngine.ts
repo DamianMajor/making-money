@@ -72,6 +72,12 @@ interface GameState {
   gaveInToStoneWorker: boolean;
   // Extra berry spawns after giving in - allows getting 1 more fish but not enough for both
   extraBerryAvailable: boolean;
+  // Extra fish available from Fisherman after giving in to Stone-worker (Loop 2 only)
+  extraFishAvailable: boolean;
+  // Track when items have been introduced (for inventory display)
+  fishIntroduced: boolean;
+  stoneIntroduced: boolean;
+  berriesIntroduced: boolean;
   ledgerEntries: LedgerEntry[];
   dialogueQueue: DialogueLine[];
   currentDialogue: DialogueLine | null;
@@ -300,6 +306,10 @@ export class VillageLedgerGame {
       gaveInToWoodcutter: false,
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
+      extraFishAvailable: false,
+      fishIntroduced: false,
+      stoneIntroduced: false,
+      berriesIntroduced: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -846,6 +856,8 @@ export class VillageLedgerGame {
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.state.obtainedWood = true;
+            this.state.stoneIntroduced = true; // Stone mentioned as payment
+            this.state.fishIntroduced = true; // Fish mentioned as payment
             this.showInventoryPopup('+1 WOOD');
             this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
@@ -1021,8 +1033,9 @@ export class VillageLedgerGame {
         return;
       }
       
-      // If Elder has verified, NPC accepts payment without dispute
+      // If tablet verified (directly or via Elder), NPC accepts payment without dispute
       if (this.state.elderVerified && this.state.woodcutterDebtRecorded) {
+        // Tablet shows the truth - NPC accepts it directly
         this.state.inventory.fish -= 1;
         this.setMood('happy');
         this.queueDialogue([
@@ -1091,6 +1104,8 @@ export class VillageLedgerGame {
           onComplete: () => {
             this.state.inventory.stone = 1;
             this.state.obtainedStone = true;
+            this.state.stoneIntroduced = true;
+            this.state.fishIntroduced = true; // Fish mentioned as payment
             this.showInventoryPopup('+1 SHARP STONE');
             this.setMood('happy');
             this.state.phase = 'got_stone_need_fish';
@@ -1256,6 +1271,7 @@ export class VillageLedgerGame {
       }
       
       // If Elder has verified, NPC accepts payment without dispute
+      // If tablet verified (directly or via Elder), NPC accepts payment without dispute
       if (this.state.elderVerified && this.state.stoneWorkerDebtRecorded) {
         this.state.inventory.fish -= 2;
         this.setMood('happy');
@@ -1350,8 +1366,23 @@ export class VillageLedgerGame {
         }
       ]);
     }
+    // Loop 2: Extra fish available after giving in to Stone-worker
+    else if (this.state.extraFishAvailable && this.state.inventory.berries >= 1) {
+      this.state.inventory.berries -= 1;
+      this.state.inventory.fish += 1;
+      this.state.extraFishAvailable = false; // Only one extra fish
+      this.showInventoryPopup('+1 FISH');
+      this.setMood('happy');
+      this.queueDialogue([
+        {
+          speaker: 'FISHERMAN',
+          text: "I managed to catch one more fish! Here, 1 Berry for 1 Fish. That's all I have left though."
+        }
+      ]);
+    }
     // Debts initiated but no berries - hint to get some
     else {
+      this.state.berriesIntroduced = true; // Berries mentioned
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
@@ -1383,6 +1414,7 @@ export class VillageLedgerGame {
     // Berry bush is now always available (no gating)
     if (this.state.inventory.berries < 3) {
       this.state.inventory.berries++;
+      this.state.berriesIntroduced = true; // Berries now shown in inventory
       this.showInventoryPopup(`+1 BERRY (${this.state.inventory.berries}/3)`);
       this.setMood('happy');
       
@@ -1809,6 +1841,7 @@ export class VillageLedgerGame {
             this.state.inventory.fish -= 4;
             this.state.gaveInToStoneWorker = true;
             this.state.extraBerryAvailable = true; // Extra berry spawns
+            this.state.extraFishAvailable = true; // Fisherman has 1 more fish
             this.queueDialogue([
               {
                 speaker: 'STONE-WORKER',
@@ -2264,10 +2297,15 @@ export class VillageLedgerGame {
         speaker: 'WOODCUTTER',
         text: "Enough! You're trying to cheat us all!",
         onComplete: () => {
-          // Trigger the brawl - NPCs run to player, Elder steps aside
-          this.woodcutter.targetX = this.player.x - 30;
-          this.stoneWorker.targetX = this.player.x + 30;
-          this.villageElder.targetX = this.villageCenterX + 200; // Elder steps away
+          // Position NPCs for brawl - Elder at Stone Tablet edge, others spaced out
+          // Stone Tablet is at x=1600, Elder overlaps its edge
+          this.villageElder.x = this.villageCenterX - 30; // Elder at tablet's left edge
+          this.villageElder.targetX = undefined; // Stop moving
+          // Woodcutter to the left of Elder
+          this.woodcutter.targetX = this.villageCenterX - 130;
+          // Stone-worker to the right of tablet
+          this.stoneWorker.targetX = this.villageCenterX + 100;
+          
           this.state.phase = 'brawl';
           this.state.showBrawl = true;
           this.state.brawlTimer = 0;
@@ -2453,6 +2491,9 @@ export class VillageLedgerGame {
       this.drawInventoryPopup(ctx);
     }
 
+    // Draw inventory HUD at top of screen
+    this.drawInventoryHUD(ctx);
+    
     // Draw UI elements
     if (this.state.showHUD) {
       this.drawStoneTabletHUD(ctx);
@@ -3313,6 +3354,56 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
   }
 
+  private drawInventoryHUD(ctx: CanvasRenderingContext2D): void {
+    const padding = 12;
+    const iconSize = 24;
+    const spacing = 8;
+    let xPos = padding;
+    const yPos = padding;
+    
+    // Only show items that have been introduced
+    const items: { icon: string; count: number; color: string; introduced: boolean }[] = [
+      { icon: '🪨', count: this.state.inventory.stone, color: '#6B7280', introduced: this.state.stoneIntroduced },
+      { icon: '🐟', count: this.state.inventory.fish, color: '#3B82F6', introduced: this.state.fishIntroduced },
+      { icon: '🫐', count: this.state.inventory.berries, color: '#DC2626', introduced: this.state.berriesIntroduced }
+    ];
+    
+    const introducedItems = items.filter(item => item.introduced);
+    if (introducedItems.length === 0) return;
+    
+    // Background panel
+    const panelWidth = introducedItems.length * (iconSize + spacing + 20) + padding;
+    const panelHeight = iconSize + padding * 1.5;
+    
+    ctx.fillStyle = 'rgba(139, 115, 85, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(xPos - 4, yPos - 4, panelWidth, panelHeight, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#5D4837';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Draw each item
+    introducedItems.forEach((item) => {
+      // Draw simple colored circle as icon
+      ctx.fillStyle = item.color;
+      ctx.beginPath();
+      ctx.arc(xPos + iconSize / 2, yPos + iconSize / 2, iconSize / 2 - 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#5D4837';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Draw count
+      ctx.font = `bold 14px ${this.uiFont}`;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${item.count}`, xPos + iconSize + 4, yPos + iconSize / 2 + 5);
+      
+      xPos += iconSize + spacing + 20;
+    });
+  }
+
   private drawDialogueBox(ctx: CanvasRenderingContext2D): void {
     const x = 0;
     const y = this.canvas.height - this.dialogueBoxHeight;
@@ -3762,6 +3853,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       gaveInToWoodcutter: false,
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
+      extraFishAvailable: false,
+      fishIntroduced: false,
+      stoneIntroduced: false,
+      berriesIntroduced: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -3827,6 +3922,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       gaveInToWoodcutter: false,
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
+      extraFishAvailable: false,
+      fishIntroduced: false,
+      stoneIntroduced: false,
+      berriesIntroduced: false,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,

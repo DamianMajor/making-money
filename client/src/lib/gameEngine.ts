@@ -157,7 +157,7 @@ export class VillageLedgerGame {
   // UI dimensions (calculated on resize)
   private dialogueBoxHeight: number = 0;
   private hudWidth: number = 260;
-  private hudHeight: number = 160;
+  private hudHeight: number = 185;
   private interactButtonSize: number = 100;
 
   // Animation timers
@@ -275,7 +275,7 @@ export class VillageLedgerGame {
     this.fisherman = {
       id: 'fisherman',
       name: 'FISHERMAN',
-      x: 3200,
+      x: 3175,
       y: 0,
       width: 50,
       height: 70,
@@ -284,7 +284,7 @@ export class VillageLedgerGame {
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 3200
+      originalX: 3175
     };
 
     this.npcs = [this.woodcutter, this.villageElder, this.berryBush, this.stoneWorker, this.fisherman];
@@ -620,15 +620,7 @@ export class VillageLedgerGame {
       return 'home';
     }
     
-    // Check if tapping on Stone Tablet (at villageCenterX = 1600)
-    const tabletScreenX = this.villageCenterX - this.cameraX;
-    const tabletHitbox = { x: tabletScreenX - 40, y: groundY - 100, width: 80, height: 100 };
-    if (x >= tabletHitbox.x && x <= tabletHitbox.x + tabletHitbox.width &&
-        y >= tabletHitbox.y && y <= tabletHitbox.y + tabletHitbox.height) {
-      return 'stoneTablet';
-    }
-    
-    // Collect all NPCs whose hitbox contains the tap point
+    // Collect all NPCs whose hitbox contains the tap point FIRST (priority over Stone Tablet)
     const tappedNPCs: { npc: Character; distance: number }[] = [];
     
     for (const npc of this.npcs) {
@@ -651,10 +643,18 @@ export class VillageLedgerGame {
       }
     }
     
-    // Return the closest NPC to the player (prioritize in crowded areas)
+    // Return the closest NPC to the player (prioritize NPCs over Stone Tablet)
     if (tappedNPCs.length > 0) {
       tappedNPCs.sort((a, b) => a.distance - b.distance);
       return tappedNPCs[0].npc;
+    }
+    
+    // Check if tapping on Stone Tablet (at villageCenterX = 1600) - AFTER NPCs
+    const tabletScreenX = this.villageCenterX - this.cameraX;
+    const tabletHitbox = { x: tabletScreenX - 40, y: groundY - 100, width: 80, height: 100 };
+    if (x >= tabletHitbox.x && x <= tabletHitbox.x + tabletHitbox.width &&
+        y >= tabletHitbox.y && y <= tabletHitbox.y + tabletHitbox.height) {
+      return 'stoneTablet';
     }
     
     return null;
@@ -734,17 +734,25 @@ export class VillageLedgerGame {
                          this.state.phase === 'complete';
     
     // If debts are settled, trigger night transition and quiz
-    if (debtsSettled && this.state.loop === 2) {
+    if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && !this.state.showNightTransition && !this.state.showSuccess) {
       setTimeout(() => {
-        if (!this.state.currentDialogue && !this.state.showNightTransition) {
-          // Start night transition, then quiz
-          this.state.showNightTransition = true;
-          this.state.nightTransitionTimer = 0;
-          setTimeout(() => {
-            this.state.showNightTransition = false;
-            this.state.showQuiz = true;
-            this.state.phase = 'quiz';
-          }, 4000);
+        try {
+          if (!this.state.currentDialogue && !this.state.showNightTransition && !this.state.showQuiz) {
+            // Start night transition, then quiz
+            this.state.showNightTransition = true;
+            this.state.nightTransitionTimer = 0;
+            setTimeout(() => {
+              try {
+                this.state.showNightTransition = false;
+                this.state.showQuiz = true;
+                this.state.phase = 'quiz';
+              } catch (e) {
+                console.error('Error in quiz transition:', e);
+              }
+            }, 4000);
+          }
+        } catch (e) {
+          console.error('Error in night transition:', e);
         }
       }, 2000);
       return;
@@ -783,7 +791,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "The Stone Tablet... it's blank. The villagers haven't started using it yet."
+          text: "The Stone Tablet has words of wisdom from the Village Elder carved into it."
         },
         {
           speaker: 'VILLAGE ELDER',
@@ -1908,6 +1916,7 @@ export class VillageLedgerGame {
           if (this.state.inventory.fish >= 3) {
             this.state.inventory.fish -= 3;
             this.state.gaveInToWoodcutter = true;
+            this.state.woodcutterSettled = true; // Mark settled IMMEDIATELY to prevent re-trigger
             // Resources are now depleted - no extra berry or fish available
             // This makes it impossible to pay Stone-worker's inflated demand later
             this.state.resourcesDepleted = true;
@@ -1918,8 +1927,7 @@ export class VillageLedgerGame {
                 speaker: 'WOODCUTTER',
                 text: "That's more like it!",
                 onComplete: () => {
-                  this.state.woodcutterSettled = true;
-                  // Don't check all debts settled - player needs to also pay Stone-worker
+                  // Check if all debts are settled
                   if (this.state.stoneWorkerSettled) {
                     this.checkAllDebtsSettled();
                   }
@@ -1927,19 +1935,42 @@ export class VillageLedgerGame {
               }
             ]);
           } else {
-            // Not enough fish - enable extra berry and fish trade
-            this.state.extraBerryAvailable = true; // Extra berry spawns at bush
-            this.state.extraFishAvailable = true; // Fisherman has 1 more fish
-            this.queueDialogue([
-              {
-                speaker: 'YOU',
-                text: "I don't have 3 Fish right now..."
-              },
-              {
-                speaker: 'WOODCUTTER',
-                text: "Then go pick more berries and trade them! The Berry Bush is to the west. The Fisherman has 1 Fish left. I'll be waiting!"
-              }
-            ]);
+            // Not enough fish - check if resources are depleted (after paying Stone-worker first)
+            if (this.state.resourcesDepleted || this.state.gaveInToStoneWorker) {
+              // Can't get more resources - trigger brawl
+              this.queueDialogue([
+                {
+                  speaker: 'YOU',
+                  text: "I... I don't have enough fish. I already gave everything to the Stone-worker..."
+                },
+                {
+                  speaker: 'WOODCUTTER',
+                  text: "WHAT?! You paid the Stone-worker but not me?! This is outrageous!",
+                  onComplete: () => {
+                    // Trigger brawl
+                    this.woodcutter.targetX = this.player.x - 30;
+                    this.stoneWorker.targetX = this.player.x + 30;
+                    this.villageElder.targetX = this.villageCenterX + 200;
+                    this.state.showBrawl = true;
+                    this.state.brawlTimer = 0;
+                  }
+                }
+              ]);
+            } else {
+              // Resources not depleted - enable extra berry and fish trade
+              this.state.extraBerryAvailable = true; // Extra berry spawns at bush
+              this.state.extraFishAvailable = true; // Fisherman has 1 more fish
+              this.queueDialogue([
+                {
+                  speaker: 'YOU',
+                  text: "I don't have 3 Fish right now..."
+                },
+                {
+                  speaker: 'WOODCUTTER',
+                  text: "Then go pick more berries and trade them! The Berry Bush is to the west. The Fisherman has 1 Fish left. I'll be waiting!"
+                }
+              ]);
+            }
           }
         }
       }
@@ -1997,6 +2028,8 @@ export class VillageLedgerGame {
           
           if (this.state.inventory.fish >= 4) {
             this.state.inventory.fish -= 4;
+            this.state.gaveInToStoneWorker = true;
+            this.state.stoneWorkerSettled = true; // Mark settled IMMEDIATELY to prevent re-trigger
             // Resources are now depleted - no extra berry or fish available
             // This makes it impossible to pay the Woodcutter's inflated demand later
             this.state.resourcesDepleted = true;
@@ -2007,8 +2040,7 @@ export class VillageLedgerGame {
                 speaker: 'STONE-WORKER',
                 text: "That's more like it!",
                 onComplete: () => {
-                  this.state.stoneWorkerSettled = true;
-                  // Don't check all debts settled - player needs to also pay Woodcutter
+                  // Check if all debts are settled
                   if (this.state.woodcutterSettled) {
                     this.checkAllDebtsSettled();
                   }
@@ -2016,19 +2048,42 @@ export class VillageLedgerGame {
               }
             ]);
           } else {
-            // Not enough fish - enable extra berry and fish trade, then direct to berry bush
-            this.state.extraBerryAvailable = true; // Extra berry spawns at bush
-            this.state.extraFishAvailable = true; // Fisherman has 1 more fish to trade
-            this.queueDialogue([
-              {
-                speaker: 'YOU',
-                text: "I don't have 4 Fish right now..."
-              },
-              {
-                speaker: 'STONE-WORKER',
-                text: "Then go pick more berries and trade them! The Berry Bush is to the west. The Fisherman has 1 Fish left. I'll be waiting!"
-              }
-            ]);
+            // Not enough fish - check if resources are depleted (after paying Woodcutter first)
+            if (this.state.resourcesDepleted || this.state.gaveInToWoodcutter) {
+              // Can't get more resources - trigger brawl
+              this.queueDialogue([
+                {
+                  speaker: 'YOU',
+                  text: "I... I don't have enough fish. I already gave everything to the Woodcutter..."
+                },
+                {
+                  speaker: 'STONE-WORKER',
+                  text: "WHAT?! You paid the Woodcutter but not me?! This is outrageous!",
+                  onComplete: () => {
+                    // Trigger brawl
+                    this.woodcutter.targetX = this.player.x - 30;
+                    this.stoneWorker.targetX = this.player.x + 30;
+                    this.villageElder.targetX = this.villageCenterX + 200;
+                    this.state.showBrawl = true;
+                    this.state.brawlTimer = 0;
+                  }
+                }
+              ]);
+            } else {
+              // Resources not depleted - enable extra berry and fish trade
+              this.state.extraBerryAvailable = true; // Extra berry spawns at bush
+              this.state.extraFishAvailable = true; // Fisherman has 1 more fish to trade
+              this.queueDialogue([
+                {
+                  speaker: 'YOU',
+                  text: "I don't have 4 Fish right now..."
+                },
+                {
+                  speaker: 'STONE-WORKER',
+                  text: "Then go pick more berries and trade them! The Berry Bush is to the west. The Fisherman has 1 Fish left. I'll be waiting!"
+                }
+              ]);
+            }
           }
         }
       }
@@ -2079,10 +2134,9 @@ export class VillageLedgerGame {
     const tabletExclusionRadius = 50; // Keep NPCs away from tablet center for clicking
     const npcs = [this.woodcutter, this.stoneWorker, this.fisherman, this.villageElder];
     
-    // Calculate render offsets for each NPC to prevent visual overlap
-    // This doesn't change their actual x position, just adjusts rendering
+    // Reset render offsets each tick to prevent accumulation drift
     npcs.forEach(npc => {
-      if (!npc.renderOffsetX) npc.renderOffsetX = 0;
+      npc.renderOffsetX = 0;
     });
     
     // Sort by x position
@@ -2107,14 +2161,15 @@ export class VillageLedgerGame {
     }
     
     // Keep NPCs away from Stone Tablet center so it remains clickable
+    // Use renderOffsetX only - don't change actual positions to avoid pushing
     npcs.forEach(npc => {
       const distToTablet = npc.x - this.villageCenterX;
       if (Math.abs(distToTablet) < tabletExclusionRadius) {
-        // Gently push NPC away from tablet center
+        // Apply render offset to move NPC visually away from tablet (without changing x)
         if (distToTablet < 0) {
-          npc.x -= 2; // Push left
+          npc.renderOffsetX = (npc.renderOffsetX || 0) - 3; // Offset left
         } else {
-          npc.x += 2; // Push right
+          npc.renderOffsetX = (npc.renderOffsetX || 0) + 3; // Offset right
         }
       }
     });
@@ -2130,7 +2185,7 @@ export class VillageLedgerGame {
     // Update UI dimensions based on canvas size
     this.dialogueBoxHeight = this.canvas.height * 0.2;
     this.hudWidth = Math.min(260, this.canvas.width * 0.25);
-    this.hudHeight = Math.min(160, this.canvas.height * 0.2);
+    this.hudHeight = Math.min(185, this.canvas.height * 0.25);
     this.interactButtonSize = Math.min(100, this.canvas.width * 0.12);
 
     // Calculate ground Y position
@@ -2230,6 +2285,9 @@ export class VillageLedgerGame {
           const escortSpeed = 180; // Faster than player to ensure arrival
           npc.x += Math.sign(diff) * escortSpeed * dt;
           isWalking = true;
+        } else {
+          // Arrived during escort - reset bobOffset
+          npc.bobOffset = 0;
         }
       }
       // Move NPC toward target if set (non-escort movement)
@@ -4195,7 +4253,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.woodcutter.targetX = undefined;
     this.stoneWorker.x = this.stoneWorker.originalX || 2500;
     this.stoneWorker.targetX = undefined;
-    this.fisherman.x = this.fisherman.originalX || 3200;
+    this.fisherman.x = this.fisherman.originalX || 3175;
     this.fisherman.targetX = undefined;
     
     // Trigger intro again
@@ -4263,7 +4321,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.woodcutter.targetX = undefined;
     this.stoneWorker.x = this.stoneWorker.originalX || 2500;
     this.stoneWorker.targetX = undefined;
-    this.fisherman.x = this.fisherman.originalX || 3200;
+    this.fisherman.x = this.fisherman.originalX || 3175;
     this.fisherman.targetX = undefined;
     
     setTimeout(() => this.triggerIntro(), 500);

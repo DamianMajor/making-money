@@ -53,12 +53,17 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 
 - **Inventory HUD**: All 4 items (Wood, Stone, Fish, Berries) now visible from game start; HUD aligned at y=24 with Stone Tablet box
 - **NPC Movement Fix**: Added `isWalking` state tracking with immediate `bobOffset` reset on arrival, preventing stuck bouncing animation
-- **NPC Spacing Overhaul**: Woodcutter targets +120, Stone-worker targets +180/+220 from village center to prevent overlap with Elder
+- **NPC Collision Fix**: Uses `renderOffsetX` visual offset only (reset each tick), doesn't modify actual npc.x to prevent pushing
+- **NPC Spacing Overhaul**: Woodcutter targets +120, Stone-worker targets +180/+220 from village center to prevent overlap with Elder; Fisherman at x=3175
 - **Stone Tablet Loop 1**: Displays elder wisdom text ("A promise remembered only by one...") instead of NAME/DEBT columns until Loop 2
+- **Stone Tablet HUD Height**: Increased to 185px to accommodate wisdom text without overflow
 - **Loop 2 Hint Text**: Changed from "Go to the Elder" to "Go to the Stone Tablet" for verification phase
-- **Give-In Brawl Trigger**: Added confession dialogue and brawl trigger when player returns to NPC without fish after settling first inflated debt
+- **Give-In Brawl Trigger**: Added confession dialogue and brawl trigger when player returns to NPC without fish after settling first inflated debt (works for both Woodcutter-first and Stone-worker-first paths)
+- **Settlement Fix**: Marks woodcutterSettled/stoneWorkerSettled IMMEDIATELY when payment made (not in onComplete) to prevent re-trigger bugs
 - **Choice Color Coding**: Procurement phase (green=record, red=promise), Settlement phase (green=consult tablet, red=give-in)
 - **Gaslight Failure Path**: `resourcesDepleted` flag properly set when paying inflated demands, making second debt impossible to pay
+- **Interaction Priority**: NPCs checked before Stone Tablet in getTappedInteractable() to prevent overlap issues
+- **Runtime Error Prevention**: Try-catch blocks and guards around timeout chains in home interaction
 
 ## External Dependencies
 

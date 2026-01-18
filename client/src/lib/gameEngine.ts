@@ -2144,7 +2144,11 @@ export class VillageLedgerGame {
 
   private advanceDialogue(): void {
     if (this.state.currentDialogue?.onComplete) {
-      this.state.currentDialogue.onComplete();
+      try {
+        this.state.currentDialogue.onComplete();
+      } catch (e) {
+        console.error('Error in dialogue onComplete callback:', e);
+      }
     }
 
     if (this.state.dialogueQueue.length > 0) {
@@ -3465,22 +3469,23 @@ export class VillageLedgerGame {
     const fishingHoleX = 3200;
     const pondScreenX = fishingHoleX - this.cameraX - 60; // Same offset as pond
     const pondYOffset = 25;
+    const poleOffsetX = -50; // Move pole 50 pixels to the left
     
     if (pondScreenX > -150 && pondScreenX < this.canvas.width + 150) {
       // Fishing pole (held by Fisherman, angled over pond)
       ctx.strokeStyle = '#8B6914';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(pondScreenX + 30, groundY - 50 + pondYOffset); // Held at character level
-      ctx.lineTo(pondScreenX - 30, groundY - 80 + pondYOffset); // Tip extends over water
+      ctx.moveTo(pondScreenX + 30 + poleOffsetX, groundY - 50 + pondYOffset); // Held at character level
+      ctx.lineTo(pondScreenX - 30 + poleOffsetX, groundY - 80 + pondYOffset); // Tip extends over water
       ctx.stroke();
       
       // Fishing line
       ctx.strokeStyle = '#AAA';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(pondScreenX - 30, groundY - 80 + pondYOffset); // From pole tip
-      ctx.lineTo(pondScreenX - 35, groundY - 5 + pondYOffset);  // Down to water
+      ctx.moveTo(pondScreenX - 30 + poleOffsetX, groundY - 80 + pondYOffset); // From pole tip
+      ctx.lineTo(pondScreenX - 35 + poleOffsetX, groundY - 5 + pondYOffset);  // Down to water
       ctx.stroke();
     }
   }
@@ -4033,7 +4038,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   private notifyStateChange(): void {
     if (this.onStateChange) {
-      this.onStateChange({ ...this.state });
+      try {
+        this.onStateChange({ ...this.state });
+      } catch (e) {
+        console.error('Error in onStateChange callback:', e);
+      }
     }
   }
 
@@ -4043,15 +4052,19 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private setMood(mood: 'neutral' | 'happy' | 'angry') {
-    this.state.playerMood = mood;
-    // Set timer for auto-reset to neutral (3 seconds for happy, no timer for angry/neutral)
-    if (mood === 'happy') {
-      this.state.moodTimer = 3; // Extended from 2 to 3 seconds
-      console.log('MOOD: Set to happy, timer=3');
-    } else {
-      this.state.moodTimer = 0;
+    try {
+      this.state.playerMood = mood;
+      // Set timer for auto-reset to neutral (3 seconds for happy, no timer for angry/neutral)
+      if (mood === 'happy') {
+        this.state.moodTimer = 3; // Extended from 2 to 3 seconds
+        console.log('MOOD: Set to happy, timer=3');
+      } else {
+        this.state.moodTimer = 0;
+      }
+      this.notifyStateChange();
+    } catch (e) {
+      console.error('Error in setMood:', e);
     }
-    this.notifyStateChange();
   }
 
   // Quiz questions

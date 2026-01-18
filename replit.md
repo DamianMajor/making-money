@@ -49,6 +49,15 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - Earth tones, natural materials, monospace fonts for dialogue, and bold sans-serif for UI.
 - Responsive canvas design for various tablet aspect ratios.
 
+## Recent Changes (January 2026)
+
+- **NPC Spacing**: NPCs use `renderOffsetX` for visual separation without pushing, with 50px exclusion radius around Stone Tablet to keep it clickable
+- **Pond Positioning**: Shifted pond/fishing graphics left 60px and down 25px below ground horizon
+- **Wood in Inventory HUD**: Wood now displays with brown color (#8B4513) and 'W' label, with proper `woodIntroduced` flag tracking
+- **Stone Tablet Loop 1**: Elder wisdom dialogue about trustless verification: "A promise remembered only by one is easily forgotten by another"
+- **Choice Color Coding**: Procurement phase (green=record, red=promise), Settlement phase (green=consult tablet, red=give-in) with context-aware detection
+- **Gaslight Failure Path Fix**: `resourcesDepleted` flag properly set when paying inflated demands, making second debt impossible to pay (intentional failure path)
+
 ## External Dependencies
 
 - **Database**: PostgreSQL with Drizzle ORM for database operations and migrations.

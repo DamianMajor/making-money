@@ -51,9 +51,11 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 
 ## Recent Changes (January 2026)
 
-- **Clickable Stone Tablet HUD**: Tapping the Stone Tablet box in the HUD opens a 520px wide centered popup showing either elder wisdom (Loop 1) or ledger entries (Loop 2)
+- **Clickable Stone Tablet HUD**: Tapping the Stone Tablet box in the HUD opens a 620px wide centered popup showing either elder wisdom (Loop 1) or ledger entries (Loop 2)
 - **NPC Click Detection Fix**: Click detection now prioritizes the NPC whose center is closest to your tap point (not closest to the player), making it easier to select overlapping NPCs
-- **NPC Spacing Overhaul (Settlement)**: Woodcutter at +80, Stone-worker at +380 from village center (~300px apart) for easy individual selection
+- **NPC Spacing Overhaul (Settlement)**: Woodcutter at +80 (right), Stone-worker at -100 (left of tablet) from village center for easy individual selection
+- **Return Home Sequence**: After Elder celebrates all debts settled, player returns home → fixes roof if needed → enters hut (disappears) → 2.5s dark clouds rolling animation with "THE STORM APPROACHES..." text → night transition → quiz
+- **Elder Celebration**: checkAllDebtsSettled() now triggers showCelebration immediately when both debts are paid, with Elder thanking the Stone Tablet system
 - **Settlement Logic Fix**: NPCs now accept fair fish amounts after Elder verification alone (elderVerified flag), without requiring the debt to be recorded first. Dialogue adapts based on whether the Tablet or Elder confirmed the amount.
 - **Z-Order Fix**: Player passes behind fisherman sprite when in fishing area (x: 3100-3250)
 - **Position Adjustments**: Berry Bush moved to x=2050, Stone-worker starting position moved to x=2550

@@ -51,6 +51,13 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 
 ## Recent Changes (January 2026)
 
+- **Clickable Stone Tablet HUD**: Tapping the Stone Tablet box in the HUD opens a large centered popup showing either elder wisdom (Loop 1) or ledger entries (Loop 2)
+- **Settlement Logic Fix**: NPCs now accept fair fish amounts after Elder verification alone (elderVerified flag), without requiring the debt to be recorded first. Dialogue adapts based on whether the Tablet or Elder confirmed the amount.
+- **Z-Order Fix**: Player passes behind fisherman sprite when in fishing area (x: 3100-3250)
+- **Position Adjustments**: Berry Bush moved to x=2050, Stone-worker starting position moved to x=2550
+- **Inventory Icon Centering**: Icons offset +4px down and right to center in inventory box
+- **Loop 1 Stone Worker Fix**: Auto-transitions to settlement phase when stone worker is at village center in got_fish_ready_settle phase
+- **NPC Spacing**: Increased from 60 to 80 pixels at village center for better interaction selection
 - **Inventory HUD**: All 4 items (Wood, Stone, Fish, Berries) now visible from game start; HUD aligned at y=24 with Stone Tablet box
 - **NPC Movement Fix**: Added `isWalking` state tracking with immediate `bobOffset` reset on arrival, preventing stuck bouncing animation
 - **NPC Collision Fix**: Uses `renderOffsetX` visual offset only (reset each tick), doesn't modify actual npc.x to prevent pushing

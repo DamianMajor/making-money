@@ -19,13 +19,14 @@ Preferred communication style: Simple, everyday language.
 
 ### Game Engine Design
 - Custom vanilla JavaScript game engine using `requestAnimationFrame` for 60fps rendering
-- Touch-only input system - screen divided into left/right zones for movement
-- Player speed: 200 units/second, interaction range: 200 units (tablet-friendly)
+- Click-to-walk input system: clicking anywhere sets walk destination, clicking NPCs/items auto-walks and interacts
+- Player speed: 200 units/second, interaction range: 25 units (tight proximity-based)
 - Character system with placeholder colored rectangles (Blue=Player, Brown=Woodcutter, Gray=Stone-worker, Orange=Fisherman, White=Elder)
 - HUD displays a "Stone Tablet" ledger tracking debts/promises
 - Dialogue system with typewriter effect using "Press Start 2P" retro font
 - INTERACT button with 200ms fade transition in bottom-right corner
 - Multiple choice dialogue system with red/green color-coded buttons
+- Background: 6 parallax huts (no transparency fade)
 
 ### World Layout (3500px wide)
 - **x=100** - Player Home (starting position, has hole in roof that can be fixed with wood)
@@ -39,7 +40,7 @@ Preferred communication style: Simple, everyday language.
 ### NPC Movement System
 NPCs can walk toward a target position (targetX property):
 - Woodcutter and Stone-worker have `originalX` to store their starting positions
-- After giving items on credit, Woodcutter and Stone-worker set `targetX` to Village Center and walk there at 80 units/second
+- After giving items on credit, Woodcutter and Stone-worker set `targetX` to Village Center (±100 units spacing to avoid overlap) and walk there at 80 units/second
 - Fisherman stays at his fishing hole (does NOT walk to center)
 - This ensures NPCs are gathered at town center when player returns with fish
 - On game reset or Loop 2 start, NPCs return to original positions
@@ -74,8 +75,8 @@ When Elder successfully settles all recorded debts, a 3-second celebration plays
 - After repair, a reminder prompts player to settle outstanding debts (if any)
 
 ### NPC Interaction Range & Direct Tap
-- NPC interaction range: 50 units (tight range for precise targeting at Town Center)
-- Home interaction range: 50 units
+- NPC interaction range: 25 units (small range for natural proximity-based interactions)
+- Home interaction range: 25 units  
 - Players can tap directly on NPCs, home hut, or berry bush to interact
 - If out of range, player auto-walks to target and interacts on arrival (can be interrupted by new tap)
 - When multiple NPC hitboxes overlap, the closest NPC to the player is prioritized
@@ -83,10 +84,10 @@ When Elder successfully settles all recorded debts, a 3-second celebration plays
 - Note: Intro dialogue must be dismissed (tap to advance) before NPC taps register
 
 ### Auto-Walk System
-- Clicking on distant NPC/home/berry bush sets autoWalkTarget
+- Clicking anywhere on screen sets walk destination; clicking NPCs/items auto-walks and interacts
 - Player walks toward target at 200 units/sec
-- When within 50 units of target, interaction triggers automatically
-- Manual touch (tap elsewhere) cancels auto-walk
+- When within 25 units of target, interaction triggers automatically
+- Clicking elsewhere cancels current auto-walk and sets new destination
 - Movement state (moveDirection, touchActive) cleared when setting target to prevent drift
 - Hitbox detection uses npc.y (set by resize() to groundY - height) for accurate Y alignment
 
@@ -105,15 +106,30 @@ When player completes Loop 2 successfully and returns home:
 - Then quiz begins
 
 ### Brawl Animation
-- Large dust cloud (size 220) covers player + all 3 NPCs
+- Dust cloud (size 180) centered on player's screen position
+- Covers player + Woodcutter + Stoneworker only (NOT Elder)
+- When brawl triggers: Woodcutter and Stoneworker run to player (300 units/sec), Elder steps aside
 - POW/BAM/CRASH text cycling above
-- Positioned 80px left of center to cover clustered NPCs
 - Lasts 4 seconds before fail screen
 
+### Thunderstorm Animation
+After player returns home with roof fixed in Loop 2:
+- 3.5-second thunderstorm animation plays
+- Dark overlay builds up, lightning flashes at intervals
+- Rain streaks animate across screen
+- "THE STORM!" text appears with lightning effect
+- Dialogue: "Just in time! The storm is here... but my roof is fixed!"
+- Transitions to night scene after thunderstorm
+
+### Happy Mood System
+- Happy face shows when receiving items (wood, stone, fish, berries)
+- Happy face shows when fixing roof
+- Happy face stays active for remainder of Loop 2 after successful settlement
+- Auto-returns to neutral after 3 seconds in normal gameplay
+
 ### Background Parallax
-- Background huts fade gradually as camera moves right (not sudden cutoff)
-- Full opacity until 40% across world, then fades to 15% by 80%
-- Makes fisherman area feel more remote/outside village
+- 6 parallax background huts at full opacity (no transparency fade)
+- Huts maintain consistent visibility across the entire world
 
 ### Loop 1 Settlement Phase (Interaction-Based Confrontation)
 The settlement phase requires player to interact with each NPC:

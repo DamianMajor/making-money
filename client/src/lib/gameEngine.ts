@@ -80,6 +80,8 @@ interface GameState {
   celebrationTimer: number;
   showNightTransition: boolean; // Nighttime transition before quiz
   nightTransitionTimer: number;
+  showThunderstorm: boolean; // Thunderstorm after roof fix
+  thunderstormTimer: number;
   showChoice: boolean;
   choiceOptions: { text: string; action: () => void }[];
 }
@@ -143,7 +145,7 @@ export class VillageLedgerGame {
   private moodTimer: number = 0;
   
   // Auto-walk feature: player walks to clicked target and interacts
-  private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush'; id?: string } | null = null;
+  private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush' | 'location'; id?: string } | null = null;
 
   // Font constants (retro monospace for dialogue/HUD)
   private readonly retroFont: string = '"Press Start 2P", monospace';
@@ -294,6 +296,8 @@ export class VillageLedgerGame {
       celebrationTimer: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
+      showThunderstorm: false,
+      thunderstormTimer: 0,
       showChoice: false,
       choiceOptions: []
     };
@@ -447,9 +451,9 @@ export class VillageLedgerGame {
     // Check if tapping directly on an NPC, home, or berry bush
     // Set auto-walk target - player will walk there and interact on arrival
     const tappedTarget = this.getTappedInteractable(x, y);
+    const interactionRange = 25; // Small range for natural proximity-based interactions
+    
     if (tappedTarget) {
-      const interactionRange = 50; // Tight range for precise targeting
-      
       if (tappedTarget === 'home') {
         const inRange = Math.abs(this.player.x - this.playerHomeX) < interactionRange;
         if (inRange) {
@@ -484,11 +488,14 @@ export class VillageLedgerGame {
       }
     }
 
-    // Movement touch cancels auto-walk and starts manual movement
-    this.autoWalkTarget = null;
-    this.touchActive = true;
-    this.touchX = x;
-    this.updateMoveDirection(x);
+    // Click-to-walk: clicking anywhere on screen sets walk destination
+    // Convert screen X to world X position
+    const worldX = x + this.cameraX;
+    // Clamp to world bounds
+    const clampedWorldX = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, worldX));
+    this.autoWalkTarget = { x: clampedWorldX, type: 'location' };
+    this.moveDirection = 0;
+    this.touchActive = false;
   }
   
   // Helper to trigger NPC interaction by id
@@ -701,7 +708,7 @@ export class VillageLedgerGame {
             this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
             // Woodcutter walks to village center
-            this.woodcutter.targetX = this.villageCenterX - 50;
+            this.woodcutter.targetX = this.villageCenterX - 100;
           }
         }
       ]);
@@ -773,7 +780,7 @@ export class VillageLedgerGame {
                 this.state.showHUD = true;
                 this.hudGlow = 1;
               }
-              this.woodcutter.targetX = this.villageCenterX - 50;
+              this.woodcutter.targetX = this.villageCenterX - 100;
             }
           }
         ]);
@@ -897,7 +904,7 @@ export class VillageLedgerGame {
             this.setMood('happy');
             this.state.phase = 'got_stone_need_fish';
             // Stone-worker walks to village center
-            this.stoneWorker.targetX = this.villageCenterX + 50;
+            this.stoneWorker.targetX = this.villageCenterX + 100;
           }
         }
       ]);
@@ -968,7 +975,7 @@ export class VillageLedgerGame {
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
                 this.hudGlow = 1;
               }
-              this.stoneWorker.targetX = this.villageCenterX + 50;
+              this.stoneWorker.targetX = this.villageCenterX + 100;
             }
           }
         ]);
@@ -1121,6 +1128,7 @@ export class VillageLedgerGame {
     if (this.state.inventory.berries < 3) {
       this.state.inventory.berries++;
       this.showInventoryPopup(`+1 BERRY (${this.state.inventory.berries}/3)`);
+      this.setMood('happy');
       
       if (this.state.inventory.berries >= 3) {
         this.queueDialogue([
@@ -1184,7 +1192,10 @@ export class VillageLedgerGame {
             speaker: 'WOODCUTTER',
             text: "Enough talk! You're trying to cheat us all!",
             onComplete: () => {
-              // Trigger the brawl
+              // Trigger the brawl - NPCs run to player, Elder steps aside
+              this.woodcutter.targetX = this.player.x - 30;
+              this.stoneWorker.targetX = this.player.x + 30;
+              this.villageElder.targetX = this.villageCenterX + 200; // Elder steps away
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -1352,7 +1363,7 @@ export class VillageLedgerGame {
     if (this.autoWalkTarget && !this.state.currentDialogue) {
       const targetX = this.autoWalkTarget.x;
       const dx = targetX - this.player.x;
-      const interactionRange = 50; // Must be close to interact
+      const interactionRange = 25; // Small range for proximity-based interactions
       
       if (Math.abs(dx) <= interactionRange) {
         // Arrived at target - trigger interaction and clear movement state
@@ -1363,6 +1374,8 @@ export class VillageLedgerGame {
         
         if (targetType === 'home') {
           this.handleHomeInteraction();
+        } else if (targetType === 'location') {
+          // Just arrived at location, no interaction needed
         } else if (targetId) {
           this.triggerNPCInteraction(targetId);
         }
@@ -1396,7 +1409,7 @@ export class VillageLedgerGame {
       
       if (isEscortingWoodcutter || isEscortingStoneworker) {
         // Simple escort: NPC always moves toward its target position at the village center
-        const npcTargetX = isEscortingWoodcutter ? this.villageCenterX - 50 : this.villageCenterX + 50;
+        const npcTargetX = isEscortingWoodcutter ? this.villageCenterX - 100 : this.villageCenterX + 100;
         const diff = npcTargetX - npc.x;
         
         if (Math.abs(diff) > 5) {
@@ -1442,7 +1455,7 @@ export class VillageLedgerGame {
     for (const npc of this.npcs) {
       if (!npc.visible) continue;
       const dist = Math.abs(this.player.x - npc.x);
-      if (dist <= 50) { // Tight range for precise NPC targeting at Town Center
+      if (dist <= 25) { // Small range for proximity-based interactions
         this.state.nearbyNPC = npc;
         this.state.showInteractButton = true;
         break;
@@ -1512,9 +1525,9 @@ export class VillageLedgerGame {
       const hasRequirements = this.state.inventory.stone >= 1 && this.state.inventory.fish >= 3;
       if (nearVillageCenter && hasRequirements && !this.state.currentDialogue) {
         this.state.phase = 'settlement';
-        // Move NPCs to village center area for the confrontation
-        this.woodcutter.targetX = this.villageCenterX - 50;
-        this.stoneWorker.targetX = this.villageCenterX + 50;
+        // Move NPCs to village center area for the confrontation (wider spacing)
+        this.woodcutter.targetX = this.villageCenterX - 100;
+        this.stoneWorker.targetX = this.villageCenterX + 100;
       }
     }
     
@@ -1551,21 +1564,52 @@ export class VillageLedgerGame {
       this.triggerConfrontation();
     }
 
-    // Check if player completed Loop 2 successfully - trigger night transition
-    if (this.state.phase === 'complete_success' && this.player.x <= this.playerHomeX + 50 && !this.state.showNightTransition) {
+    // Check if player completed Loop 2 successfully - trigger thunderstorm then night transition
+    if (this.state.phase === 'complete_success' && this.player.x <= this.playerHomeX + 50 && 
+        !this.state.showThunderstorm && !this.state.showNightTransition) {
       // Auto-fix roof if not already repaired
       if (!this.state.roofRepaired) {
         this.state.roofRepaired = true;
-        this.setMood('happy');
       }
-      // Start night transition animation
-      this.state.showNightTransition = true;
-      this.state.nightTransitionTimer = 0;
+      // Keep happy mood active for the rest of loop 2
+      this.setMood('happy');
+      this.state.moodTimer = 999; // Large value to keep happy mood
+      // Start thunderstorm animation (before night transition)
+      this.state.showThunderstorm = true;
+      this.state.thunderstormTimer = 0;
+      // Show thunderstorm dialogue
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "Just in time! The storm is here... but my roof is fixed!"
+        }
+      ]);
     }
 
-    // Update brawl animation timer
+    // Update brawl animation timer and NPC movement during brawl
     if (this.state.showBrawl) {
       this.state.brawlTimer += dt;
+      // Move NPCs quickly toward their targets during brawl
+      const brawlSpeed = 300 * dt;
+      if (this.woodcutter.targetX !== undefined) {
+        const dx = this.woodcutter.targetX - this.woodcutter.x;
+        if (Math.abs(dx) > 5) {
+          this.woodcutter.x += Math.sign(dx) * brawlSpeed;
+        }
+      }
+      if (this.stoneWorker.targetX !== undefined) {
+        const dx = this.stoneWorker.targetX - this.stoneWorker.x;
+        if (Math.abs(dx) > 5) {
+          this.stoneWorker.x += Math.sign(dx) * brawlSpeed;
+        }
+      }
+      // Elder steps away more slowly
+      if (this.villageElder.targetX !== undefined) {
+        const dx = this.villageElder.targetX - this.villageElder.x;
+        if (Math.abs(dx) > 5) {
+          this.villageElder.x += Math.sign(dx) * brawlSpeed * 0.5;
+        }
+      }
       if (this.state.brawlTimer > 4) {
         this.state.showBrawl = false;
         this.state.showFail = true;
@@ -1579,6 +1623,18 @@ export class VillageLedgerGame {
       // Celebration lasts 3 seconds
       if (this.state.celebrationTimer > 3) {
         this.state.showCelebration = false;
+      }
+    }
+    
+    // Update thunderstorm animation timer
+    if (this.state.showThunderstorm) {
+      this.state.thunderstormTimer += dt;
+      // Thunderstorm lasts 3.5 seconds, then transition to night
+      if (this.state.thunderstormTimer > 3.5) {
+        this.state.showThunderstorm = false;
+        // Start night transition after thunderstorm
+        this.state.showNightTransition = true;
+        this.state.nightTransitionTimer = 0;
       }
     }
     
@@ -1631,6 +1687,10 @@ export class VillageLedgerGame {
         speaker: 'WOODCUTTER',
         text: "Enough! You're trying to cheat us all!",
         onComplete: () => {
+          // Trigger the brawl - NPCs run to player, Elder steps aside
+          this.woodcutter.targetX = this.player.x - 30;
+          this.stoneWorker.targetX = this.player.x + 30;
+          this.villageElder.targetX = this.villageCenterX + 200; // Elder steps away
           this.state.phase = 'brawl';
           this.state.showBrawl = true;
           this.state.brawlTimer = 0;
@@ -1722,6 +1782,10 @@ export class VillageLedgerGame {
       speaker: 'VILLAGE ELDER',
       text: "Without a record, there is no way to know the truth...",
       onComplete: () => {
+        // Trigger the brawl - NPCs run to player, Elder steps aside
+        this.woodcutter.targetX = this.player.x - 30;
+        this.stoneWorker.targetX = this.player.x + 30;
+        this.villageElder.targetX = this.villageCenterX + 200; // Elder steps away
         this.state.phase = 'brawl';
         this.state.showBrawl = true;
         this.state.brawlTimer = 0;
@@ -1809,6 +1873,11 @@ export class VillageLedgerGame {
     // Draw celebration animation if active
     if (this.state.showCelebration) {
       this.drawCelebrationAnimation(ctx);
+    }
+    
+    // Draw thunderstorm animation if active
+    if (this.state.showThunderstorm) {
+      this.drawThunderstorm(ctx);
     }
     
     // Draw night transition animation if active
@@ -1920,15 +1989,16 @@ export class VillageLedgerGame {
   private drawBrawlAnimation(ctx: CanvasRenderingContext2D): void {
     const w = this.canvas.width;
     const h = this.canvas.height;
-    // Shift brawl to the left to cover clustered NPCs at village center
-    const centerX = w / 2 - 80;
+    // Center brawl on player's screen position (covers player + Woodcutter + Stoneworker, not Elder)
+    const playerScreenX = this.player.x - this.cameraX;
+    const centerX = Math.max(150, Math.min(w - 150, playerScreenX));
     // Position brawl on the ground (above dialogue box, at character level)
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const centerY = groundY - 60; // Just above ground level
 
-    // Animate the dust cloud size - MUCH LARGER to cover player + all 3 NPCs
+    // Animate the dust cloud size - covers player + 2 NPCs (not Elder)
     const t = this.state.brawlTimer;
-    const cloudSize = 220 + Math.sin(t * 10) * 40;
+    const cloudSize = 180 + Math.sin(t * 10) * 30;
     const rotation = t * 3;
 
     ctx.save();
@@ -2057,6 +2127,56 @@ export class VillageLedgerGame {
     const celebY = 80 + Math.sin(t * 5) * 10;
     ctx.strokeText('DEBTS SETTLED!', w / 2, celebY);
     ctx.fillText('DEBTS SETTLED!', w / 2, celebY);
+  }
+  
+  private drawThunderstorm(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    const t = this.state.thunderstormTimer;
+    
+    // Dark storm overlay that builds up
+    const stormProgress = Math.min(1, t / 1.5);
+    const stormAlpha = stormProgress * 0.5;
+    ctx.fillStyle = `rgba(30, 30, 50, ${stormAlpha})`;
+    ctx.fillRect(0, 0, w, h);
+    
+    // Lightning flashes at intervals
+    const flashTime = t % 0.8;
+    if (flashTime < 0.1) {
+      const flashIntensity = (0.1 - flashTime) / 0.1;
+      ctx.fillStyle = `rgba(255, 255, 220, ${flashIntensity * 0.6})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+    
+    // Draw rain
+    ctx.strokeStyle = 'rgba(150, 180, 220, 0.6)';
+    ctx.lineWidth = 1;
+    const rainSpeed = 800;
+    const rainCount = 100;
+    for (let i = 0; i < rainCount; i++) {
+      const rainX = (i * 37 + t * rainSpeed * 0.3) % (w + 100) - 50;
+      const rainY = (i * 53 + t * rainSpeed) % (h + 50) - 25;
+      ctx.beginPath();
+      ctx.moveTo(rainX, rainY);
+      ctx.lineTo(rainX - 3, rainY + 15);
+      ctx.stroke();
+    }
+    
+    // "STORM!" text with lightning effect
+    if (t > 0.5) {
+      const textAlpha = Math.min(1, (t - 0.5) / 0.5);
+      ctx.save();
+      ctx.globalAlpha = textAlpha;
+      ctx.font = `bold ${Math.min(48, w / 15)}px ${this.retroFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#FFD700';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 4;
+      const stormY = 80 + Math.sin(t * 8) * 5;
+      ctx.strokeText('THE STORM!', w / 2, stormY);
+      ctx.fillText('THE STORM!', w / 2, stormY);
+      ctx.restore();
+    }
   }
   
   private drawNightTransition(ctx: CanvasRenderingContext2D): void {
@@ -2375,19 +2495,9 @@ export class VillageLedgerGame {
       ctx.fill();
     }
 
-    // Mid background - village buildings
-    // Fade huts gradually as camera moves right (near fisherman) to feel more remote
-    const cameraProgress = this.cameraX / this.worldWidth; // 0 to 1
-    // Calculate fade: full opacity (1.0) until 40%, then fade to 0.2 by 80%
-    let hutOpacity = 1.0;
-    if (cameraProgress > 0.4) {
-      hutOpacity = Math.max(0.15, 1.0 - (cameraProgress - 0.4) * 2.125); // Fades from 1.0 to 0.15
-    }
-    
-    ctx.save();
-    ctx.globalAlpha = hutOpacity;
+    // Mid background - village buildings (reduced count, removed rightmost two)
     ctx.fillStyle = '#A89080';
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 6; i++) {
       const x = (i * 300 - this.cameraX * 0.4) % (w + 300) - 150;
       const buildingWidth = 60 + (i % 3) * 20;
       const buildingHeight = 50 + (i % 2) * 30;
@@ -2404,7 +2514,6 @@ export class VillageLedgerGame {
       ctx.fill();
       ctx.fillStyle = '#A89080';
     }
-    ctx.restore();
 
     // Near decorative elements
     ctx.fillStyle = '#6B8E5E';
@@ -3049,6 +3158,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       celebrationTimer: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
+      showThunderstorm: false,
+      thunderstormTimer: 0,
       showChoice: false,
       choiceOptions: []
     };
@@ -3104,6 +3215,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       celebrationTimer: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
+      showThunderstorm: false,
+      thunderstormTimer: 0,
       showChoice: false,
       choiceOptions: []
     };

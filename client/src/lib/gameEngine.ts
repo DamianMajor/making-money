@@ -879,7 +879,7 @@ export class VillageLedgerGame {
             this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
             // Woodcutter walks to village center (right of Elder to avoid overlap)
-            this.woodcutter.targetX = this.villageCenterX + 50;
+            this.woodcutter.targetX = this.villageCenterX + 120; // Far enough from Elder
           }
         }
       ]);
@@ -955,7 +955,7 @@ export class VillageLedgerGame {
                 this.state.showHUD = true;
                 this.hudGlow = 1;
               }
-              this.woodcutter.targetX = this.villageCenterX + 50;
+              this.woodcutter.targetX = this.villageCenterX + 120; // Far enough from Elder
             }
           }
         ]);
@@ -998,7 +998,7 @@ export class VillageLedgerGame {
     // LOOP 1 SETTLEMENT: Player tries to settle - Woodcutter claims inflated debt
     else if (phase === 'settlement' && !this.state.woodcutterDisputed) {
       // Woodcutter steps to position (right of Elder to avoid overlap)
-      this.woodcutter.targetX = this.villageCenterX + 50;
+      this.woodcutter.targetX = this.villageCenterX + 120;
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
@@ -1078,10 +1078,23 @@ export class VillageLedgerGame {
             }
           ]);
         } else {
+          // Player can't pay - trigger confession and brawl
           this.queueDialogue([
             {
+              speaker: 'YOU',
+              text: "I... I don't have enough fish. I gave in to the Stone-worker's demands..."
+            },
+            {
               speaker: 'WOODCUTTER',
-              text: `You agreed to pay 3 Fish, but you only have ${this.state.inventory.fish}. Get more from the Fisherman!`
+              text: "WHAT?! You paid the Stone-worker but not me?! This is outrageous!",
+              onComplete: () => {
+                // Trigger brawl
+                this.woodcutter.targetX = this.player.x - 30;
+                this.stoneWorker.targetX = this.player.x + 30;
+                this.villageElder.targetX = this.villageCenterX + 200;
+                this.state.showBrawl = true;
+                this.state.brawlTimer = 0;
+              }
             }
           ]);
         }
@@ -1165,7 +1178,7 @@ export class VillageLedgerGame {
             this.setMood('happy');
             this.state.phase = 'got_stone_need_fish';
             // Stone-worker walks to village center
-            this.stoneWorker.targetX = this.villageCenterX + 100;
+            this.stoneWorker.targetX = this.villageCenterX + 180;
           }
         }
       ]);
@@ -1239,7 +1252,7 @@ export class VillageLedgerGame {
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
                 this.hudGlow = 1;
               }
-              this.stoneWorker.targetX = this.villageCenterX + 100;
+              this.stoneWorker.targetX = this.villageCenterX + 180;
             }
           }
         ]);
@@ -1340,10 +1353,23 @@ export class VillageLedgerGame {
             }
           ]);
         } else {
+          // Player can't pay - trigger confession and brawl
           this.queueDialogue([
             {
+              speaker: 'YOU',
+              text: "I... I don't have enough fish. I gave in to the Woodcutter's demands..."
+            },
+            {
               speaker: 'STONE-WORKER',
-              text: `You agreed to pay 4 Fish, but you only have ${this.state.inventory.fish}. Get more from the Fisherman!`
+              text: "WHAT?! You paid the Woodcutter but not me?! This is outrageous!",
+              onComplete: () => {
+                // Trigger brawl
+                this.woodcutter.targetX = this.player.x - 30;
+                this.stoneWorker.targetX = this.player.x + 30;
+                this.villageElder.targetX = this.villageCenterX + 200;
+                this.state.showBrawl = true;
+                this.state.brawlTimer = 0;
+              }
             }
           ]);
         }
@@ -1934,7 +1960,7 @@ export class VillageLedgerGame {
               text: "Fine! The Tablet will prove I'm right! Let's go!",
               onComplete: () => {
                 this.state.phase = 'loop2_verify_at_tablet';
-                this.stoneWorker.targetX = this.villageCenterX + 50;
+                this.stoneWorker.targetX = this.villageCenterX + 120;
               }
             }
           ]);
@@ -2188,11 +2214,11 @@ export class VillageLedgerGame {
     // Update NPC bobs and movement toward targets
     const npcSpeed = 80; // NPCs walk slower than player
     this.npcs.forEach((npc, i) => {
-      npc.bobOffset = Math.sin(this.bobTimer * 0.5 + i * 1.5) * 1.5;
-      
       // LOOP 2 ESCORT BEHAVIOR: NPC follows player during Loop 2 escort phases
       const isEscortingWoodcutter = this.state.phase === 'loop2_escorting_woodcutter' && npc.id === 'woodcutter';
       const isEscortingStoneworker = this.state.phase === 'loop2_escorting_stoneworker' && npc.id === 'stoneWorker';
+      
+      let isWalking = false; // Track if NPC is currently walking
       
       if (isEscortingWoodcutter || isEscortingStoneworker) {
         // Simple escort: NPC always moves toward its target position at the village center
@@ -2203,7 +2229,7 @@ export class VillageLedgerGame {
           // Move toward center at a speed that matches player
           const escortSpeed = 180; // Faster than player to ensure arrival
           npc.x += Math.sign(diff) * escortSpeed * dt;
-          npc.bobOffset = Math.sin(this.bobTimer * 2 + i) * 3;
+          isWalking = true;
         }
       }
       // Move NPC toward target if set (non-escort movement)
@@ -2211,13 +2237,22 @@ export class VillageLedgerGame {
         const diff = npc.targetX - npc.x;
         if (Math.abs(diff) > 5) {
           npc.x += Math.sign(diff) * npcSpeed * dt;
-          // Walking bob animation
-          npc.bobOffset = Math.sin(this.bobTimer * 2 + i) * 3;
+          isWalking = true;
         } else {
-          // Arrived at target - clear it
+          // Arrived at target - clear it and reset bobOffset
           npc.x = npc.targetX;
           npc.targetX = undefined;
+          npc.bobOffset = 0; // Stop bouncing immediately
         }
+      }
+      
+      // Apply appropriate bob animation based on movement state
+      if (isWalking) {
+        // Fast walking bob when actively moving
+        npc.bobOffset = Math.sin(this.bobTimer * 2 + i) * 3;
+      } else if (npc.targetX === undefined) {
+        // Slow idle bob only when not moving
+        npc.bobOffset = Math.sin(this.bobTimer * 0.5 + i * 1.5) * 1.5;
       }
     });
     
@@ -2323,8 +2358,8 @@ export class VillageLedgerGame {
       if (nearVillageCenter && hasRequirements && !this.state.currentDialogue) {
         this.state.phase = 'settlement';
         // Move NPCs to village center area for the confrontation (woodcutter right to avoid Elder overlap)
-        this.woodcutter.targetX = this.villageCenterX + 50;
-        this.stoneWorker.targetX = this.villageCenterX + 150;
+        this.woodcutter.targetX = this.villageCenterX + 120;
+        this.stoneWorker.targetX = this.villageCenterX + 220;
       }
     }
     
@@ -3512,51 +3547,77 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.lineTo(x + w - 16, y + 38);
     ctx.stroke();
 
-    // Column headers - bold sans-serif at 14px per guidelines
-    ctx.font = `bold 14px ${this.uiFont}`;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#6B5344';
-    ctx.fillText('NAME', x + 20, y + 60);
-    ctx.fillText('DEBT', x + w * 0.55, y + 60);
-
-    // Column divider
-    ctx.beginPath();
-    ctx.moveTo(x + w * 0.5, y + 44);
-    ctx.lineTo(x + w * 0.5, y + h - 16);
-    ctx.stroke();
-
-    // Ledger entries - 12px sans-serif per guidelines
-    // Add safe zone margins and text truncation
-    ctx.font = `12px ${this.uiFont}`;
-    const nameMaxWidth = w * 0.45 - 30; // Safe zone for name column
-    const debtMaxWidth = w * 0.45 - 20; // Safe zone for debt column
+    // In Loop 1, show elder wisdom instead of NAME/DEBT columns
+    const isLoop1 = this.state.loop === 1;
     
-    this.state.ledgerEntries.forEach((entry, i) => {
-      const entryY = y + 86 + i * 32;
-      ctx.fillStyle = '#5D4837';
-      ctx.textAlign = 'left';
-      
-      // Truncate name if too long
-      let displayName = entry.name;
-      while (ctx.measureText(displayName).width > nameMaxWidth && displayName.length > 3) {
-        displayName = displayName.slice(0, -4) + '...';
-      }
-      ctx.fillText(displayName, x + 20, entryY);
-      
-      // Truncate debt if too long
-      let displayDebt = entry.debt;
-      while (ctx.measureText(displayDebt).width > debtMaxWidth && displayDebt.length > 3) {
-        displayDebt = displayDebt.slice(0, -4) + '...';
-      }
-      ctx.fillText(displayDebt, x + w * 0.55, entryY);
-    });
-
-    // Empty state message
-    if (this.state.ledgerEntries.length === 0) {
-      ctx.font = `italic 12px ${this.uiFont}`;
+    if (isLoop1) {
+      // Display elder wisdom about trustless verification
+      ctx.font = `italic 11px ${this.uiFont}`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#8B7355';
-      ctx.fillText('(Empty)', x + w / 2, y + 100);
+      ctx.fillStyle = '#5D4837';
+      
+      // Word-wrap the wisdom text
+      const wisdomLines = [
+        '"A promise remembered',
+        'only by one is easily',
+        'forgotten by another."',
+        '',
+        '"When debts are carved',
+        'in stone, no one can',
+        'deny what was agreed."'
+      ];
+      
+      wisdomLines.forEach((line, i) => {
+        ctx.fillText(line, x + w / 2, y + 55 + i * 18);
+      });
+    } else {
+      // Loop 2+: Show NAME/DEBT columns
+      // Column headers - bold sans-serif at 14px per guidelines
+      ctx.font = `bold 14px ${this.uiFont}`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#6B5344';
+      ctx.fillText('NAME', x + 20, y + 60);
+      ctx.fillText('DEBT', x + w * 0.55, y + 60);
+
+      // Column divider
+      ctx.beginPath();
+      ctx.moveTo(x + w * 0.5, y + 44);
+      ctx.lineTo(x + w * 0.5, y + h - 16);
+      ctx.stroke();
+
+      // Ledger entries - 12px sans-serif per guidelines
+      // Add safe zone margins and text truncation
+      ctx.font = `12px ${this.uiFont}`;
+      const nameMaxWidth = w * 0.45 - 30; // Safe zone for name column
+      const debtMaxWidth = w * 0.45 - 20; // Safe zone for debt column
+      
+      this.state.ledgerEntries.forEach((entry, i) => {
+        const entryY = y + 86 + i * 32;
+        ctx.fillStyle = '#5D4837';
+        ctx.textAlign = 'left';
+        
+        // Truncate name if too long
+        let displayName = entry.name;
+        while (ctx.measureText(displayName).width > nameMaxWidth && displayName.length > 3) {
+          displayName = displayName.slice(0, -4) + '...';
+        }
+        ctx.fillText(displayName, x + 20, entryY);
+        
+        // Truncate debt if too long
+        let displayDebt = entry.debt;
+        while (ctx.measureText(displayDebt).width > debtMaxWidth && displayDebt.length > 3) {
+          displayDebt = displayDebt.slice(0, -4) + '...';
+        }
+        ctx.fillText(displayDebt, x + w * 0.55, entryY);
+      });
+
+      // Empty state message
+      if (this.state.ledgerEntries.length === 0) {
+        ctx.font = `italic 12px ${this.uiFont}`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#8B7355';
+        ctx.fillText('(Empty)', x + w / 2, y + 100);
+      }
     }
   }
 
@@ -3564,26 +3625,24 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const padding = 12;
     const iconSize = 24;
     const spacing = 8;
-    const yPos = padding;
     
-    // Only show items that have been introduced
-    const items: { count: number; color: string; introduced: boolean; label: string }[] = [
-      { count: this.state.inventory.wood, color: '#8B4513', introduced: this.state.woodIntroduced, label: 'W' },
-      { count: this.state.inventory.stone, color: '#6B7280', introduced: this.state.stoneIntroduced, label: 'S' },
-      { count: this.state.inventory.fish, color: '#3B82F6', introduced: this.state.fishIntroduced, label: 'F' },
-      { count: this.state.inventory.berries, color: '#DC2626', introduced: this.state.berriesIntroduced, label: 'B' }
+    // All items shown from start of each loop - no need to collect first
+    const items: { count: number; color: string; label: string }[] = [
+      { count: this.state.inventory.wood, color: '#8B4513', label: 'W' },
+      { count: this.state.inventory.stone, color: '#6B7280', label: 'S' },
+      { count: this.state.inventory.fish, color: '#3B82F6', label: 'F' },
+      { count: this.state.inventory.berries, color: '#DC2626', label: 'B' }
     ];
     
-    const introducedItems = items.filter(item => item.introduced);
-    if (introducedItems.length === 0) return;
-    
     // Background panel - positioned to the left of the Stone Tablet HUD (top right area)
-    const panelWidth = introducedItems.length * (iconSize + spacing + 20) + padding;
+    const panelWidth = items.length * (iconSize + spacing + 20) + padding;
     const panelHeight = iconSize + padding * 1.5;
     
     // Position to the left of Stone Tablet HUD (which is at canvas.width - hudWidth - 24)
     const stoneTabletHudX = this.canvas.width - this.hudWidth - 24;
+    const stoneTabletHudY = 24; // Stone Tablet HUD is at y=24
     const panelX = stoneTabletHudX - panelWidth - 12; // 12px gap from Stone Tablet HUD
+    const yPos = stoneTabletHudY; // Align top edge with Stone Tablet HUD
     let xPos = panelX + padding / 2;
     
     ctx.fillStyle = 'rgba(139, 115, 85, 0.85)';
@@ -3595,7 +3654,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.stroke();
     
     // Draw each item
-    introducedItems.forEach((item) => {
+    items.forEach((item) => {
       // Draw simple colored circle as icon
       ctx.fillStyle = item.color;
       ctx.beginPath();
@@ -3751,7 +3810,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           hint = 'Settle your debts with the NPCs or visit the Elder...';
           break;
         case 'loop2_verify_at_tablet':
-          hint = 'Go to the Elder to verify the disputed debt...';
+          hint = 'Go to the Stone Tablet to verify the disputed debt...';
           break;
         case 'loop2_return':
           hint = 'Return to the Woodcutter...';

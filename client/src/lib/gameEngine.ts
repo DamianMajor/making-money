@@ -105,6 +105,9 @@ interface GameState {
   nightTransitionTimer: number;
   showThunderstorm: boolean; // Thunderstorm after roof fix
   thunderstormTimer: number;
+  showCloudsAnimation: boolean; // Dark clouds rolling in before storm
+  cloudsAnimationTimer: number;
+  playerEnteredHut: boolean; // Player has entered the hut
   showStoneTabletPopup: boolean; // Popup view of Stone Tablet
   showChoice: boolean;
   choiceOptions: { text: string; action: () => void }[];
@@ -340,6 +343,9 @@ export class VillageLedgerGame {
       nightTransitionTimer: 0,
       showThunderstorm: false,
       thunderstormTimer: 0,
+      showCloudsAnimation: false,
+      cloudsAnimationTimer: 0,
+      playerEnteredHut: false,
       showStoneTabletPopup: false,
       showChoice: false,
       choiceOptions: []
@@ -712,6 +718,48 @@ export class VillageLedgerGame {
   private handleHomeInteraction(): void {
     const hasWood = this.state.inventory.wood >= 1;
     
+    // Check if debts are already settled (Loop 2 success path)
+    const debtsSettled = this.state.phase === 'loop2_return' || 
+                         this.state.phase === 'complete_success' || 
+                         this.state.phase === 'complete';
+    
+    // LOOP 2 SUCCESS: Debts settled, time to return home
+    if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && !this.state.showCloudsAnimation && !this.state.showNightTransition && !this.state.showSuccess && !this.state.playerEnteredHut) {
+      
+      // If roof needs fixing, fix it first, then trigger clouds
+      if (!this.state.roofRepaired && hasWood) {
+        this.queueDialogue([
+          {
+            speaker: 'YOU',
+            text: "Just in time! Let me fix my roof before the storm hits!",
+            onComplete: () => {
+              this.state.roofRepaired = true;
+              this.state.inventory.wood = 0;
+              this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
+              this.setMood('happy');
+              // After roof is fixed, trigger return home sequence
+              this.triggerReturnHomeSequence();
+            }
+          }
+        ]);
+        return;
+      }
+      
+      // Roof already fixed or somehow no wood - trigger return home sequence directly
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "Safe inside! The storm can come now.",
+          onComplete: () => {
+            this.triggerReturnHomeSequence();
+          }
+        }
+      ]);
+      return;
+    }
+    
+    // Regular home interaction (not loop2_return)
+    
     // Roof already repaired
     if (this.state.roofRepaired) {
       this.queueDialogue([
@@ -748,36 +796,6 @@ export class VillageLedgerGame {
       }
     ]);
     
-    // Check if debts are already settled (Loop 2 success path)
-    const debtsSettled = this.state.phase === 'loop2_return' || 
-                         this.state.phase === 'complete_success' || 
-                         this.state.phase === 'complete';
-    
-    // If debts are settled, trigger night transition and quiz
-    if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && !this.state.showNightTransition && !this.state.showSuccess) {
-      setTimeout(() => {
-        try {
-          if (!this.state.currentDialogue && !this.state.showNightTransition && !this.state.showQuiz) {
-            // Start night transition, then quiz
-            this.state.showNightTransition = true;
-            this.state.nightTransitionTimer = 0;
-            setTimeout(() => {
-              try {
-                this.state.showNightTransition = false;
-                this.state.showQuiz = true;
-                this.state.phase = 'quiz';
-              } catch (e) {
-                console.error('Error in quiz transition:', e);
-              }
-            }, 4000);
-          }
-        } catch (e) {
-          console.error('Error in night transition:', e);
-        }
-      }, 2000);
-      return;
-    }
-    
     // Check if player still has outstanding debts (Loop 1 or Loop 2 not yet settled)
     const hasOutstandingDebts = this.state.ledgerEntries.some(e => e.debt.includes('OWED'));
     const isLoop1 = this.state.loop === 1;
@@ -797,6 +815,40 @@ export class VillageLedgerGame {
         }
       }, 2000);
     }
+  }
+  
+  // Trigger the return home sequence with clouds animation
+  private triggerReturnHomeSequence(): void {
+    // Player enters hut (disappears)
+    this.state.playerEnteredHut = true;
+    this.player.visible = false;
+    
+    // Start dark clouds animation (2.5 seconds)
+    this.state.showCloudsAnimation = true;
+    this.state.cloudsAnimationTimer = 0;
+    
+    setTimeout(() => {
+      try {
+        this.state.showCloudsAnimation = false;
+        // Now trigger night transition, then quiz
+        this.state.showNightTransition = true;
+        this.state.nightTransitionTimer = 0;
+        setTimeout(() => {
+          try {
+            this.state.showNightTransition = false;
+            this.state.showQuiz = true;
+            this.state.phase = 'quiz';
+            // Restore player visibility for quiz
+            this.player.visible = true;
+            this.state.playerEnteredHut = false;
+          } catch (e) {
+            console.error('Error in quiz transition:', e);
+          }
+        }, 4000);
+      } catch (e) {
+        console.error('Error in clouds transition:', e);
+      }
+    }, 2500); // 2.5 second clouds animation
   }
 
   // ============ STONE TABLET INTERACTION ============
@@ -1233,7 +1285,7 @@ export class VillageLedgerGame {
             this.setMood('happy');
             this.state.phase = 'got_stone_need_fish';
             // Stone-worker walks to village center
-            this.stoneWorker.targetX = this.villageCenterX + 380;
+            this.stoneWorker.targetX = this.villageCenterX - 100;
           }
         }
       ]);
@@ -1307,7 +1359,7 @@ export class VillageLedgerGame {
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
                 this.hudGlow = 1;
               }
-              this.stoneWorker.targetX = this.villageCenterX + 380;
+              this.stoneWorker.targetX = this.villageCenterX - 100;
             }
           }
         ]);
@@ -1348,7 +1400,7 @@ export class VillageLedgerGame {
     // LOOP 1 SETTLEMENT: Player tries to settle - Stone-worker claims inflated debt
     else if (phase === 'settlement' && !this.state.stoneworkerDisputed) {
       // Stone-worker steps to the right to confront player
-      this.stoneWorker.targetX = this.villageCenterX + 380;
+      this.stoneWorker.targetX = this.villageCenterX - 100;
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
@@ -1963,7 +2015,7 @@ export class VillageLedgerGame {
               text: "Fine! The Tablet will prove I'm right! Let's go!",
               onComplete: () => {
                 this.state.phase = 'loop2_verify_at_tablet';
-                this.woodcutter.targetX = this.villageCenterX - 50;
+                this.woodcutter.targetX = this.villageCenterX + 80;
               }
             }
           ]);
@@ -2077,7 +2129,7 @@ export class VillageLedgerGame {
               text: "Fine! The Tablet will prove I'm right! Let's go!",
               onComplete: () => {
                 this.state.phase = 'loop2_verify_at_tablet';
-                this.stoneWorker.targetX = this.villageCenterX + 380;
+                this.stoneWorker.targetX = this.villageCenterX - 100;
               }
             }
           ]);
@@ -2514,7 +2566,7 @@ export class VillageLedgerGame {
         this.state.phase = 'settlement';
         // Move NPCs to village center area for the confrontation (woodcutter right to avoid Elder overlap)
         this.woodcutter.targetX = this.villageCenterX + 80;
-        this.stoneWorker.targetX = this.villageCenterX + 380;
+        this.stoneWorker.targetX = this.villageCenterX - 100;
       }
     }
     
@@ -2681,7 +2733,7 @@ export class VillageLedgerGame {
           // Woodcutter to the left of Elder
           this.woodcutter.targetX = this.villageCenterX - 130;
           // Stone-worker to the right of tablet
-          this.stoneWorker.targetX = this.villageCenterX + 380;
+          this.stoneWorker.targetX = this.villageCenterX - 100;
           
           this.state.phase = 'brawl';
           this.state.showBrawl = true;
@@ -2795,11 +2847,21 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "I've paid everyone what I owe! My debts are settled!",
+          text: "I've paid everyone what I owe! My debts are settled!"
+        },
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "All debts are paid and recorded on the Stone Tablet. Peace is restored to our village!",
           onComplete: () => {
-            this.state.phase = 'loop2_return';
             this.state.showCelebration = true;
             this.state.celebrationTimer = 0;
+          }
+        },
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "Now return home before the storm arrives. Your roof still needs fixing!",
+          onComplete: () => {
+            this.state.phase = 'loop2_return';
           }
         }
       ]);
@@ -2917,6 +2979,11 @@ export class VillageLedgerGame {
     // Draw thunderstorm animation if active
     if (this.state.showThunderstorm) {
       this.drawThunderstorm(ctx);
+    }
+    
+    // Draw dark clouds animation if active
+    if (this.state.showCloudsAnimation) {
+      this.drawCloudsAnimation(ctx);
     }
     
     // Draw night transition animation if active
@@ -3236,6 +3303,77 @@ export class VillageLedgerGame {
       ctx.fillText('THE STORM!', w / 2, stormY);
       ctx.restore();
     }
+  }
+  
+  private drawCloudsAnimation(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    
+    // Update timer
+    this.state.cloudsAnimationTimer += 1/60;
+    const t = this.state.cloudsAnimationTimer;
+    
+    // Calculate cloud positions rolling in from left and right
+    const progress = Math.min(1, t / 2.5); // 0 to 1 over 2.5 seconds
+    const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease out
+    
+    // Darken the sky gradually
+    const darkenAlpha = easeProgress * 0.6;
+    ctx.fillStyle = `rgba(30, 30, 50, ${darkenAlpha})`;
+    ctx.fillRect(0, 0, w, h);
+    
+    // Draw large dark clouds rolling in from left
+    const leftCloudX = -w * 0.4 + (w * 0.6) * easeProgress;
+    this.drawCloud(ctx, leftCloudX, h * 0.15, 200, 0.8 * easeProgress, '#3a3a50');
+    this.drawCloud(ctx, leftCloudX - 100, h * 0.25, 180, 0.7 * easeProgress, '#404055');
+    this.drawCloud(ctx, leftCloudX + 50, h * 0.1, 150, 0.6 * easeProgress, '#454560');
+    
+    // Draw large dark clouds rolling in from right
+    const rightCloudX = w + w * 0.4 - (w * 0.6) * easeProgress;
+    this.drawCloud(ctx, rightCloudX, h * 0.12, 220, 0.8 * easeProgress, '#3a3a50');
+    this.drawCloud(ctx, rightCloudX + 100, h * 0.22, 170, 0.7 * easeProgress, '#404055');
+    this.drawCloud(ctx, rightCloudX - 80, h * 0.08, 160, 0.6 * easeProgress, '#454560');
+    
+    // Text overlay at the end
+    if (progress > 0.7) {
+      const textAlpha = (progress - 0.7) / 0.3;
+      ctx.save();
+      ctx.globalAlpha = textAlpha;
+      ctx.font = `bold 24px ${this.retroFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 3;
+      ctx.strokeText('THE STORM APPROACHES...', w / 2, h / 2);
+      ctx.fillText('THE STORM APPROACHES...', w / 2, h / 2);
+      ctx.restore();
+    }
+  }
+  
+  private drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, alpha: number, color: string): void {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    
+    // Draw cloud as overlapping circles
+    const r = size / 3;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x - r * 0.8, y + r * 0.3, r * 0.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + r * 0.8, y + r * 0.3, r * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x - r * 0.4, y - r * 0.3, r * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x + r * 0.4, y - r * 0.3, r * 0.75, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.restore();
   }
   
   private drawNightTransition(ctx: CanvasRenderingContext2D): void {
@@ -3822,7 +3960,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillRect(0, 0, w, h);
     
     // Popup dimensions - larger than HUD for readability, wide enough for full debt text
-    const popupWidth = Math.min(520, w - 40);
+    const popupWidth = Math.min(620, w - 40);
     const popupHeight = Math.min(500, h - 120);
     const popupX = (w - popupWidth) / 2;
     const popupY = (h - popupHeight) / 2;
@@ -4489,6 +4627,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       nightTransitionTimer: 0,
       showThunderstorm: false,
       thunderstormTimer: 0,
+      showCloudsAnimation: false,
+      cloudsAnimationTimer: 0,
+      playerEnteredHut: false,
       showStoneTabletPopup: false,
       showChoice: false,
       choiceOptions: []
@@ -4561,6 +4702,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       nightTransitionTimer: 0,
       showThunderstorm: false,
       thunderstormTimer: 0,
+      showCloudsAnimation: false,
+      cloudsAnimationTimer: 0,
+      playerEnteredHut: false,
       showStoneTabletPopup: false,
       showChoice: false,
       choiceOptions: []

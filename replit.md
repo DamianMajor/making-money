@@ -74,10 +74,21 @@ When Elder successfully settles all recorded debts, a 3-second celebration plays
 - After repair, a reminder prompts player to settle outstanding debts (if any)
 
 ### NPC Interaction Range & Direct Tap
-- NPC interaction range: 180 units (reduced for more precise targeting)
-- Home interaction range: 120 units
-- Players can tap directly on NPCs, home hut, or berry bush to interact (within range)
+- NPC interaction range: 50 units (tight range for precise targeting at Town Center)
+- Home interaction range: 50 units
+- Players can tap directly on NPCs, home hut, or berry bush to interact
+- If out of range, player auto-walks to target and interacts on arrival (can be interrupted by new tap)
+- When multiple NPC hitboxes overlap, the closest NPC to the player is prioritized
 - INTERACT button shows target name: "INTERACT (Woodcutter)", "INTERACT (Home)", etc.
+- Note: Intro dialogue must be dismissed (tap to advance) before NPC taps register
+
+### Auto-Walk System
+- Clicking on distant NPC/home/berry bush sets autoWalkTarget
+- Player walks toward target at 200 units/sec
+- When within 50 units of target, interaction triggers automatically
+- Manual touch (tap elsewhere) cancels auto-walk
+- Movement state (moveDirection, touchActive) cleared when setting target to prevent drift
+- Hitbox detection uses npc.y (set by resize() to groundY - height) for accurate Y alignment
 
 ### Happy Face Timer
 - Happy mood (happy.png) triggers when receiving items, fixing roof, or settling debts

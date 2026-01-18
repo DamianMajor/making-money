@@ -141,6 +141,9 @@ export class VillageLedgerGame {
   private interactButtonOpacity: number = 0;
   private faceImages: Record<string, HTMLImageElement> = {};
   private moodTimer: number = 0;
+  
+  // Auto-walk feature: player walks to clicked target and interacts
+  private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush'; id?: string } | null = null;
 
   // Font constants (retro monospace for dialogue/HUD)
   private readonly retroFont: string = '"Press Start 2P", monospace';
@@ -387,7 +390,7 @@ export class VillageLedgerGame {
     const scaleY = this.canvas.height / rect.height;
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
-
+    
     // Handle fail screen touches
     if (this.state.showFail) {
       this.handleFailTouch(x, y);
@@ -441,48 +444,66 @@ export class VillageLedgerGame {
         return;
       }
     }
-    
     // Check if tapping directly on an NPC, home, or berry bush
-    // Only allow direct tap if player is within interaction range (250 units)
+    // Set auto-walk target - player will walk there and interact on arrival
     const tappedTarget = this.getTappedInteractable(x, y);
     if (tappedTarget) {
-      const interactionRange = 180;
-      let inRange = false;
+      const interactionRange = 50; // Tight range for precise targeting
       
       if (tappedTarget === 'home') {
-        inRange = Math.abs(this.player.x - this.playerHomeX) < 120;
+        const inRange = Math.abs(this.player.x - this.playerHomeX) < interactionRange;
         if (inRange) {
           this.handleHomeInteraction();
+          this.autoWalkTarget = null;
+          return;
+        } else {
+          // Set auto-walk target to home, clear manual movement
+          this.autoWalkTarget = { x: this.playerHomeX, type: 'home' };
+          this.moveDirection = 0;
+          this.touchActive = false;
           return;
         }
       } else {
         // Check if player is within range of the NPC
-        inRange = Math.abs(this.player.x - tappedTarget.x) < interactionRange;
+        const inRange = Math.abs(this.player.x - tappedTarget.x) < interactionRange;
         if (inRange) {
-          if (tappedTarget.id === 'woodcutter') {
-            this.handleWoodcutterInteraction();
-            return;
-          } else if (tappedTarget.id === 'villageElder') {
-            this.handleElderInteraction();
-            return;
-          } else if (tappedTarget.id === 'berryBush') {
-            this.handleBerryBushInteraction();
-            return;
-          } else if (tappedTarget.id === 'stoneWorker') {
-            this.handleStoneWorkerInteraction();
-            return;
-          } else if (tappedTarget.id === 'fisherman') {
-            this.handleFishermanInteraction();
-            return;
+          this.triggerNPCInteraction(tappedTarget.id);
+          this.autoWalkTarget = null;
+          return;
+        } else {
+          // Set auto-walk target to NPC, clear manual movement
+          if (tappedTarget.id === 'berryBush') {
+            this.autoWalkTarget = { x: tappedTarget.x, type: 'berryBush', id: tappedTarget.id };
+          } else {
+            this.autoWalkTarget = { x: tappedTarget.x, type: 'npc', id: tappedTarget.id };
           }
+          this.moveDirection = 0;
+          this.touchActive = false;
+          return;
         }
       }
     }
 
-    // Movement touch - only if not touching button area
+    // Movement touch cancels auto-walk and starts manual movement
+    this.autoWalkTarget = null;
     this.touchActive = true;
     this.touchX = x;
     this.updateMoveDirection(x);
+  }
+  
+  // Helper to trigger NPC interaction by id
+  private triggerNPCInteraction(npcId: string): void {
+    if (npcId === 'woodcutter') {
+      this.handleWoodcutterInteraction();
+    } else if (npcId === 'villageElder') {
+      this.handleElderInteraction();
+    } else if (npcId === 'berryBush') {
+      this.handleBerryBushInteraction();
+    } else if (npcId === 'stoneWorker') {
+      this.handleStoneWorkerInteraction();
+    } else if (npcId === 'fisherman') {
+      this.handleFishermanInteraction();
+    }
   }
 
   private processTouchMove(clientX: number): void {
@@ -510,6 +531,7 @@ export class VillageLedgerGame {
   }
   
   // Check if player tapped directly on an NPC, home hut, or berry bush
+  // Prioritizes the NPC closest to the player when multiple hitboxes overlap
   private getTappedInteractable(x: number, y: number): Character | 'home' | null {
     const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
     
@@ -521,22 +543,33 @@ export class VillageLedgerGame {
       return 'home';
     }
     
-    // Check each NPC with a generous tap hitbox
+    // Collect all NPCs whose hitbox contains the tap point
+    const tappedNPCs: { npc: Character; distance: number }[] = [];
+    
     for (const npc of this.npcs) {
       if (!npc.visible) continue;
       const npcScreenX = npc.x - this.cameraX;
-      const npcY = npc.y + npc.bobOffset;
+      // Use same Y calculation as drawCharacter (npc.y is set to groundY - height in resize)
+      const npcScreenY = npc.y + (npc.bobOffset || 0);
       // Generous hitbox for tap targeting
       const hitbox = {
         x: npcScreenX - npc.width / 2 - 20,
-        y: npcY - 20,
+        y: npcScreenY - 20,
         width: npc.width + 40,
         height: npc.height + 40
       };
       if (x >= hitbox.x && x <= hitbox.x + hitbox.width &&
           y >= hitbox.y && y <= hitbox.y + hitbox.height) {
-        return npc;
+        // Calculate distance from player to this NPC
+        const distance = Math.abs(this.player.x - npc.x);
+        tappedNPCs.push({ npc, distance });
       }
+    }
+    
+    // Return the closest NPC to the player (prioritize in crowded areas)
+    if (tappedNPCs.length > 0) {
+      tappedNPCs.sort((a, b) => a.distance - b.distance);
+      return tappedNPCs[0].npc;
     }
     
     return null;
@@ -1315,8 +1348,33 @@ export class VillageLedgerGame {
     // Update bob animation
     this.bobTimer += dt * 8;
 
-    // Update player movement
-    if (this.moveDirection !== 0 && !this.state.currentDialogue) {
+    // Auto-walk feature: player walks to clicked target and interacts on arrival
+    if (this.autoWalkTarget && !this.state.currentDialogue) {
+      const targetX = this.autoWalkTarget.x;
+      const dx = targetX - this.player.x;
+      const interactionRange = 50; // Must be close to interact
+      
+      if (Math.abs(dx) <= interactionRange) {
+        // Arrived at target - trigger interaction and clear movement state
+        const targetType = this.autoWalkTarget.type;
+        const targetId = this.autoWalkTarget.id;
+        this.autoWalkTarget = null;
+        this.moveDirection = 0; // Prevent drift after arrival
+        
+        if (targetType === 'home') {
+          this.handleHomeInteraction();
+        } else if (targetId) {
+          this.triggerNPCInteraction(targetId);
+        }
+      } else {
+        // Walk toward target
+        this.player.x += Math.sign(dx) * this.playerSpeed * dt;
+        this.player.x = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, this.player.x));
+        this.player.bobOffset = Math.sin(this.bobTimer) * 3;
+      }
+    }
+    // Regular player movement (manual touch controls)
+    else if (this.moveDirection !== 0 && !this.state.currentDialogue) {
       this.player.x += this.moveDirection * this.playerSpeed * dt;
       this.player.x = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, this.player.x));
 
@@ -1384,7 +1442,7 @@ export class VillageLedgerGame {
     for (const npc of this.npcs) {
       if (!npc.visible) continue;
       const dist = Math.abs(this.player.x - npc.x);
-      if (dist <= 180) { // Reduced range for more precise targeting
+      if (dist <= 50) { // Tight range for precise NPC targeting at Town Center
         this.state.nearbyNPC = npc;
         this.state.showInteractButton = true;
         break;
@@ -1463,14 +1521,14 @@ export class VillageLedgerGame {
     // Move NPCs during settlement phase
     if (this.state.phase === 'settlement') {
       // Woodcutter moves toward target
-      if (this.woodcutter.targetX !== null) {
+      if (this.woodcutter.targetX !== null && this.woodcutter.targetX !== undefined) {
         const dx = this.woodcutter.targetX - this.woodcutter.x;
         if (Math.abs(dx) > 5) {
           this.woodcutter.x += Math.sign(dx) * 80 * dt;
         }
       }
       // Stone-worker moves toward target
-      if (this.stoneWorker.targetX !== null) {
+      if (this.stoneWorker.targetX !== null && this.stoneWorker.targetX !== undefined) {
         const dx = this.stoneWorker.targetX - this.stoneWorker.x;
         if (Math.abs(dx) > 5) {
           this.stoneWorker.x += Math.sign(dx) * 80 * dt;
@@ -1815,9 +1873,43 @@ export class VillageLedgerGame {
       ctx.roundRect(btnX, btnY, btnW, btnH, 8);
       ctx.fill();
 
+      // Draw button text with horizontal padding and wrapping (max 2 lines)
       ctx.font = `10px ${this.retroFont}`;
       ctx.fillStyle = '#FFF';
-      ctx.fillText(option.text, w / 2, btnY + btnH / 2 + 4);
+      ctx.textAlign = 'center';
+      
+      // Wrap text if too wide (with 20px padding on each side)
+      const maxTextWidth = btnW - 40;
+      const words = option.text.split(' ');
+      let lines: string[] = [];
+      let currentLine = '';
+      
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const testWidth = ctx.measureText(testLine).width;
+        if (testWidth > maxTextWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+      
+      // Limit to max 2 lines, truncate if needed
+      if (lines.length > 2) {
+        lines = lines.slice(0, 2);
+        lines[1] = lines[1].slice(0, -3) + '...';
+      }
+      
+      // Draw wrapped lines centered vertically
+      const lineHeight = 14;
+      const totalHeight = lines.length * lineHeight;
+      const startY = btnY + (btnH - totalHeight) / 2 + lineHeight / 2 + 4;
+      
+      lines.forEach((line, lineIndex) => {
+        ctx.fillText(line, w / 2, startY + lineIndex * lineHeight);
+      });
 
       this.choiceButtonAreas.push({ x: btnX, y: btnY, w: btnW, h: btnH, index: i });
     });
@@ -2446,13 +2538,29 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.stroke();
 
     // Ledger entries - 12px sans-serif per guidelines
+    // Add safe zone margins and text truncation
     ctx.font = `12px ${this.uiFont}`;
+    const nameMaxWidth = w * 0.45 - 30; // Safe zone for name column
+    const debtMaxWidth = w * 0.45 - 20; // Safe zone for debt column
+    
     this.state.ledgerEntries.forEach((entry, i) => {
       const entryY = y + 86 + i * 32;
       ctx.fillStyle = '#5D4837';
       ctx.textAlign = 'left';
-      ctx.fillText(entry.name, x + 20, entryY);
-      ctx.fillText(entry.debt, x + w * 0.55, entryY);
+      
+      // Truncate name if too long
+      let displayName = entry.name;
+      while (ctx.measureText(displayName).width > nameMaxWidth && displayName.length > 3) {
+        displayName = displayName.slice(0, -4) + '...';
+      }
+      ctx.fillText(displayName, x + 20, entryY);
+      
+      // Truncate debt if too long
+      let displayDebt = entry.debt;
+      while (ctx.measureText(displayDebt).width > debtMaxWidth && displayDebt.length > 3) {
+        displayDebt = displayDebt.slice(0, -4) + '...';
+      }
+      ctx.fillText(displayDebt, x + w * 0.55, entryY);
     });
 
     // Empty state message

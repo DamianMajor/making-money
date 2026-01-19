@@ -75,6 +75,15 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - **Gaslight Failure Path**: `resourcesDepleted` flag properly set when paying inflated demands, making second debt impossible to pay
 - **Interaction Priority**: NPCs checked before Stone Tablet in getTappedInteractable() to prevent overlap issues
 - **Runtime Error Prevention**: Try-catch blocks and guards around timeout chains in home interaction
+- **Loop 2 Return Hint**: Changed to "Return home to fix your roof before the storm!" after both debts settled
+- **Auto-trigger Elder Celebration**: Elder walks toward player (targetX = player.x + 50) when both debts settled, triggers celebration without manual interaction
+- **Woodcutter Settlement Fix**: Now correctly checks for and deducts BOTH 1 Stone + 1 Fish (was only taking fish)
+- **Post-Settlement NPC Dialogue**: Both woodcutter and stone-worker remind player to fix roof when both debts settled
+- **Stone Tablet Ledger Updates**: All entries show "SETTLED" when debts are paid (replaces OWED/VERIFIED)
+- **Stone Tablet Popup Width**: Loop 2 expanded to 720px for full text visibility; Loop 1 remains 620px
+- **Loop 1 Wisdom Text Size**: Increased from 16px to 20px with 34px line spacing for better readability
+- **Stone Tablet Speaker Portrait**: Shows tablet icon with text lines instead of NPC face when speaker is "STONE TABLET"
+- **3-Second Storm Buffer**: Added delay after roof fix before storm clouds animation begins
 
 ## External Dependencies
 

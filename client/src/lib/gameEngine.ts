@@ -68,6 +68,8 @@ interface GameState {
   pendingStoneWorkerDispute: boolean;
   // Elder has verified debts at tablet - NPCs accept payment without dispute
   elderVerified: boolean;
+  // Elder is walking toward player to celebrate after both debts settled
+  elderWalkingToCelebrate: boolean;
   // Track if player gave in to inflated demands (leads to failure path)
   gaveInToWoodcutter: boolean;
   gaveInToStoneWorker: boolean;
@@ -311,6 +313,7 @@ export class VillageLedgerGame {
       pendingWoodcutterDispute: false,
       pendingStoneWorkerDispute: false,
       elderVerified: false,
+      elderWalkingToCelebrate: false,
       gaveInToWoodcutter: false,
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
@@ -2490,6 +2493,11 @@ export class VillageLedgerGame {
           npc.x = npc.targetX;
           npc.targetX = undefined;
           npc.bobOffset = 0; // Stop bouncing immediately
+          
+          // Check if Elder arrived to celebrate
+          if (npc === this.villageElder && this.state.elderWalkingToCelebrate) {
+            this.triggerElderCelebration();
+          }
         }
       }
       
@@ -2884,6 +2892,7 @@ export class VillageLedgerGame {
     if (this.state.woodcutterSettled && this.state.stoneWorkerSettled) {
       // Both NPCs have been paid directly - Elder walks toward player to congratulate
       this.villageElder.targetX = this.player.x + 50; // Elder walks toward player
+      this.state.elderWalkingToCelebrate = true; // Flag to trigger dialogue on arrival
       this.setMood('happy');
       
       // Update any VERIFIED or OWED entries to SETTLED
@@ -2892,29 +2901,34 @@ export class VillageLedgerGame {
         debt: e.debt.replace('OWED', 'SETTLED').replace('VERIFIED', 'SETTLED')
       }));
       this.hudGlow = 1;
-      
-      this.queueDialogue([
-        {
-          speaker: 'YOU',
-          text: "I've paid everyone what I owe! My debts are settled!"
-        },
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "All debts are paid and recorded on the Stone Tablet. Peace is restored to our village!",
-          onComplete: () => {
-            this.state.showCelebration = true;
-            this.state.celebrationTimer = 0;
-          }
-        },
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "Now return home before the storm arrives. Your roof still needs fixing!",
-          onComplete: () => {
-            this.state.phase = 'loop2_return';
-          }
-        }
-      ]);
     }
+  }
+  
+  // Triggered when Elder arrives at player after both debts are settled
+  private triggerElderCelebration(): void {
+    this.state.elderWalkingToCelebrate = false;
+    
+    this.queueDialogue([
+      {
+        speaker: 'YOU',
+        text: "I've paid everyone what I owe! My debts are settled!"
+      },
+      {
+        speaker: 'VILLAGE ELDER',
+        text: "All debts are paid and recorded on the Stone Tablet. Peace is restored to our village!",
+        onComplete: () => {
+          this.state.showCelebration = true;
+          this.state.celebrationTimer = 0;
+        }
+      },
+      {
+        speaker: 'VILLAGE ELDER',
+        text: "Now return home before the storm arrives. Your roof still needs fixing!",
+        onComplete: () => {
+          this.state.phase = 'loop2_return';
+        }
+      }
+    ]);
   }
 
   private render(): void {
@@ -4666,6 +4680,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       pendingWoodcutterDispute: false,
       pendingStoneWorkerDispute: false,
       elderVerified: false,
+      elderWalkingToCelebrate: false,
       gaveInToWoodcutter: false,
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
@@ -4741,6 +4756,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       pendingWoodcutterDispute: false,
       pendingStoneWorkerDispute: false,
       elderVerified: false,
+      elderWalkingToCelebrate: false,
       gaveInToWoodcutter: false,
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,

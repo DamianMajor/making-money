@@ -145,6 +145,56 @@ export class SoundManager {
     audio.play().catch(() => {});
   }
 
+  private durationTimeouts: Map<SoundName, NodeJS.Timeout> = new Map();
+
+  private clearDurationTimeout(name: SoundName): void {
+    const existing = this.durationTimeouts.get(name);
+    if (existing) {
+      clearTimeout(existing);
+      this.durationTimeouts.delete(name);
+    }
+  }
+
+  public playForDuration(name: SoundName, durationMs: number): void {
+    if (this.muted) return;
+    
+    this.clearDurationTimeout(name);
+    this.play(name);
+    
+    const timeout = setTimeout(() => {
+      this.stop(name);
+      this.durationTimeouts.delete(name);
+    }, durationMs);
+    this.durationTimeouts.set(name, timeout);
+  }
+
+  public playLoop(name: SoundName): void {
+    if (this.muted) return;
+    
+    if (!this.initialized) {
+      this.pendingPlays.add(name);
+      return;
+    }
+    
+    const audio = this.sounds.get(name);
+    if (!audio) return;
+    
+    audio.loop = true;
+    audio.currentTime = 0;
+    const config = SOUND_CONFIGS[name];
+    audio.volume = config.volume * this.masterVolume;
+    audio.play().catch(() => {});
+  }
+
+  public stopLoop(name: SoundName): void {
+    const audio = this.sounds.get(name);
+    if (!audio) return;
+    
+    audio.loop = false;
+    audio.pause();
+    audio.currentTime = 0;
+  }
+
   private clearFadeInterval(name: SoundName): void {
     const existing = this.fadeIntervals.get(name);
     if (existing) {

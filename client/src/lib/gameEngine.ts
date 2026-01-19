@@ -1092,7 +1092,7 @@ export class VillageLedgerGame {
               this.state.phase = 'loop2_got_wood';
               this.state.escortingNPC = null;
               if (recorded) {
-                soundManager.play('stoneCarve');
+                soundManager.playForDuration('stoneCarve', 3000);
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
                 this.state.showHUD = true;
                 this.hudGlow = 1;
@@ -1445,7 +1445,7 @@ export class VillageLedgerGame {
               this.state.phase = 'loop2_got_stone';
               this.state.escortingNPC = null;
               if (recorded) {
-                soundManager.play('stoneCarve');
+                soundManager.playForDuration('stoneCarve', 3000);
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
                 this.hudGlow = 1;
               }

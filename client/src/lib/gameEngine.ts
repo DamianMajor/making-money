@@ -1,6 +1,8 @@
 // Village Ledger Educational Game Engine
 // Touch-only side-scroller optimized for iPad/Tablet
 
+import { soundManager } from './soundManager';
+
 // Game State Types
 interface Vector2 {
   x: number;
@@ -179,6 +181,9 @@ export class VillageLedgerGame {
   private interactButtonOpacity: number = 0;
   private faceImages: Record<string, HTMLImageElement> = {};
   private moodTimer: number = 0;
+  
+  // Sound mute button
+  private muteButtonArea: { x: number; y: number; w: number; h: number } | null = null;
   
   // Auto-walk feature: player walks to clicked target and interacts
   private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush' | 'stoneTablet' | 'location'; id?: string } | null = null;
@@ -410,6 +415,7 @@ export class VillageLedgerGame {
 
   private handleTouchStart(e: TouchEvent): void {
     e.preventDefault();
+    soundManager.init();
     if (e.touches.length > 0) {
       const touch = e.touches[0];
       this.processTouchStart(touch.clientX, touch.clientY);
@@ -430,6 +436,7 @@ export class VillageLedgerGame {
   }
 
   private handleMouseDown(e: MouseEvent): void {
+    soundManager.init();
     this.processTouchStart(e.clientX, e.clientY);
   }
 
@@ -471,6 +478,16 @@ export class VillageLedgerGame {
     if (this.state.showStoneTabletPopup) {
       this.state.showStoneTabletPopup = false;
       return;
+    }
+    
+    // Check if clicking on mute button
+    if (this.muteButtonArea) {
+      const btn = this.muteButtonArea;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.toggleMute();
+        soundManager.play('buttonClick');
+        return;
+      }
     }
     
     // Check if clicking on Stone Tablet HUD to open popup
@@ -4290,6 +4307,63 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       
       xPos += iconSize + spacing + 20;
     });
+    
+    // Draw mute/sound button to the left of inventory
+    const muteButtonSize = 32;
+    const muteX = panelX - muteButtonSize - 12;
+    const muteY = yPos - 2;
+    
+    this.muteButtonArea = { x: muteX, y: muteY, w: muteButtonSize, h: muteButtonSize };
+    
+    // Button background
+    ctx.fillStyle = soundManager.isMuted() ? 'rgba(220, 38, 38, 0.85)' : 'rgba(34, 197, 94, 0.85)';
+    ctx.beginPath();
+    ctx.roundRect(muteX, muteY, muteButtonSize, muteButtonSize, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#5D4837';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Draw speaker icon
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2;
+    
+    const iconX = muteX + 8;
+    const iconY = muteY + 10;
+    
+    // Speaker body
+    ctx.beginPath();
+    ctx.moveTo(iconX, iconY + 4);
+    ctx.lineTo(iconX + 6, iconY + 4);
+    ctx.lineTo(iconX + 12, iconY);
+    ctx.lineTo(iconX + 12, iconY + 12);
+    ctx.lineTo(iconX + 6, iconY + 8);
+    ctx.lineTo(iconX, iconY + 8);
+    ctx.closePath();
+    ctx.fill();
+    
+    if (soundManager.isMuted()) {
+      // Draw X for muted
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(iconX + 14, iconY + 2);
+      ctx.lineTo(iconX + 20, iconY + 10);
+      ctx.moveTo(iconX + 20, iconY + 2);
+      ctx.lineTo(iconX + 14, iconY + 10);
+      ctx.stroke();
+    } else {
+      // Draw sound waves
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(iconX + 14, iconY + 6, 4, -0.5, 0.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(iconX + 14, iconY + 6, 8, -0.5, 0.5);
+      ctx.stroke();
+    }
   }
 
   private drawDialogueBox(ctx: CanvasRenderingContext2D): void {

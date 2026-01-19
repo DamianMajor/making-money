@@ -83,7 +83,12 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - **Stone Tablet Popup Width**: Loop 2 expanded to 720px for full text visibility; Loop 1 remains 620px
 - **Loop 1 Wisdom Text Size**: Increased from 16px to 20px with 34px line spacing for better readability
 - **Stone Tablet Speaker Portrait**: Shows tablet icon with text lines instead of NPC face when speaker is "STONE TABLET"
-- **3-Second Storm Buffer**: Added delay after roof fix before storm clouds animation begins
+- **2-Second Storm Buffer**: Reduced delay after roof fix before storm clouds animation begins
+- **Center Cloud Animation**: Added center clouds that slowly fade in over 3 seconds during storm
+- **Rainfall Animation**: New 3-second rainfall phase between clouds and night transition
+- **Storm Sequence**: clouds 2.5s → rainfall 3s → night fade 3s → quiz
+- **Quiz Wrong Answer Feedback**: Shows explanations for wrong answers with pagination, correct answers highlighted, retry button
+- **Stone Tablet Columns**: 35/65 split with smaller font for debt column to fit long text
 
 ## External Dependencies
 

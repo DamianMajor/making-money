@@ -109,6 +109,8 @@ interface GameState {
   thunderstormTimer: number;
   showCloudsAnimation: boolean; // Dark clouds rolling in before storm
   cloudsAnimationTimer: number;
+  showRainfall: boolean; // Rainfall animation after clouds
+  rainfallTimer: number;
   playerEnteredHut: boolean; // Player has entered the hut
   showStoneTabletPopup: boolean; // Popup view of Stone Tablet
   showChoice: boolean;
@@ -348,6 +350,8 @@ export class VillageLedgerGame {
       thunderstormTimer: 0,
       showCloudsAnimation: false,
       cloudsAnimationTimer: 0,
+      showRainfall: false,
+      rainfallTimer: 0,
       playerEnteredHut: false,
       showStoneTabletPopup: false,
       showChoice: false,
@@ -740,10 +744,10 @@ export class VillageLedgerGame {
               this.state.inventory.wood = 0;
               this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
               this.setMood('happy');
-              // After roof is fixed, add 3 second buffer before storm clouds
+              // After roof is fixed, add 2 second buffer before storm clouds
               setTimeout(() => {
                 this.triggerReturnHomeSequence();
-              }, 3000);
+              }, 2000);
             }
           }
         ]);
@@ -756,10 +760,10 @@ export class VillageLedgerGame {
           speaker: 'YOU',
           text: "Safe inside! The storm can come now.",
           onComplete: () => {
-            // 3 second buffer before storm clouds roll in
+            // 2 second buffer before storm clouds roll in
             setTimeout(() => {
               this.triggerReturnHomeSequence();
-            }, 3000);
+            }, 2000);
           }
         }
       ]);
@@ -835,24 +839,37 @@ export class VillageLedgerGame {
     this.state.showCloudsAnimation = true;
     this.state.cloudsAnimationTimer = 0;
     
+    // Sequence: clouds 2.5s → rainfall 3s → night transition 3s → quiz
     setTimeout(() => {
       try {
         this.state.showCloudsAnimation = false;
-        // Now trigger night transition, then quiz
-        this.state.showNightTransition = true;
-        this.state.nightTransitionTimer = 0;
+        // Start rainfall animation
+        this.state.showRainfall = true;
+        this.state.rainfallTimer = 0;
+        
         setTimeout(() => {
           try {
-            this.state.showNightTransition = false;
-            this.state.showQuiz = true;
-            this.state.phase = 'quiz';
-            // Restore player visibility for quiz
-            this.player.visible = true;
-            this.state.playerEnteredHut = false;
+            this.state.showRainfall = false;
+            // Start night transition with fade
+            this.state.showNightTransition = true;
+            this.state.nightTransitionTimer = 0;
+            
+            setTimeout(() => {
+              try {
+                this.state.showNightTransition = false;
+                this.state.showQuiz = true;
+                this.state.phase = 'quiz';
+                // Restore player visibility for quiz
+                this.player.visible = true;
+                this.state.playerEnteredHut = false;
+              } catch (e) {
+                console.error('Error in quiz transition:', e);
+              }
+            }, 3000); // 3 second fade to night
           } catch (e) {
-            console.error('Error in quiz transition:', e);
+            console.error('Error in rainfall transition:', e);
           }
-        }, 4000);
+        }, 3000); // 3 second rainfall
       } catch (e) {
         console.error('Error in clouds transition:', e);
       }
@@ -3049,6 +3066,11 @@ export class VillageLedgerGame {
       this.drawCloudsAnimation(ctx);
     }
     
+    // Draw rainfall animation if active
+    if (this.state.showRainfall) {
+      this.drawRainfallAnimation(ctx);
+    }
+    
     // Draw night transition animation if active
     if (this.state.showNightTransition) {
       this.drawNightTransition(ctx);
@@ -3066,7 +3088,11 @@ export class VillageLedgerGame {
     
     // Draw quiz overlay if active
     if (this.state.showQuiz) {
-      this.drawQuizOverlay(ctx);
+      if (this.showQuizFeedback) {
+        this.drawQuizFeedback(ctx);
+      } else {
+        this.drawQuizOverlay(ctx);
+      }
     }
 
     // Draw success screen if complete
@@ -3397,6 +3423,12 @@ export class VillageLedgerGame {
     this.drawCloud(ctx, rightCloudX + 100, h * 0.22, 170, 0.7 * easeProgress, '#404055');
     this.drawCloud(ctx, rightCloudX - 80, h * 0.08, 160, 0.6 * easeProgress, '#454560');
     
+    // Draw center cloud that slowly fades in from center top
+    const centerCloudAlpha = Math.min(1, t / 3.0) * 0.85; // Fade in slowly over 3 seconds
+    this.drawCloud(ctx, w * 0.5, h * 0.18, 250, centerCloudAlpha, '#2a2a40');
+    this.drawCloud(ctx, w * 0.4, h * 0.14, 180, centerCloudAlpha * 0.8, '#353550');
+    this.drawCloud(ctx, w * 0.6, h * 0.16, 190, centerCloudAlpha * 0.8, '#353550');
+    
     // Text overlay at the end
     if (progress > 0.7) {
       const textAlpha = (progress - 0.7) / 0.3;
@@ -3410,6 +3442,51 @@ export class VillageLedgerGame {
       ctx.strokeText('THE STORM APPROACHES...', w / 2, h / 2);
       ctx.fillText('THE STORM APPROACHES...', w / 2, h / 2);
       ctx.restore();
+    }
+  }
+  
+  private drawRainfallAnimation(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    
+    // Update timer
+    this.state.rainfallTimer += 1/60;
+    const t = this.state.rainfallTimer;
+    
+    // Dark stormy sky background
+    ctx.fillStyle = 'rgba(20, 20, 35, 0.85)';
+    ctx.fillRect(0, 0, w, h);
+    
+    // Draw persistent clouds at top
+    this.drawCloud(ctx, w * 0.2, h * 0.12, 220, 0.9, '#2a2a40');
+    this.drawCloud(ctx, w * 0.5, h * 0.15, 280, 0.95, '#252538');
+    this.drawCloud(ctx, w * 0.8, h * 0.1, 200, 0.85, '#2a2a40');
+    this.drawCloud(ctx, w * 0.35, h * 0.08, 180, 0.8, '#303048');
+    this.drawCloud(ctx, w * 0.65, h * 0.12, 190, 0.8, '#303048');
+    
+    // Rain drops animation
+    ctx.strokeStyle = 'rgba(180, 200, 255, 0.4)';
+    ctx.lineWidth = 1.5;
+    
+    const rainDensity = 150; // Number of rain drops
+    for (let i = 0; i < rainDensity; i++) {
+      // Seeded random positions that animate
+      const seed = i * 1234.5678;
+      const x = ((seed % w) + t * 80 * ((i % 3) + 1)) % w;
+      const baseY = ((seed * 7) % h);
+      const y = (baseY + t * 400 * (0.8 + (i % 5) * 0.1)) % (h + 50);
+      
+      // Rain drop as a short line
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 2, y + 15);
+      ctx.stroke();
+    }
+    
+    // Occasional lightning flash
+    if (Math.sin(t * 3) > 0.98) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.fillRect(0, 0, w, h);
     }
   }
   
@@ -4025,7 +4102,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Popup dimensions - larger than HUD for readability, wide enough for full debt text
     // Loop 2 needs wider popup for longer debt text
     const isLoop2OrLater = this.state.loop >= 2;
-    const popupWidth = Math.min(isLoop2OrLater ? 720 : 620, w - 40);
+    const popupWidth = Math.min(isLoop2OrLater ? 780 : 620, w - 40);
     const popupHeight = Math.min(500, h - 120);
     const popupX = (w - popupWidth) / 2;
     const popupY = (h - popupHeight) / 2;
@@ -4081,27 +4158,30 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         ctx.fillText(line, popupX + popupWidth / 2, popupY + 120 + i * 34);
       });
     } else {
-      // Loop 2+: Show NAME/DEBT columns
+      // Loop 2+: Show NAME/DEBT columns - 25/75 split for short names and long debt text
       ctx.font = `bold 18px ${this.uiFont}`;
       ctx.textAlign = 'left';
       ctx.fillStyle = '#6B5344';
-      ctx.fillText('NAME', popupX + 40, popupY + 110);
-      ctx.fillText('DEBT', popupX + popupWidth * 0.55, popupY + 110);
+      ctx.fillText('NAME', popupX + 30, popupY + 110);
+      ctx.fillText('DEBT', popupX + popupWidth * 0.22, popupY + 110);
       
-      // Column divider
+      // Column divider - positioned at 18% to give debt column most of the space
       ctx.beginPath();
-      ctx.moveTo(popupX + popupWidth * 0.5, popupY + 85);
-      ctx.lineTo(popupX + popupWidth * 0.5, popupY + popupHeight - 60);
+      ctx.moveTo(popupX + popupWidth * 0.18, popupY + 85);
+      ctx.lineTo(popupX + popupWidth * 0.18, popupY + popupHeight - 60);
       ctx.stroke();
       
-      // Ledger entries
+      // Ledger entries - name column is narrow, debt column gets most space
       ctx.font = `16px ${this.uiFont}`;
       ctx.fillStyle = '#5D4837';
       
       this.state.ledgerEntries.forEach((entry, i) => {
         const entryY = popupY + 145 + i * 30;
-        ctx.fillText(entry.name, popupX + 40, entryY);
-        ctx.fillText(entry.debt, popupX + popupWidth * 0.55, entryY);
+        ctx.fillText(entry.name, popupX + 30, entryY);
+        // Debt text with slightly smaller font to ensure it fits
+        ctx.font = `15px ${this.uiFont}`;
+        ctx.fillText(entry.debt, popupX + popupWidth * 0.22, entryY);
+        ctx.font = `16px ${this.uiFont}`;
       });
       
       // Empty state message
@@ -4463,22 +4543,28 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     {
       question: "Why was the Stone-worker angry?",
       options: ["A: He forgot the deal", "B: He didn't like fish"],
-      correct: 0
+      correct: 0,
+      explanation: "Without a written record, memories can differ. The Stone-worker genuinely believed a different amount was promised."
     },
     {
       question: "What is the main benefit of the Stone Ledger?",
       options: ["A: It's pretty", "B: It is a shared, immutable record"],
-      correct: 1
+      correct: 1,
+      explanation: "The Stone Tablet creates an unchangeable, shared record that everyone can verify - no need to trust anyone's memory."
     },
     {
       question: "Why did the Woodcutter trust you at the end?",
       options: ["A: Because the debt was recorded publicly", "B: Because he is nice"],
-      correct: 0
+      correct: 0,
+      explanation: "The public record on the Stone Tablet meant neither party had to rely on trust alone - the truth was carved in stone for all to see."
     }
   ];
 
   private currentQuizQuestion: number = 0;
   private quizButtonAreas: { x: number; y: number; w: number; h: number; option: number }[] = [];
+  private showQuizFeedback: boolean = false;
+  private quizWrongAnswers: { questionIndex: number; playerAnswer: number }[] = [];
+  private quizFeedbackScrollOffset: number = 0;
 
   private drawQuizOverlay(ctx: CanvasRenderingContext2D): void {
     const w = this.canvas.width;
@@ -4567,6 +4653,40 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private handleQuizTouch(x: number, y: number): void {
+    // If showing feedback, check for retry and navigation buttons
+    if (this.showQuizFeedback) {
+      // Check retry button
+      if (this.retryQuizButton) {
+        const btn = this.retryQuizButton;
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          // Reset quiz for retry
+          this.showQuizFeedback = false;
+          this.quizWrongAnswers = [];
+          this.currentQuizQuestion = 0;
+          this.state.quizAnswers = [];
+          this.quizFeedbackScrollOffset = 0;
+          return;
+        }
+      }
+      // Check prev button
+      if (this.prevFeedbackButton) {
+        const btn = this.prevFeedbackButton;
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          this.quizFeedbackScrollOffset = Math.max(0, this.quizFeedbackScrollOffset - 1);
+          return;
+        }
+      }
+      // Check next button
+      if (this.nextFeedbackButton) {
+        const btn = this.nextFeedbackButton;
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          this.quizFeedbackScrollOffset = Math.min(this.quizWrongAnswers.length - 1, this.quizFeedbackScrollOffset + 1);
+          return;
+        }
+      }
+      return;
+    }
+    
     for (const btn of this.quizButtonAreas) {
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.state.quizAnswers.push(btn.option);
@@ -4574,14 +4694,208 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         if (this.currentQuizQuestion < this.quizQuestions.length - 1) {
           this.currentQuizQuestion++;
         } else {
-          // Quiz complete
-          this.state.showQuiz = false;
-          this.state.showSuccess = true;
-          this.state.phase = 'complete';
+          // Quiz complete - check for wrong answers
+          this.quizWrongAnswers = [];
+          this.state.quizAnswers.forEach((answer, i) => {
+            if (answer !== this.quizQuestions[i].correct) {
+              this.quizWrongAnswers.push({ questionIndex: i, playerAnswer: answer });
+            }
+          });
+          
+          if (this.quizWrongAnswers.length > 0) {
+            // Show feedback for wrong answers
+            this.showQuizFeedback = true;
+          } else {
+            // All correct - show success
+            this.state.showQuiz = false;
+            this.state.showSuccess = true;
+            this.state.phase = 'complete';
+          }
         }
         break;
       }
     }
+  }
+  
+  private retryQuizButton: { x: number; y: number; w: number; h: number } | null = null;
+  
+  private drawQuizFeedback(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    
+    // Dark overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.fillRect(0, 0, w, h);
+    
+    // Feedback card - taller for explanations
+    const cardW = Math.min(650, w - 40);
+    const cardH = Math.min(520, h - 60);
+    const cardX = (w - cardW) / 2;
+    const cardY = (h - cardH) / 2;
+    
+    // Card background
+    ctx.fillStyle = '#C9B896';
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    
+    // Title
+    ctx.font = `16px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#DC2626';
+    ctx.fillText('NOT QUITE RIGHT...', w / 2, cardY + 40);
+    
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = '#3D2914';
+    ctx.fillText(`You got ${this.quizQuestions.length - this.quizWrongAnswers.length} of ${this.quizQuestions.length} correct. Let's review:`, w / 2, cardY + 65);
+    
+    // Content area with clipping to prevent overflow
+    const contentTop = cardY + 85;
+    const contentBottom = cardY + cardH - 75;
+    const contentHeight = contentBottom - contentTop;
+    const maxWidth = cardW - 60;
+    
+    // Save context and set clip region
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(cardX + 20, contentTop, cardW - 40, contentHeight);
+    ctx.clip();
+    
+    // Draw wrong answers with explanations (only first one to avoid overflow)
+    // Show one wrong answer at a time with compact layout
+    const wrongIdx = Math.min(this.quizFeedbackScrollOffset, this.quizWrongAnswers.length - 1);
+    const wrong = this.quizWrongAnswers[wrongIdx];
+    const q = this.quizQuestions[wrong.questionIndex];
+    
+    let yOffset = contentTop + 10;
+    
+    // Question number and navigation hint
+    ctx.font = `bold 10px ${this.retroFont}`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#8B4513';
+    const navText = this.quizWrongAnswers.length > 1 
+      ? `Question ${wrong.questionIndex + 1} (${wrongIdx + 1} of ${this.quizWrongAnswers.length} wrong):`
+      : `Question ${wrong.questionIndex + 1}:`;
+    ctx.fillText(navText, cardX + 30, yOffset);
+    yOffset += 22;
+    
+    // The question
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = '#3D2914';
+    const questionLines = this.wrapText(ctx, q.question, maxWidth);
+    questionLines.forEach(line => {
+      ctx.fillText(line, cardX + 30, yOffset);
+      yOffset += 18;
+    });
+    yOffset += 5;
+    
+    // Your answer (wrong)
+    ctx.fillStyle = '#DC2626';
+    ctx.fillText(`Your answer: ${q.options[wrong.playerAnswer]}`, cardX + 30, yOffset);
+    yOffset += 22;
+    
+    // Correct answer
+    ctx.fillStyle = '#22C55E';
+    ctx.fillText(`Correct: ${q.options[q.correct]}`, cardX + 30, yOffset);
+    yOffset += 25;
+    
+    // Explanation with more room
+    ctx.font = `italic 10px ${this.retroFont}`;
+    ctx.fillStyle = '#5D4837';
+    const explanationLines = this.wrapText(ctx, q.explanation, maxWidth);
+    explanationLines.forEach(line => {
+      ctx.fillText(line, cardX + 30, yOffset);
+      yOffset += 18;
+    });
+    
+    ctx.restore();
+    
+    // Navigation buttons if multiple wrong answers
+    if (this.quizWrongAnswers.length > 1) {
+      const navBtnW = 80;
+      const navBtnH = 30;
+      const navY = cardY + cardH - 110;
+      
+      // Previous button
+      if (this.quizFeedbackScrollOffset > 0) {
+        const prevX = cardX + 30;
+        ctx.fillStyle = '#6B7280';
+        ctx.beginPath();
+        ctx.roundRect(prevX, navY, navBtnW, navBtnH, 6);
+        ctx.fill();
+        ctx.font = `10px ${this.retroFont}`;
+        ctx.fillStyle = '#FFF';
+        ctx.textAlign = 'center';
+        ctx.fillText('< PREV', prevX + navBtnW / 2, navY + navBtnH / 2 + 4);
+        this.prevFeedbackButton = { x: prevX, y: navY, w: navBtnW, h: navBtnH };
+      } else {
+        this.prevFeedbackButton = null;
+      }
+      
+      // Next button
+      if (this.quizFeedbackScrollOffset < this.quizWrongAnswers.length - 1) {
+        const nextX = cardX + cardW - 30 - navBtnW;
+        ctx.fillStyle = '#6B7280';
+        ctx.beginPath();
+        ctx.roundRect(nextX, navY, navBtnW, navBtnH, 6);
+        ctx.fill();
+        ctx.font = `10px ${this.retroFont}`;
+        ctx.fillStyle = '#FFF';
+        ctx.textAlign = 'center';
+        ctx.fillText('NEXT >', nextX + navBtnW / 2, navY + navBtnH / 2 + 4);
+        this.nextFeedbackButton = { x: nextX, y: navY, w: navBtnW, h: navBtnH };
+      } else {
+        this.nextFeedbackButton = null;
+      }
+    } else {
+      this.prevFeedbackButton = null;
+      this.nextFeedbackButton = null;
+    }
+    
+    // Try Again button
+    const btnW = 180;
+    const btnH = 45;
+    const btnX = (w - btnW) / 2;
+    const btnY = cardY + cardH - 60;
+    
+    ctx.fillStyle = '#3B82F6';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#1D4ED8';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.font = `12px ${this.retroFont}`;
+    ctx.fillStyle = '#FFF';
+    ctx.textAlign = 'center';
+    ctx.fillText('TRY AGAIN', w / 2, btnY + btnH / 2 + 4);
+    
+    this.retryQuizButton = { x: btnX, y: btnY, w: btnW, h: btnH };
+  }
+  
+  private prevFeedbackButton: { x: number; y: number; w: number; h: number } | null = null;
+  private nextFeedbackButton: { x: number; y: number; w: number; h: number } | null = null;
+  
+  private wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+    
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines;
   }
 
   private drawSuccessScreen(ctx: CanvasRenderingContext2D): void {
@@ -4715,6 +5029,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       thunderstormTimer: 0,
       showCloudsAnimation: false,
       cloudsAnimationTimer: 0,
+      showRainfall: false,
+      rainfallTimer: 0,
       playerEnteredHut: false,
       showStoneTabletPopup: false,
       showChoice: false,
@@ -4791,6 +5107,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       thunderstormTimer: 0,
       showCloudsAnimation: false,
       cloudsAnimationTimer: 0,
+      showRainfall: false,
+      rainfallTimer: 0,
       playerEnteredHut: false,
       showStoneTabletPopup: false,
       showChoice: false,

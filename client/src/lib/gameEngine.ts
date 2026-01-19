@@ -726,7 +726,7 @@ export class VillageLedgerGame {
     // LOOP 2 SUCCESS: Debts settled, time to return home
     if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && !this.state.showCloudsAnimation && !this.state.showNightTransition && !this.state.showSuccess && !this.state.playerEnteredHut) {
       
-      // If roof needs fixing, fix it first, then trigger clouds
+      // If roof needs fixing, fix it first, then trigger clouds after buffer
       if (!this.state.roofRepaired && hasWood) {
         this.queueDialogue([
           {
@@ -737,21 +737,26 @@ export class VillageLedgerGame {
               this.state.inventory.wood = 0;
               this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
               this.setMood('happy');
-              // After roof is fixed, trigger return home sequence
-              this.triggerReturnHomeSequence();
+              // After roof is fixed, add 3 second buffer before storm clouds
+              setTimeout(() => {
+                this.triggerReturnHomeSequence();
+              }, 3000);
             }
           }
         ]);
         return;
       }
       
-      // Roof already fixed or somehow no wood - trigger return home sequence directly
+      // Roof already fixed - show brief dialogue, then trigger return home sequence with buffer
       this.queueDialogue([
         {
           speaker: 'YOU',
           text: "Safe inside! The storm can come now.",
           onComplete: () => {
-            this.triggerReturnHomeSequence();
+            // 3 second buffer before storm clouds roll in
+            setTimeout(() => {
+              this.triggerReturnHomeSequence();
+            }, 3000);
           }
         }
       ]);
@@ -1145,14 +1150,24 @@ export class VillageLedgerGame {
         return;
       }
       
-      // If already settled, just confirm
+      // If already settled, check if player should go home
       if (this.state.woodcutterSettled) {
-        this.queueDialogue([
-          {
-            speaker: 'WOODCUTTER',
-            text: "We're all settled! Thanks for being honest."
-          }
-        ]);
+        if (this.state.stoneWorkerSettled) {
+          // Both debts settled - remind to go home
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "All debts are settled! You should hurry home and fix your roof before the storm!"
+            }
+          ]);
+        } else {
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "We're all settled! Thanks for being honest."
+            }
+          ]);
+        }
         return;
       }
       
@@ -1205,12 +1220,27 @@ export class VillageLedgerGame {
       
       // If Elder verified (directly or via tablet), NPC accepts payment without dispute
       if (this.state.elderVerified) {
-        // Accept the fair amount
+        // Check if player has both stone and fish for payment
+        const hasStone = this.state.inventory.stone >= 1;
+        const hasFish = this.state.inventory.fish >= 1;
+        
+        if (!hasStone || !hasFish) {
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: `You still need to bring me ${!hasStone ? '1 Stone' : ''}${!hasStone && !hasFish ? ' and ' : ''}${!hasFish ? '1 Fish' : ''} as recorded on the Tablet.`
+            }
+          ]);
+          return;
+        }
+        
+        // Accept the fair amount - take both stone and fish
+        this.state.inventory.stone -= 1;
         this.state.inventory.fish -= 1;
         this.setMood('happy');
         const verificationText = this.state.woodcutterDebtRecorded 
-          ? "The Tablet shows the true record - 1 Fish it is. Thank you!"
-          : "The Elder confirmed the true amount - 1 Fish it is. Thank you!";
+          ? "The Tablet shows the true record - 1 Stone + 1 Fish. Thank you!"
+          : "The Elder confirmed the true amount - 1 Stone + 1 Fish. Thank you!";
         this.queueDialogue([
           {
             speaker: 'WOODCUTTER',
@@ -1433,14 +1463,24 @@ export class VillageLedgerGame {
     }
     // Loop 2: Direct settlement attempt - NPC always disputes first
     else if (phase === 'loop2_got_fish' || phase === 'loop2_verify_at_tablet') {
-      // If already settled, just confirm
+      // If already settled, check if player should go home
       if (this.state.stoneWorkerSettled) {
-        this.queueDialogue([
-          {
-            speaker: 'STONE-WORKER',
-            text: "We're all settled! Thanks for being honest."
-          }
-        ]);
+        if (this.state.woodcutterSettled) {
+          // Both debts settled - remind to go home
+          this.queueDialogue([
+            {
+              speaker: 'STONE-WORKER',
+              text: "All debts are settled! You should hurry home and fix your roof before the storm!"
+            }
+          ]);
+        } else {
+          this.queueDialogue([
+            {
+              speaker: 'STONE-WORKER',
+              text: "We're all settled! Thanks for being honest."
+            }
+          ]);
+        }
         return;
       }
       
@@ -2842,8 +2882,17 @@ export class VillageLedgerGame {
   // Check if all debts have been settled directly with NPCs
   private checkAllDebtsSettled(): void {
     if (this.state.woodcutterSettled && this.state.stoneWorkerSettled) {
-      // Both NPCs have been paid directly
+      // Both NPCs have been paid directly - Elder walks toward player to congratulate
+      this.villageElder.targetX = this.player.x + 50; // Elder walks toward player
       this.setMood('happy');
+      
+      // Update any VERIFIED or OWED entries to SETTLED
+      this.state.ledgerEntries = this.state.ledgerEntries.map(e => ({
+        ...e,
+        debt: e.debt.replace('OWED', 'SETTLED').replace('VERIFIED', 'SETTLED')
+      }));
+      this.hudGlow = 1;
+      
       this.queueDialogue([
         {
           speaker: 'YOU',
@@ -3960,7 +4009,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillRect(0, 0, w, h);
     
     // Popup dimensions - larger than HUD for readability, wide enough for full debt text
-    const popupWidth = Math.min(620, w - 40);
+    // Loop 2 needs wider popup for longer debt text
+    const isLoop2OrLater = this.state.loop >= 2;
+    const popupWidth = Math.min(isLoop2OrLater ? 720 : 620, w - 40);
     const popupHeight = Math.min(500, h - 120);
     const popupX = (w - popupWidth) / 2;
     const popupY = (h - popupHeight) / 2;
@@ -3997,8 +4048,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const isLoop1 = this.state.loop === 1;
     
     if (isLoop1) {
-      // Display elder wisdom about trustless verification
-      ctx.font = `italic 16px ${this.uiFont}`;
+      // Display elder wisdom about trustless verification - larger text to match HUD proportions
+      ctx.font = `italic 20px ${this.uiFont}`;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#5D4837';
       
@@ -4013,7 +4064,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ];
       
       wisdomLines.forEach((line, i) => {
-        ctx.fillText(line, popupX + popupWidth / 2, popupY + 110 + i * 28);
+        ctx.fillText(line, popupX + popupWidth / 2, popupY + 120 + i * 34);
       });
     } else {
       // Loop 2+: Show NAME/DEBT columns
@@ -4149,6 +4200,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         'FISHERMAN': { bg: '#F97316', outline: '#C2410C' },
         'VILLAGE ELDER': { bg: '#F8FAFC', outline: '#64748B' },
         'YOU': { bg: '#3B82F6', outline: '#FFFFFF' },
+        'STONE TABLET': { bg: '#A0826D', outline: '#6B5344' },
       };
       
       const colors = speakerColors[this.state.currentDialogue.speaker] || { bg: '#6B7280', outline: '#374151' };
@@ -4162,10 +4214,29 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fill();
       ctx.stroke();
       
-      // Draw simple face on portrait
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-      ctx.fillRect(portraitX + 15, portraitY + 18, 10, 10); // Left eye
-      ctx.fillRect(portraitX + portraitSize - 25, portraitY + 18, 10, 10); // Right eye
+      // Draw speaker-specific icon on portrait
+      if (this.state.currentDialogue.speaker === 'STONE TABLET') {
+        // Draw tablet icon instead of face
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        // Tablet shape
+        ctx.fillRect(portraitX + 15, portraitY + 10, 30, 40);
+        // Lines on tablet representing text
+        ctx.strokeStyle = colors.outline;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(portraitX + 20, portraitY + 20);
+        ctx.lineTo(portraitX + 40, portraitY + 20);
+        ctx.moveTo(portraitX + 20, portraitY + 30);
+        ctx.lineTo(portraitX + 40, portraitY + 30);
+        ctx.moveTo(portraitX + 20, portraitY + 40);
+        ctx.lineTo(portraitX + 35, portraitY + 40);
+        ctx.stroke();
+      } else {
+        // Draw simple face on portrait for NPC speakers
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fillRect(portraitX + 15, portraitY + 18, 10, 10); // Left eye
+        ctx.fillRect(portraitX + portraitSize - 25, portraitY + 18, 10, 10); // Right eye
+      }
       
       // Speaker name - using retro font at proper size (16px per guidelines)
       ctx.font = `16px ${this.retroFont}`;
@@ -4249,7 +4320,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           hint = 'Go to the Stone Tablet to verify the disputed debt...';
           break;
         case 'loop2_return':
-          hint = 'Return to the Woodcutter...';
+          hint = 'Return home to fix your roof before the storm!';
           break;
         case 'confrontation':
         case 'brawl':

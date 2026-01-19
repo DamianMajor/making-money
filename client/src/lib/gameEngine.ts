@@ -5415,12 +5415,18 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.fisherman.x = this.fisherman.originalX || 3175;
     this.fisherman.targetX = undefined;
     
+    // Resume ambient music
+    soundManager.fadeIn('ambientVillage', 1000);
+    
     // Trigger intro again
     setTimeout(() => this.triggerIntro(), 500);
   }
 
   // Start Loop 2 after fail screen
   private startLoop2(): void {
+    // Resume ambient music if it was stopped
+    soundManager.fadeIn('ambientVillage', 1000);
+    
     this.player.x = 100;
     this.state = {
       phase: 'loop2_intro',

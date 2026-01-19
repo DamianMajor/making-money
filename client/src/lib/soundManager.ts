@@ -43,6 +43,7 @@ export class SoundManager {
   private masterVolume: number = 1.0;
   private initialized: boolean = false;
   private pendingPlays: Set<SoundName> = new Set();
+  private fadeIntervals: Map<SoundName, NodeJS.Timeout> = new Map();
 
   constructor() {
     this.loadFromStorage();
@@ -144,9 +145,19 @@ export class SoundManager {
     audio.play().catch(() => {});
   }
 
+  private clearFadeInterval(name: SoundName): void {
+    const existing = this.fadeIntervals.get(name);
+    if (existing) {
+      clearInterval(existing);
+      this.fadeIntervals.delete(name);
+    }
+  }
+
   public fadeOut(name: SoundName, duration: number = 1000): void {
     const audio = this.sounds.get(name);
     if (!audio) return;
+    
+    this.clearFadeInterval(name);
     
     const startVolume = audio.volume;
     const steps = 20;
@@ -159,13 +170,14 @@ export class SoundManager {
       audio.volume = Math.max(0, startVolume - (volumeStep * step));
       
       if (step >= steps) {
-        clearInterval(interval);
+        this.clearFadeInterval(name);
         audio.pause();
         audio.currentTime = 0;
         const config = SOUND_CONFIGS[name];
         audio.volume = config.volume * this.masterVolume;
       }
     }, stepDuration);
+    this.fadeIntervals.set(name, interval);
   }
 
   public fadeIn(name: SoundName, duration: number = 1000): void {
@@ -173,6 +185,8 @@ export class SoundManager {
     
     const audio = this.sounds.get(name);
     if (!audio) return;
+    
+    this.clearFadeInterval(name);
     
     const config = SOUND_CONFIGS[name];
     const targetVolume = config.volume * this.masterVolume;
@@ -190,9 +204,10 @@ export class SoundManager {
       audio.volume = Math.min(targetVolume, volumeStep * step);
       
       if (step >= steps) {
-        clearInterval(interval);
+        this.clearFadeInterval(name);
       }
     }, stepDuration);
+    this.fadeIntervals.set(name, interval);
   }
 
   public setMuted(muted: boolean): void {

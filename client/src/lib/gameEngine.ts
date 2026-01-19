@@ -185,6 +185,10 @@ export class VillageLedgerGame {
   // Sound mute button
   private muteButtonArea: { x: number; y: number; w: number; h: number } | null = null;
   
+  // Sound timing
+  private lastFootstepTime: number = 0;
+  private footstepInterval: number = 300;
+  
   // Auto-walk feature: player walks to clicked target and interacts
   private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush' | 'stoneTablet' | 'location'; id?: string } | null = null;
 
@@ -765,6 +769,7 @@ export class VillageLedgerGame {
             speaker: 'YOU',
             text: "Just in time! Let me fix my roof before the storm hits!",
             onComplete: () => {
+              soundManager.play('roofHammer');
               this.state.roofRepaired = true;
               this.state.inventory.wood = 0;
               this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
@@ -825,6 +830,7 @@ export class VillageLedgerGame {
         speaker: 'YOU',
         text: "I'll use this wood to fix the hole in my roof!",
         onComplete: () => {
+          soundManager.play('roofHammer');
           this.state.roofRepaired = true;
           this.state.inventory.wood = 0;
           this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
@@ -863,6 +869,8 @@ export class VillageLedgerGame {
     // Start dark clouds animation (2.5 seconds)
     this.state.showCloudsAnimation = true;
     this.state.cloudsAnimationTimer = 0;
+    soundManager.fadeOut('ambientVillage', 1000);
+    soundManager.play('thunder');
     
     // Sequence: clouds 2.5s → rainfall 3s → night transition 3s → quiz
     setTimeout(() => {
@@ -871,6 +879,7 @@ export class VillageLedgerGame {
         // Start rainfall animation
         this.state.showRainfall = true;
         this.state.rainfallTimer = 0;
+        soundManager.fadeIn('rain', 500);
         
         setTimeout(() => {
           try {
@@ -882,6 +891,7 @@ export class VillageLedgerGame {
             setTimeout(() => {
               try {
                 this.state.showRainfall = false; // Now turn off rain
+                soundManager.fadeOut('rain', 1000);
                 this.state.showNightTransition = false;
                 this.state.showQuiz = true;
                 this.state.phase = 'quiz';
@@ -1082,6 +1092,7 @@ export class VillageLedgerGame {
               this.state.phase = 'loop2_got_wood';
               this.state.escortingNPC = null;
               if (recorded) {
+                soundManager.play('stoneCarve');
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
                 this.state.showHUD = true;
                 this.hudGlow = 1;
@@ -1182,6 +1193,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.play('brawl');
               }
             }
           ]);
@@ -1257,6 +1269,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.play('brawl');
               }
             }
           ]);
@@ -1432,6 +1445,7 @@ export class VillageLedgerGame {
               this.state.phase = 'loop2_got_stone';
               this.state.escortingNPC = null;
               if (recorded) {
+                soundManager.play('stoneCarve');
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
                 this.hudGlow = 1;
               }
@@ -1570,6 +1584,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.play('brawl');
               }
             }
           ]);
@@ -1597,6 +1612,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.play('brawl');
               }
             }
           ]);
@@ -1864,6 +1880,7 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
+              soundManager.play('brawl');
             }
           }
         ]);
@@ -1912,6 +1929,7 @@ export class VillageLedgerGame {
                 this.state.phase = 'loop2_return';
                 this.state.showCelebration = true;
                 this.state.celebrationTimer = 0;
+                soundManager.play('celebration');
               }
             }
           ]);
@@ -1981,6 +1999,7 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
+              soundManager.play('brawl');
             }
           }
         );
@@ -2008,6 +2027,7 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
+              soundManager.play('brawl');
             }
           }
         );
@@ -2035,6 +2055,7 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
+              soundManager.play('brawl');
             }
           }
         );
@@ -2130,6 +2151,7 @@ export class VillageLedgerGame {
               try {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.play('brawl');
               } catch (e) {
                 console.error('Error triggering brawl:', e);
               }
@@ -2177,6 +2199,7 @@ export class VillageLedgerGame {
                     this.villageElder.targetX = this.villageCenterX + 200;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
+                    soundManager.play('brawl');
                   }
                 }
               ]);
@@ -2247,6 +2270,7 @@ export class VillageLedgerGame {
               try {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.play('brawl');
               } catch (e) {
                 console.error('Error triggering brawl:', e);
               }
@@ -2294,6 +2318,7 @@ export class VillageLedgerGame {
                     this.villageElder.targetX = this.villageCenterX + 200;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
+                    soundManager.play('brawl');
                   }
                 }
               ]);
@@ -2319,6 +2344,7 @@ export class VillageLedgerGame {
   }
 
   private advanceDialogue(): void {
+    soundManager.play('dialogueAdvance');
     if (this.state.currentDialogue?.onComplete) {
       try {
         this.state.currentDialogue.onComplete();
@@ -2352,6 +2378,7 @@ export class VillageLedgerGame {
   }
 
   private showInventoryPopup(text: string): void {
+    soundManager.play('itemPickup');
     this.inventoryPopup = {
       text,
       timer: 2,
@@ -2433,6 +2460,7 @@ export class VillageLedgerGame {
   public start(): void {
     this.lastTime = performance.now();
     this.gameLoop();
+    soundManager.play('ambientVillage');
   }
 
   public stop(): void {
@@ -2440,6 +2468,7 @@ export class VillageLedgerGame {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }
+    soundManager.stopAll();
   }
 
   private gameLoop(): void {
@@ -2487,6 +2516,13 @@ export class VillageLedgerGame {
         this.player.x += Math.sign(dx) * this.playerSpeed * dt;
         this.player.x = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, this.player.x));
         this.player.bobOffset = Math.sin(this.bobTimer) * 3;
+        
+        // Play footstep sounds (throttled)
+        const now = performance.now();
+        if (now - this.lastFootstepTime > this.footstepInterval) {
+          soundManager.play('footstep');
+          this.lastFootstepTime = now;
+        }
       }
     }
     // Regular player movement (manual touch controls)
@@ -2496,6 +2532,13 @@ export class VillageLedgerGame {
 
       // Update player bob
       this.player.bobOffset = Math.sin(this.bobTimer) * 3;
+      
+      // Play footstep sounds (throttled)
+      const now = performance.now();
+      if (now - this.lastFootstepTime > this.footstepInterval) {
+        soundManager.play('footstep');
+        this.lastFootstepTime = now;
+      }
     } else {
       // Subtle idle animation
       this.player.bobOffset = Math.sin(this.bobTimer * 0.5) * 1;
@@ -2829,6 +2872,7 @@ export class VillageLedgerGame {
           this.state.phase = 'brawl';
           this.state.showBrawl = true;
           this.state.brawlTimer = 0;
+          soundManager.play('brawl');
         }
       }
     ]);
@@ -2924,6 +2968,7 @@ export class VillageLedgerGame {
         this.state.phase = 'brawl';
         this.state.showBrawl = true;
         this.state.brawlTimer = 0;
+        soundManager.play('brawl');
       }
     });
     
@@ -2962,6 +3007,7 @@ export class VillageLedgerGame {
         onComplete: () => {
           this.state.showCelebration = true;
           this.state.celebrationTimer = 0;
+          soundManager.play('celebration');
         }
       },
       {
@@ -3737,6 +3783,7 @@ export class VillageLedgerGame {
   private handleChoiceTouch(x: number, y: number): void {
     for (const btn of this.choiceButtonAreas) {
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.play('choiceSelect');
         const option = this.state.choiceOptions[btn.index];
         if (option && option.action) {
           option.action();
@@ -4802,6 +4849,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     for (const btn of this.quizButtonAreas) {
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.state.quizAnswers.push(btn.option);
+        soundManager.play('choiceSelect');
         
         if (this.currentQuizQuestion < this.quizQuestions.length - 1) {
           this.currentQuizQuestion++;
@@ -4817,8 +4865,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           if (this.quizWrongAnswers.length > 0) {
             // Show feedback for wrong answers (with retry)
             this.showQuizFeedback = true;
+            soundManager.play('quizWrong');
           } else {
             // All correct - show quiz review before success
+            soundManager.play('quizCorrect');
             this.state.showQuiz = false;
             this.state.showQuizReview = true;
             this.quizReviewScrollOffset = 0;

@@ -98,6 +98,7 @@ interface GameState {
   quizAnswers: number[];
   showQuiz: boolean;
   showSuccess: boolean;
+  showQuizReview: boolean; // Post-quiz review of all answers
   showFail: boolean;
   showBrawl: boolean;
   brawlTimer: number;
@@ -339,6 +340,7 @@ export class VillageLedgerGame {
       quizAnswers: [],
       showQuiz: false,
       showSuccess: false,
+      showQuizReview: false,
       showFail: false,
       showBrawl: false,
       brawlTimer: 0,
@@ -506,6 +508,12 @@ export class VillageLedgerGame {
     // Handle quiz touches
     if (this.state.showQuiz) {
       this.handleQuizTouch(x, y);
+      return;
+    }
+    
+    // Handle quiz review touches
+    if (this.state.showQuizReview) {
+      this.handleQuizReviewTouch(x, y);
       return;
     }
 
@@ -849,13 +857,14 @@ export class VillageLedgerGame {
         
         setTimeout(() => {
           try {
-            this.state.showRainfall = false;
-            // Start night transition with fade
+            // Keep rainfall visible during night transition for smooth blend
+            // Start night transition with fade (rain continues)
             this.state.showNightTransition = true;
             this.state.nightTransitionTimer = 0;
             
             setTimeout(() => {
               try {
+                this.state.showRainfall = false; // Now turn off rain
                 this.state.showNightTransition = false;
                 this.state.showQuiz = true;
                 this.state.phase = 'quiz';
@@ -3066,12 +3075,12 @@ export class VillageLedgerGame {
       this.drawCloudsAnimation(ctx);
     }
     
-    // Draw rainfall animation if active
-    if (this.state.showRainfall) {
+    // Draw rainfall animation if active (but not during night transition which handles its own rain)
+    if (this.state.showRainfall && !this.state.showNightTransition) {
       this.drawRainfallAnimation(ctx);
     }
     
-    // Draw night transition animation if active
+    // Draw night transition animation if active (includes fading rain)
     if (this.state.showNightTransition) {
       this.drawNightTransition(ctx);
     }
@@ -3093,6 +3102,11 @@ export class VillageLedgerGame {
       } else {
         this.drawQuizOverlay(ctx);
       }
+    }
+
+    // Draw quiz review screen
+    if (this.state.showQuizReview) {
+      this.drawQuizReview(ctx);
     }
 
     // Draw success screen if complete
@@ -3521,11 +3535,34 @@ export class VillageLedgerGame {
     const h = this.canvas.height;
     const t = this.state.nightTransitionTimer;
     
-    // Fade from day to night over first 2 seconds
-    const fadeProgress = Math.min(1, t / 2);
-    const nightAlpha = fadeProgress * 0.7; // Max 70% dark overlay
+    // Continue rain effect during night transition (fading out)
+    if (this.state.showRainfall) {
+      const rainFade = Math.max(0, 1 - t / 2); // Fade rain over first 2 seconds
+      
+      // Rain drops animation (continuing from rainfall)
+      ctx.strokeStyle = `rgba(180, 200, 255, ${0.4 * rainFade})`;
+      ctx.lineWidth = 1.5;
+      
+      const rainDensity = Math.floor(150 * rainFade);
+      const rainT = this.state.rainfallTimer + t;
+      for (let i = 0; i < rainDensity; i++) {
+        const seed = i * 1234.5678;
+        const x = ((seed % w) + rainT * 80 * ((i % 3) + 1)) % w;
+        const baseY = ((seed * 7) % h);
+        const y = (baseY + rainT * 400 * (0.8 + (i % 5) * 0.1)) % (h + 50);
+        
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - 2, y + 15);
+        ctx.stroke();
+      }
+    }
     
-    // Draw dark overlay
+    // Fade from storm to night over first 2 seconds
+    const fadeProgress = Math.min(1, t / 2);
+    const nightAlpha = 0.85 + fadeProgress * 0.1; // Start darker (storm already dark), end at 95%
+    
+    // Draw dark overlay that increases as rain fades
     ctx.fillStyle = `rgba(10, 20, 50, ${nightAlpha})`;
     ctx.fillRect(0, 0, w, h);
     
@@ -4565,6 +4602,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private showQuizFeedback: boolean = false;
   private quizWrongAnswers: { questionIndex: number; playerAnswer: number }[] = [];
   private quizFeedbackScrollOffset: number = 0;
+  private quizReviewScrollOffset: number = 0;
 
   private drawQuizOverlay(ctx: CanvasRenderingContext2D): void {
     const w = this.canvas.width;
@@ -4703,13 +4741,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           });
           
           if (this.quizWrongAnswers.length > 0) {
-            // Show feedback for wrong answers
+            // Show feedback for wrong answers (with retry)
             this.showQuizFeedback = true;
           } else {
-            // All correct - show success
+            // All correct - show quiz review before success
             this.state.showQuiz = false;
-            this.state.showSuccess = true;
-            this.state.phase = 'complete';
+            this.state.showQuizReview = true;
+            this.quizReviewScrollOffset = 0;
           }
         }
         break;
@@ -4797,8 +4835,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillText(`Your answer: ${q.options[wrong.playerAnswer]}`, cardX + 30, yOffset);
     yOffset += 22;
     
-    // Correct answer
-    ctx.fillStyle = '#22C55E';
+    // Correct answer - darker green for readability
+    ctx.fillStyle = '#166534';
     ctx.fillText(`Correct: ${q.options[q.correct]}`, cardX + 30, yOffset);
     yOffset += 25;
     
@@ -4896,6 +4934,210 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
     if (currentLine) lines.push(currentLine);
     return lines;
+  }
+  
+  private reviewContinueButton: { x: number; y: number; w: number; h: number } | null = null;
+  private reviewPrevButton: { x: number; y: number; w: number; h: number } | null = null;
+  private reviewNextButton: { x: number; y: number; w: number; h: number } | null = null;
+  
+  private handleQuizReviewTouch(x: number, y: number): void {
+    // Check continue button
+    if (this.reviewContinueButton) {
+      const btn = this.reviewContinueButton;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.state.showQuizReview = false;
+        this.state.showSuccess = true;
+        this.state.phase = 'complete';
+        return;
+      }
+    }
+    // Check prev button
+    if (this.reviewPrevButton) {
+      const btn = this.reviewPrevButton;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.quizReviewScrollOffset = Math.max(0, this.quizReviewScrollOffset - 1);
+        return;
+      }
+    }
+    // Check next button
+    if (this.reviewNextButton) {
+      const btn = this.reviewNextButton;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.quizReviewScrollOffset = Math.min(this.quizQuestions.length - 1, this.quizReviewScrollOffset + 1);
+        return;
+      }
+    }
+  }
+  
+  private drawQuizReview(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    
+    // Dark overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.fillRect(0, 0, w, h);
+    
+    // Card dimensions
+    const cardW = Math.min(700, w - 40);
+    const cardH = Math.min(550, h - 40);
+    const cardX = (w - cardW) / 2;
+    const cardY = (h - cardH) / 2;
+    
+    // Card background - parchment style
+    ctx.fillStyle = '#E8DCC8';
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    
+    // Title
+    ctx.font = `bold 18px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#3D2914';
+    ctx.fillText('LESSON COMPLETE!', w / 2, cardY + 40);
+    
+    // Score
+    ctx.font = `12px ${this.retroFont}`;
+    ctx.fillStyle = '#5D4837';
+    ctx.fillText(`You answered all ${this.quizQuestions.length} questions correctly!`, w / 2, cardY + 65);
+    
+    // Current question display (one at a time with navigation)
+    const qIdx = this.quizReviewScrollOffset;
+    const q = this.quizQuestions[qIdx];
+    const playerAnswer = this.state.quizAnswers[qIdx];
+    const isCorrect = playerAnswer === q.correct;
+    
+    const maxWidth = cardW - 60;
+    let yOffset = cardY + 100;
+    
+    // Question counter
+    ctx.font = `bold 11px ${this.retroFont}`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#6B5344';
+    ctx.fillText(`Question ${qIdx + 1} of ${this.quizQuestions.length}:`, cardX + 30, yOffset);
+    yOffset += 22;
+    
+    // Question text
+    ctx.font = `11px ${this.retroFont}`;
+    ctx.fillStyle = '#3D2914';
+    const questionLines = this.wrapText(ctx, q.question, maxWidth);
+    questionLines.forEach(line => {
+      ctx.fillText(line, cardX + 30, yOffset);
+      yOffset += 18;
+    });
+    yOffset += 10;
+    
+    // Show all options with highlighting
+    q.options.forEach((option, optIdx) => {
+      const wasChosen = optIdx === playerAnswer;
+      const isCorrectOption = optIdx === q.correct;
+      
+      // Use darker green (#166534) for correct, red for wrong
+      if (isCorrectOption) {
+        ctx.fillStyle = '#166534'; // Darker green for readability
+        ctx.font = `bold 10px ${this.retroFont}`;
+      } else if (wasChosen && !isCorrectOption) {
+        ctx.fillStyle = '#DC2626'; // Red for wrong answer
+        ctx.font = `10px ${this.retroFont}`;
+      } else {
+        ctx.fillStyle = '#5D4837';
+        ctx.font = `10px ${this.retroFont}`;
+      }
+      
+      const prefix = isCorrectOption ? '✓ ' : wasChosen ? '✗ ' : '  ';
+      ctx.fillText(`${prefix}${option}`, cardX + 35, yOffset);
+      yOffset += 20;
+    });
+    
+    yOffset += 10;
+    
+    // Explanation
+    ctx.font = `italic 10px ${this.retroFont}`;
+    ctx.fillStyle = '#5D4837';
+    const explanationLines = this.wrapText(ctx, q.explanation, maxWidth);
+    explanationLines.forEach(line => {
+      ctx.fillText(line, cardX + 30, yOffset);
+      yOffset += 16;
+    });
+    
+    // Educational note about money (show on last question)
+    if (qIdx === this.quizQuestions.length - 1) {
+      yOffset += 15;
+      ctx.font = `bold 10px ${this.retroFont}`;
+      ctx.fillStyle = '#6B4423';
+      ctx.textAlign = 'center';
+      ctx.fillText('The Lesson of the Stone Tablet:', w / 2, yOffset);
+      yOffset += 18;
+      
+      ctx.font = `10px ${this.retroFont}`;
+      ctx.fillStyle = '#5D4837';
+      const lessonText = "Money is a system for tracking debt. When someone creates value for others, money represents what they are owed. Even today, when you work and receive payment, those dollars represent that others owe you something in return—a debt you can collect later in many forms.";
+      const lessonLines = this.wrapText(ctx, lessonText, maxWidth);
+      lessonLines.forEach(line => {
+        ctx.fillText(line, w / 2, yOffset);
+        yOffset += 16;
+      });
+    }
+    
+    // Navigation buttons
+    const navY = cardY + cardH - 110;
+    const navBtnW = 90;
+    const navBtnH = 35;
+    
+    // Prev button
+    if (qIdx > 0) {
+      const prevX = cardX + 30;
+      ctx.fillStyle = '#6B7280';
+      ctx.beginPath();
+      ctx.roundRect(prevX, navY, navBtnW, navBtnH, 6);
+      ctx.fill();
+      ctx.font = `10px ${this.retroFont}`;
+      ctx.fillStyle = '#FFF';
+      ctx.textAlign = 'center';
+      ctx.fillText('< PREV', prevX + navBtnW / 2, navY + navBtnH / 2 + 4);
+      this.reviewPrevButton = { x: prevX, y: navY, w: navBtnW, h: navBtnH };
+    } else {
+      this.reviewPrevButton = null;
+    }
+    
+    // Next button
+    if (qIdx < this.quizQuestions.length - 1) {
+      const nextX = cardX + cardW - 30 - navBtnW;
+      ctx.fillStyle = '#6B7280';
+      ctx.beginPath();
+      ctx.roundRect(nextX, navY, navBtnW, navBtnH, 6);
+      ctx.fill();
+      ctx.font = `10px ${this.retroFont}`;
+      ctx.fillStyle = '#FFF';
+      ctx.textAlign = 'center';
+      ctx.fillText('NEXT >', nextX + navBtnW / 2, navY + navBtnH / 2 + 4);
+      this.reviewNextButton = { x: nextX, y: navY, w: navBtnW, h: navBtnH };
+    } else {
+      this.reviewNextButton = null;
+    }
+    
+    // Continue button (always visible)
+    const btnW = 200;
+    const btnH = 50;
+    const btnX = (w - btnW) / 2;
+    const btnY = cardY + cardH - 60;
+    
+    ctx.fillStyle = '#166534'; // Darker green to match theme
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#14532D';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.font = `14px ${this.retroFont}`;
+    ctx.fillStyle = '#FFF';
+    ctx.textAlign = 'center';
+    ctx.fillText('CONTINUE', w / 2, btnY + btnH / 2 + 5);
+    
+    this.reviewContinueButton = { x: btnX, y: btnY, w: btnW, h: btnH };
   }
 
   private drawSuccessScreen(ctx: CanvasRenderingContext2D): void {
@@ -5018,6 +5260,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       quizAnswers: [],
       showQuiz: false,
       showSuccess: false,
+      showQuizReview: false,
       showFail: false,
       showBrawl: false,
       brawlTimer: 0,
@@ -5096,6 +5339,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       quizAnswers: [],
       showQuiz: false,
       showSuccess: false,
+      showQuizReview: false,
       showFail: false,
       showBrawl: false,
       brawlTimer: 0,

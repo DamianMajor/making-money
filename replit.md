@@ -88,7 +88,10 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - **Rainfall Animation**: New 3-second rainfall phase between clouds and night transition
 - **Storm Sequence**: clouds 2.5s → rainfall 3s → night fade 3s → quiz
 - **Quiz Wrong Answer Feedback**: Shows explanations for wrong answers with pagination, correct answers highlighted, retry button
-- **Stone Tablet Columns**: 35/65 split with smaller font for debt column to fit long text
+- **Stone Tablet Columns**: 25/75 split with 780px popup width and 15px font for debt column to fit long text
+- **Rainfall During Night Transition**: Rain continues and fades out during night transition for smooth blend
+- **Quiz Review Screen**: After correct quiz answers, shows paginated review of all questions with educational note about money as debt tracking
+- **Darker Green**: Changed correct answer highlighting from #22C55E to #166534 for better readability on light backgrounds
 
 ## External Dependencies
 

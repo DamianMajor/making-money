@@ -185,6 +185,11 @@ export class VillageLedgerGame {
   // Sound mute button
   private muteButtonArea: { x: number; y: number; w: number; h: number } | null = null;
   
+  // Inventory UI
+  private inventoryButtonArea: { x: number; y: number; w: number; h: number } | null = null;
+  private inventoryDetailPopupArea: { x: number; y: number; w: number; h: number } | null = null;
+  private showInventoryDetailPopup: boolean = false;
+  
   // Sound timing
   private lastFootstepTime: number = 0;
   private footstepInterval: number = 300;
@@ -484,11 +489,27 @@ export class VillageLedgerGame {
       return;
     }
     
+    // Close inventory popup if clicking outside it
+    if (this.showInventoryDetailPopup) {
+      this.showInventoryDetailPopup = false;
+      return;
+    }
+    
     // Check if clicking on mute button
     if (this.muteButtonArea) {
       const btn = this.muteButtonArea;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         soundManager.toggleMute();
+        soundManager.play('buttonClick');
+        return;
+      }
+    }
+    
+    // Check if clicking on inventory HUD to open popup
+    if (this.inventoryButtonArea) {
+      const btn = this.inventoryButtonArea;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.showInventoryDetailPopup = true;
         soundManager.play('buttonClick');
         return;
       }
@@ -4356,29 +4377,32 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       xPos += iconSize + spacing + 20;
     });
     
-    // Draw mute/sound button to the left of inventory
-    const muteButtonSize = 32;
+    // Store inventory area for click detection
+    this.inventoryButtonArea = { x: panelX, y: yPos - 4, w: panelWidth, h: panelHeight };
+    
+    // Draw mute/sound button to the left of inventory (match inventory height, square)
+    const muteButtonSize = Math.round(panelHeight);
     const muteX = panelX - muteButtonSize - 12;
-    const muteY = yPos - 2;
+    const muteY = yPos - 4;
     
     this.muteButtonArea = { x: muteX, y: muteY, w: muteButtonSize, h: muteButtonSize };
     
     // Button background
     ctx.fillStyle = soundManager.isMuted() ? 'rgba(220, 38, 38, 0.85)' : 'rgba(34, 197, 94, 0.85)';
     ctx.beginPath();
-    ctx.roundRect(muteX, muteY, muteButtonSize, muteButtonSize, 6);
+    ctx.roundRect(muteX, muteY, muteButtonSize, muteButtonSize, 8);
     ctx.fill();
     ctx.strokeStyle = '#5D4837';
     ctx.lineWidth = 2;
     ctx.stroke();
     
-    // Draw speaker icon
+    // Draw speaker icon (centered in larger button)
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 2;
     
-    const iconX = muteX + 8;
-    const iconY = muteY + 10;
+    const iconX = muteX + muteButtonSize / 2 - 10;
+    const iconY = muteY + muteButtonSize / 2 - 6;
     
     // Speaker body
     ctx.beginPath();
@@ -4412,6 +4436,86 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.arc(iconX + 14, iconY + 6, 8, -0.5, 0.5);
       ctx.stroke();
     }
+    
+    // Draw inventory detail popup if open
+    if (this.showInventoryDetailPopup) {
+      this.drawInventoryDetailPopup(ctx, panelX, yPos + panelHeight + 8);
+    }
+  }
+  
+  private drawInventoryDetailPopup(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+    const popupWidth = 280;
+    const itemHeight = 50;
+    const padding = 12;
+    
+    const items = [
+      { name: 'Wood', count: this.state.inventory.wood, color: '#8B4513', desc: 'Building material from the Woodcutter' },
+      { name: 'Stone', count: this.state.inventory.stone, color: '#6B7280', desc: 'Strong material from the Stone-worker' },
+      { name: 'Fish', count: this.state.inventory.fish, color: '#3B82F6', desc: 'Fresh catch from the Fisherman' },
+      { name: 'Berries', count: this.state.inventory.berries, color: '#DC2626', desc: 'Sweet berries from the bush' }
+    ];
+    
+    const popupHeight = items.length * itemHeight + padding * 2 + 24;
+    const popupX = x + (this.inventoryButtonArea?.w || 200) / 2 - popupWidth / 2;
+    
+    // Background
+    ctx.fillStyle = 'rgba(45, 35, 28, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(popupX, y, popupWidth, popupHeight, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Title
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#F5DEB3';
+    ctx.fillText('INVENTORY', popupX + popupWidth / 2, y + 20);
+    
+    // Divider
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(popupX + padding, y + 28);
+    ctx.lineTo(popupX + popupWidth - padding, y + 28);
+    ctx.stroke();
+    
+    // Draw each item
+    let itemY = y + 36;
+    items.forEach((item) => {
+      // Icon
+      const iconSize = 32;
+      ctx.fillStyle = item.color;
+      ctx.beginPath();
+      ctx.arc(popupX + padding + iconSize / 2, itemY + itemHeight / 2, iconSize / 2 - 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#5D4837';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Name and count
+      ctx.font = `bold 14px ${this.uiFont}`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#F5DEB3';
+      ctx.fillText(`${item.name}: ${item.count}`, popupX + padding + iconSize + 10, itemY + 18);
+      
+      // Description
+      ctx.font = `italic 11px ${this.uiFont}`;
+      ctx.fillStyle = '#A09080';
+      ctx.fillText(item.desc, popupX + padding + iconSize + 10, itemY + 34);
+      
+      itemY += itemHeight;
+    });
+    
+    // Tap anywhere to close hint
+    ctx.font = `italic 10px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#706050';
+    ctx.fillText('Tap anywhere to close', popupX + popupWidth / 2, y + popupHeight - 6);
+    
+    // Store popup area for click detection
+    this.inventoryDetailPopupArea = { x: popupX, y, w: popupWidth, h: popupHeight };
   }
 
   private drawDialogueBox(ctx: CanvasRenderingContext2D): void {

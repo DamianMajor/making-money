@@ -77,6 +77,8 @@ export class SoundManager {
   private pendingPlays: Set<SoundName> = new Set();
   private footstepToggle: boolean = false;
   private brawlSources: ActiveSound[] = [];
+  private brawlTimeouts: ReturnType<typeof setTimeout>[] = [];
+  private brawlActive: boolean = false;
 
   constructor() {
     this.loadFromStorage();
@@ -245,8 +247,9 @@ export class SoundManager {
   public playBrawlWithLayers(durationMs: number): void {
     if (this.muted || !this.initialized) return;
     
-    // Stop any existing brawl sounds
+    // Stop any existing brawl sounds and clear pending timeouts
     this.stopBrawl();
+    this.brawlActive = true;
     
     // Play main brawl sound looping
     const mainBrawl = this.createSource('brawl', true);
@@ -262,23 +265,31 @@ export class SoundManager {
     
     // Play each layer with slight delay for variation
     selectedLayers.forEach((layerName, index) => {
-      setTimeout(() => {
-        if (this.muted) return;
+      const timeoutId = setTimeout(() => {
+        if (this.muted || !this.brawlActive) return;
         const layerSound = this.createSource(layerName, false);
         if (layerSound) {
           this.brawlSources.push(layerSound);
           layerSound.source.start(0);
         }
       }, index * 300); // Stagger by 300ms
+      this.brawlTimeouts.push(timeoutId);
     });
     
     // Stop all brawl sounds after duration
-    setTimeout(() => {
+    const stopTimeoutId = setTimeout(() => {
       this.stopBrawl();
     }, durationMs);
+    this.brawlTimeouts.push(stopTimeoutId);
   }
 
   public stopBrawl(): void {
+    // Clear all pending brawl timeouts
+    this.brawlTimeouts.forEach(id => clearTimeout(id));
+    this.brawlTimeouts = [];
+    this.brawlActive = false;
+    
+    // Stop all active brawl sources
     this.brawlSources.forEach(sound => {
       try {
         sound.source.stop();

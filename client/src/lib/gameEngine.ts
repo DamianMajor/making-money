@@ -489,9 +489,14 @@ export class VillageLedgerGame {
       return;
     }
     
-    // Close inventory popup if clicking outside it
-    if (this.showInventoryDetailPopup) {
-      this.showInventoryDetailPopup = false;
+    // Handle inventory popup - close only if clicking outside it
+    if (this.showInventoryDetailPopup && this.inventoryDetailPopupArea) {
+      const popup = this.inventoryDetailPopupArea;
+      if (x < popup.x || x > popup.x + popup.w || y < popup.y || y > popup.y + popup.h) {
+        this.showInventoryDetailPopup = false;
+        return;
+      }
+      // Click inside popup - just consume the click
       return;
     }
     

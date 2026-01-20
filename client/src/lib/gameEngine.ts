@@ -1127,7 +1127,7 @@ export class VillageLedgerGame {
               this.state.phase = 'loop2_got_wood';
               this.state.escortingNPC = null;
               if (recorded) {
-                soundManager.playForDuration('stoneCarve', 5000);
+                soundManager.playForDuration('stoneCarve', 2500);
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
                 this.state.showHUD = true;
                 this.hudGlow = 1;
@@ -1282,6 +1282,13 @@ export class VillageLedgerGame {
               text: "That's all 3 Fish! Debt settled.",
               onComplete: () => {
                 this.state.woodcutterSettled = true;
+                // Update ledger to SETTLED immediately
+                if (this.state.woodcutterDebtRecorded) {
+                  this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
+                    e.debt.includes('WOODCUTTER') ? { ...e, debt: e.debt.replace('OWED', 'SETTLED').replace('VERIFIED', 'SETTLED') } : e
+                  );
+                  this.hudGlow = 1;
+                }
                 if (this.state.stoneWorkerSettled) {
                   this.checkAllDebtsSettled();
                 }
@@ -1482,7 +1489,7 @@ export class VillageLedgerGame {
               this.state.phase = 'loop2_got_stone';
               this.state.escortingNPC = null;
               if (recorded) {
-                soundManager.playForDuration('stoneCarve', 5000);
+                soundManager.playForDuration('stoneCarve', 2500);
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
                 this.hudGlow = 1;
               }
@@ -1598,6 +1605,13 @@ export class VillageLedgerGame {
               text: "That's all 4 Fish! Debt settled.",
               onComplete: () => {
                 this.state.stoneWorkerSettled = true;
+                // Update ledger to SETTLED immediately
+                if (this.state.stoneWorkerDebtRecorded) {
+                  this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
+                    e.debt.includes('STONE-WORKER') ? { ...e, debt: e.debt.replace('OWED', 'SETTLED').replace('VERIFIED', 'SETTLED') } : e
+                  );
+                  this.hudGlow = 1;
+                }
                 if (this.state.woodcutterSettled) {
                   this.checkAllDebtsSettled();
                 }
@@ -2595,8 +2609,8 @@ export class VillageLedgerGame {
       this.player.bobOffset = Math.sin(this.bobTimer * 0.5) * 1;
     }
     
-    // Check if player is approaching fisherman - play fishing cast + plop sounds once
-    const nearFisherman = this.player.x > 3050 && this.player.x < 3200;
+    // Check if player is approaching fisherman - play fishing cast + plop sounds once (tripled distance)
+    const nearFisherman = this.player.x > 2850 && this.player.x < 3300;
     if (nearFisherman && !this.state.fishingSoundPlayed) {
       this.state.fishingSoundPlayed = true;
       soundManager.playFishingSequence();
@@ -2841,21 +2855,27 @@ export class VillageLedgerGame {
           this.villageElder.x += Math.sign(dx) * brawlSpeed * 0.5;
         }
       }
-      // Trigger boo sound at end of fight, then failure after boo ends
-      if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.1) {
+      // Trigger boo sound overlapping with fight end (at 3s), then failure overlaps with boo
+      if (this.state.brawlTimer > 3 && this.state.brawlTimer <= 3.1) {
         soundManager.playBooThenFailure();
+      }
+      // End brawl at 4 seconds, show fail screen
+      if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.1) {
         this.state.showBrawl = false;
         this.state.showFail = true;
         this.state.phase = 'fail';
       }
     }
     
-    // Update celebration animation timer
+    // Update celebration animation timer - confetti continues until applause stops
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
-      // Celebration lasts 3 seconds
-      if (this.state.celebrationTimer > 3) {
+      // Celebration lasts based on applause duration (approx 5 seconds)
+      const applauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
+      if (this.state.celebrationTimer > applauseDuration) {
         this.state.showCelebration = false;
+        // After celebration ends, immediately show clouds and storm approaching
+        this.triggerStormApproaching();
       }
     }
     
@@ -3069,14 +3089,81 @@ export class VillageLedgerGame {
         onComplete: () => {
           this.state.showCelebration = true;
           this.state.celebrationTimer = 0;
-          soundManager.play('celebration');
-        }
-      },
-      {
-        speaker: 'VILLAGE ELDER',
-        text: "Now return home before the storm arrives. Your roof still needs fixing!",
-        onComplete: () => {
           this.state.phase = 'loop2_return';
+          soundManager.play('celebration');
+          soundManager.play('crowdApplause');
+        }
+      }
+    ]);
+  }
+  
+  // Storm approaching after celebration - player goes home, fixes roof, enters hut, then rain
+  private triggerStormApproaching(): void {
+    this.queueDialogue([
+      {
+        speaker: 'YOU',
+        text: "The storm is approaching! I need to fix my roof and get inside!",
+        onComplete: () => {
+          // Start clouds animation immediately
+          this.state.showCloudsAnimation = true;
+          this.state.cloudsAnimationTimer = 0;
+          soundManager.fadeOut('backgroundMusicDay', 1000);
+          soundManager.fadeOut('backgroundMusicDay2', 1000);
+          soundManager.stopDaytimeMusic();
+          soundManager.fadeOut('ambientVillage', 1000);
+          soundManager.play('thunder');
+          
+          // After 2.5 seconds clouds, player fixes roof and enters hut
+          setTimeout(() => {
+            try {
+              this.state.showCloudsAnimation = false;
+              // Auto-fix roof if player has wood
+              if (this.state.inventory.wood >= 1 && !this.state.roofRepaired) {
+                soundManager.play('roofHammer');
+                this.state.roofRepaired = true;
+                this.state.inventory.wood = 0;
+                this.showInventoryPopup('ROOF FIXED!');
+              }
+              
+              // Player enters hut
+              this.state.playerEnteredHut = true;
+              this.player.visible = false;
+              
+              // Start rainfall
+              this.state.showRainfall = true;
+              this.state.rainfallTimer = 0;
+              soundManager.fadeIn('rain', 500);
+              soundManager.fadeIn('ambientNight', 500);
+              
+              // Rain for 6 seconds, then night transition
+              setTimeout(() => {
+                try {
+                  this.state.showNightTransition = true;
+                  this.state.nightTransitionTimer = 0;
+                  soundManager.fadeIn('backgroundMusicNight', 2000);
+                  
+                  // After 3 second night transition, show quiz
+                  setTimeout(() => {
+                    try {
+                      this.state.showRainfall = false;
+                      soundManager.fadeOut('rain', 1000);
+                      this.state.showNightTransition = false;
+                      this.state.showQuiz = true;
+                      this.state.phase = 'quiz';
+                      this.player.visible = true;
+                      this.state.playerEnteredHut = false;
+                    } catch (e) {
+                      console.error('Error in quiz transition:', e);
+                    }
+                  }, 3000);
+                } catch (e) {
+                  console.error('Error in night transition:', e);
+                }
+              }, 6000); // 6 seconds of rain
+            } catch (e) {
+              console.error('Error in storm sequence:', e);
+            }
+          }, 2500); // 2.5 seconds clouds
         }
       }
     ]);
@@ -5218,6 +5305,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         this.state.showQuizReview = false;
         this.state.showSuccess = true;
         this.state.phase = 'complete';
+        // Fade out ambient night when quiz completes
+        soundManager.fadeOut('ambientNight', 1000);
         return;
       }
     }

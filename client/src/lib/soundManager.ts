@@ -344,21 +344,50 @@ export class SoundManager {
     const isDay2Turn = this.daytimeMusicLoopCount % 2 === 1;
     const trackName: SoundName = isDay2Turn ? 'backgroundMusicDay2' : 'backgroundMusicDay';
     
-    this.stopLoop('backgroundMusicDay');
-    this.stopLoop('backgroundMusicDay2');
+    // Stop any existing daytime music
+    const existingDay = this.activeSources.get('backgroundMusicDay');
+    const existingDay2 = this.activeSources.get('backgroundMusicDay2');
+    if (existingDay) {
+      try { existingDay.source.stop(); } catch {}
+      this.activeSources.delete('backgroundMusicDay');
+    }
+    if (existingDay2) {
+      try { existingDay2.source.stop(); } catch {}
+      this.activeSources.delete('backgroundMusicDay2');
+    }
     
     const activeSound = this.createSource(trackName, false);
-    if (!activeSound) return;
+    if (!activeSound) {
+      // If buffer not loaded yet, retry after delay
+      setTimeout(() => this.playNextDaytimeTrack(), 500);
+      return;
+    }
     
     this.activeSources.set(trackName, activeSound);
     
-    activeSound.source.onended = () => {
+    // Use both onended callback and backup timer for reliability
+    const buffer = this.buffers.get(trackName);
+    const duration = buffer ? buffer.duration * 1000 : 60000;
+    
+    let hasEnded = false;
+    const handleTrackEnd = () => {
+      if (hasEnded) return;
+      hasEnded = true;
       this.activeSources.delete(trackName);
-      if (this.daytimeMusicActive) {
+      if (this.daytimeMusicActive && !this.muted) {
         this.daytimeMusicLoopCount++;
         this.playNextDaytimeTrack();
       }
     };
+    
+    activeSound.source.onended = handleTrackEnd;
+    
+    // Backup timer in case onended doesn't fire
+    setTimeout(() => {
+      if (!hasEnded && this.daytimeMusicActive) {
+        handleTrackEnd();
+      }
+    }, duration + 100);
     
     activeSound.source.start(0);
   }
@@ -387,25 +416,26 @@ export class SoundManager {
   public playBushSequence(): void {
     if (this.muted || !this.initialized) return;
     
-    this.play('bush');
+    // Play bush sound for 1 second, then item pickup overlapping by 0.6 seconds
+    this.playForDuration('bush', 1000);
     
-    const bushBuffer = this.buffers.get('bush');
-    const delay = bushBuffer ? bushBuffer.duration * 1000 : 500;
-    
+    // Item pickup starts at 0.4 seconds (1s - 0.6s overlap)
     setTimeout(() => {
       if (!this.muted) {
         this.play('itemPickup');
       }
-    }, delay);
+    }, 400);
   }
 
   public playBooThenFailure(): void {
     if (this.muted || !this.initialized) return;
     
+    // Play boo, then failure overlapping by 1 second
     this.play('crowdBoo');
     
     const booBuffer = this.buffers.get('crowdBoo');
-    const delay = booBuffer ? booBuffer.duration * 1000 : 1500;
+    const booDuration = booBuffer ? booBuffer.duration * 1000 : 1500;
+    const delay = Math.max(0, booDuration - 1000); // Overlap by 1 second
     
     setTimeout(() => {
       if (!this.muted) {

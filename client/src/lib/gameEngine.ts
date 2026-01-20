@@ -869,7 +869,7 @@ export class VillageLedgerGame {
     // Start dark clouds animation (2.5 seconds)
     this.state.showCloudsAnimation = true;
     this.state.cloudsAnimationTimer = 0;
-    soundManager.fadeOut('ambientVillage', 1000);
+    soundManager.fadeOut('backgroundMusicDay', 1000);
     soundManager.play('thunder');
     
     // Sequence: clouds 2.5s → rainfall 3s → night transition 3s → quiz
@@ -887,6 +887,7 @@ export class VillageLedgerGame {
             // Start night transition with fade (rain continues)
             this.state.showNightTransition = true;
             this.state.nightTransitionTimer = 0;
+            soundManager.fadeIn('backgroundMusicNight', 2000);
             
             setTimeout(() => {
               try {
@@ -1193,7 +1194,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
-                soundManager.play('brawl');
+                soundManager.playBrawlWithLayers(4000);
               }
             }
           ]);
@@ -1269,7 +1270,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
-                soundManager.play('brawl');
+                soundManager.playBrawlWithLayers(4000);
               }
             }
           ]);
@@ -1584,7 +1585,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
-                soundManager.play('brawl');
+                soundManager.playBrawlWithLayers(4000);
               }
             }
           ]);
@@ -1612,7 +1613,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
-                soundManager.play('brawl');
+                soundManager.playBrawlWithLayers(4000);
               }
             }
           ]);
@@ -1880,7 +1881,7 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
-              soundManager.play('brawl');
+              soundManager.playBrawlWithLayers(4000);
             }
           }
         ]);
@@ -1999,7 +2000,7 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
-              soundManager.play('brawl');
+              soundManager.playBrawlWithLayers(4000);
             }
           }
         );
@@ -2027,7 +2028,7 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
-              soundManager.play('brawl');
+              soundManager.playBrawlWithLayers(4000);
             }
           }
         );
@@ -2055,7 +2056,7 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
-              soundManager.play('brawl');
+              soundManager.playBrawlWithLayers(4000);
             }
           }
         );
@@ -2151,7 +2152,7 @@ export class VillageLedgerGame {
               try {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
-                soundManager.play('brawl');
+                soundManager.playBrawlWithLayers(4000);
               } catch (e) {
                 console.error('Error triggering brawl:', e);
               }
@@ -2199,7 +2200,7 @@ export class VillageLedgerGame {
                     this.villageElder.targetX = this.villageCenterX + 200;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
-                    soundManager.play('brawl');
+                    soundManager.playBrawlWithLayers(4000);
                   }
                 }
               ]);
@@ -2270,7 +2271,7 @@ export class VillageLedgerGame {
               try {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
-                soundManager.play('brawl');
+                soundManager.playBrawlWithLayers(4000);
               } catch (e) {
                 console.error('Error triggering brawl:', e);
               }
@@ -2318,7 +2319,7 @@ export class VillageLedgerGame {
                     this.villageElder.targetX = this.villageCenterX + 200;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
-                    soundManager.play('brawl');
+                    soundManager.playBrawlWithLayers(4000);
                   }
                 }
               ]);
@@ -2460,7 +2461,7 @@ export class VillageLedgerGame {
   public start(): void {
     this.lastTime = performance.now();
     this.gameLoop();
-    soundManager.play('ambientVillage');
+    soundManager.playLoop('backgroundMusicDay');
   }
 
   public stop(): void {
@@ -2872,7 +2873,7 @@ export class VillageLedgerGame {
           this.state.phase = 'brawl';
           this.state.showBrawl = true;
           this.state.brawlTimer = 0;
-          soundManager.play('brawl');
+          soundManager.playBrawlWithLayers(4000);
         }
       }
     ]);
@@ -2968,7 +2969,7 @@ export class VillageLedgerGame {
         this.state.phase = 'brawl';
         this.state.showBrawl = true;
         this.state.brawlTimer = 0;
-        soundManager.play('brawl');
+        soundManager.playBrawlWithLayers(4000);
       }
     });
     
@@ -4869,6 +4870,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           } else {
             // All correct - show quiz review before success
             soundManager.play('quizCorrect');
+            soundManager.play('crowdApplause');
             this.state.showQuiz = false;
             this.state.showQuizReview = true;
             this.quizReviewScrollOffset = 0;
@@ -5416,7 +5418,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.fisherman.targetX = undefined;
     
     // Resume ambient music
-    soundManager.fadeIn('ambientVillage', 1000);
+    soundManager.stopLoop('backgroundMusicNight');
+    soundManager.fadeIn('backgroundMusicDay', 1000);
     
     // Trigger intro again
     setTimeout(() => this.triggerIntro(), 500);
@@ -5425,7 +5428,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   // Start Loop 2 after fail screen
   private startLoop2(): void {
     // Resume ambient music if it was stopped
-    soundManager.fadeIn('ambientVillage', 1000);
+    soundManager.stopLoop('backgroundMusicNight');
+    soundManager.fadeIn('backgroundMusicDay', 1000);
     
     this.player.x = 100;
     this.state = {

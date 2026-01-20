@@ -1,5 +1,6 @@
 export type SoundName = 
-  | 'footstep'
+  | 'footstepA'
+  | 'footstepB'
   | 'itemPickup'
   | 'stoneCarve'
   | 'dialogueAdvance'
@@ -21,7 +22,8 @@ interface SoundConfig {
 }
 
 const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
-  footstep: { src: '/sounds/footstep.mp3', volume: 0.3, loop: false },
+  footstepA: { src: '/sounds/footstep_a.mp3', volume: 0.3, loop: false },
+  footstepB: { src: '/sounds/footstep_b.mp3', volume: 0.3, loop: false },
   itemPickup: { src: '/sounds/item-pickup.mp3', volume: 0.5, loop: false },
   stoneCarve: { src: '/sounds/stone-carve.mp3', volume: 0.4, loop: false },
   dialogueAdvance: { src: '/sounds/dialogue-advance.mp3', volume: 0.3, loop: false },
@@ -44,6 +46,7 @@ export class SoundManager {
   private initialized: boolean = false;
   private pendingPlays: Set<SoundName> = new Set();
   private fadeIntervals: Map<SoundName, NodeJS.Timeout> = new Map();
+  private footstepToggle: boolean = false;
 
   constructor() {
     this.loadFromStorage();
@@ -119,6 +122,12 @@ export class SoundManager {
     audio.play().catch(() => {
       // Autoplay blocked - will work after user interaction
     });
+  }
+
+  public playFootstep(): void {
+    const soundName = this.footstepToggle ? 'footstepB' : 'footstepA';
+    this.footstepToggle = !this.footstepToggle;
+    this.play(soundName);
   }
 
   public stop(name: SoundName): void {

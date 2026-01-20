@@ -2520,7 +2520,7 @@ export class VillageLedgerGame {
         // Play footstep sounds (throttled)
         const now = performance.now();
         if (now - this.lastFootstepTime > this.footstepInterval) {
-          soundManager.playFootstep();
+          soundManager.play('footstep');
           this.lastFootstepTime = now;
         }
       }
@@ -2536,7 +2536,7 @@ export class VillageLedgerGame {
       // Play footstep sounds (throttled)
       const now = performance.now();
       if (now - this.lastFootstepTime > this.footstepInterval) {
-        soundManager.playFootstep();
+        soundManager.play('footstep');
         this.lastFootstepTime = now;
       }
     } else {

@@ -3,6 +3,7 @@ export type SoundName =
   | 'footstepB'
   | 'itemPickup'
   | 'stoneCarve'
+  | 'stoneLedger'
   | 'dialogueAdvance'
   | 'buttonClick'
   | 'choiceSelect'
@@ -11,6 +12,7 @@ export type SoundName =
   | 'celebration'
   | 'brawl'
   | 'ambientVillage'
+  | 'ambientNight'
   | 'rain'
   | 'thunder'
   | 'roofHammer'
@@ -42,6 +44,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   footstepB: { src: '/sounds/footstep_b.mp3', volume: 0.3, loop: false, lowPassFreq: 2500 },
   itemPickup: { src: '/sounds/item-pickup.mp3', volume: 0.5, loop: false },
   stoneCarve: { src: '/sounds/stone-carve.mp3', volume: 0.4, loop: false },
+  stoneLedger: { src: '/sounds/stone-ledger.mp3', volume: 0.5, loop: false },
   dialogueAdvance: { src: '/sounds/dialogue-advance.mp3', volume: 0.3, loop: false },
   buttonClick: { src: '/sounds/button-click.mp3', volume: 0.4, loop: false },
   choiceSelect: { src: '/sounds/choice-select.mp3', volume: 0.4, loop: false },
@@ -50,6 +53,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   celebration: { src: '/sounds/celebration.mp3', volume: 0.6, loop: false },
   brawl: { src: '/sounds/brawl.mp3', volume: 0.5, loop: false },
   ambientVillage: { src: '/sounds/ambient-village.mp3', volume: 0.2, loop: true },
+  ambientNight: { src: '/sounds/ambient-night.mp3', volume: 0.3, loop: true },
   rain: { src: '/sounds/rain.mp3', volume: 0.4, loop: true },
   thunder: { src: '/sounds/thunder.mp3', volume: 0.6, loop: false },
   roofHammer: { src: '/sounds/roof-hammer.mp3', volume: 0.4, loop: false },
@@ -336,7 +340,8 @@ export class SoundManager {
   private playNextDaytimeTrack(): void {
     if (!this.daytimeMusicActive || this.muted) return;
     
-    const isDay2Turn = this.daytimeMusicLoopCount >= 3;
+    // Alternate back-to-back: day → day2 → day → day2
+    const isDay2Turn = this.daytimeMusicLoopCount % 2 === 1;
     const trackName: SoundName = isDay2Turn ? 'backgroundMusicDay2' : 'backgroundMusicDay';
     
     this.stopLoop('backgroundMusicDay');
@@ -350,11 +355,7 @@ export class SoundManager {
     activeSound.source.onended = () => {
       this.activeSources.delete(trackName);
       if (this.daytimeMusicActive) {
-        if (isDay2Turn) {
-          this.daytimeMusicLoopCount = 0;
-        } else {
-          this.daytimeMusicLoopCount++;
-        }
+        this.daytimeMusicLoopCount++;
         this.playNextDaytimeTrack();
       }
     };
@@ -381,6 +382,41 @@ export class SoundManager {
         this.play('fishingPlop');
       }
     }, delay);
+  }
+
+  public playBushSequence(): void {
+    if (this.muted || !this.initialized) return;
+    
+    this.play('bush');
+    
+    const bushBuffer = this.buffers.get('bush');
+    const delay = bushBuffer ? bushBuffer.duration * 1000 : 500;
+    
+    setTimeout(() => {
+      if (!this.muted) {
+        this.play('itemPickup');
+      }
+    }, delay);
+  }
+
+  public playBooThenFailure(): void {
+    if (this.muted || !this.initialized) return;
+    
+    this.play('crowdBoo');
+    
+    const booBuffer = this.buffers.get('crowdBoo');
+    const delay = booBuffer ? booBuffer.duration * 1000 : 1500;
+    
+    setTimeout(() => {
+      if (!this.muted) {
+        this.play('failure');
+      }
+    }, delay);
+  }
+
+  public getBufferDuration(name: SoundName): number {
+    const buffer = this.buffers.get(name);
+    return buffer ? buffer.duration * 1000 : 1000;
   }
 
   public fadeOut(name: SoundName, duration: number = 1000): void {

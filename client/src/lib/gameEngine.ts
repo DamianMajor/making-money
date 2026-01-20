@@ -529,6 +529,7 @@ export class VillageLedgerGame {
       const hudY = 24;
       if (x >= hudX && x <= hudX + this.hudWidth && y >= hudY && y <= hudY + this.hudHeight) {
         this.state.showStoneTabletPopup = true;
+        soundManager.play('stoneLedger');
         return;
       }
     }
@@ -902,7 +903,7 @@ export class VillageLedgerGame {
     soundManager.fadeOut('ambientVillage', 1000);
     soundManager.play('thunder');
     
-    // Sequence: clouds 2.5s → rainfall 3s → night transition 3s → quiz
+    // Sequence: clouds 2.5s → rainfall 6s → night transition 3s → quiz
     setTimeout(() => {
       try {
         this.state.showCloudsAnimation = false;
@@ -910,6 +911,7 @@ export class VillageLedgerGame {
         this.state.showRainfall = true;
         this.state.rainfallTimer = 0;
         soundManager.fadeIn('rain', 500);
+        soundManager.fadeIn('ambientNight', 500); // Start ambient night sounds with storm
         
         setTimeout(() => {
           try {
@@ -924,6 +926,7 @@ export class VillageLedgerGame {
               try {
                 this.state.showRainfall = false; // Now turn off rain
                 soundManager.fadeOut('rain', 1000);
+                soundManager.fadeOut('ambientNight', 1000); // Fade out ambient night
                 this.state.showNightTransition = false;
                 this.state.showQuiz = true;
                 this.state.phase = 'quiz';
@@ -937,7 +940,7 @@ export class VillageLedgerGame {
           } catch (e) {
             console.error('Error in rainfall transition:', e);
           }
-        }, 3000); // 3 second rainfall
+        }, 6000); // 6 second rainfall (extended by 3 seconds)
       } catch (e) {
         console.error('Error in clouds transition:', e);
       }
@@ -1124,7 +1127,7 @@ export class VillageLedgerGame {
               this.state.phase = 'loop2_got_wood';
               this.state.escortingNPC = null;
               if (recorded) {
-                soundManager.playForDuration('stoneCarve', 3000);
+                soundManager.playForDuration('stoneCarve', 5000);
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
                 this.state.showHUD = true;
                 this.hudGlow = 1;
@@ -1479,7 +1482,7 @@ export class VillageLedgerGame {
               this.state.phase = 'loop2_got_stone';
               this.state.escortingNPC = null;
               if (recorded) {
-                soundManager.playForDuration('stoneCarve', 3000);
+                soundManager.playForDuration('stoneCarve', 5000);
                 this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
                 this.hudGlow = 1;
               }
@@ -1814,8 +1817,8 @@ export class VillageLedgerGame {
   // CREDIT-FIRST: Always interactable - allows player to pick up to 3 berries at any time
   // Extra berry spawns after giving in to inflated demand
   private handleBerryBushInteraction(): void {
-    // Play bush rustling sound (1 second)
-    soundManager.playForDuration('bush', 1000);
+    // Play bush rustling followed by item pickup sound
+    soundManager.playBushSequence();
     
     // Check if resources are depleted (after paying first inflated demand)
     if (this.state.resourcesDepleted) {
@@ -2838,13 +2841,9 @@ export class VillageLedgerGame {
           this.villageElder.x += Math.sign(dx) * brawlSpeed * 0.5;
         }
       }
-      // Trigger overlapping sounds as fight ends
-      // Boo starts at 3s (overlaps fight by 1s), failure starts at 4s (overlaps boo by 1s)
-      if (this.state.brawlTimer > 3 && this.state.brawlTimer <= 3.1) {
-        soundManager.play('crowdBoo');
-      }
+      // Trigger boo sound at end of fight, then failure after boo ends
       if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.1) {
-        soundManager.play('failure');
+        soundManager.playBooThenFailure();
         this.state.showBrawl = false;
         this.state.showFail = true;
         this.state.phase = 'fail';

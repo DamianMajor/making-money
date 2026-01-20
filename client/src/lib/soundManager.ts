@@ -58,7 +58,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   thunder: { src: '/sounds/thunder.mp3', volume: 0.6, loop: false },
   roofHammer: { src: '/sounds/roof-hammer.mp3', volume: 0.4, loop: false },
   backgroundMusicDay: { src: '/sounds/backgroundmusic-day.mp3', volume: 0.25, loop: false },
-  backgroundMusicDay2: { src: '/sounds/background-daytime-2.mp3', volume: 0.25, loop: false },
+  backgroundMusicDay2: { src: '/sounds/backgroundmusic-day-2.mp3', volume: 0.25, loop: false },
   backgroundMusicNight: { src: '/sounds/backgroundmusic-night.mp3', volume: 0.25, loop: true },
   crowdApplause: { src: '/sounds/crowd-applause.mp3', volume: 0.6, loop: false },
   fightCartoon: { src: '/sounds/fightcartoon.mp3', volume: 0.4, loop: false },

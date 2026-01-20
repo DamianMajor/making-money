@@ -896,6 +896,7 @@ export class VillageLedgerGame {
     this.state.showCloudsAnimation = true;
     this.state.cloudsAnimationTimer = 0;
     soundManager.fadeOut('backgroundMusicDay', 1000);
+    soundManager.fadeOut('ambientVillage', 1000);
     soundManager.play('thunder');
     
     // Sequence: clouds 2.5s → rainfall 3s → night transition 3s → quiz
@@ -913,6 +914,7 @@ export class VillageLedgerGame {
             // Start night transition with fade (rain continues)
             this.state.showNightTransition = true;
             this.state.nightTransitionTimer = 0;
+            soundManager.fadeIn('ambientVillage', 2000);
             soundManager.fadeIn('backgroundMusicNight', 2000);
             
             setTimeout(() => {
@@ -2487,6 +2489,7 @@ export class VillageLedgerGame {
   public start(): void {
     this.lastTime = performance.now();
     this.gameLoop();
+    soundManager.playLoop('ambientVillage');
     soundManager.playLoop('backgroundMusicDay');
   }
 
@@ -5526,8 +5529,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.fisherman.x = this.fisherman.originalX || 3175;
     this.fisherman.targetX = undefined;
     
-    // Resume ambient music
+    // Resume ambient music and day background
     soundManager.stopLoop('backgroundMusicNight');
+    soundManager.fadeIn('ambientVillage', 1000);
     soundManager.fadeIn('backgroundMusicDay', 1000);
     
     // Trigger intro again
@@ -5536,8 +5540,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   // Start Loop 2 after fail screen
   private startLoop2(): void {
-    // Resume ambient music if it was stopped
+    // Resume ambient music and day background if it was stopped
     soundManager.stopLoop('backgroundMusicNight');
+    soundManager.fadeIn('ambientVillage', 1000);
     soundManager.fadeIn('backgroundMusicDay', 1000);
     
     this.player.x = 100;

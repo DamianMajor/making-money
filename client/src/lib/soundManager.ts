@@ -125,9 +125,7 @@ export class SoundManager {
   }
 
   public playFootstep(): void {
-    const soundName = this.footstepToggle ? 'footstepB' : 'footstepA';
-    this.footstepToggle = !this.footstepToggle;
-    this.play(soundName);
+    this.play('footstepA');
   }
 
   public stop(name: SoundName): void {

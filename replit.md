@@ -92,6 +92,13 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - **Rainfall During Night Transition**: Rain continues and fades out during night transition for smooth blend
 - **Quiz Review Screen**: After correct quiz answers, shows paginated review of all questions with educational note about money as debt tracking
 - **Darker Green**: Changed correct answer highlighting from #22C55E to #166534 for better readability on light backgrounds
+- **Web Audio API Sound System**: Complete SoundManager rewrite using AudioContext, AudioBuffer, and GainNode for advanced audio manipulation
+- **Pitch-Varied Footsteps**: Alternating pitch (1.0 and 0.95) for natural walking sound variation
+- **Layered Brawl Audio**: playBrawlWithLayers() plays main brawl sound + 2-3 randomly selected fight layer sounds (fightcartoon, fight-cat, fightcrash, fightintro, fightmartialarts, fightyell) staggered over 4 seconds
+- **Dynamic Background Music**: backgroundMusicDay loops during daytime, fades out at storm, backgroundMusicNight fades in at night transition and loops until game restart
+- **Crowd Applause**: Plays alongside quiz-correct sound when player achieves 100% quiz score
+- **Improved Audio Button**: Resized to match inventory panel height (square button) for visual consistency
+- **Clickable Inventory Popup**: Tapping inventory HUD opens enlarged popup showing all 4 items (Wood, Stone, Fish, Berries) with colored icons, counts, and descriptions; tap anywhere outside to close
 
 ## External Dependencies
 

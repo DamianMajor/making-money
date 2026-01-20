@@ -1226,7 +1226,7 @@ export class VillageLedgerGame {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
               }
             }
           ]);
@@ -1303,7 +1303,7 @@ export class VillageLedgerGame {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
               }
             }
           ]);
@@ -1619,7 +1619,7 @@ export class VillageLedgerGame {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
               }
             }
           ]);
@@ -1648,7 +1648,7 @@ export class VillageLedgerGame {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
               }
             }
           ]);
@@ -1920,7 +1920,7 @@ export class VillageLedgerGame {
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
               soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
             }
           }
         ]);
@@ -2040,7 +2040,7 @@ export class VillageLedgerGame {
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
               soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
             }
           }
         );
@@ -2069,7 +2069,7 @@ export class VillageLedgerGame {
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
               soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
             }
           }
         );
@@ -2098,7 +2098,7 @@ export class VillageLedgerGame {
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
               soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
             }
           }
         );
@@ -2195,7 +2195,7 @@ export class VillageLedgerGame {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
               } catch (e) {
                 console.error('Error triggering brawl:', e);
               }
@@ -2244,7 +2244,7 @@ export class VillageLedgerGame {
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
                   }
                 }
               ]);
@@ -2316,7 +2316,7 @@ export class VillageLedgerGame {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
               } catch (e) {
                 console.error('Error triggering brawl:', e);
               }
@@ -2365,7 +2365,7 @@ export class VillageLedgerGame {
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
                   }
                 }
               ]);
@@ -2838,7 +2838,15 @@ export class VillageLedgerGame {
           this.villageElder.x += Math.sign(dx) * brawlSpeed * 0.5;
         }
       }
-      if (this.state.brawlTimer > 4) {
+      // Trigger overlapping sounds as fight ends
+      // Boo starts at 3s (overlaps fight by 1s), failure starts at 4s (overlaps boo by 1s), brawl ends at 5s (overlaps failure by 1s)
+      if (this.state.brawlTimer > 3 && this.state.brawlTimer <= 3.1) {
+        soundManager.play('crowdBoo');
+      }
+      if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.1) {
+        soundManager.play('failure');
+      }
+      if (this.state.brawlTimer > 5) {
         this.state.showBrawl = false;
         this.state.showFail = true;
         this.state.phase = 'fail';
@@ -2928,7 +2936,7 @@ export class VillageLedgerGame {
           this.state.showBrawl = true;
           this.state.brawlTimer = 0;
           soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
         }
       }
     ]);
@@ -3025,7 +3033,7 @@ export class VillageLedgerGame {
         this.state.showBrawl = true;
         this.state.brawlTimer = 0;
         soundManager.stopDaytimeMusic();
-                soundManager.playBrawlWithLayers(4000);
+                soundManager.playBrawlWithLayers(5000);
       }
     });
     

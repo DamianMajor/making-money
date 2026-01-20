@@ -26,7 +26,9 @@ export type SoundName =
   | 'fightYell'
   | 'bush'
   | 'fishingCast'
-  | 'fishingPlop';
+  | 'fishingPlop'
+  | 'crowdBoo'
+  | 'failure';
 
 interface SoundConfig {
   src: string;
@@ -64,6 +66,8 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   bush: { src: '/sounds/bush.mp3', volume: 0.5, loop: false },
   fishingCast: { src: '/sounds/fishing-cast.mp3', volume: 0.5, loop: false },
   fishingPlop: { src: '/sounds/fishing-plop.mp3', volume: 0.5, loop: false },
+  crowdBoo: { src: '/sounds/crowd-boo.mp3', volume: 0.5, loop: false },
+  failure: { src: '/sounds/failure.mp3', volume: 0.5, loop: false },
 };
 
 const FIGHT_LAYER_SOUNDS: SoundName[] = [

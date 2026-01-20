@@ -15,6 +15,7 @@ export type SoundName =
   | 'thunder'
   | 'roofHammer'
   | 'backgroundMusicDay'
+  | 'backgroundMusicDay2'
   | 'backgroundMusicNight'
   | 'crowdApplause'
   | 'fightCartoon'
@@ -22,17 +23,21 @@ export type SoundName =
   | 'fightCrash'
   | 'fightIntro'
   | 'fightMartialArts'
-  | 'fightYell';
+  | 'fightYell'
+  | 'bush'
+  | 'fishingCast'
+  | 'fishingPlop';
 
 interface SoundConfig {
   src: string;
   volume: number;
   loop: boolean;
+  lowPassFreq?: number;
 }
 
 const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
-  footstepA: { src: '/sounds/footstep_a.mp3', volume: 0.3, loop: false },
-  footstepB: { src: '/sounds/footstep_b.mp3', volume: 0.3, loop: false },
+  footstepA: { src: '/sounds/footstep_a.mp3', volume: 0.3, loop: false, lowPassFreq: 2500 },
+  footstepB: { src: '/sounds/footstep_b.mp3', volume: 0.3, loop: false, lowPassFreq: 2500 },
   itemPickup: { src: '/sounds/item-pickup.mp3', volume: 0.5, loop: false },
   stoneCarve: { src: '/sounds/stone-carve.mp3', volume: 0.4, loop: false },
   dialogueAdvance: { src: '/sounds/dialogue-advance.mp3', volume: 0.3, loop: false },
@@ -46,7 +51,8 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   rain: { src: '/sounds/rain.mp3', volume: 0.4, loop: true },
   thunder: { src: '/sounds/thunder.mp3', volume: 0.6, loop: false },
   roofHammer: { src: '/sounds/roof-hammer.mp3', volume: 0.4, loop: false },
-  backgroundMusicDay: { src: '/sounds/backgroundmusic-day.mp3', volume: 0.25, loop: true },
+  backgroundMusicDay: { src: '/sounds/backgroundmusic-day.mp3', volume: 0.25, loop: false },
+  backgroundMusicDay2: { src: '/sounds/background-daytime-2.mp3', volume: 0.25, loop: false },
   backgroundMusicNight: { src: '/sounds/backgroundmusic-night.mp3', volume: 0.25, loop: true },
   crowdApplause: { src: '/sounds/crowd-applause.mp3', volume: 0.6, loop: false },
   fightCartoon: { src: '/sounds/fightcartoon.mp3', volume: 0.4, loop: false },
@@ -55,6 +61,9 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   fightIntro: { src: '/sounds/fightintro.mp3', volume: 0.4, loop: false },
   fightMartialArts: { src: '/sounds/fightmartialarts.mp3', volume: 0.4, loop: false },
   fightYell: { src: '/sounds/fightyell.mp3', volume: 0.4, loop: false },
+  bush: { src: '/sounds/bush.mp3', volume: 0.5, loop: false },
+  fishingCast: { src: '/sounds/fishing-cast.mp3', volume: 0.5, loop: false },
+  fishingPlop: { src: '/sounds/fishing-plop.mp3', volume: 0.5, loop: false },
 };
 
 const FIGHT_LAYER_SOUNDS: SoundName[] = [
@@ -64,6 +73,7 @@ const FIGHT_LAYER_SOUNDS: SoundName[] = [
 interface ActiveSound {
   source: AudioBufferSourceNode;
   gainNode: GainNode;
+  filterNode?: BiquadFilterNode;
 }
 
 export class SoundManager {
@@ -79,6 +89,8 @@ export class SoundManager {
   private brawlSources: ActiveSound[] = [];
   private brawlTimeouts: ReturnType<typeof setTimeout>[] = [];
   private brawlActive: boolean = false;
+  private daytimeMusicLoopCount: number = 0;
+  private daytimeMusicActive: boolean = false;
 
   constructor() {
     this.loadFromStorage();
@@ -159,10 +171,21 @@ export class SoundManager {
     const gainNode = this.audioContext.createGain();
     gainNode.gain.value = config.volume;
     
-    source.connect(gainNode);
+    let filterNode: BiquadFilterNode | undefined;
+    
+    if (config.lowPassFreq) {
+      filterNode = this.audioContext.createBiquadFilter();
+      filterNode.type = 'lowpass';
+      filterNode.frequency.value = config.lowPassFreq;
+      filterNode.Q.value = 0.7;
+      source.connect(filterNode);
+      filterNode.connect(gainNode);
+    } else {
+      source.connect(gainNode);
+    }
     gainNode.connect(this.masterGain);
     
-    return { source, gainNode };
+    return { source, gainNode, filterNode };
   }
 
   public play(name: SoundName, pitch: number = 1.0): void {
@@ -296,6 +319,64 @@ export class SoundManager {
       } catch {}
     });
     this.brawlSources = [];
+  }
+
+  public startDaytimeMusic(): void {
+    if (this.muted || !this.initialized) return;
+    
+    this.daytimeMusicActive = true;
+    this.daytimeMusicLoopCount = 0;
+    this.playNextDaytimeTrack();
+  }
+
+  private playNextDaytimeTrack(): void {
+    if (!this.daytimeMusicActive || this.muted) return;
+    
+    const isDay2Turn = this.daytimeMusicLoopCount >= 3;
+    const trackName: SoundName = isDay2Turn ? 'backgroundMusicDay2' : 'backgroundMusicDay';
+    
+    this.stopLoop('backgroundMusicDay');
+    this.stopLoop('backgroundMusicDay2');
+    
+    const activeSound = this.createSource(trackName, false);
+    if (!activeSound) return;
+    
+    this.activeSources.set(trackName, activeSound);
+    
+    activeSound.source.onended = () => {
+      this.activeSources.delete(trackName);
+      if (this.daytimeMusicActive) {
+        if (isDay2Turn) {
+          this.daytimeMusicLoopCount = 0;
+        } else {
+          this.daytimeMusicLoopCount++;
+        }
+        this.playNextDaytimeTrack();
+      }
+    };
+    
+    activeSound.source.start(0);
+  }
+
+  public stopDaytimeMusic(): void {
+    this.daytimeMusicActive = false;
+    this.stopLoop('backgroundMusicDay');
+    this.stopLoop('backgroundMusicDay2');
+  }
+
+  public playFishingSequence(): void {
+    if (this.muted || !this.initialized) return;
+    
+    this.play('fishingCast');
+    
+    const castBuffer = this.buffers.get('fishingCast');
+    const delay = castBuffer ? castBuffer.duration * 1000 : 500;
+    
+    setTimeout(() => {
+      if (!this.muted) {
+        this.play('fishingPlop');
+      }
+    }, delay);
   }
 
   public fadeOut(name: SoundName, duration: number = 1000): void {

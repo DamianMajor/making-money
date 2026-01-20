@@ -81,6 +81,8 @@ interface GameState {
   extraFishAvailable: boolean;
   // Resources depleted after paying first inflated demand - no more extra resources available
   resourcesDepleted: boolean;
+  // Track if fishing sound was played when approaching fisherman
+  fishingSoundPlayed: boolean;
   // Track when items have been introduced (for inventory display)
   woodIntroduced: boolean;
   fishIntroduced: boolean;
@@ -336,6 +338,7 @@ export class VillageLedgerGame {
       extraBerryAvailable: false,
       extraFishAvailable: false,
       resourcesDepleted: false,
+      fishingSoundPlayed: false,
       woodIntroduced: false,
       fishIntroduced: false,
       stoneIntroduced: false,
@@ -1222,6 +1225,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.stopDaytimeMusic();
                 soundManager.playBrawlWithLayers(4000);
               }
             }
@@ -1298,6 +1302,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.stopDaytimeMusic();
                 soundManager.playBrawlWithLayers(4000);
               }
             }
@@ -1613,6 +1618,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.stopDaytimeMusic();
                 soundManager.playBrawlWithLayers(4000);
               }
             }
@@ -1641,6 +1647,7 @@ export class VillageLedgerGame {
                 this.villageElder.targetX = this.villageCenterX + 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.stopDaytimeMusic();
                 soundManager.playBrawlWithLayers(4000);
               }
             }
@@ -1807,6 +1814,9 @@ export class VillageLedgerGame {
   // CREDIT-FIRST: Always interactable - allows player to pick up to 3 berries at any time
   // Extra berry spawns after giving in to inflated demand
   private handleBerryBushInteraction(): void {
+    // Play bush rustling sound (1 second)
+    soundManager.playForDuration('bush', 1000);
+    
     // Check if resources are depleted (after paying first inflated demand)
     if (this.state.resourcesDepleted) {
       this.queueDialogue([
@@ -1909,7 +1919,8 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
-              soundManager.playBrawlWithLayers(4000);
+              soundManager.stopDaytimeMusic();
+                soundManager.playBrawlWithLayers(4000);
             }
           }
         ]);
@@ -2028,7 +2039,8 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
-              soundManager.playBrawlWithLayers(4000);
+              soundManager.stopDaytimeMusic();
+                soundManager.playBrawlWithLayers(4000);
             }
           }
         );
@@ -2056,7 +2068,8 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
-              soundManager.playBrawlWithLayers(4000);
+              soundManager.stopDaytimeMusic();
+                soundManager.playBrawlWithLayers(4000);
             }
           }
         );
@@ -2084,7 +2097,8 @@ export class VillageLedgerGame {
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
-              soundManager.playBrawlWithLayers(4000);
+              soundManager.stopDaytimeMusic();
+                soundManager.playBrawlWithLayers(4000);
             }
           }
         );
@@ -2180,6 +2194,7 @@ export class VillageLedgerGame {
               try {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.stopDaytimeMusic();
                 soundManager.playBrawlWithLayers(4000);
               } catch (e) {
                 console.error('Error triggering brawl:', e);
@@ -2228,7 +2243,8 @@ export class VillageLedgerGame {
                     this.villageElder.targetX = this.villageCenterX + 200;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
-                    soundManager.playBrawlWithLayers(4000);
+                    soundManager.stopDaytimeMusic();
+                soundManager.playBrawlWithLayers(4000);
                   }
                 }
               ]);
@@ -2299,6 +2315,7 @@ export class VillageLedgerGame {
               try {
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
+                soundManager.stopDaytimeMusic();
                 soundManager.playBrawlWithLayers(4000);
               } catch (e) {
                 console.error('Error triggering brawl:', e);
@@ -2347,7 +2364,8 @@ export class VillageLedgerGame {
                     this.villageElder.targetX = this.villageCenterX + 200;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
-                    soundManager.playBrawlWithLayers(4000);
+                    soundManager.stopDaytimeMusic();
+                soundManager.playBrawlWithLayers(4000);
                   }
                 }
               ]);
@@ -2490,7 +2508,7 @@ export class VillageLedgerGame {
     this.lastTime = performance.now();
     this.gameLoop();
     soundManager.playLoop('ambientVillage');
-    soundManager.playLoop('backgroundMusicDay');
+    soundManager.startDaytimeMusic();
   }
 
   public stop(): void {
@@ -2572,6 +2590,13 @@ export class VillageLedgerGame {
     } else {
       // Subtle idle animation
       this.player.bobOffset = Math.sin(this.bobTimer * 0.5) * 1;
+    }
+    
+    // Check if player is approaching fisherman - play fishing cast + plop sounds once
+    const nearFisherman = this.player.x > 3050 && this.player.x < 3200;
+    if (nearFisherman && !this.state.fishingSoundPlayed) {
+      this.state.fishingSoundPlayed = true;
+      soundManager.playFishingSequence();
     }
 
     // Update NPC bobs and movement toward targets
@@ -2902,7 +2927,8 @@ export class VillageLedgerGame {
           this.state.phase = 'brawl';
           this.state.showBrawl = true;
           this.state.brawlTimer = 0;
-          soundManager.playBrawlWithLayers(4000);
+          soundManager.stopDaytimeMusic();
+                soundManager.playBrawlWithLayers(4000);
         }
       }
     ]);
@@ -2998,7 +3024,8 @@ export class VillageLedgerGame {
         this.state.phase = 'brawl';
         this.state.showBrawl = true;
         this.state.brawlTimer = 0;
-        soundManager.playBrawlWithLayers(4000);
+        soundManager.stopDaytimeMusic();
+                soundManager.playBrawlWithLayers(4000);
       }
     });
     
@@ -5480,6 +5507,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       extraBerryAvailable: false,
       extraFishAvailable: false,
       resourcesDepleted: false,
+      fishingSoundPlayed: false,
       woodIntroduced: false,
       fishIntroduced: false,
       stoneIntroduced: false,
@@ -5532,7 +5560,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Resume ambient music and day background
     soundManager.stopLoop('backgroundMusicNight');
     soundManager.fadeIn('ambientVillage', 1000);
-    soundManager.fadeIn('backgroundMusicDay', 1000);
+    soundManager.startDaytimeMusic();
     
     // Trigger intro again
     setTimeout(() => this.triggerIntro(), 500);
@@ -5543,7 +5571,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Resume ambient music and day background if it was stopped
     soundManager.stopLoop('backgroundMusicNight');
     soundManager.fadeIn('ambientVillage', 1000);
-    soundManager.fadeIn('backgroundMusicDay', 1000);
+    soundManager.startDaytimeMusic();
     
     this.player.x = 100;
     this.state = {
@@ -5569,6 +5597,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       extraBerryAvailable: false,
       extraFishAvailable: false,
       resourcesDepleted: false,
+      fishingSoundPlayed: false,
       woodIntroduced: false,
       fishIntroduced: false,
       stoneIntroduced: false,

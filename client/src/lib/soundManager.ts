@@ -416,8 +416,8 @@ export class SoundManager {
   public playBushSequence(): void {
     if (this.muted || !this.initialized) return;
     
-    // Play bush sound, then item pickup after 1 second delay
-    this.play('bush', 1.0);
+    // Play bush sound for max 2 seconds, then item pickup after 1 second delay
+    this.playForDuration('bush', 2000);
     
     // Item pickup starts after 1 second delay
     setTimeout(() => {
@@ -428,53 +428,34 @@ export class SoundManager {
   }
 
   public playBooThenFailure(): void {
-    if (this.muted || !this.initialized) return;
-    
-    // Play boo at normal pitch (1.0), then failure overlapping by 1 second
-    this.playAtNormalPitch('crowdBoo');
-    
-    const booBuffer = this.buffers.get('crowdBoo');
-    const booDuration = booBuffer ? booBuffer.duration * 1000 : 1500;
-    const delay = Math.max(0, booDuration - 1000); // Overlap by 1 second
-    
-    setTimeout(() => {
-      if (!this.muted) {
-        this.playAtNormalPitch('failure');
-      }
-    }, delay);
-  }
-  
-  // Play sound at exactly normal pitch (1.0) - no pitch shifting
-  private playAtNormalPitch(name: SoundName): void {
     if (this.muted) return;
     
-    if (!this.initialized) {
-      this.pendingPlays.add(name);
-      return;
-    }
+    // Use HTML5 Audio elements to guarantee no pitch shifting
+    const booAudio = new Audio('/sounds/crowd-boo.mp3');
+    booAudio.volume = this.masterVolume * 0.5;
+    booAudio.playbackRate = 1.0;
+    booAudio.play().catch(() => {});
     
-    const buffer = this.buffers.get(name);
-    if (!buffer || !this.audioContext || !this.masterGain) return;
+    let failurePlayed = false;
     
-    const config = SOUND_CONFIGS[name];
-    const source = this.audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.loop = false;
-    source.playbackRate.value = 1.0; // Explicitly normal pitch
-    
-    const gainNode = this.audioContext.createGain();
-    gainNode.gain.value = config.volume;
-    source.connect(gainNode);
-    gainNode.connect(this.masterGain);
-    
-    const key = `${name}_${Date.now()}`;
-    this.activeSources.set(key, { source, gainNode });
-    
-    source.onended = () => {
-      this.activeSources.delete(key);
+    const playFailure = () => {
+      if (failurePlayed || this.muted) return;
+      failurePlayed = true;
+      const failureAudio = new Audio('/sounds/failure.mp3');
+      failureAudio.volume = this.masterVolume * 0.5;
+      failureAudio.playbackRate = 1.0;
+      failureAudio.play().catch(() => {});
     };
     
-    source.start(0);
+    // Get duration and play failure with overlap
+    booAudio.addEventListener('loadedmetadata', () => {
+      const booDuration = booAudio.duration * 1000;
+      const delay = Math.max(0, booDuration - 1000); // Overlap by 1 second
+      setTimeout(playFailure, delay);
+    });
+    
+    // Fallback if metadata doesn't load quickly
+    setTimeout(playFailure, 1500);
   }
 
   public getBufferDuration(name: SoundName): number {

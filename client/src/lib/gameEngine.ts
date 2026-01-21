@@ -790,9 +790,10 @@ export class VillageLedgerGame {
                          this.state.phase === 'complete';
     
     // LOOP 2 SUCCESS: Debts settled, time to return home
+    // Player must interact with hut to trigger storm sequence - no auto-trigger
     if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && !this.state.showCloudsAnimation && !this.state.showNightTransition && !this.state.showSuccess && !this.state.playerEnteredHut) {
       
-      // If roof needs fixing, fix it first, then trigger clouds after buffer
+      // If roof needs fixing, fix it first, then trigger storm sequence
       if (!this.state.roofRepaired && hasWood) {
         this.queueDialogue([
           {
@@ -804,26 +805,47 @@ export class VillageLedgerGame {
               this.state.inventory.wood = 0;
               this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
               this.setMood('happy');
-              // After roof is fixed, add 2 second buffer before storm clouds
+              
+              // After roof fix: play 3 footsteps, then player enters hut
               setTimeout(() => {
-                this.triggerReturnHomeSequence();
-              }, 2000);
+                soundManager.play('footstepA', 1.0);
+                setTimeout(() => {
+                  soundManager.play('footstepA', 0.95);
+                  setTimeout(() => {
+                    soundManager.play('footstepA', 1.0);
+                    // Player enters hut after footsteps
+                    setTimeout(() => {
+                      this.triggerEnterHutSequence();
+                    }, 300);
+                  }, 250);
+                }, 250);
+              }, 500);
             }
           }
         ]);
         return;
       }
       
-      // Roof already fixed - show brief dialogue, then trigger return home sequence with buffer
+      // Roof already fixed - player enters directly
       this.queueDialogue([
         {
           speaker: 'YOU',
           text: "Safe inside! The storm can come now.",
           onComplete: () => {
-            // 2 second buffer before storm clouds roll in
+            // Play 3 footsteps, then player enters hut
             setTimeout(() => {
-              this.triggerReturnHomeSequence();
-            }, 2000);
+              soundManager.play('footstepA', 1.0);
+              setTimeout(() => {
+                soundManager.play('footstepA', 0.95);
+                setTimeout(() => {
+                  soundManager.play('footstepA', 1.0);
+                  // Player enters hut after footsteps
+                  setTimeout(() => {
+                    this.triggerEnterHutSequence();
+                  }, 300);
+                }, 250);
+              }, 250);
+            }, 300);
           }
         }
       ]);
@@ -890,7 +912,52 @@ export class VillageLedgerGame {
     }
   }
   
-  // Trigger the return home sequence with clouds animation
+  // Trigger the enter hut sequence - player disappears, then rain starts
+  private triggerEnterHutSequence(): void {
+    // Player enters hut (disappears)
+    this.state.playerEnteredHut = true;
+    this.player.visible = false;
+    
+    // Fade out day sounds and start rain immediately
+    soundManager.fadeOut('backgroundMusicDay', 1000);
+    soundManager.fadeOut('ambientVillage', 1000);
+    
+    // Start rainfall (5 seconds overlay on scene)
+    this.state.showRainfall = true;
+    this.state.rainfallTimer = 0;
+    soundManager.fadeIn('rain', 500);
+    soundManager.play('thunder');
+    
+    // Sequence: rainfall 5s → night transition 3s → quiz
+    setTimeout(() => {
+      try {
+        // Start night transition with fade (rain continues and fades)
+        this.state.showNightTransition = true;
+        this.state.nightTransitionTimer = 0;
+        soundManager.fadeIn('ambientNight', 1000);
+        soundManager.fadeIn('backgroundMusicNight', 2000);
+        
+        setTimeout(() => {
+          try {
+            this.state.showRainfall = false; // Turn off rain
+            soundManager.fadeOut('rain', 1000);
+            this.state.showNightTransition = false;
+            this.state.showQuiz = true;
+            this.state.phase = 'quiz';
+            // Restore player visibility for quiz
+            this.player.visible = true;
+            this.state.playerEnteredHut = false;
+          } catch (e) {
+            console.error('Error in quiz transition:', e);
+          }
+        }, 3000); // 3 second fade to night
+      } catch (e) {
+        console.error('Error in rainfall transition:', e);
+      }
+    }, 5000); // 5 second rainfall
+  }
+
+  // Trigger the return home sequence with clouds animation (unused - kept for reference)
   private triggerReturnHomeSequence(): void {
     // Player enters hut (disappears)
     this.state.playerEnteredHut = true;
@@ -2165,7 +2232,8 @@ export class VillageLedgerGame {
 
   private queueDialogue(lines: DialogueLine[]): void {
     this.state.dialogueQueue = lines;
-    this.advanceDialogue();
+    // Don't play sound when starting new dialogue - only on user click to advance
+    this.advanceDialogue(false);
   }
 
   private showWoodcutterDisputeChoice(): void {
@@ -2407,8 +2475,11 @@ export class VillageLedgerGame {
     ];
   }
 
-  private advanceDialogue(): void {
-    soundManager.play('dialogueAdvance');
+  private advanceDialogue(playSound: boolean = true): void {
+    // Only play sound on user-initiated advances, not when starting new dialogue
+    if (playSound) {
+      soundManager.play('dialogueAdvance');
+    }
     if (this.state.currentDialogue?.onComplete) {
       try {
         this.state.currentDialogue.onComplete();
@@ -2881,8 +2952,7 @@ export class VillageLedgerGame {
         // Fade out both celebration and applause sounds
         soundManager.fadeOut('crowdApplause', 500);
         soundManager.fadeOut('celebration', 500);
-        // After celebration ends, immediately show clouds and storm approaching
-        this.triggerStormApproaching();
+        // Player must now manually walk home and interact with hut to trigger storm
       }
     }
     
@@ -3591,7 +3661,9 @@ export class VillageLedgerGame {
     ctx.fillStyle = '#22C55E';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 3;
-    const celebY = 80 + Math.sin(t * 5) * 10;
+    // Center vertically in the playable area (above ground and dialogue box)
+    const playableHeight = groundY;
+    const celebY = (playableHeight / 2) + Math.sin(t * 5) * 10;
     // Only show "DEBTS SETTLED!" text for first 3 seconds
     if (t <= 3) {
       ctx.strokeText('DEBTS SETTLED!', w / 2, celebY);

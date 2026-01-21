@@ -30,7 +30,8 @@ export type SoundName =
   | 'fishingCast'
   | 'fishingPlop'
   | 'crowdBoo'
-  | 'failure';
+  | 'failure'
+  | 'settle';
 
 interface SoundConfig {
   src: string;
@@ -72,6 +73,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   fishingPlop: { src: '/sounds/fishing-plop.mp3', volume: 0.5, loop: false },
   crowdBoo: { src: '/sounds/crowd-boo.mp3', volume: 0.5, loop: false },
   failure: { src: '/sounds/failure.mp3', volume: 0.5, loop: false },
+  settle: { src: '/sounds/settle.mp3', volume: 0.5, loop: false },
 };
 
 const FIGHT_LAYER_SOUNDS: SoundName[] = [
@@ -416,8 +418,8 @@ export class SoundManager {
   public playBushSequence(): void {
     if (this.muted || !this.initialized) return;
     
-    // Play bush sound for max 1.5 seconds, then item pickup after 1 second delay
-    this.playForDuration('bush', 1500);
+    // Play bush sound for max 1.5 seconds with 0.3s fade out at end, then item pickup after 1 second delay
+    this.playForDurationWithFade('bush', 1500, 300);
     
     // Item pickup starts after 1 second delay
     setTimeout(() => {
@@ -425,6 +427,37 @@ export class SoundManager {
         this.play('itemPickup', 1.0);
       }
     }, 1000);
+  }
+  
+  // Play sound for a duration with fade out at the end
+  public playForDurationWithFade(name: SoundName, durationMs: number, fadeMs: number, pitch: number = 1.0): void {
+    if (this.muted || !this.initialized) return;
+    
+    const activeSound = this.createSource(name, false, pitch);
+    if (!activeSound) return;
+    
+    const key = `${name}_fade_${Date.now()}`;
+    this.activeSources.set(key, activeSound);
+    
+    activeSound.source.start(0);
+    
+    // Start fade out before the end
+    const fadeStartTime = durationMs - fadeMs;
+    setTimeout(() => {
+      if (!this.muted && activeSound.gainNode) {
+        const currentTime = this.audioContext!.currentTime;
+        activeSound.gainNode.gain.setValueAtTime(activeSound.gainNode.gain.value, currentTime);
+        activeSound.gainNode.gain.linearRampToValueAtTime(0, currentTime + fadeMs / 1000);
+      }
+    }, fadeStartTime);
+    
+    // Stop the sound after duration
+    setTimeout(() => {
+      try {
+        activeSound.source.stop();
+      } catch {}
+      this.activeSources.delete(key);
+    }, durationMs);
   }
 
   public playBooThenFailure(): void {

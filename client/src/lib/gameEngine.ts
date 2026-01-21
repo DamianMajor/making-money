@@ -171,7 +171,7 @@ export class VillageLedgerGame {
   private dialogueBoxHeight: number = 0;
   private hudWidth: number = 260;
   private hudHeight: number = 185;
-  private interactButtonSize: number = 100;
+  private interactButtonSize: number = 90; // 10% smaller than original 100
 
   // Animation timers
   private bobTimer: number = 0;
@@ -274,7 +274,7 @@ export class VillageLedgerGame {
     this.berryBush = {
       id: 'berryBush',
       name: 'BERRY BUSH',
-      x: 2150,
+      x: 2550, // Swapped with Stone Worker
       y: 0,
       width: 70,
       height: 50,
@@ -288,7 +288,7 @@ export class VillageLedgerGame {
     this.stoneWorker = {
       id: 'stoneWorker',
       name: 'STONE-WORKER',
-      x: 2550, // Original position - far from village center (50 right of before)
+      x: 2150, // Swapped with Berry Bush
       y: 0,
       width: 50,
       height: 70,
@@ -297,7 +297,7 @@ export class VillageLedgerGame {
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 2550
+      originalX: 2150
     };
 
     this.fisherman = {
@@ -693,7 +693,10 @@ export class VillageLedgerGame {
   private isInteractButtonTouched(x: number, y: number): boolean {
     const size = this.interactButtonSize;
     const btnX = this.canvas.width - size - 32;
-    const btnY = this.canvas.height - this.dialogueBoxHeight - size - 48;
+    // Center vertically on the land area (matching drawInteractButton)
+    const landTop = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
+    const landBottom = this.canvas.height - this.dialogueBoxHeight;
+    const btnY = landTop + (landBottom - landTop - size) / 2;
     // Add padding around button for easier touch targeting
     const padding = 20;
     return x >= btnX - padding && x <= btnX + size + padding && 
@@ -921,13 +924,14 @@ export class VillageLedgerGame {
     this.state.playerEnteredHut = true;
     this.player.visible = false;
     
-    // Wait 1.5 seconds before starting rain
+    // Wait 2.5 seconds before starting rain (after roof hammer sound completes)
     setTimeout(() => {
       try {
         // Start rainfall (5 seconds overlay on scene)
         this.state.showRainfall = true;
         this.state.rainfallTimer = 0;
-        soundManager.fadeIn('rain', 500);
+        soundManager.fadeIn('rain', 2000); // 2 second fade in
+        soundManager.play('thunder'); // Thunder plays directly when rain begins
         
         // Sequence: rainfall 5s → night transition 3s → quiz
         setTimeout(() => {
@@ -959,7 +963,7 @@ export class VillageLedgerGame {
       } catch (e) {
         console.error('Error starting rain:', e);
       }
-    }, 1500); // Wait 1.5 seconds after entering hut before rain starts
+    }, 2500); // Wait 2.5 seconds after entering hut before rain starts
   }
 
   // Trigger the return home sequence with clouds animation (unused - kept for reference)
@@ -1181,33 +1185,64 @@ export class VillageLedgerGame {
       
       if (playerAtCenter && woodcutterAtCenter) {
         const recorded = this.state.woodcutterDebtRecorded;
-        this.queueDialogue([
-          {
-            speaker: 'WOODCUTTER',
-            text: recorded 
-              ? "Good, the debt is now recorded on the Stone Tablet. Here's your Wood!"
-              : "We're at the center. Here's your Wood. Remember, you owe me a Sharp Stone and 1 Fish!",
-            onComplete: () => {
-              this.state.inventory.wood = 1;
-              this.state.obtainedWood = true;
-              // Show wood in inventory HUD
-              this.state.woodIntroduced = true; // Wood shown in inventory HUD
-              this.state.stoneIntroduced = true; // Stone mentioned as owed
-              this.state.fishIntroduced = true; // Fish mentioned as owed
-              this.showInventoryPopup('+1 WOOD');
-              this.setMood('happy');
-              this.state.phase = 'loop2_got_wood';
-              this.state.escortingNPC = null;
-              if (recorded) {
+        
+        if (recorded) {
+          // Carving sequence: NPC is stopped at tablet, play carving sound, record debt, THEN deliver item
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "Let me carve this agreement into the Stone Tablet...",
+              onComplete: () => {
                 soundManager.playForDuration('stoneCarve', 2500);
-                this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
-                this.state.showHUD = true;
-                this.hudGlow = 1;
+                // After carving sound, record debt and deliver item
+                setTimeout(() => {
+                  this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
+                  this.state.showHUD = true;
+                  this.hudGlow = 1;
+                  // Now deliver the wood and move to final position
+                  this.queueDialogue([
+                    {
+                      speaker: 'WOODCUTTER',
+                      text: "The debt is now recorded! Here's your Wood.",
+                      onComplete: () => {
+                        this.state.inventory.wood = 1;
+                        this.state.obtainedWood = true;
+                        this.state.woodIntroduced = true;
+                        this.state.stoneIntroduced = true;
+                        this.state.fishIntroduced = true;
+                        this.showInventoryPopup('+1 WOOD');
+                        this.setMood('happy');
+                        this.state.phase = 'loop2_got_wood';
+                        this.state.escortingNPC = null;
+                        this.woodcutter.targetX = this.villageCenterX + 80;
+                      }
+                    }
+                  ]);
+                }, 2500); // Wait for carving sound to finish
               }
-              this.woodcutter.targetX = this.villageCenterX + 80; // Far enough from Elder
             }
-          }
-        ]);
+          ]);
+        } else {
+          // Verbal promise path - deliver item immediately
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "We're at the center. Here's your Wood. Remember, you owe me a Sharp Stone and 1 Fish!",
+              onComplete: () => {
+                this.state.inventory.wood = 1;
+                this.state.obtainedWood = true;
+                this.state.woodIntroduced = true;
+                this.state.stoneIntroduced = true;
+                this.state.fishIntroduced = true;
+                this.showInventoryPopup('+1 WOOD');
+                this.setMood('happy');
+                this.state.phase = 'loop2_got_wood';
+                this.state.escortingNPC = null;
+                this.woodcutter.targetX = this.villageCenterX + 80;
+              }
+            }
+          ]);
+        }
       } else {
         this.queueDialogue([
           {
@@ -1353,6 +1388,7 @@ export class VillageLedgerGame {
               speaker: 'WOODCUTTER',
               text: "That's all 3 Fish! Debt settled.",
               onComplete: () => {
+                soundManager.play('settle');
                 this.state.woodcutterSettled = true;
                 // Update ledger to SETTLED immediately
                 if (this.state.woodcutterDebtRecorded) {
@@ -1421,6 +1457,7 @@ export class VillageLedgerGame {
             speaker: 'WOODCUTTER',
             text: verificationText,
             onComplete: () => {
+              soundManager.play('settle');
               if (this.state.woodcutterDebtRecorded) {
                 this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
                   e.name === 'Woodcutter' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
@@ -1544,31 +1581,61 @@ export class VillageLedgerGame {
       
       if (playerAtCenter && stoneWorkerAtCenter) {
         const recorded = this.state.stoneWorkerDebtRecorded;
-        this.queueDialogue([
-          {
-            speaker: 'STONE-WORKER',
-            text: recorded 
-              ? "Good, the debt is now recorded. Here's your Sharp Stone!"
-              : "We're at the center. Here's your Sharp Stone. Remember, you owe me 2 Fish!",
-            onComplete: () => {
-              this.state.inventory.stone = 1;
-              this.state.obtainedStone = true;
-              // Ensure stone and fish appear in inventory HUD
-              this.state.stoneIntroduced = true;
-              this.state.fishIntroduced = true;
-              this.showInventoryPopup('+1 SHARP STONE');
-              this.setMood('happy');
-              this.state.phase = 'loop2_got_stone';
-              this.state.escortingNPC = null;
-              if (recorded) {
+        
+        if (recorded) {
+          // Carving sequence: NPC is stopped at tablet, play carving sound, record debt, THEN deliver item
+          this.queueDialogue([
+            {
+              speaker: 'STONE-WORKER',
+              text: "Let me carve this agreement into the Stone Tablet...",
+              onComplete: () => {
                 soundManager.playForDuration('stoneCarve', 2500);
-                this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
-                this.hudGlow = 1;
+                // After carving sound, record debt and deliver item
+                setTimeout(() => {
+                  this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
+                  this.hudGlow = 1;
+                  // Now deliver the stone and move to final position
+                  this.queueDialogue([
+                    {
+                      speaker: 'STONE-WORKER',
+                      text: "The debt is now recorded! Here's your Sharp Stone.",
+                      onComplete: () => {
+                        this.state.inventory.stone = 1;
+                        this.state.obtainedStone = true;
+                        this.state.stoneIntroduced = true;
+                        this.state.fishIntroduced = true;
+                        this.showInventoryPopup('+1 SHARP STONE');
+                        this.setMood('happy');
+                        this.state.phase = 'loop2_got_stone';
+                        this.state.escortingNPC = null;
+                        this.stoneWorker.targetX = this.villageCenterX - 100;
+                      }
+                    }
+                  ]);
+                }, 2500); // Wait for carving sound to finish
               }
-              this.stoneWorker.targetX = this.villageCenterX - 100;
             }
-          }
-        ]);
+          ]);
+        } else {
+          // Verbal promise path - deliver item immediately
+          this.queueDialogue([
+            {
+              speaker: 'STONE-WORKER',
+              text: "We're at the center. Here's your Sharp Stone. Remember, you owe me 2 Fish!",
+              onComplete: () => {
+                this.state.inventory.stone = 1;
+                this.state.obtainedStone = true;
+                this.state.stoneIntroduced = true;
+                this.state.fishIntroduced = true;
+                this.showInventoryPopup('+1 SHARP STONE');
+                this.setMood('happy');
+                this.state.phase = 'loop2_got_stone';
+                this.state.escortingNPC = null;
+                this.stoneWorker.targetX = this.villageCenterX - 100;
+              }
+            }
+          ]);
+        }
       } else {
         this.queueDialogue([
           {
@@ -1676,6 +1743,7 @@ export class VillageLedgerGame {
               speaker: 'STONE-WORKER',
               text: "That's all 4 Fish! Debt settled.",
               onComplete: () => {
+                soundManager.play('settle');
                 this.state.stoneWorkerSettled = true;
                 // Update ledger to SETTLED immediately
                 if (this.state.stoneWorkerDebtRecorded) {
@@ -1764,6 +1832,7 @@ export class VillageLedgerGame {
             speaker: 'STONE-WORKER',
             text: verificationText,
             onComplete: () => {
+              soundManager.play('settle');
               if (this.state.stoneWorkerDebtRecorded) {
                 this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
                   e.name === 'Stone-worker' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
@@ -1855,25 +1924,65 @@ export class VillageLedgerGame {
         }
       ]);
     }
-    // Debts initiated AND has berries - trade!
-    else if (hasBerries) {
+    // Debts initiated AND has berries - offer trade choices
+    else if (this.state.inventory.berries >= 1) {
+      const berryCount = this.state.inventory.berries;
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "Ah, 3 lovely berries! Here are 3 Fish in exchange.",
+          text: `I see you have ${berryCount} ${berryCount === 1 ? 'berry' : 'berries'}! I'll trade Fish for Berries - 1 for 1. How many would you like?`,
           onComplete: () => {
-            this.state.inventory.berries -= 3;
-            this.state.inventory.fish = 3;
-            this.state.fishIntroduced = true; // Ensure fish shows in inventory HUD
-            this.showInventoryPopup('+3 FISH (-3 BERRIES)');
-            this.setMood('happy');
-            // Update phase based on current loop
-            if (phase === 'got_stone_need_fish') {
-              this.state.phase = 'got_fish_ready_settle';
-            } else if (phase === 'loop2_got_stone') {
-              this.state.phase = 'loop2_got_fish';
+            // Build choice options based on how many berries the player has
+            const choices: { text: string; action: () => void }[] = [];
+            
+            if (berryCount >= 1) {
+              choices.push({
+                text: "1 Berry for 1 Fish",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.state.inventory.berries -= 1;
+                  this.state.inventory.fish += 1;
+                  this.state.fishIntroduced = true;
+                  this.showInventoryPopup('+1 FISH (-1 BERRY)');
+                  this.setMood('happy');
+                  this.queueDialogue([{ speaker: 'FISHERMAN', text: "Here's 1 Fish for you!" }]);
+                  this.updatePhaseAfterFishTrade(phase);
+                }
+              });
             }
-            // Fisherman stays at his fishing hole - no walking to town center
+            if (berryCount >= 2) {
+              choices.push({
+                text: "2 Berries for 2 Fish",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.state.inventory.berries -= 2;
+                  this.state.inventory.fish += 2;
+                  this.state.fishIntroduced = true;
+                  this.showInventoryPopup('+2 FISH (-2 BERRIES)');
+                  this.setMood('happy');
+                  this.queueDialogue([{ speaker: 'FISHERMAN', text: "Here's 2 Fish for you!" }]);
+                  this.updatePhaseAfterFishTrade(phase);
+                }
+              });
+            }
+            if (berryCount >= 3) {
+              choices.push({
+                text: "3 Berries for 3 Fish",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.state.inventory.berries -= 3;
+                  this.state.inventory.fish += 3;
+                  this.state.fishIntroduced = true;
+                  this.showInventoryPopup('+3 FISH (-3 BERRIES)');
+                  this.setMood('happy');
+                  this.queueDialogue([{ speaker: 'FISHERMAN', text: "Here's 3 Fish for you! A fine trade!" }]);
+                  this.updatePhaseAfterFishTrade(phase);
+                }
+              });
+            }
+            
+            this.state.showChoice = true;
+            this.state.choiceOptions = choices;
           }
         }
       ]);
@@ -1896,6 +2005,15 @@ export class VillageLedgerGame {
           text: "I'll trade you 3 Fish for 3 Berries. Find them at the berry bush to the west!"
         }
       ]);
+    }
+  }
+  
+  // Helper to update phase after fish trade
+  private updatePhaseAfterFishTrade(phase: string): void {
+    if (phase === 'got_stone_need_fish') {
+      this.state.phase = 'got_fish_ready_settle';
+    } else if (phase === 'loop2_got_stone') {
+      this.state.phase = 'loop2_got_fish';
     }
   }
 
@@ -2587,7 +2705,7 @@ export class VillageLedgerGame {
     this.dialogueBoxHeight = this.canvas.height * 0.2;
     this.hudWidth = Math.min(260, this.canvas.width * 0.25);
     this.hudHeight = Math.min(185, this.canvas.height * 0.25);
-    this.interactButtonSize = Math.min(100, this.canvas.width * 0.12);
+    this.interactButtonSize = Math.min(90, this.canvas.width * 0.11); // 10% smaller
 
     // Calculate ground Y position
     const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
@@ -4941,7 +5059,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           }
           break;
         case 'loop2_got_fish':
-          hint = 'Settle your debts with the NPCs or visit the Elder...';
+          // After viewing Stone Tablet, encourage settling with NPCs
+          if (this.state.elderVerified || (this.state.woodcutterDebtRecorded && this.state.stoneWorkerDebtRecorded)) {
+            hint = 'Settle your debts with the Woodcutter and Stone-worker!';
+          } else {
+            hint = 'Visit the Stone Tablet to verify debts, then settle with NPCs...';
+          }
           break;
         case 'loop2_verify_at_tablet':
           hint = 'Go to the Stone Tablet to verify the disputed debt...';
@@ -4976,7 +5099,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
     const size = this.interactButtonSize;
     const x = this.canvas.width - size - 32;
-    const y = this.canvas.height - this.dialogueBoxHeight - size - 48;
+    // Center vertically on the land area (between ground line and dialogue box)
+    const landTop = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
+    const landBottom = this.canvas.height - this.dialogueBoxHeight;
+    const y = landTop + (landBottom - landTop - size) / 2;
 
     ctx.save();
     ctx.globalAlpha = this.interactButtonOpacity;
@@ -5789,7 +5915,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Reset NPC positions to original locations
     this.woodcutter.x = this.woodcutter.originalX || 700;
     this.woodcutter.targetX = undefined;
-    this.stoneWorker.x = this.stoneWorker.originalX || 2500;
+    this.stoneWorker.x = this.stoneWorker.originalX || 2150;
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3175;
     this.fisherman.targetX = undefined;
@@ -5881,7 +6007,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Reset NPC positions to original locations
     this.woodcutter.x = this.woodcutter.originalX || 700;
     this.woodcutter.targetX = undefined;
-    this.stoneWorker.x = this.stoneWorker.originalX || 2500;
+    this.stoneWorker.x = this.stoneWorker.originalX || 2150;
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3175;
     this.fisherman.targetX = undefined;

@@ -2878,7 +2878,9 @@ export class VillageLedgerGame {
       // End celebration when: applause ends OR player within 250 pixels of home
       if (this.state.celebrationTimer > applauseDuration || distToHome <= 250) {
         this.state.showCelebration = false;
+        // Fade out both celebration and applause sounds
         soundManager.fadeOut('crowdApplause', 500);
+        soundManager.fadeOut('celebration', 500);
         // After celebration ends, immediately show clouds and storm approaching
         this.triggerStormApproaching();
       }
@@ -3524,8 +3526,26 @@ export class VillageLedgerGame {
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
     
-    // Draw confetti particles
+    // Calculate fade out - start fading 1.5 seconds before end
+    const applauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
+    const fadeStartTime = Math.max(0, applauseDuration - 1.5);
+    const distToHome = Math.abs(this.player.x - this.playerHomeX);
+    
+    // Also start fading when approaching home (within 400 pixels, full fade at 250)
+    let fadeAlpha = 1.0;
+    if (distToHome <= 400) {
+      fadeAlpha = Math.max(0, (distToHome - 250) / 150);
+    }
+    if (t > fadeStartTime) {
+      const timeFade = 1 - ((t - fadeStartTime) / 1.5);
+      fadeAlpha = Math.min(fadeAlpha, timeFade);
+    }
+    fadeAlpha = Math.max(0, Math.min(1, fadeAlpha));
+    
+    // Draw confetti particles with fade
     const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#9B59B6', '#2ECC71'];
+    ctx.save();
+    ctx.globalAlpha = fadeAlpha;
     for (let i = 0; i < 30; i++) {
       const seed = i * 137.5;
       const x = (seed * 7.3 + t * 100) % w;
@@ -3541,6 +3561,7 @@ export class VillageLedgerGame {
       ctx.fillRect(-size / 2, -size / 2, size, size);
       ctx.restore();
     }
+    ctx.restore();
     
     // Draw dancing NPCs indicator - bouncing motion for NPCs at village center
     // Get the screen positions for NPCs at center

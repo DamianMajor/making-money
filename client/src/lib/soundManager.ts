@@ -416,22 +416,22 @@ export class SoundManager {
   public playBushSequence(): void {
     if (this.muted || !this.initialized) return;
     
-    // Play bush sound for 1 second, then item pickup overlapping by 0.6 seconds
-    this.playForDuration('bush', 1000);
+    // Play bush sound, then item pickup after 1 second delay
+    this.play('bush', 1.0);
     
-    // Item pickup starts at 0.4 seconds (1s - 0.6s overlap)
+    // Item pickup starts after 1 second delay
     setTimeout(() => {
       if (!this.muted) {
-        this.play('itemPickup');
+        this.play('itemPickup', 1.0);
       }
-    }, 400);
+    }, 1000);
   }
 
   public playBooThenFailure(): void {
     if (this.muted || !this.initialized) return;
     
-    // Play boo, then failure overlapping by 1 second
-    this.play('crowdBoo');
+    // Play boo at normal pitch (1.0), then failure overlapping by 1 second
+    this.playAtNormalPitch('crowdBoo');
     
     const booBuffer = this.buffers.get('crowdBoo');
     const booDuration = booBuffer ? booBuffer.duration * 1000 : 1500;
@@ -439,9 +439,42 @@ export class SoundManager {
     
     setTimeout(() => {
       if (!this.muted) {
-        this.play('failure');
+        this.playAtNormalPitch('failure');
       }
     }, delay);
+  }
+  
+  // Play sound at exactly normal pitch (1.0) - no pitch shifting
+  private playAtNormalPitch(name: SoundName): void {
+    if (this.muted) return;
+    
+    if (!this.initialized) {
+      this.pendingPlays.add(name);
+      return;
+    }
+    
+    const buffer = this.buffers.get(name);
+    if (!buffer || !this.audioContext || !this.masterGain) return;
+    
+    const config = SOUND_CONFIGS[name];
+    const source = this.audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.loop = false;
+    source.playbackRate.value = 1.0; // Explicitly normal pitch
+    
+    const gainNode = this.audioContext.createGain();
+    gainNode.gain.value = config.volume;
+    source.connect(gainNode);
+    gainNode.connect(this.masterGain);
+    
+    const key = `${name}_${Date.now()}`;
+    this.activeSources.set(key, { source, gainNode });
+    
+    source.onended = () => {
+      this.activeSources.delete(key);
+    };
+    
+    source.start(0);
   }
 
   public getBufferDuration(name: SoundName): number {

@@ -570,6 +570,18 @@ export class VillageLedgerGame {
       return;
     }
 
+    // Handle badge popup touches
+    if (this.state.showBadgePopup) {
+      this.handleBadgePopupTouch(x, y);
+      return;
+    }
+
+    // Handle trade selection popup touches
+    if (this.state.showTradeSelection) {
+      this.handleTradeSelectionTouch(x, y);
+      return;
+    }
+
     // Handle choice dialogue touches
     if (this.state.showChoice) {
       this.handleChoiceTouch(x, y);
@@ -3635,6 +3647,16 @@ export class VillageLedgerGame {
       this.drawChoiceDialogue(ctx);
     }
 
+    // Draw trade selection popup if active
+    if (this.state.showTradeSelection) {
+      this.drawTradeSelectionPopup(ctx);
+    }
+
+    // Draw badge popup if active
+    if (this.state.showBadgePopup) {
+      this.drawBadgePopup(ctx);
+    }
+
     // Draw brawl animation if active
     if (this.state.showBrawl) {
       this.drawBrawlAnimation(ctx);
@@ -3758,6 +3780,235 @@ export class VillageLedgerGame {
   }
 
   private choiceButtonAreas: { x: number; y: number; w: number; h: number; index: number }[] = [];
+  private tradeSelectionButtonAreas: { x: number; y: number; w: number; h: number; item: string }[] = [];
+  private badgePopupButtonArea: { x: number; y: number; w: number; h: number } | null = null;
+
+  private drawTradeSelectionPopup(ctx: CanvasRenderingContext2D): void {
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    
+    // Collect available items (count > 0)
+    const availableItems: { name: string; count: number; color: string }[] = [];
+    if (this.state.inventory.slingshot > 0) {
+      availableItems.push({ name: 'Slingshot', count: this.state.inventory.slingshot, color: '#D97706' });
+    }
+    if (this.state.inventory.berries > 0) {
+      availableItems.push({ name: 'Berries', count: this.state.inventory.berries, color: '#DC2626' });
+    }
+    if (this.state.inventory.wood > 0) {
+      availableItems.push({ name: 'Wood', count: this.state.inventory.wood, color: '#8B4513' });
+    }
+    if (this.state.inventory.stone > 0) {
+      availableItems.push({ name: 'Stone', count: this.state.inventory.stone, color: '#6B7280' });
+    }
+    if (this.state.inventory.fish > 0) {
+      availableItems.push({ name: 'Fish', count: this.state.inventory.fish, color: '#3B82F6' });
+    }
+    
+    // Popup dimensions
+    const popupWidth = 320;
+    const itemBtnHeight = 50;
+    const padding = 16;
+    const headerHeight = 50;
+    const popupHeight = headerHeight + availableItems.length * (itemBtnHeight + 8) + padding * 2 + 50;
+    const popupX = (w - popupWidth) / 2;
+    const popupY = (h - popupHeight) / 2;
+    
+    // Dark overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, w, h);
+    
+    // Popup background
+    ctx.fillStyle = '#3D2B1F';
+    ctx.beginPath();
+    ctx.roundRect(popupX, popupY, popupWidth, popupHeight, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Header
+    ctx.font = `bold 18px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#F5DEB3';
+    ctx.fillText('What would you like to offer?', popupX + popupWidth / 2, popupY + 30);
+    
+    // Draw item buttons
+    this.tradeSelectionButtonAreas = [];
+    let itemY = popupY + headerHeight;
+    
+    availableItems.forEach((item) => {
+      const btnX = popupX + padding;
+      const btnW = popupWidth - padding * 2;
+      
+      // Button background
+      ctx.fillStyle = item.color;
+      ctx.beginPath();
+      ctx.roundRect(btnX, itemY, btnW, itemBtnHeight, 8);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Item icon (circle)
+      const iconRadius = 16;
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.beginPath();
+      ctx.arc(btnX + padding + iconRadius, itemY + itemBtnHeight / 2, iconRadius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Item name and count
+      ctx.font = `bold 16px ${this.uiFont}`;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'left';
+      ctx.fillText(`${item.name} (${item.count})`, btnX + padding + iconRadius * 2 + 12, itemY + itemBtnHeight / 2 + 6);
+      
+      this.tradeSelectionButtonAreas.push({ x: btnX, y: itemY, w: btnW, h: itemBtnHeight, item: item.name.toLowerCase() });
+      itemY += itemBtnHeight + 8;
+    });
+    
+    // Cancel button
+    const cancelBtnY = itemY + 8;
+    const cancelBtnW = popupWidth - padding * 2;
+    const cancelBtnX = popupX + padding;
+    
+    ctx.fillStyle = '#6B7280';
+    ctx.beginPath();
+    ctx.roundRect(cancelBtnX, cancelBtnY, cancelBtnW, 40, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.fillText('Never mind', cancelBtnX + cancelBtnW / 2, cancelBtnY + 25);
+    
+    this.tradeSelectionButtonAreas.push({ x: cancelBtnX, y: cancelBtnY, w: cancelBtnW, h: 40, item: 'cancel' });
+  }
+
+  private drawBadgePopup(ctx: CanvasRenderingContext2D): void {
+    if (!this.state.pendingBadge) return;
+    
+    const w = this.canvas.width;
+    const h = this.canvas.height;
+    
+    // Popup dimensions
+    const popupWidth = 400;
+    const popupHeight = 280;
+    const popupX = (w - popupWidth) / 2;
+    const popupY = (h - popupHeight) / 2;
+    
+    // Dark overlay with celebration effect
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, w, h);
+    
+    // Add sparkle particles
+    const now = Date.now() / 1000;
+    for (let i = 0; i < 20; i++) {
+      const angle = (i / 20) * Math.PI * 2 + now;
+      const dist = 180 + Math.sin(now * 3 + i) * 30;
+      const sparkleX = w / 2 + Math.cos(angle) * dist;
+      const sparkleY = h / 2 + Math.sin(angle) * dist * 0.5;
+      const size = 3 + Math.sin(now * 5 + i * 0.5) * 2;
+      
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Popup background with gradient effect
+    const gradient = ctx.createLinearGradient(popupX, popupY, popupX, popupY + popupHeight);
+    gradient.addColorStop(0, '#4A3728');
+    gradient.addColorStop(1, '#2D1B0E');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(popupX, popupY, popupWidth, popupHeight, 16);
+    ctx.fill();
+    
+    // Golden border
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    
+    // "Badge Earned!" header
+    ctx.font = `bold 24px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('Badge Earned!', popupX + popupWidth / 2, popupY + 40);
+    
+    // Badge icon (star/medal shape)
+    const badgeX = popupX + popupWidth / 2;
+    const badgeY = popupY + 90;
+    const badgeSize = 40;
+    
+    // Draw star shape
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const angle = (i * 4 * Math.PI / 5) - Math.PI / 2;
+      const x = badgeX + Math.cos(angle) * badgeSize;
+      const y = badgeY + Math.sin(angle) * badgeSize;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#B8860B';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Badge name
+    ctx.font = `bold 18px ${this.uiFont}`;
+    ctx.fillStyle = '#F5DEB3';
+    ctx.fillText(this.state.pendingBadge.name, popupX + popupWidth / 2, popupY + 150);
+    
+    // Badge description (word wrap)
+    ctx.font = `14px ${this.uiFont}`;
+    ctx.fillStyle = '#C4A77D';
+    const desc = this.state.pendingBadge.description;
+    const maxWidth = popupWidth - 40;
+    const words = desc.split(' ');
+    let line = '';
+    let lineY = popupY + 180;
+    
+    words.forEach((word) => {
+      const testLine = line + word + ' ';
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth) {
+        ctx.fillText(line.trim(), popupX + popupWidth / 2, lineY);
+        line = word + ' ';
+        lineY += 20;
+      } else {
+        line = testLine;
+      }
+    });
+    if (line.trim()) {
+      ctx.fillText(line.trim(), popupX + popupWidth / 2, lineY);
+    }
+    
+    // Continue button
+    const btnWidth = 120;
+    const btnHeight = 40;
+    const btnX = popupX + (popupWidth - btnWidth) / 2;
+    const btnY = popupY + popupHeight - 55;
+    
+    ctx.fillStyle = '#22C55E';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnWidth, btnHeight, 8);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.font = `bold 16px ${this.uiFont}`;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText('Continue', btnX + btnWidth / 2, btnY + 26);
+    
+    this.badgePopupButtonArea = { x: btnX, y: btnY, w: btnWidth, h: btnHeight };
+  }
 
   private drawBrawlAnimation(ctx: CanvasRenderingContext2D): void {
     const w = this.canvas.width;
@@ -4338,6 +4589,53 @@ export class VillageLedgerGame {
         }
         break;
       }
+    }
+  }
+
+  private handleTradeSelectionTouch(x: number, y: number): void {
+    for (const btn of this.tradeSelectionButtonAreas) {
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.play('choiceSelect');
+        this.state.showTradeSelection = false;
+        if (this.state.tradeSelectionCallback) {
+          if (btn.item === 'cancel') {
+            this.state.tradeSelectionCallback(null);
+          } else {
+            this.state.tradeSelectionCallback(btn.item);
+          }
+          this.state.tradeSelectionCallback = null;
+        }
+        break;
+      }
+    }
+  }
+
+  private handleBadgePopupTouch(x: number, y: number): void {
+    if (this.badgePopupButtonArea) {
+      const btn = this.badgePopupButtonArea;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.play('choiceSelect');
+        // Add badge to earned badges
+        if (this.state.pendingBadge) {
+          this.state.badges.push(this.state.pendingBadge.name);
+        }
+        this.state.showBadgePopup = false;
+        this.state.pendingBadge = null;
+      }
+    }
+  }
+
+  private showTradeSelection(callback: (item: string | null) => void): void {
+    this.state.showTradeSelection = true;
+    this.state.tradeSelectionCallback = callback;
+  }
+
+  private awardBadge(name: string, description: string): void {
+    // Don't award duplicates
+    if (!this.state.badges.includes(name)) {
+      this.state.pendingBadge = { name, description };
+      this.state.showBadgePopup = true;
+      soundManager.play('quizCorrect');
     }
   }
 

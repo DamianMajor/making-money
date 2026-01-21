@@ -1831,7 +1831,7 @@ export class VillageLedgerGame {
   // CREDIT-FIRST: Always interactable - allows player to pick up to 3 berries at any time
   // Extra berry spawns after giving in to inflated demand
   private handleBerryBushInteraction(): void {
-    // Play bush rustling followed by item pickup sound
+    // Play bush rustling followed by item pickup sound (playBushSequence handles both sounds)
     soundManager.playBushSequence();
     
     // Check if resources are depleted (after paying first inflated demand)
@@ -1849,7 +1849,7 @@ export class VillageLedgerGame {
     if (this.state.extraBerryAvailable) {
       this.state.inventory.berries++;
       this.state.extraBerryAvailable = false; // Only one extra berry
-      this.showInventoryPopup(`+1 EXTRA BERRY!`);
+      this.showInventoryPopup(`+1 EXTRA BERRY!`, true); // Skip sound - playBushSequence handles it
       this.setMood('happy');
       this.queueDialogue([
         {
@@ -1864,7 +1864,7 @@ export class VillageLedgerGame {
     if (this.state.inventory.berries < 3) {
       this.state.inventory.berries++;
       this.state.berriesIntroduced = true; // Berries now shown in inventory
-      this.showInventoryPopup(`+1 BERRY (${this.state.inventory.berries}/3)`);
+      this.showInventoryPopup(`+1 BERRY (${this.state.inventory.berries}/3)`, true); // Skip sound - playBushSequence handles it
       this.setMood('happy');
       
       if (this.state.inventory.berries >= 3) {
@@ -2441,8 +2441,10 @@ export class VillageLedgerGame {
     this.notifyStateChange();
   }
 
-  private showInventoryPopup(text: string): void {
-    soundManager.play('itemPickup');
+  private showInventoryPopup(text: string, skipSound: boolean = false): void {
+    if (!skipSound) {
+      soundManager.play('itemPickup');
+    }
     this.inventoryPopup = {
       text,
       timer: 2,
@@ -2867,13 +2869,16 @@ export class VillageLedgerGame {
       }
     }
     
-    // Update celebration animation timer - confetti continues until applause stops
+    // Update celebration animation timer - confetti continues until applause stops or player nears home
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
-      // Celebration lasts based on applause duration (approx 5 seconds)
       const applauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
-      if (this.state.celebrationTimer > applauseDuration) {
+      const distToHome = Math.abs(this.player.x - this.playerHomeX);
+      
+      // End celebration when: applause ends OR player within 250 pixels of home
+      if (this.state.celebrationTimer > applauseDuration || distToHome <= 250) {
         this.state.showCelebration = false;
+        soundManager.fadeOut('crowdApplause', 500);
         // After celebration ends, immediately show clouds and storm approaching
         this.triggerStormApproaching();
       }
@@ -3566,8 +3571,11 @@ export class VillageLedgerGame {
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 3;
     const celebY = 80 + Math.sin(t * 5) * 10;
-    ctx.strokeText('DEBTS SETTLED!', w / 2, celebY);
-    ctx.fillText('DEBTS SETTLED!', w / 2, celebY);
+    // Only show "DEBTS SETTLED!" text for first 3 seconds
+    if (t <= 3) {
+      ctx.strokeText('DEBTS SETTLED!', w / 2, celebY);
+      ctx.fillText('DEBTS SETTLED!', w / 2, celebY);
+    }
   }
   
   private drawThunderstorm(ctx: CanvasRenderingContext2D): void {

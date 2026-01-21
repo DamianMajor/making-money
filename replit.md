@@ -99,7 +99,7 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - **Crowd Applause**: Plays alongside quiz-correct sound when player achieves 100% quiz score
 - **Improved Audio Button**: Resized to match inventory panel height (square button) for visual consistency
 - **Clickable Inventory Popup**: Tapping inventory HUD opens enlarged popup showing all 4 items (Wood, Stone, Fish, Berries) with colored icons, counts, and descriptions; tap anywhere outside to close
-- **Talking Bounce Animation**: Characters now bounce subtly (2.5px sine wave, ~3 cycles/sec) when they are the current speaker in dialogue
+- **Talking Bounce Animation**: Characters now bounce subtly (2.5px sine wave, ~3 cycles/sec) when they are the current speaker in dialogue, only while text is being typed (stops when typewriter completes)
 - **Clickable In-World Stone Tablet**: Tapping the Stone Tablet sprite in the game world opens the expanded popup view (same as tapping HUD), triggering any game interactions as well
 - **Dialogue-Aware Tablet Popup**: When dialogue is active, the tablet popup is smaller (350px height) and positioned higher to leave room for the dialogue box; overlay is lighter (55% opacity)
 

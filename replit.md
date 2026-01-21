@@ -102,6 +102,14 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - **Talking Bounce Animation**: Characters now bounce subtly (2.5px sine wave, ~3 cycles/sec) when they are the current speaker in dialogue, only while text is being typed (stops when typewriter completes)
 - **Clickable In-World Stone Tablet**: Tapping the Stone Tablet sprite in the game world opens the expanded popup view (same as tapping HUD), triggering any game interactions as well
 - **Dialogue-Aware Tablet Popup**: When dialogue is active, the tablet popup is smaller (350px height) and positioned higher to leave room for the dialogue box; overlay is lighter (55% opacity)
+- **Horizontal Choice Boxes**: Choice buttons now display horizontally within the dialogue box area, fitting multiple options side-by-side without popup overlay
+- **Double Coincidence of Wants Dialogue**: Woodcutter and Stone-worker interactions now demonstrate the economic problem - player needs wood/stone but can't offer what NPCs want (fish), teaching the concept of bartering challenges
+- **Sound Guard Flags**: Added woodReceiveSoundPlayed and stoneReceiveSoundPlayed flags to prevent triple sound playback when receiving items in Loop 2
+- **Boo/Failure Timing**: Adjusted to overlap fight ending by 2 seconds (triggers at 2s instead of 3s)
+- **Fisherman Dialogue Simplified**: Now states "I want some berries! I'll trade 1 fish for each berry" for clearer trading mechanics
+- **Storm Text Updated**: Changed from "THE STORM APPROACHES..." to "A storm approaches..." with 5-second fade-out spanning clouds and rainfall animations
+- **Post-Fishing Hint Text**: Changed from "Debts verified!" to appropriate guidance messages directing player to Stone Tablet or NPCs
+- **Post-Verification Hint Text**: After Stone Tablet verification, now directs player to "Settle your debts with the Woodcutter and Stone-worker..."
 
 ## External Dependencies
 

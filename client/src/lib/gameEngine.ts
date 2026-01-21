@@ -59,6 +59,9 @@ interface GameState {
   // Track which debts are recorded on the Stone Tablet (Loop 2 only)
   woodcutterDebtRecorded: boolean;
   stoneWorkerDebtRecorded: boolean;
+  // Track if carving sound has been played (to prevent double-trigger)
+  woodcutterCarvingSoundPlayed: boolean;
+  stoneWorkerCarvingSoundPlayed: boolean;
   // Loop 1 settlement disputes - track who has been confronted
   woodcutterDisputed: boolean;
   stoneworkerDisputed: boolean;
@@ -329,6 +332,8 @@ export class VillageLedgerGame {
       escortingNPC: null,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
+      woodcutterCarvingSoundPlayed: false,
+      stoneWorkerCarvingSoundPlayed: false,
       woodcutterDisputed: false,
       stoneworkerDisputed: false,
       woodcutterSettled: false,
@@ -1201,7 +1206,11 @@ export class VillageLedgerGame {
               speaker: 'WOODCUTTER',
               text: "Let me carve this agreement into the Stone Tablet...",
               onComplete: () => {
-                soundManager.playForDuration('stoneCarve', 2500);
+                // Only play carving sound once per carve (prevent double-trigger)
+                if (!this.state.woodcutterCarvingSoundPlayed) {
+                  this.state.woodcutterCarvingSoundPlayed = true;
+                  soundManager.playForDuration('stoneCarve', 2500);
+                }
                 // After carving sound, record debt and deliver item
                 setTimeout(() => {
                   // Only add entry if not already recorded (prevent duplicates)
@@ -1601,7 +1610,11 @@ export class VillageLedgerGame {
               speaker: 'STONE-WORKER',
               text: "Let me carve this agreement into the Stone Tablet...",
               onComplete: () => {
-                soundManager.playForDuration('stoneCarve', 2500);
+                // Only play carving sound once per carve (prevent double-trigger)
+                if (!this.state.stoneWorkerCarvingSoundPlayed) {
+                  this.state.stoneWorkerCarvingSoundPlayed = true;
+                  soundManager.playForDuration('stoneCarve', 2500);
+                }
                 // After carving sound, record debt and deliver item
                 setTimeout(() => {
                   // Only add entry if not already recorded (prevent duplicates)
@@ -3620,7 +3633,7 @@ export class VillageLedgerGame {
     ctx.font = `12px ${this.retroFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#3D2914';
-    const headerText = isSettlementPhase ? 'How will you settle this debt?' : 'How will you seal this deal?';
+    const headerText = isSettlementPhase ? 'How will you settle this debt?' : 'How many fish do you want?';
     ctx.fillText(headerText, w / 2, cardY + 35);
 
     // Draw choice buttons
@@ -4420,7 +4433,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   const renderOffset = char.renderOffsetX || 0;
   const screenX = char.x - this.cameraX + renderOffset;
   
-  // Calculate talking bounce if this character is currently speaking
+  // Calculate talking bounce if this character is currently speaking AND text is still typing
   let talkingBounce = 0;
   if (this.state.currentDialogue) {
     const speaker = this.state.currentDialogue.speaker.toUpperCase();
@@ -4430,7 +4443,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
                        (speaker === charName) ||
                        (speaker === 'STONE-WORKER' && charName === 'STONE-WORKER') ||
                        (speaker === 'VILLAGE ELDER' && charName === 'VILLAGE ELDER');
-    if (isSpeaking) {
+    // Only bounce while text is being typed (not after fully displayed)
+    const isStillTyping = this.dialogueCharIndex < this.state.currentDialogue.text.length;
+    if (isSpeaking && isStillTyping) {
       talkingBounce = Math.sin(this.talkingTimer) * 2.5; // Subtle 2.5px bounce
     }
   }
@@ -5911,6 +5926,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       escortingNPC: null,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
+      woodcutterCarvingSoundPlayed: false,
+      stoneWorkerCarvingSoundPlayed: false,
       woodcutterDisputed: false,
       stoneworkerDisputed: false,
       woodcutterSettled: false,
@@ -6006,6 +6023,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       escortingNPC: null,
       woodcutterDebtRecorded: false,
       stoneWorkerDebtRecorded: false,
+      woodcutterCarvingSoundPlayed: false,
+      stoneWorkerCarvingSoundPlayed: false,
       woodcutterDisputed: false,
       stoneworkerDisputed: false,
       woodcutterSettled: false,

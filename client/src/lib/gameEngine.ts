@@ -115,7 +115,7 @@ interface GameState {
   playerMood: 'neutral' | 'happy' | 'angry';
   moodTimer: number; // Timer to auto-reset mood to neutral
   showHUD: boolean;
-  quizAnswers: number[];
+  quizAnswers: (number | number[])[]; // Can be single-select (number) or multi-select (number[])
   showQuiz: boolean;
   showSuccess: boolean;
   showQuizReview: boolean; // Post-quiz review of all answers
@@ -1702,16 +1702,16 @@ export class VillageLedgerGame {
     }
   }
 
-  // Loop 2: Continue woodcutter dialogue after trade offer (with record choice)
+  // Loop 2: Shorter woodcutter dialogue - references past experience
   private continueWoodcutterTradeDialogueLoop2(offeredItem: string | null): void {
     const rejectAndOfferCredit = (itemName: string) => {
       let rejectText = '';
       if (itemName === 'slingshot') {
-        rejectText = "A slingshot? No thanks, I can't eat a slingshot! I need fish to feed my family.";
+        rejectText = "A slingshot? Sorry, I still need fish!";
       } else if (itemName === 'berries') {
-        rejectText = "Berries are nice, but they won't fill my belly! I need fish to feed my family.";
+        rejectText = "Berries again? I need fish!";
       } else {
-        rejectText = "That's not what I need. I need fish to feed my family.";
+        rejectText = "That won't work. I need fish.";
       }
 
       this.queueDialogue([
@@ -1721,11 +1721,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "That's the problem! You don't have what I need, and I can't use what you have. This is called the 'Double Coincidence of Wants'."
-        },
-        {
-          speaker: 'WOODCUTTER',
-          text: "I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later. How should we seal this deal?",
+          text: "Ah, the old Double Coincidence of Wants! Last time we just relied on memory... that didn't end well. A shared ledger might work better!",
           onComplete: () => {
             this.showRecordOrRememberChoice();
           }
@@ -1737,15 +1733,11 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "Actually, I don't have anything you'd want..."
+          text: "I still don't have fish..."
         },
         {
           speaker: 'WOODCUTTER',
-          text: "That's the problem! I want fish, but you don't have fish. You need what I have, but I don't need what you have. This problem is called the 'Double Coincidence of Wants'."
-        },
-        {
-          speaker: 'WOODCUTTER',
-          text: "I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later. How should we seal this deal?",
+          text: "Ah, that Double Coincidence of Wants problem again! Last time we each kept our own mental ledger... and we know how that ended.",
           onComplete: () => {
             this.showRecordOrRememberChoice();
           }
@@ -1755,7 +1747,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "How about my slingshot? It's a useful tool!"
+          text: "How about my slingshot?"
         }
       ]);
       setTimeout(() => rejectAndOfferCredit('slingshot'), 100);
@@ -1763,7 +1755,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "I have some berries! Would you take those?"
+          text: "Berries?"
         }
       ]);
       setTimeout(() => rejectAndOfferCredit('berries'), 100);
@@ -2363,15 +2355,11 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "Actually, I don't have anything you'd want..."
+          text: "I still don't have fish..."
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Same problem as always! You don't have what I want, and I don't need what you have. This 'Double Coincidence of Wants' is quite troublesome!"
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. How should we seal this deal?",
+          text: "The Double Coincidence strikes again! But this time, let's use a shared ledger instead of trusting memory.",
           onComplete: showRecordChoice
         }
       ]);
@@ -2379,19 +2367,11 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "How about my slingshot?"
+          text: "My slingshot?"
         },
         {
           speaker: 'STONE-WORKER',
-          text: "A slingshot? I already have tools! I need fish to feed my family."
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "Same problem as before! This 'Double Coincidence of Wants' keeps getting in the way!"
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. How should we seal this deal?",
+          text: "I need fish, not tools! Same problem as before - but maybe a shared record will help this time.",
           onComplete: showRecordChoice
         }
       ]);
@@ -2399,19 +2379,11 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "Would you take some berries?"
+          text: "How about berries?"
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Berries? I need something more filling. I want fish!"
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "Same problem as before! This 'Double Coincidence of Wants' keeps getting in the way!"
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. How should we seal this deal?",
+          text: "Fish is what I need! You know the drill - let's record this properly.",
           onComplete: showRecordChoice
         }
       ]);
@@ -2419,19 +2391,11 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "I have some wood! Would you trade for that?"
+          text: "Would you take wood?"
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Wood? I work with stone, not wood! I need fish for my family."
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "Same problem as before! This 'Double Coincidence of Wants' keeps getting in the way!"
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. How should we seal this deal?",
+          text: "I work with stone! Fish is what my family needs. Let's just record it this time.",
           onComplete: showRecordChoice
         }
       ]);
@@ -6166,8 +6130,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
   }
 
-  // Quiz questions
-  private quizQuestions = [
+  // Quiz questions - some are single-select, some are multi-select
+  private quizQuestions: Array<{
+    question: string;
+    options: string[];
+    correct: number | number[]; // number for single-select, number[] for multi-select
+    explanation: string;
+    multiSelect?: boolean;
+  }> = [
     {
       question: "What is the 'Double Coincidence of Wants' problem?",
       options: ["A: Both people must want exactly what the other has to trade", "B: Everyone wants the same thing at the same time"],
@@ -6191,13 +6161,27 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       options: ["A: People can honestly misremember or disagree", "B: Writing is more fun"],
       correct: 0,
       explanation: "Without records, people may genuinely believe different things about what was promised. A ledger removes this uncertainty."
+    },
+    {
+      question: "What is Money? (Select all that apply)",
+      options: [
+        "A: A system for tracking debts",
+        "B: Just coins and paper",
+        "C: A way to trade without double coincidence of wants",
+        "D: A shared record of who owes what"
+      ],
+      correct: [0, 2, 3], // A, C, D are correct
+      multiSelect: true,
+      explanation: "Money is fundamentally a system for tracking debts - it lets us trade even when we don't have what someone wants right now. It's a shared record that everyone trusts."
     }
   ];
 
   private currentQuizQuestion: number = 0;
   private quizButtonAreas: { x: number; y: number; w: number; h: number; option: number }[] = [];
+  private quizSubmitButton: { x: number; y: number; w: number; h: number } | null = null;
+  private multiSelectAnswers: number[] = []; // Track selections for current multi-select question
   private showQuizFeedback: boolean = false;
-  private quizWrongAnswers: { questionIndex: number; playerAnswer: number }[] = [];
+  private quizWrongAnswers: { questionIndex: number; playerAnswer: number | number[] }[] = [];
   private quizFeedbackScrollOffset: number = 0;
   private quizReviewScrollOffset: number = 0;
 
@@ -6253,31 +6237,62 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
     ctx.fillText(line.trim(), w / 2, lineY);
 
-    // Options as buttons
+    // Options as buttons - smaller for multi-select to fit submit button
     this.quizButtonAreas = [];
+    this.quizSubmitButton = null;
+    const isMultiSelect = q.multiSelect === true;
     const btnW = cardW - 80;
-    const btnH = 60;
+    const btnH = isMultiSelect ? 40 : 60;
+    const btnSpacing = isMultiSelect ? 48 : 80; // Tighter spacing for multi-select
     const btnX = cardX + 40;
 
     q.options.forEach((option, i) => {
-      const btnY = cardY + 160 + i * 80;
+      const btnY = cardY + 140 + i * btnSpacing;
       
-      // Button background
-      ctx.fillStyle = '#A89080';
+      // Check if this option is selected (for multi-select)
+      const isSelected = isMultiSelect && this.multiSelectAnswers.includes(i);
+      
+      // Button background - highlight if selected
+      ctx.fillStyle = isSelected ? '#6B8E23' : '#A89080';
       ctx.beginPath();
       ctx.roundRect(btnX, btnY, btnW, btnH, 8);
       ctx.fill();
-      ctx.strokeStyle = '#6B5344';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = isSelected ? '#4A6B15' : '#6B5344';
+      ctx.lineWidth = isSelected ? 3 : 2;
       ctx.stroke();
+      
+      // Draw checkbox for multi-select
+      if (isMultiSelect) {
+        const checkboxX = btnX + 12;
+        const checkboxY = btnY + btnH / 2 - 8;
+        const checkboxSize = 16;
+        
+        ctx.fillStyle = '#FFF';
+        ctx.fillRect(checkboxX, checkboxY, checkboxSize, checkboxSize);
+        ctx.strokeStyle = '#3D2914';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(checkboxX, checkboxY, checkboxSize, checkboxSize);
+        
+        // Draw checkmark if selected
+        if (isSelected) {
+          ctx.strokeStyle = '#166534';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(checkboxX + 3, checkboxY + 8);
+          ctx.lineTo(checkboxX + 7, checkboxY + 12);
+          ctx.lineTo(checkboxX + 13, checkboxY + 4);
+          ctx.stroke();
+        }
+      }
 
       // Button text with word wrapping
       ctx.font = `10px ${this.retroFont}`;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#FFF';
       
-      // Wrap option text to fit button width
-      const optMaxWidth = btnW - 20;
+      // Wrap option text to fit button width (account for checkbox in multi-select)
+      const optMaxWidth = isMultiSelect ? btnW - 50 : btnW - 20;
+      const textCenterX = isMultiSelect ? btnX + 30 + (btnW - 30) / 2 : btnX + btnW / 2;
       const optWords = option.split(' ');
       let optLine = '';
       const optLines: string[] = [];
@@ -6299,18 +6314,48 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       let optLineY = btnY + (btnH - totalTextHeight) / 2 + optLineHeight / 2 + 4;
       
       for (const line of optLines) {
-        ctx.fillText(line, btnX + btnW / 2, optLineY);
+        ctx.fillText(line, textCenterX, optLineY);
         optLineY += optLineHeight;
       }
 
       // Store button area for touch detection
       this.quizButtonAreas.push({ x: btnX, y: btnY, w: btnW, h: btnH, option: i });
     });
+    
+    // Draw Submit button for multi-select questions
+    if (isMultiSelect) {
+      const submitBtnW = 180;
+      const submitBtnH = 40;
+      const submitBtnX = (w - submitBtnW) / 2;
+      // Clamp submit button to stay within card bounds (cardY + cardH - submitBtnH - 10)
+      const rawSubmitY = cardY + 140 + q.options.length * btnSpacing + 5;
+      const maxSubmitY = cardY + cardH - submitBtnH - 10;
+      const submitBtnY = Math.min(rawSubmitY, maxSubmitY);
+      
+      // Only enable if at least one option selected
+      const hasSelection = this.multiSelectAnswers.length > 0;
+      
+      ctx.fillStyle = hasSelection ? '#166534' : '#888';
+      ctx.beginPath();
+      ctx.roundRect(submitBtnX, submitBtnY, submitBtnW, submitBtnH, 8);
+      ctx.fill();
+      ctx.strokeStyle = hasSelection ? '#14532D' : '#666';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.font = `12px ${this.retroFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#FFF';
+      ctx.fillText('SUBMIT ANSWER', w / 2, submitBtnY + submitBtnH / 2 + 4);
+      
+      this.quizSubmitButton = { x: submitBtnX, y: submitBtnY, w: submitBtnW, h: submitBtnH };
+    }
 
     // Progress indicator
     ctx.font = `10px ${this.retroFont}`;
     ctx.fillStyle = '#6B5344';
-    ctx.fillText(`Question ${this.currentQuizQuestion + 1} of ${this.quizQuestions.length}`, w / 2, cardY + cardH - 30);
+    const progressY = isMultiSelect ? cardY + cardH - 15 : cardY + cardH - 30;
+    ctx.fillText(`Question ${this.currentQuizQuestion + 1} of ${this.quizQuestions.length}`, w / 2, progressY);
   }
 
   private handleQuizTouch(x: number, y: number): void {
@@ -6325,6 +6370,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           this.quizWrongAnswers = [];
           this.currentQuizQuestion = 0;
           this.state.quizAnswers = [];
+          this.multiSelectAnswers = []; // Reset multi-select selections
           this.quizFeedbackScrollOffset = 0;
           return;
         }
@@ -6348,36 +6394,82 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       return;
     }
     
+    const q = this.quizQuestions[this.currentQuizQuestion];
+    const isMultiSelect = q.multiSelect === true;
+    
+    // Handle multi-select Submit button
+    if (isMultiSelect && this.quizSubmitButton) {
+      const btn = this.quizSubmitButton;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        if (this.multiSelectAnswers.length > 0) {
+          // Store multi-select answer and move to next question
+          this.state.quizAnswers.push([...this.multiSelectAnswers]);
+          soundManager.play('choiceSelect');
+          this.multiSelectAnswers = []; // Reset for next question
+          this.advanceQuizQuestion();
+        }
+        return;
+      }
+    }
+    
     for (const btn of this.quizButtonAreas) {
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
-        this.state.quizAnswers.push(btn.option);
-        soundManager.play('choiceSelect');
-        
-        if (this.currentQuizQuestion < this.quizQuestions.length - 1) {
-          this.currentQuizQuestion++;
-        } else {
-          // Quiz complete - check for wrong answers
-          this.quizWrongAnswers = [];
-          this.state.quizAnswers.forEach((answer, i) => {
-            if (answer !== this.quizQuestions[i].correct) {
-              this.quizWrongAnswers.push({ questionIndex: i, playerAnswer: answer });
-            }
-          });
-          
-          if (this.quizWrongAnswers.length > 0) {
-            // Show feedback for wrong answers (with retry)
-            this.showQuizFeedback = true;
-            soundManager.play('quizWrong');
+        if (isMultiSelect) {
+          // Toggle selection for multi-select
+          const idx = this.multiSelectAnswers.indexOf(btn.option);
+          if (idx >= 0) {
+            this.multiSelectAnswers.splice(idx, 1);
           } else {
-            // All correct - show quiz review before success
-            soundManager.play('quizCorrect');
-            soundManager.play('crowdApplause');
-            this.state.showQuiz = false;
-            this.state.showQuizReview = true;
-            this.quizReviewScrollOffset = 0;
+            this.multiSelectAnswers.push(btn.option);
           }
+          soundManager.play('choiceSelect');
+        } else {
+          // Single-select: store answer and advance
+          this.state.quizAnswers.push(btn.option);
+          soundManager.play('choiceSelect');
+          this.advanceQuizQuestion();
         }
         break;
+      }
+    }
+  }
+  
+  private advanceQuizQuestion(): void {
+    if (this.currentQuizQuestion < this.quizQuestions.length - 1) {
+      this.currentQuizQuestion++;
+    } else {
+      // Quiz complete - check for wrong answers
+      this.quizWrongAnswers = [];
+      this.state.quizAnswers.forEach((answer, i) => {
+        const q = this.quizQuestions[i];
+        if (q.multiSelect) {
+          // Multi-select: compare arrays
+          const correctArr = q.correct as number[];
+          const answerArr = answer as number[];
+          const isCorrect = correctArr.length === answerArr.length && 
+            correctArr.every(v => answerArr.includes(v));
+          if (!isCorrect) {
+            this.quizWrongAnswers.push({ questionIndex: i, playerAnswer: answer });
+          }
+        } else {
+          // Single-select: compare numbers
+          if (answer !== q.correct) {
+            this.quizWrongAnswers.push({ questionIndex: i, playerAnswer: answer as number });
+          }
+        }
+      });
+      
+      if (this.quizWrongAnswers.length > 0) {
+        // Show feedback for wrong answers (with retry)
+        this.showQuizFeedback = true;
+        soundManager.play('quizWrong');
+      } else {
+        // All correct - show quiz review before success
+        soundManager.play('quizCorrect');
+        soundManager.play('crowdApplause');
+        this.state.showQuiz = false;
+        this.state.showQuizReview = true;
+        this.quizReviewScrollOffset = 0;
       }
     }
   }
@@ -6457,14 +6549,26 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     });
     yOffset += 5;
     
-    // Your answer (wrong)
+    // Your answer (wrong) - generate letter labels by index (A, B, C, D...)
     ctx.fillStyle = '#DC2626';
-    ctx.fillText(`Your answer: ${q.options[wrong.playerAnswer]}`, cardX + 30, yOffset);
+    if (q.multiSelect && Array.isArray(wrong.playerAnswer)) {
+      const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+      const yourLetters = (wrong.playerAnswer as number[]).map(i => letters[i]).join(', ') || 'None';
+      ctx.fillText(`Your answer: ${yourLetters}`, cardX + 30, yOffset);
+    } else {
+      ctx.fillText(`Your answer: ${q.options[wrong.playerAnswer as number]}`, cardX + 30, yOffset);
+    }
     yOffset += 22;
     
     // Correct answer - darker green for readability
     ctx.fillStyle = '#166534';
-    ctx.fillText(`Correct: ${q.options[q.correct]}`, cardX + 30, yOffset);
+    if (q.multiSelect && Array.isArray(q.correct)) {
+      const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+      const correctLetters = (q.correct as number[]).map(i => letters[i]).join(', ');
+      ctx.fillText(`Correct: ${correctLetters}`, cardX + 30, yOffset);
+    } else {
+      ctx.fillText(`Correct: ${q.options[q.correct as number]}`, cardX + 30, yOffset);
+    }
     yOffset += 25;
     
     // Explanation with more room

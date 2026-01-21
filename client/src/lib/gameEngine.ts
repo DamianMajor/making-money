@@ -559,7 +559,9 @@ export class VillageLedgerGame {
       const hudY = 24;
       if (x >= hudX && x <= hudX + this.hudWidth && y >= hudY && y <= hudY + this.hudHeight) {
         this.state.showStoneTabletPopup = true;
-        soundManager.play('stoneLedger');
+        // Play stone ledger sound reduced by 1 second (getBufferDuration returns ms)
+        const ledgerDuration = Math.max(500, soundManager.getBufferDuration('stoneLedger') - 1000);
+        soundManager.playForDuration('stoneLedger', ledgerDuration);
         return;
       }
     }
@@ -659,7 +661,9 @@ export class VillageLedgerGame {
         if (inRange) {
           // Open the Stone Tablet popup view (same as clicking the HUD)
           this.state.showStoneTabletPopup = true;
-          soundManager.play('stoneLedger');
+          // Play stone ledger sound reduced by 1 second (getBufferDuration returns ms)
+          const ledgerDuration = Math.max(500, soundManager.getBufferDuration('stoneLedger') - 1000);
+          soundManager.playForDuration('stoneLedger', ledgerDuration);
           // Also trigger any game-related Stone Tablet interaction
           this.handleStoneTabletInteraction();
           this.autoWalkTarget = null;
@@ -992,7 +996,7 @@ export class VillageLedgerGame {
             setTimeout(() => {
               try {
                 this.state.showRainfall = false; // Turn off rain
-                soundManager.fadeOut('rain', 1000);
+                soundManager.fadeOut('rain', 3000);
                 this.state.showNightTransition = false;
                 this.state.showQuiz = true;
                 this.state.phase = 'quiz';
@@ -1048,7 +1052,7 @@ export class VillageLedgerGame {
             setTimeout(() => {
               try {
                 this.state.showRainfall = false; // Now turn off rain
-                soundManager.fadeOut('rain', 1000);
+                soundManager.fadeOut('rain', 3000);
                 soundManager.fadeOut('ambientNight', 1000); // Fade out ambient night
                 this.state.showNightTransition = false;
                 this.state.showQuiz = true;
@@ -1274,7 +1278,7 @@ export class VillageLedgerGame {
                       setTimeout(() => {
                         this.awardBadge(
                           'Ledger Master',
-                          'You recorded your second debt on the Stone Tablet! A ledger is a permanent record that everyone can verify - no more disputes about who owes what. This is the foundation of all accounting systems.'
+                          'You recorded your second debt on the Stone Tablet! A ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
                         );
                       }, 2000);
                     }
@@ -1916,7 +1920,7 @@ export class VillageLedgerGame {
                       setTimeout(() => {
                         this.awardBadge(
                           'Ledger Master',
-                          'You recorded your second debt on the Stone Tablet! A ledger is a permanent record that everyone can verify - no more disputes about who owes what. This is the foundation of all accounting systems.'
+                          'You recorded your second debt on the Stone Tablet! A ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
                         );
                       }, 2000);
                     }
@@ -2216,13 +2220,15 @@ export class VillageLedgerGame {
       this.setMood('happy');
       this.state.phase = 'got_stone_need_fish';
       this.stoneWorker.targetX = this.villageCenterX - 100;
-      // Award badge after second encounter with double coincidence
-      setTimeout(() => {
-        this.awardBadge(
-          'Double Coincidence of Wants',
-          'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!'
-        );
-      }, 1000);
+      // Award badge after second encounter with double coincidence (only in loop 1)
+      if (this.state.loop === 1) {
+        setTimeout(() => {
+          this.awardBadge(
+            'Double Coincidence of Wants',
+            'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!'
+          );
+        }, 1000);
+      }
     };
 
     if (offeredItem === null) {
@@ -2322,13 +2328,6 @@ export class VillageLedgerGame {
                 onComplete: () => {
                   this.state.phase = 'loop2_escorting_stoneworker';
                   this.state.escortingNPC = 'stoneworker';
-                  // Award badge after second encounter
-                  setTimeout(() => {
-                    this.awardBadge(
-                      'Double Coincidence of Wants',
-                      'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!'
-                    );
-                  }, 1000);
                 }
               }
             ]);
@@ -2346,13 +2345,6 @@ export class VillageLedgerGame {
                   this.state.phase = 'loop2_escorting_stoneworker';
                   this.state.escortingNPC = 'stoneworker';
                   this.state.stoneWorkerDebtRecorded = true;
-                  // Award badge after second encounter
-                  setTimeout(() => {
-                    this.awardBadge(
-                      'Double Coincidence of Wants',
-                      'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!'
-                    );
-                  }, 1000);
                 }
               }
             ]);
@@ -3965,7 +3957,7 @@ export class VillageLedgerGame {
                   setTimeout(() => {
                     try {
                       this.state.showRainfall = false;
-                      soundManager.fadeOut('rain', 1000);
+                      soundManager.fadeOut('rain', 3000);
                       this.state.showNightTransition = false;
                       this.state.showQuiz = true;
                       this.state.phase = 'quiz';
@@ -5299,8 +5291,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   const screenX = char.x - this.cameraX + renderOffset;
   
   // Calculate talking bounce if this character is currently speaking AND text is still typing
+  // Don't bounce if NPC is carving into the ledger
   let talkingBounce = 0;
-  if (this.state.currentDialogue) {
+  const isCarving = (char.name.toUpperCase() === 'WOODCUTTER' && this.state.woodcutterCarvingSoundPlayed && !this.state.ledgerEntries.some(e => e.debt.includes('WOODCUTTER'))) ||
+                    (char.name.toUpperCase() === 'STONE-WORKER' && this.state.stoneWorkerCarvingSoundPlayed && !this.state.ledgerEntries.some(e => e.debt.includes('STONE-WORKER')));
+  if (this.state.currentDialogue && !isCarving) {
     const speaker = this.state.currentDialogue.speaker.toUpperCase();
     const charName = char.name.toUpperCase();
     // Match speaker to character (handle YOU -> player, others by name)
@@ -5994,6 +5989,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             hint = 'Ask the Elder to help settle the dispute...';
           }
           break;
+        case 'loop2_escorting_woodcutter':
+        case 'loop2_escorting_stoneworker':
+          hint = 'Go to the Stone Tablet to record the debt...';
+          break;
         case 'loop2_got_fish':
           // After getting fish, direct to Stone Tablet or settling
           if (this.state.elderVerified || (this.state.woodcutterDebtRecorded && this.state.stoneWorkerDebtRecorded)) {
@@ -6238,11 +6237,37 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Button text
+      // Button text with word wrapping
       ctx.font = `10px ${this.retroFont}`;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#FFF';
-      ctx.fillText(option, btnX + btnW / 2, btnY + btnH / 2 + 4);
+      
+      // Wrap option text to fit button width
+      const optMaxWidth = btnW - 20;
+      const optWords = option.split(' ');
+      let optLine = '';
+      const optLines: string[] = [];
+      
+      for (const word of optWords) {
+        const testLine = optLine + word + ' ';
+        if (ctx.measureText(testLine).width > optMaxWidth && optLine !== '') {
+          optLines.push(optLine.trim());
+          optLine = word + ' ';
+        } else {
+          optLine = testLine;
+        }
+      }
+      optLines.push(optLine.trim());
+      
+      // Draw lines centered vertically in button
+      const optLineHeight = 14;
+      const totalTextHeight = optLines.length * optLineHeight;
+      let optLineY = btnY + (btnH - totalTextHeight) / 2 + optLineHeight / 2 + 4;
+      
+      for (const line of optLines) {
+        ctx.fillText(line, btnX + btnW / 2, optLineY);
+        optLineY += optLineHeight;
+      }
 
       // Store button area for touch detection
       this.quizButtonAreas.push({ x: btnX, y: btnY, w: btnW, h: btnH, option: i });

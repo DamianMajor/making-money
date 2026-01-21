@@ -416,8 +416,8 @@ export class SoundManager {
   public playBushSequence(): void {
     if (this.muted || !this.initialized) return;
     
-    // Play bush sound for max 2 seconds, then item pickup after 1 second delay
-    this.playForDuration('bush', 2000);
+    // Play bush sound for max 1.5 seconds, then item pickup after 1 second delay
+    this.playForDuration('bush', 1500);
     
     // Item pickup starts after 1 second delay
     setTimeout(() => {

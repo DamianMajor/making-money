@@ -793,8 +793,8 @@ export class VillageLedgerGame {
                          this.state.phase === 'complete';
     
     // LOOP 2 SUCCESS: Debts settled, time to return home
-    // Player must interact with hut to trigger storm sequence - no auto-trigger
-    if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && !this.state.showCloudsAnimation && !this.state.showNightTransition && !this.state.showSuccess && !this.state.playerEnteredHut) {
+    // Player must interact with hut to fix roof and enter - allow interaction even during clouds animation
+    if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && !this.state.showNightTransition && !this.state.showSuccess && !this.state.playerEnteredHut) {
       
       // If roof needs fixing, fix it first, then trigger storm sequence
       if (!this.state.roofRepaired && hasWood) {
@@ -2958,9 +2958,9 @@ export class VillageLedgerGame {
       if (this.state.celebrationTimer > applauseDuration || distToHome <= 250) {
         this.state.showCelebration = false;
         this.celebrationEndTime = Date.now();
-        // Fade out both celebration and applause sounds
-        soundManager.fadeOut('crowdApplause', 500);
-        soundManager.fadeOut('celebration', 500);
+        // Fade out both celebration and applause sounds (2.5 seconds for smooth fade)
+        soundManager.fadeOut('crowdApplause', 2500);
+        soundManager.fadeOut('celebration', 2500);
       }
     }
     
@@ -3634,9 +3634,9 @@ export class VillageLedgerGame {
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
     
-    // Calculate fade out - start fading 1.5 seconds before end
+    // Calculate fade out - start fading 3.5 seconds before end (2s longer fade)
     const applauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
-    const fadeStartTime = Math.max(0, applauseDuration - 1.5);
+    const fadeStartTime = Math.max(0, applauseDuration - 3.5);
     const distToHome = Math.abs(this.player.x - this.playerHomeX);
     
     // Also start fading when approaching home (within 400 pixels, full fade at 250)

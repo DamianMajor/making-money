@@ -659,6 +659,7 @@ export class VillageLedgerGame {
         if (inRange) {
           // Open the Stone Tablet popup view (same as clicking the HUD)
           this.state.showStoneTabletPopup = true;
+          soundManager.play('stoneLedger');
           // Also trigger any game-related Stone Tablet interaction
           this.handleStoneTabletInteraction();
           this.autoWalkTarget = null;
@@ -1268,6 +1269,15 @@ export class VillageLedgerGame {
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('WOODCUTTER'));
                   if (!alreadyRecorded) {
                     this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
+                    // Award Ledger badge after second entry
+                    if (this.state.ledgerEntries.length >= 2) {
+                      setTimeout(() => {
+                        this.awardBadge(
+                          'Ledger Master',
+                          'You recorded your second debt on the Stone Tablet! A ledger is a permanent record that everyone can verify - no more disputes about who owes what. This is the foundation of all accounting systems.'
+                        );
+                      }, 2000);
+                    }
                   }
                   this.state.showHUD = true;
                   this.hudGlow = 1;
@@ -1602,7 +1612,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "Tell you what - I'll give you the wood on credit. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
+          text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.state.obtainedWood = true;
@@ -1632,7 +1642,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "Tell you what - I'll give you the wood on credit. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
+          text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.state.obtainedWood = true;
@@ -1662,7 +1672,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "Tell you what - I'll give you the wood on credit. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
+          text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.state.obtainedWood = true;
@@ -1705,7 +1715,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "I'll lend you the wood on credit. Bring me a Sharp Stone and 1 Fish later. How should we seal this deal?",
+          text: "I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later. How should we seal this deal?",
           onComplete: () => {
             this.showRecordOrRememberChoice();
           }
@@ -1725,7 +1735,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "I'll lend you the wood on credit. Bring me a Sharp Stone and 1 Fish later. How should we seal this deal?",
+          text: "I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later. How should we seal this deal?",
           onComplete: () => {
             this.showRecordOrRememberChoice();
           }
@@ -1901,6 +1911,15 @@ export class VillageLedgerGame {
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('STONE-WORKER'));
                   if (!alreadyRecorded) {
                     this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
+                    // Award Ledger badge after second entry
+                    if (this.state.ledgerEntries.length >= 2) {
+                      setTimeout(() => {
+                        this.awardBadge(
+                          'Ledger Master',
+                          'You recorded your second debt on the Stone Tablet! A ledger is a permanent record that everyone can verify - no more disputes about who owes what. This is the foundation of all accounting systems.'
+                        );
+                      }, 2000);
+                    }
                   }
                   this.hudGlow = 1;
                   // Now deliver the stone and move to final position
@@ -2218,7 +2237,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Tell you what - I'll give you the stone on credit. Bring me 2 Fish later. I'll meet you at the Village Center.",
+          text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
           onComplete: finishWithBadge
         }
       ]);
@@ -2238,7 +2257,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Tell you what - I'll give you the stone on credit. Bring me 2 Fish later. I'll meet you at the Village Center.",
+          text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
           onComplete: finishWithBadge
         }
       ]);
@@ -2258,7 +2277,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Tell you what - I'll give you the stone on credit. Bring me 2 Fish later. I'll meet you at the Village Center.",
+          text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
           onComplete: finishWithBadge
         }
       ]);
@@ -2278,7 +2297,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Tell you what - I'll give you the stone on credit. Bring me 2 Fish later. I'll meet you at the Village Center.",
+          text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
           onComplete: finishWithBadge
         }
       ]);
@@ -2354,7 +2373,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "I'll give you the stone on credit. Bring me 2 Fish later. How should we seal this deal?",
+          text: "I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. How should we seal this deal?",
           onComplete: showRecordChoice
         }
       ]);
@@ -2374,7 +2393,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "I'll give you the stone on credit. Bring me 2 Fish later. How should we seal this deal?",
+          text: "I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. How should we seal this deal?",
           onComplete: showRecordChoice
         }
       ]);
@@ -2394,7 +2413,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "I'll give you the stone on credit. Bring me 2 Fish later. How should we seal this deal?",
+          text: "I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. How should we seal this deal?",
           onComplete: showRecordChoice
         }
       ]);
@@ -2414,7 +2433,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "I'll give you the stone on credit. Bring me 2 Fish later. How should we seal this deal?",
+          text: "I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. How should we seal this deal?",
           onComplete: showRecordChoice
         }
       ]);
@@ -2484,7 +2503,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "I want some berries! I'll trade 1 fish for each berry you bring me.",
+          text: "I would love some berries! Do you have any? I'll trade 1 fish for each berry you bring me.",
           onComplete: () => {
             // Build choice options based on how many berries the player has
             const choices: { text: string; action: () => void }[] = [];
@@ -2556,7 +2575,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "I'll trade you 3 Fish for 3 Berries. Find them at the berry bush to the west!"
+          text: "I would love some berries! Do you have any? Find them at the berry bush to the west!"
         }
       ]);
     }
@@ -4152,17 +4171,45 @@ export class VillageLedgerGame {
     const btnSpacing = 10;
     const btnH = 45;
     
-    // Calculate button layout - fit horizontally with spacing
-    const totalAvailableWidth = w - (padding * 2) - ((numChoices - 1) * btnSpacing);
-    const btnW = Math.min(180, totalAvailableWidth / numChoices);
-    const totalButtonsWidth = (btnW * numChoices) + ((numChoices - 1) * btnSpacing);
+    // Calculate button layout - measure text to ensure proper width
+    // Start with normal font size, reduce if needed
+    let fontSize = 14;
+    const minFontSize = 10;
+    let btnW: number;
+    let maxTextWidth: number;
+    
+    // Find optimal font size and button width
+    while (fontSize >= minFontSize) {
+      ctx.font = `bold ${fontSize}px ${this.retroFont}`;
+      
+      // Measure all button texts to find the widest
+      maxTextWidth = 0;
+      this.state.choiceOptions.forEach(option => {
+        const textWidth = ctx.measureText(option.text).width;
+        if (textWidth > maxTextWidth) maxTextWidth = textWidth;
+      });
+      
+      // Button width = text width + padding (30px on each side)
+      const idealBtnW = maxTextWidth + 60;
+      const totalAvailableWidth = w - (padding * 2) - ((numChoices - 1) * btnSpacing);
+      const maxBtnW = totalAvailableWidth / numChoices;
+      btnW = Math.min(idealBtnW, maxBtnW);
+      
+      // Check if text fits with padding
+      if (maxTextWidth + 20 <= btnW) {
+        break; // Text fits, use this font size
+      }
+      fontSize -= 1;
+    }
+    
+    const totalButtonsWidth = (btnW! * numChoices) + ((numChoices - 1) * btnSpacing);
     const startX = (w - totalButtonsWidth) / 2;
     const btnY = dialogueY + (this.dialogueBoxHeight - btnH) / 2;
 
     // Draw choice buttons horizontally
     this.choiceButtonAreas = [];
     this.state.choiceOptions.forEach((option, i) => {
-      const btnX = startX + i * (btnW + btnSpacing);
+      const btnX = startX + i * (btnW! + btnSpacing);
 
       // Color logic:
       // Settlement phase: first option (consult tablet) = GREEN (smart), second (give in) = RED (risky)
@@ -4178,22 +4225,22 @@ export class VillageLedgerGame {
       // Button background with border
       ctx.fillStyle = btnColor;
       ctx.beginPath();
-      ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+      ctx.roundRect(btnX, btnY, btnW!, btnH, 8);
       ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,0.3)';
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Draw button text centered
-      ctx.font = `bold 14px ${this.retroFont}`;
+      // Draw button text centered with calculated font size
+      ctx.font = `bold ${fontSize}px ${this.retroFont}`;
       ctx.fillStyle = '#FFF';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       
-      // Simple text (choices should be short like "1 Fish", "2 Fish")
-      ctx.fillText(option.text, btnX + btnW / 2, btnY + btnH / 2);
+      // Draw text - it should fit since we measured and adjusted font
+      ctx.fillText(option.text, btnX + btnW! / 2, btnY + btnH / 2);
 
-      this.choiceButtonAreas.push({ x: btnX, y: btnY, w: btnW, h: btnH, index: i });
+      this.choiceButtonAreas.push({ x: btnX, y: btnY, w: btnW!, h: btnH, index: i });
     });
     
     ctx.textBaseline = 'alphabetic';
@@ -4314,9 +4361,9 @@ export class VillageLedgerGame {
     const w = this.canvas.width;
     const h = this.canvas.height;
     
-    // Popup dimensions
-    const popupWidth = 400;
-    const popupHeight = 280;
+    // Popup dimensions - increased height for text and button spacing
+    const popupWidth = 420;
+    const popupHeight = 360;
     const popupX = (w - popupWidth) / 2;
     const popupY = (h - popupHeight) / 2;
     
@@ -4682,13 +4729,13 @@ export class VillageLedgerGame {
     this.drawCloud(ctx, w * 0.4, h * 0.14, 180, centerCloudAlpha * 0.8, '#353550');
     this.drawCloud(ctx, w * 0.6, h * 0.16, 190, centerCloudAlpha * 0.8, '#353550');
     
-    // Text overlay at the end - fades in then fades out after 5 seconds
-    // Text appears at progress > 0.7 (t = 1.75s), should fade out by t = 6.75s
-    const textAppearTime = 1.75; // When text starts appearing
-    const textDuration = 5; // How long text stays fully visible
-    const textFadeOutTime = 1; // How long to fade out
-    
-    if (progress > 0.7) {
+    // Text overlay at the end - fades in then fades out
+    // Skip text entirely once roof fix starts (roofRepaired becomes true)
+    if (!this.state.roofRepaired && progress > 0.7) {
+      const textAppearTime = 1.75;
+      const textDuration = 5;
+      const textFadeOutTime = 1;
+      
       let textAlpha = (progress - 0.7) / 0.3; // Fade in
       
       // Calculate fade out (after 5 seconds of visibility)
@@ -4757,31 +4804,31 @@ export class VillageLedgerGame {
       ctx.fillRect(0, 0, w, h);
     }
     
-    // Continue showing "A storm approaches" text with fade
-    // Text appeared at 1.75s during clouds, should fade after 5s total visibility
-    // Rainfall starts at 2.5s, so text has been visible for 0.75s when rainfall begins
-    // Fade out when rainfallTimer + 0.75 > 5 (i.e., rainfallTimer > 4.25)
-    const textVisibleTime = t + 0.75; // Time since text first appeared
-    const textDuration = 5; // Total visibility before fade
-    const textFadeOutTime = 1; // Fade out duration
-    
-    if (textVisibleTime < textDuration + textFadeOutTime) {
-      let textAlpha = 1;
-      if (textVisibleTime > textDuration) {
-        textAlpha = Math.max(0, 1 - (textVisibleTime - textDuration) / textFadeOutTime);
-      }
+    // Show "A storm approaches" text with fade - but hide once roof fix starts
+    // Once roofRepaired is true, fade out the text quickly
+    if (!this.state.roofRepaired) {
+      const textVisibleTime = t + 0.75; // Time since text first appeared
+      const textDuration = 5; // Total visibility before fade
+      const textFadeOutTime = 1; // Fade out duration
       
-      if (textAlpha > 0) {
-        ctx.save();
-        ctx.globalAlpha = textAlpha;
-        ctx.font = `bold 24px ${this.retroFont}`;
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#FFFFFF';
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 3;
-        ctx.strokeText('A storm approaches...', w / 2, h / 2);
-        ctx.fillText('A storm approaches...', w / 2, h / 2);
-        ctx.restore();
+      if (textVisibleTime < textDuration + textFadeOutTime) {
+        let textAlpha = 1;
+        if (textVisibleTime > textDuration) {
+          textAlpha = Math.max(0, 1 - (textVisibleTime - textDuration) / textFadeOutTime);
+        }
+        
+        if (textAlpha > 0) {
+          ctx.save();
+          ctx.globalAlpha = textAlpha;
+          ctx.font = `bold 24px ${this.retroFont}`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 3;
+          ctx.strokeText('A storm approaches...', w / 2, h / 2);
+          ctx.fillText('A storm approaches...', w / 2, h / 2);
+          ctx.restore();
+        }
       }
     }
   }
@@ -6089,22 +6136,28 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   // Quiz questions
   private quizQuestions = [
     {
-      question: "Why was the Stone-worker angry?",
-      options: ["A: He forgot the deal", "B: He didn't like fish"],
+      question: "What is the 'Double Coincidence of Wants' problem?",
+      options: ["A: Both people must want exactly what the other has to trade", "B: Everyone wants the same thing at the same time"],
       correct: 0,
-      explanation: "Without a written record, memories can differ. The Stone-worker genuinely believed a different amount was promised."
+      explanation: "For direct trade to work, you need what I have AND I need what you have - at the same time. This rarely happens!"
     },
     {
-      question: "What is the main benefit of the Stone Ledger?",
-      options: ["A: It's pretty", "B: It is a shared, immutable record"],
+      question: "Why couldn't you trade directly with the Woodcutter?",
+      options: ["A: He was being unfriendly", "B: He wanted fish, but you didn't have fish"],
       correct: 1,
-      explanation: "The Stone Tablet creates an unchangeable, shared record that everyone can verify - no need to trust anyone's memory."
+      explanation: "You needed wood, but could only offer a slingshot or berries. The Woodcutter wanted fish - a classic Double Coincidence of Wants problem."
     },
     {
-      question: "Why did the Woodcutter trust you at the end?",
-      options: ["A: Because the debt was recorded publicly", "B: Because he is nice"],
+      question: "What problem does the Stone Ledger solve?",
+      options: ["A: Keeping a permanent record everyone can verify", "B: Making debts disappear"],
       correct: 0,
-      explanation: "The public record on the Stone Tablet meant neither party had to rely on trust alone - the truth was carved in stone for all to see."
+      explanation: "The ledger creates a shared, unchangeable record. No more disputes about who owes what - it's carved in stone for all to see."
+    },
+    {
+      question: "Why is recording debts better than relying on memory?",
+      options: ["A: People can honestly misremember or disagree", "B: Writing is more fun"],
+      correct: 0,
+      explanation: "Without records, people may genuinely believe different things about what was promised. A ledger removes this uncertainty."
     }
   ];
 
@@ -6496,7 +6549,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     // Card dimensions
     const cardW = Math.min(700, w - 40);
-    const cardH = Math.min(550, h - 40);
+    const cardH = Math.min(520, h - 40);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
     
@@ -6510,138 +6563,71 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.stroke();
     
     // Title
-    ctx.font = `bold 18px ${this.retroFont}`;
+    ctx.font = `bold 20px ${this.retroFont}`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#3D2914';
-    ctx.fillText('LESSON COMPLETE!', w / 2, cardY + 40);
+    ctx.fillStyle = '#166534';
+    ctx.fillText('LESSON COMPLETE!', w / 2, cardY + 45);
     
-    // Score
+    // Score line
     ctx.font = `12px ${this.retroFont}`;
     ctx.fillStyle = '#5D4837';
-    ctx.fillText(`You answered all ${this.quizQuestions.length} questions correctly!`, w / 2, cardY + 65);
-    
-    // Current question display (one at a time with navigation)
-    const qIdx = this.quizReviewScrollOffset;
-    const q = this.quizQuestions[qIdx];
-    const playerAnswer = this.state.quizAnswers[qIdx];
-    const isCorrect = playerAnswer === q.correct;
+    ctx.fillText(`You answered all ${this.quizQuestions.length} questions correctly!`, w / 2, cardY + 75);
     
     const maxWidth = cardW - 60;
-    let yOffset = cardY + 100;
+    let yOffset = cardY + 110;
     
-    // Question counter
-    ctx.font = `bold 11px ${this.retroFont}`;
+    // Main educational summary
+    ctx.font = `bold 14px ${this.retroFont}`;
+    ctx.fillStyle = '#3D2914';
+    ctx.fillText('What You Learned:', w / 2, yOffset);
+    yOffset += 30;
+    
+    // Key lessons
+    ctx.font = `12px ${this.retroFont}`;
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#6B5344';
-    ctx.fillText(`Question ${qIdx + 1} of ${this.quizQuestions.length}:`, cardX + 30, yOffset);
+    ctx.fillStyle = '#5D4837';
+    
+    const lessons = [
+      "1. The Double Coincidence of Wants makes direct trading difficult - both parties must want exactly what the other has, at the same time.",
+      "2. Debt allows trade even when you don't have what someone wants right now - you can promise to pay later.",
+      "3. A Ledger creates a permanent, shared record that everyone can verify - no more disputes about who owes what.",
+      "4. Money evolved as a social tool to solve these problems - it tracks debts so anyone can trade with anyone, anytime."
+    ];
+    
+    lessons.forEach(lesson => {
+      const lines = this.wrapText(ctx, lesson, maxWidth);
+      lines.forEach(line => {
+        ctx.fillText(line, cardX + 30, yOffset);
+        yOffset += 18;
+      });
+      yOffset += 8;
+    });
+    
+    yOffset += 10;
+    
+    // Big takeaway
+    ctx.font = `bold 12px ${this.retroFont}`;
+    ctx.fillStyle = '#6B4423';
+    ctx.textAlign = 'center';
+    ctx.fillText('The Big Idea:', w / 2, yOffset);
     yOffset += 22;
     
-    // Question text
-    ctx.font = `11px ${this.retroFont}`;
+    ctx.font = `italic 11px ${this.retroFont}`;
     ctx.fillStyle = '#3D2914';
-    const questionLines = this.wrapText(ctx, q.question, maxWidth);
-    questionLines.forEach(line => {
-      ctx.fillText(line, cardX + 30, yOffset);
+    const bigIdea = "Money is not just coins or paper - it's a system for keeping track of debts. When you work and get paid, you earn the right to collect value from others later. The Stone Tablet was an early ledger - today we use banks and computers, but the idea is the same!";
+    const bigIdeaLines = this.wrapText(ctx, bigIdea, maxWidth);
+    bigIdeaLines.forEach(line => {
+      ctx.fillText(line, w / 2, yOffset);
       yOffset += 18;
     });
-    yOffset += 10;
     
-    // Show all options with highlighting
-    q.options.forEach((option, optIdx) => {
-      const wasChosen = optIdx === playerAnswer;
-      const isCorrectOption = optIdx === q.correct;
-      
-      // Use darker green (#166534) for correct, red for wrong
-      if (isCorrectOption) {
-        ctx.fillStyle = '#166534'; // Darker green for readability
-        ctx.font = `bold 10px ${this.retroFont}`;
-      } else if (wasChosen && !isCorrectOption) {
-        ctx.fillStyle = '#DC2626'; // Red for wrong answer
-        ctx.font = `10px ${this.retroFont}`;
-      } else {
-        ctx.fillStyle = '#5D4837';
-        ctx.font = `10px ${this.retroFont}`;
-      }
-      
-      const prefix = isCorrectOption ? '✓ ' : wasChosen ? '✗ ' : '  ';
-      ctx.fillText(`${prefix}${option}`, cardX + 35, yOffset);
-      yOffset += 20;
-    });
-    
-    yOffset += 10;
-    
-    // Explanation
-    ctx.font = `italic 10px ${this.retroFont}`;
-    ctx.fillStyle = '#5D4837';
-    const explanationLines = this.wrapText(ctx, q.explanation, maxWidth);
-    explanationLines.forEach(line => {
-      ctx.fillText(line, cardX + 30, yOffset);
-      yOffset += 16;
-    });
-    
-    // Educational note about money (show on last question)
-    if (qIdx === this.quizQuestions.length - 1) {
-      yOffset += 15;
-      ctx.font = `bold 10px ${this.retroFont}`;
-      ctx.fillStyle = '#6B4423';
-      ctx.textAlign = 'center';
-      ctx.fillText('The Lesson of the Stone Tablet:', w / 2, yOffset);
-      yOffset += 18;
-      
-      ctx.font = `10px ${this.retroFont}`;
-      ctx.fillStyle = '#5D4837';
-      const lessonText = "Money is a system for tracking debt. When someone creates value for others, money represents what they are owed. Even today, when you work and receive payment, those dollars represent that others owe you something in return—a debt you can collect later in many forms.";
-      const lessonLines = this.wrapText(ctx, lessonText, maxWidth);
-      lessonLines.forEach(line => {
-        ctx.fillText(line, w / 2, yOffset);
-        yOffset += 16;
-      });
-    }
-    
-    // Navigation buttons
-    const navY = cardY + cardH - 110;
-    const navBtnW = 90;
-    const navBtnH = 35;
-    
-    // Prev button
-    if (qIdx > 0) {
-      const prevX = cardX + 30;
-      ctx.fillStyle = '#6B7280';
-      ctx.beginPath();
-      ctx.roundRect(prevX, navY, navBtnW, navBtnH, 6);
-      ctx.fill();
-      ctx.font = `10px ${this.retroFont}`;
-      ctx.fillStyle = '#FFF';
-      ctx.textAlign = 'center';
-      ctx.fillText('< PREV', prevX + navBtnW / 2, navY + navBtnH / 2 + 4);
-      this.reviewPrevButton = { x: prevX, y: navY, w: navBtnW, h: navBtnH };
-    } else {
-      this.reviewPrevButton = null;
-    }
-    
-    // Next button
-    if (qIdx < this.quizQuestions.length - 1) {
-      const nextX = cardX + cardW - 30 - navBtnW;
-      ctx.fillStyle = '#6B7280';
-      ctx.beginPath();
-      ctx.roundRect(nextX, navY, navBtnW, navBtnH, 6);
-      ctx.fill();
-      ctx.font = `10px ${this.retroFont}`;
-      ctx.fillStyle = '#FFF';
-      ctx.textAlign = 'center';
-      ctx.fillText('NEXT >', nextX + navBtnW / 2, navY + navBtnH / 2 + 4);
-      this.reviewNextButton = { x: nextX, y: navY, w: navBtnW, h: navBtnH };
-    } else {
-      this.reviewNextButton = null;
-    }
-    
-    // Continue button (always visible)
+    // Continue button
     const btnW = 200;
     const btnH = 50;
     const btnX = (w - btnW) / 2;
-    const btnY = cardY + cardH - 60;
+    const btnY = cardY + cardH - 65;
     
-    ctx.fillStyle = '#166534'; // Darker green to match theme
+    ctx.fillStyle = '#166534';
     ctx.beginPath();
     ctx.roundRect(btnX, btnY, btnW, btnH, 8);
     ctx.fill();
@@ -6652,9 +6638,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.font = `14px ${this.retroFont}`;
     ctx.fillStyle = '#FFF';
     ctx.textAlign = 'center';
-    ctx.fillText('CONTINUE', w / 2, btnY + btnH / 2 + 5);
+    ctx.fillText('FINISH', w / 2, btnY + btnH / 2 + 5);
     
     this.reviewContinueButton = { x: btnX, y: btnY, w: btnW, h: btnH };
+    this.reviewPrevButton = null;
+    this.reviewNextButton = null;
   }
 
   private drawSuccessScreen(ctx: CanvasRenderingContext2D): void {

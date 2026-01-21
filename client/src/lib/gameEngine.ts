@@ -50,7 +50,16 @@ interface GameState {
     fish: number;
     wood: number;
     berries: number;
+    slingshot: number;
   };
+  // Badges earned by player
+  badges: string[];
+  // Show badge popup
+  showBadgePopup: boolean;
+  pendingBadge: { name: string; description: string } | null;
+  // Trade selection state
+  showTradeSelection: boolean;
+  tradeSelectionCallback: ((item: string | null) => void) | null;
   // Track roof repair state
   roofRepaired: boolean;
   // Track if player ever obtained wood/stone (separate from current inventory)
@@ -94,6 +103,7 @@ interface GameState {
   fishIntroduced: boolean;
   stoneIntroduced: boolean;
   berriesIntroduced: boolean;
+  slingshotIntroduced: boolean;
   ledgerEntries: LedgerEntry[];
   dialogueQueue: DialogueLine[];
   currentDialogue: DialogueLine | null;
@@ -328,7 +338,12 @@ export class VillageLedgerGame {
     this.state = {
       phase: 'intro',
       loop: 1,
-      inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
+      inventory: { stone: 0, fish: 0, wood: 0, berries: 0, slingshot: 1 },
+      badges: [],
+      showBadgePopup: false,
+      pendingBadge: null,
+      showTradeSelection: false,
+      tradeSelectionCallback: null,
       roofRepaired: false,
       obtainedWood: false,
       obtainedStone: false,
@@ -357,6 +372,7 @@ export class VillageLedgerGame {
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,
+      slingshotIntroduced: true,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -4871,6 +4887,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     // All items shown from start of each loop - no need to collect first
     const items: { count: number; color: string; label: string }[] = [
+      { count: this.state.inventory.slingshot, color: '#D97706', label: 'Y' },
       { count: this.state.inventory.wood, color: '#8B4513', label: 'W' },
       { count: this.state.inventory.stone, color: '#6B7280', label: 'S' },
       { count: this.state.inventory.fish, color: '#3B82F6', label: 'F' },
@@ -4990,6 +5007,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const padding = 12;
     
     const items = [
+      { name: 'Slingshot', count: this.state.inventory.slingshot, color: '#D97706', desc: 'A simple hunting tool' },
       { name: 'Wood', count: this.state.inventory.wood, color: '#8B4513', desc: 'Building material from the Woodcutter' },
       { name: 'Stone', count: this.state.inventory.stone, color: '#6B7280', desc: 'Strong material from the Stone-worker' },
       { name: 'Fish', count: this.state.inventory.fish, color: '#3B82F6', desc: 'Fresh catch from the Fisherman' },
@@ -6003,7 +6021,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.state = {
       phase: 'intro',
       loop: 1,
-      inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
+      inventory: { stone: 0, fish: 0, wood: 0, berries: 0, slingshot: 1 },
+      badges: [],
+      showBadgePopup: false,
+      pendingBadge: null,
+      showTradeSelection: false,
+      tradeSelectionCallback: null,
       roofRepaired: false,
       obtainedWood: false,
       obtainedStone: false,
@@ -6032,6 +6055,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,
+      slingshotIntroduced: true,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,
@@ -6102,7 +6126,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.state = {
       phase: 'loop2_intro',
       loop: 2,
-      inventory: { stone: 0, fish: 0, wood: 0, berries: 0 },
+      inventory: { stone: 0, fish: 0, wood: 0, berries: 0, slingshot: 1 },
+      badges: [],
+      showBadgePopup: false,
+      pendingBadge: null,
+      showTradeSelection: false,
+      tradeSelectionCallback: null,
       roofRepaired: false,
       obtainedWood: false,
       obtainedStone: false,
@@ -6131,6 +6160,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,
+      slingshotIntroduced: true,
       ledgerEntries: [],
       dialogueQueue: [],
       currentDialogue: null,

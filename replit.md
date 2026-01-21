@@ -110,6 +110,11 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - **Storm Text Updated**: Changed from "THE STORM APPROACHES..." to "A storm approaches..." with 5-second fade-out spanning clouds and rainfall animations
 - **Post-Fishing Hint Text**: Changed from "Debts verified!" to appropriate guidance messages directing player to Stone Tablet or NPCs
 - **Post-Verification Hint Text**: After Stone Tablet verification, now directs player to "Settle your debts with the Woodcutter and Stone-worker..."
+- **Slingshot Starting Item**: Player now starts with a slingshot in inventory, visible in HUD and inventory popup
+- **Interactive Trade Dialogue System**: NPCs ask "Do you have something to trade?" with Yes/No choice, then trade selection popup shows available items (slingshot, berries, etc.) which NPCs reject, leading to credit
+- **Trade Selection Popup**: Dark overlay popup showing available inventory items as colored buttons; player can select an item to offer or cancel
+- **Badge System**: Celebratory popup with star icon, badge name, and description; awards badges for learning concepts
+- **Double Coincidence of Wants Badge**: Earned after second trading failure (Stone-worker), explains the concept that direct trade requires both parties wanting exactly what the other has
 
 ## External Dependencies
 

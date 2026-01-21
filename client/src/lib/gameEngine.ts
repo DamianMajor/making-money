@@ -1170,25 +1170,34 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "I can trade you wood, but I need fish in return. Do you have any fish?"
-        },
-        {
-          speaker: 'YOU',
-          text: "I don't have any fish right now..."
-        },
-        {
-          speaker: 'WOODCUTTER',
-          text: "Hmm, that's a problem. I want fish, but you don't have fish. Tell you what - take the wood now, and bring me a Sharp Stone and 1 Fish later. I'll meet you at the Village Center.",
+          text: "Sure, I can give you some wood. But I don't give things away for free! Do you have something to trade?",
           onComplete: () => {
-            this.state.inventory.wood = 1;
-            this.state.obtainedWood = true;
-            this.state.woodIntroduced = true;
-            this.state.stoneIntroduced = true;
-            this.state.fishIntroduced = true;
-            this.showInventoryPopup('+1 WOOD');
-            this.setMood('happy');
-            this.state.phase = 'got_wood_need_stone';
-            this.woodcutter.targetX = this.villageCenterX + 80;
+            // Show Yes/No choice
+            this.state.showChoice = true;
+            this.state.choiceOptions = [
+              {
+                text: "Yes, I do!",
+                action: () => {
+                  this.state.showChoice = false;
+                  // Show trade selection popup
+                  this.showTradeSelection((selectedItem) => {
+                    if (selectedItem === null || selectedItem === 'cancel') {
+                      // Player changed their mind
+                      this.continueWoodcutterTradeDialogue(null);
+                    } else {
+                      this.continueWoodcutterTradeDialogue(selectedItem);
+                    }
+                  });
+                }
+              },
+              {
+                text: "No, I don't",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.continueWoodcutterTradeDialogue(null);
+                }
+              }
+            ];
           }
         }
       ]);
@@ -1202,49 +1211,30 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "I can trade you wood, but I need fish in return. Do you have any fish?"
-        },
-        {
-          speaker: 'YOU',
-          text: "I don't have any fish right now..."
-        },
-        {
-          speaker: 'WOODCUTTER',
-          text: "Hmm, that's the problem with trading - you need what I have, but I don't need what you have. I'll lend you the wood on credit. Bring me a Sharp Stone and 1 Fish later. How should we seal this deal?",
+          text: "Sure, I can give you some wood. But I don't give things away for free! Do you have something to trade?",
           onComplete: () => {
+            // Show Yes/No choice
             this.state.showChoice = true;
             this.state.choiceOptions = [
               {
-                text: "Just remember it",
+                text: "Yes, I do!",
                 action: () => {
                   this.state.showChoice = false;
-                  this.queueDialogue([
-                    {
-                      speaker: 'WOODCUTTER',
-                      text: "Very well, let's walk to the Village Center together. I'll give you the wood there.",
-                      onComplete: () => {
-                        this.state.phase = 'loop2_escorting_woodcutter';
-                        this.state.escortingNPC = 'woodcutter';
-                      }
+                  // Show trade selection popup
+                  this.showTradeSelection((selectedItem) => {
+                    if (selectedItem === null || selectedItem === 'cancel') {
+                      this.continueWoodcutterTradeDialogueLoop2(null);
+                    } else {
+                      this.continueWoodcutterTradeDialogueLoop2(selectedItem);
                     }
-                  ]);
+                  });
                 }
               },
               {
-                text: "Record it",
+                text: "No, I don't",
                 action: () => {
                   this.state.showChoice = false;
-                  this.queueDialogue([
-                    {
-                      speaker: 'WOODCUTTER',
-                      text: "A wise choice! Let's walk to the Stone Tablet together and carve our agreement.",
-                      onComplete: () => {
-                        this.state.phase = 'loop2_escorting_woodcutter';
-                        this.state.escortingNPC = 'woodcutter';
-                        this.state.woodcutterDebtRecorded = true;
-                      }
-                    }
-                  ]);
+                  this.continueWoodcutterTradeDialogueLoop2(null);
                 }
               }
             ];
@@ -1597,38 +1587,251 @@ export class VillageLedgerGame {
     }
   }
 
+  // Loop 1: Continue woodcutter dialogue after trade offer
+  private continueWoodcutterTradeDialogue(offeredItem: string | null): void {
+    if (offeredItem === null) {
+      // Player said no or cancelled
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "Actually, I don't have anything you'd want..."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "That's the problem! I want fish, but you don't have fish. You need what I have, but I don't need what you have. This problem is called the 'Double Coincidence of Wants'."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "Tell you what - I'll give you the wood on credit. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
+          onComplete: () => {
+            this.state.inventory.wood = 1;
+            this.state.obtainedWood = true;
+            this.state.woodIntroduced = true;
+            this.state.stoneIntroduced = true;
+            this.state.fishIntroduced = true;
+            this.showInventoryPopup('+1 WOOD');
+            this.setMood('happy');
+            this.state.phase = 'got_wood_need_stone';
+            this.woodcutter.targetX = this.villageCenterX + 80;
+          }
+        }
+      ]);
+    } else if (offeredItem === 'slingshot') {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "How about my slingshot? It's a useful tool!"
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "A slingshot? No thanks, I can't eat a slingshot! I need fish to feed my family."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "That's the problem! You have a slingshot, but I don't want a slingshot. I want fish, but you don't have fish. This is called the 'Double Coincidence of Wants'."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "Tell you what - I'll give you the wood on credit. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
+          onComplete: () => {
+            this.state.inventory.wood = 1;
+            this.state.obtainedWood = true;
+            this.state.woodIntroduced = true;
+            this.state.stoneIntroduced = true;
+            this.state.fishIntroduced = true;
+            this.showInventoryPopup('+1 WOOD');
+            this.setMood('happy');
+            this.state.phase = 'got_wood_need_stone';
+            this.woodcutter.targetX = this.villageCenterX + 80;
+          }
+        }
+      ]);
+    } else if (offeredItem === 'berries') {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "I have some berries! Would you take those?"
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "Berries are nice, but they won't fill my belly! I need fish to feed my family."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "That's the problem! You have berries, but I don't want berries. I want fish, but you don't have fish. This is called the 'Double Coincidence of Wants'."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "Tell you what - I'll give you the wood on credit. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
+          onComplete: () => {
+            this.state.inventory.wood = 1;
+            this.state.obtainedWood = true;
+            this.state.woodIntroduced = true;
+            this.state.stoneIntroduced = true;
+            this.state.fishIntroduced = true;
+            this.showInventoryPopup('+1 WOOD');
+            this.setMood('happy');
+            this.state.phase = 'got_wood_need_stone';
+            this.woodcutter.targetX = this.villageCenterX + 80;
+          }
+        }
+      ]);
+    } else {
+      // Some other item (shouldn't happen at this stage)
+      this.continueWoodcutterTradeDialogue(null);
+    }
+  }
+
+  // Loop 2: Continue woodcutter dialogue after trade offer (with record choice)
+  private continueWoodcutterTradeDialogueLoop2(offeredItem: string | null): void {
+    const rejectAndOfferCredit = (itemName: string) => {
+      let rejectText = '';
+      if (itemName === 'slingshot') {
+        rejectText = "A slingshot? No thanks, I can't eat a slingshot! I need fish to feed my family.";
+      } else if (itemName === 'berries') {
+        rejectText = "Berries are nice, but they won't fill my belly! I need fish to feed my family.";
+      } else {
+        rejectText = "That's not what I need. I need fish to feed my family.";
+      }
+
+      this.queueDialogue([
+        {
+          speaker: 'WOODCUTTER',
+          text: rejectText
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "That's the problem! You don't have what I need, and I can't use what you have. This is called the 'Double Coincidence of Wants'."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "I'll lend you the wood on credit. Bring me a Sharp Stone and 1 Fish later. How should we seal this deal?",
+          onComplete: () => {
+            this.showRecordOrRememberChoice();
+          }
+        }
+      ]);
+    };
+
+    if (offeredItem === null) {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "Actually, I don't have anything you'd want..."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "That's the problem! I want fish, but you don't have fish. You need what I have, but I don't need what you have. This problem is called the 'Double Coincidence of Wants'."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "I'll lend you the wood on credit. Bring me a Sharp Stone and 1 Fish later. How should we seal this deal?",
+          onComplete: () => {
+            this.showRecordOrRememberChoice();
+          }
+        }
+      ]);
+    } else if (offeredItem === 'slingshot') {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "How about my slingshot? It's a useful tool!"
+        }
+      ]);
+      setTimeout(() => rejectAndOfferCredit('slingshot'), 100);
+    } else if (offeredItem === 'berries') {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "I have some berries! Would you take those?"
+        }
+      ]);
+      setTimeout(() => rejectAndOfferCredit('berries'), 100);
+    } else {
+      this.continueWoodcutterTradeDialogueLoop2(null);
+    }
+  }
+
+  // Show choice between recording or just remembering the deal
+  private showRecordOrRememberChoice(): void {
+    this.state.showChoice = true;
+    this.state.choiceOptions = [
+      {
+        text: "Just remember it",
+        action: () => {
+          this.state.showChoice = false;
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "Very well, let's walk to the Village Center together. I'll give you the wood there.",
+              onComplete: () => {
+                this.state.phase = 'loop2_escorting_woodcutter';
+                this.state.escortingNPC = 'woodcutter';
+              }
+            }
+          ]);
+        }
+      },
+      {
+        text: "Record it",
+        action: () => {
+          this.state.showChoice = false;
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "A wise choice! Let's walk to the Stone Tablet together and carve our agreement.",
+              onComplete: () => {
+                this.state.phase = 'loop2_escorting_woodcutter';
+                this.state.escortingNPC = 'woodcutter';
+                this.state.woodcutterDebtRecorded = true;
+              }
+            }
+          ]);
+        }
+      }
+    ];
+  }
+
   // ============ LOOP 1 & 2: STONE-WORKER ============
   // ESCORT FLOW: NPC accompanies player to tablet, records debt, THEN gives item
   private handleStoneWorkerInteraction(): void {
     const phase = this.state.phase;
     
-    // LOOP 1: Double coincidence of wants - player offers wood, stone-worker wants fish
+    // LOOP 1: Double coincidence of wants - player offers to trade
     if (phase === 'got_wood_need_stone') {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "I need a sharp stone for the Woodcutter. I have some wood - would you trade for that?"
+          text: "Hello! I need a sharp stone for my roof repair. Do you have one?"
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Wood? No, I don't need wood. I need fish for my family."
-        },
-        {
-          speaker: 'YOU',
-          text: "I don't have any fish right now..."
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "Same problem as always! You have wood, I want fish. We can't trade directly. But I'll give you the stone on credit - bring me 2 Fish later. I'll meet you at the Village Center.",
+          text: "Sure, I can make you a sharp stone. But I don't give things away for free! Do you have something to trade?",
           onComplete: () => {
-            this.state.inventory.stone = 1;
-            this.state.obtainedStone = true;
-            this.state.stoneIntroduced = true;
-            this.state.fishIntroduced = true;
-            this.showInventoryPopup('+1 SHARP STONE');
-            this.setMood('happy');
-            this.state.phase = 'got_stone_need_fish';
-            this.stoneWorker.targetX = this.villageCenterX - 100;
+            // Show Yes/No choice
+            this.state.showChoice = true;
+            this.state.choiceOptions = [
+              {
+                text: "Yes, I do!",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.showTradeSelection((selectedItem) => {
+                    if (selectedItem === null || selectedItem === 'cancel') {
+                      this.continueStoneWorkerTradeDialogue(null);
+                    } else {
+                      this.continueStoneWorkerTradeDialogue(selectedItem);
+                    }
+                  });
+                }
+              },
+              {
+                text: "No, I don't",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.continueStoneWorkerTradeDialogue(null);
+                }
+              }
+            ];
           }
         }
       ]);
@@ -1638,53 +1841,33 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "I need a sharp stone for the Woodcutter. I have some wood - would you trade for that?"
+          text: "Hello! I need a sharp stone for my roof repair. Do you have one?"
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Wood? No, I don't need wood. I need fish for my family."
-        },
-        {
-          speaker: 'YOU',
-          text: "I don't have any fish right now..."
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "This is the challenge of trading! You don't have what I want. I'll lend you the stone on credit - bring me 2 Fish later. How should we seal this deal?",
+          text: "Sure, I can make you a sharp stone. But I don't give things away for free! Do you have something to trade?",
           onComplete: () => {
+            // Show Yes/No choice
             this.state.showChoice = true;
             this.state.choiceOptions = [
               {
-                text: "Just remember it",
+                text: "Yes, I do!",
                 action: () => {
                   this.state.showChoice = false;
-                  this.queueDialogue([
-                    {
-                      speaker: 'STONE-WORKER',
-                      text: "Very well, let's walk to the Village Center. I'll give you the stone there.",
-                      onComplete: () => {
-                        this.state.phase = 'loop2_escorting_stoneworker';
-                        this.state.escortingNPC = 'stoneworker';
-                      }
+                  this.showTradeSelection((selectedItem) => {
+                    if (selectedItem === null || selectedItem === 'cancel') {
+                      this.continueStoneWorkerTradeDialogueLoop2(null);
+                    } else {
+                      this.continueStoneWorkerTradeDialogueLoop2(selectedItem);
                     }
-                  ]);
+                  });
                 }
               },
               {
-                text: "Record it",
+                text: "No, I don't",
                 action: () => {
                   this.state.showChoice = false;
-                  this.queueDialogue([
-                    {
-                      speaker: 'STONE-WORKER',
-                      text: "A wise choice! Let's walk to the Stone Tablet together and carve our agreement.",
-                      onComplete: () => {
-                        this.state.phase = 'loop2_escorting_stoneworker';
-                        this.state.escortingNPC = 'stoneworker';
-                        this.state.stoneWorkerDebtRecorded = true;
-                      }
-                    }
-                  ]);
+                  this.continueStoneWorkerTradeDialogueLoop2(null);
                 }
               }
             ];
@@ -2000,6 +2183,243 @@ export class VillageLedgerGame {
           text: "Hello! I craft stones for tools. Come back if you need one."
         }
       ]);
+    }
+  }
+
+  // Loop 1: Continue stone worker dialogue after trade offer - awards badge
+  private continueStoneWorkerTradeDialogue(offeredItem: string | null): void {
+    const finishWithBadge = () => {
+      this.state.inventory.stone = 1;
+      this.state.obtainedStone = true;
+      this.state.stoneIntroduced = true;
+      this.state.fishIntroduced = true;
+      this.showInventoryPopup('+1 SHARP STONE');
+      this.setMood('happy');
+      this.state.phase = 'got_stone_need_fish';
+      this.stoneWorker.targetX = this.villageCenterX - 100;
+      // Award badge after second encounter with double coincidence
+      setTimeout(() => {
+        this.awardBadge(
+          'Double Coincidence of Wants',
+          'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!'
+        );
+      }, 1000);
+    };
+
+    if (offeredItem === null) {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "Actually, I don't have anything you'd want..."
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Same problem as always! You don't have what I want, and I don't need what you have. This 'Double Coincidence of Wants' is quite troublesome!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Tell you what - I'll give you the stone on credit. Bring me 2 Fish later. I'll meet you at the Village Center.",
+          onComplete: finishWithBadge
+        }
+      ]);
+    } else if (offeredItem === 'slingshot') {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "How about my slingshot?"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "A slingshot? I already have tools! I need fish to feed my family."
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Same problem as before! We can't trade because I don't want what you have. This 'Double Coincidence of Wants' keeps getting in the way!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Tell you what - I'll give you the stone on credit. Bring me 2 Fish later. I'll meet you at the Village Center.",
+          onComplete: finishWithBadge
+        }
+      ]);
+    } else if (offeredItem === 'berries') {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "Would you take some berries?"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Berries? I need something more filling. I want fish!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Same problem as before! We can't trade because I don't want what you have. This 'Double Coincidence of Wants' keeps getting in the way!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Tell you what - I'll give you the stone on credit. Bring me 2 Fish later. I'll meet you at the Village Center.",
+          onComplete: finishWithBadge
+        }
+      ]);
+    } else if (offeredItem === 'wood') {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "I have some wood! Would you trade for that?"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Wood? I work with stone, not wood! I need fish for my family."
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Same problem as before! We can't trade because I don't want what you have. This 'Double Coincidence of Wants' keeps getting in the way!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Tell you what - I'll give you the stone on credit. Bring me 2 Fish later. I'll meet you at the Village Center.",
+          onComplete: finishWithBadge
+        }
+      ]);
+    } else {
+      this.continueStoneWorkerTradeDialogue(null);
+    }
+  }
+
+  // Loop 2: Continue stone worker dialogue after trade offer (with record choice) - awards badge
+  private continueStoneWorkerTradeDialogueLoop2(offeredItem: string | null): void {
+    const showRecordChoice = () => {
+      this.state.showChoice = true;
+      this.state.choiceOptions = [
+        {
+          text: "Just remember it",
+          action: () => {
+            this.state.showChoice = false;
+            this.queueDialogue([
+              {
+                speaker: 'STONE-WORKER',
+                text: "Very well, let's walk to the Village Center. I'll give you the stone there.",
+                onComplete: () => {
+                  this.state.phase = 'loop2_escorting_stoneworker';
+                  this.state.escortingNPC = 'stoneworker';
+                  // Award badge after second encounter
+                  setTimeout(() => {
+                    this.awardBadge(
+                      'Double Coincidence of Wants',
+                      'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!'
+                    );
+                  }, 1000);
+                }
+              }
+            ]);
+          }
+        },
+        {
+          text: "Record it",
+          action: () => {
+            this.state.showChoice = false;
+            this.queueDialogue([
+              {
+                speaker: 'STONE-WORKER',
+                text: "A wise choice! Let's walk to the Stone Tablet together and carve our agreement.",
+                onComplete: () => {
+                  this.state.phase = 'loop2_escorting_stoneworker';
+                  this.state.escortingNPC = 'stoneworker';
+                  this.state.stoneWorkerDebtRecorded = true;
+                  // Award badge after second encounter
+                  setTimeout(() => {
+                    this.awardBadge(
+                      'Double Coincidence of Wants',
+                      'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!'
+                    );
+                  }, 1000);
+                }
+              }
+            ]);
+          }
+        }
+      ];
+    };
+
+    if (offeredItem === null) {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "Actually, I don't have anything you'd want..."
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Same problem as always! You don't have what I want, and I don't need what you have. This 'Double Coincidence of Wants' is quite troublesome!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "I'll give you the stone on credit. Bring me 2 Fish later. How should we seal this deal?",
+          onComplete: showRecordChoice
+        }
+      ]);
+    } else if (offeredItem === 'slingshot') {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "How about my slingshot?"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "A slingshot? I already have tools! I need fish to feed my family."
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Same problem as before! This 'Double Coincidence of Wants' keeps getting in the way!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "I'll give you the stone on credit. Bring me 2 Fish later. How should we seal this deal?",
+          onComplete: showRecordChoice
+        }
+      ]);
+    } else if (offeredItem === 'berries') {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "Would you take some berries?"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Berries? I need something more filling. I want fish!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Same problem as before! This 'Double Coincidence of Wants' keeps getting in the way!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "I'll give you the stone on credit. Bring me 2 Fish later. How should we seal this deal?",
+          onComplete: showRecordChoice
+        }
+      ]);
+    } else if (offeredItem === 'wood') {
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "I have some wood! Would you trade for that?"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Wood? I work with stone, not wood! I need fish for my family."
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Same problem as before! This 'Double Coincidence of Wants' keeps getting in the way!"
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "I'll give you the stone on credit. Bring me 2 Fish later. How should we seal this deal?",
+          onComplete: showRecordChoice
+        }
+      ]);
+    } else {
+      this.continueStoneWorkerTradeDialogueLoop2(null);
     }
   }
 

@@ -693,10 +693,10 @@ export class VillageLedgerGame {
   private isInteractButtonTouched(x: number, y: number): boolean {
     const size = this.interactButtonSize;
     const btnX = this.canvas.width - size - 32;
-    // Center vertically on the land area (matching drawInteractButton)
-    const landTop = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
-    const landBottom = this.canvas.height - this.dialogueBoxHeight;
-    const btnY = landTop + (landBottom - landTop - size) / 2;
+    // Center vertically on the ground horizon line (between ground and dialogue box)
+    const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
+    const dialogueTop = this.canvas.height - this.dialogueBoxHeight;
+    const btnY = groundY + (dialogueTop - groundY - size) / 2;
     // Add padding around button for easier touch targeting
     const padding = 20;
     return x >= btnX - padding && x <= btnX + size + padding && 
@@ -806,7 +806,9 @@ export class VillageLedgerGame {
             speaker: 'YOU',
             text: "Just in time! Let me fix my roof before the storm hits!",
             onComplete: () => {
-              soundManager.play('roofHammer');
+              // Play hammer sound shortened by 2 seconds
+              const hammerDuration = Math.max(1000, soundManager.getBufferDuration('roofHammer') - 2000);
+              soundManager.playForDuration('roofHammer', hammerDuration);
               this.state.roofRepaired = true;
               this.state.inventory.wood = 0;
               this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
@@ -888,7 +890,9 @@ export class VillageLedgerGame {
         speaker: 'YOU',
         text: "I'll use this wood to fix the hole in my roof!",
         onComplete: () => {
-          soundManager.play('roofHammer');
+          // Play hammer sound shortened by 2 seconds
+          const hammerDuration = Math.max(1000, soundManager.getBufferDuration('roofHammer') - 2000);
+          soundManager.playForDuration('roofHammer', hammerDuration);
           this.state.roofRepaired = true;
           this.state.inventory.wood = 0;
           this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
@@ -1196,7 +1200,11 @@ export class VillageLedgerGame {
                 soundManager.playForDuration('stoneCarve', 2500);
                 // After carving sound, record debt and deliver item
                 setTimeout(() => {
-                  this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
+                  // Only add entry if not already recorded (prevent duplicates)
+                  const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('WOODCUTTER'));
+                  if (!alreadyRecorded) {
+                    this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
+                  }
                   this.state.showHUD = true;
                   this.hudGlow = 1;
                   // Now deliver the wood and move to final position
@@ -1592,7 +1600,11 @@ export class VillageLedgerGame {
                 soundManager.playForDuration('stoneCarve', 2500);
                 // After carving sound, record debt and deliver item
                 setTimeout(() => {
-                  this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
+                  // Only add entry if not already recorded (prevent duplicates)
+                  const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('STONE-WORKER'));
+                  if (!alreadyRecorded) {
+                    this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
+                  }
                   this.hudGlow = 1;
                   // Now deliver the stone and move to final position
                   this.queueDialogue([
@@ -1911,7 +1923,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "You already have your fish! Go settle your debts."
+          text: "I don't have any more fish at the moment."
         }
       ]);
     }
@@ -1930,14 +1942,14 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: `I see you have ${berryCount} ${berryCount === 1 ? 'berry' : 'berries'}! I'll trade Fish for Berries - 1 for 1. How many would you like?`,
+          text: `I see you have ${berryCount} ${berryCount === 1 ? 'berry' : 'berries'}! How many fish do you want?`,
           onComplete: () => {
             // Build choice options based on how many berries the player has
             const choices: { text: string; action: () => void }[] = [];
             
             if (berryCount >= 1) {
               choices.push({
-                text: "1 Berry for 1 Fish",
+                text: "1 Fish",
                 action: () => {
                   this.state.showChoice = false;
                   this.state.inventory.berries -= 1;
@@ -1952,7 +1964,7 @@ export class VillageLedgerGame {
             }
             if (berryCount >= 2) {
               choices.push({
-                text: "2 Berries for 2 Fish",
+                text: "2 Fish",
                 action: () => {
                   this.state.showChoice = false;
                   this.state.inventory.berries -= 2;
@@ -1967,7 +1979,7 @@ export class VillageLedgerGame {
             }
             if (berryCount >= 3) {
               choices.push({
-                text: "3 Berries for 3 Fish",
+                text: "3 Fish",
                 action: () => {
                   this.state.showChoice = false;
                   this.state.inventory.berries -= 3;
@@ -2021,8 +2033,17 @@ export class VillageLedgerGame {
   // CREDIT-FIRST: Always interactable - allows player to pick up to 3 berries at any time
   // Extra berry spawns after giving in to inflated demand
   private handleBerryBushInteraction(): void {
-    // Play bush rustling followed by item pickup sound (playBushSequence handles both sounds)
-    soundManager.playBushSequence();
+    // Check if bush is empty FIRST before playing sounds
+    const bushIsEmpty = this.state.resourcesDepleted || 
+                        (this.state.inventory.berries >= 3 && !this.state.extraBerryAvailable);
+    
+    // Play bush rustling only (no item pickup) when bush is empty
+    if (bushIsEmpty) {
+      soundManager.playForDurationWithFade('bush', 1500, 300);
+    } else {
+      // Play full bush sequence with item pickup sound when picking berries
+      soundManager.playBushSequence();
+    }
     
     // Check if resources are depleted (after paying first inflated demand)
     if (this.state.resourcesDepleted) {
@@ -2822,8 +2843,9 @@ export class VillageLedgerGame {
       let isWalking = false; // Track if NPC is currently walking
       
       if (isEscortingWoodcutter || isEscortingStoneworker) {
-        // Simple escort: NPC always moves toward its target position at the village center
-        const npcTargetX = isEscortingWoodcutter ? this.villageCenterX - 100 : this.villageCenterX + 100;
+        // Simple escort: NPC always moves toward the Stone Tablet (directly in front of it for carving)
+        // Both NPCs stop at the Stone Tablet position during escort, not offset to sides
+        const npcTargetX = this.villageCenterX; // Stone Tablet is at villageCenterX
         const diff = npcTargetX - npc.x;
         
         if (Math.abs(diff) > 5) {
@@ -3065,20 +3087,20 @@ export class VillageLedgerGame {
       }
     }
     
-    // Update celebration animation timer - reduced applause duration (minus 3 seconds)
+    // Update celebration animation timer - reduced applause duration (minus 5 seconds, earlier fade)
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
       const fullApplauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
-      const applauseDuration = Math.max(2, fullApplauseDuration - 3); // Reduce by 3 seconds, min 2s
+      const applauseDuration = Math.max(2, fullApplauseDuration - 5); // Reduce by 5 seconds, min 2s
       const distToHome = Math.abs(this.player.x - this.playerHomeX);
       
       // End celebration when: reduced applause time OR player within 250 pixels of home
       if (this.state.celebrationTimer > applauseDuration || distToHome <= 250) {
         this.state.showCelebration = false;
         this.celebrationEndTime = Date.now();
-        // Fade out both celebration and applause sounds (2.5 seconds for smooth fade)
-        soundManager.fadeOut('crowdApplause', 2500);
-        soundManager.fadeOut('celebration', 2500);
+        // Fade out both celebration and applause sounds (3.5 seconds for smoother, longer fade)
+        soundManager.fadeOut('crowdApplause', 3500);
+        soundManager.fadeOut('celebration', 3500);
       }
     }
     
@@ -3308,9 +3330,9 @@ export class VillageLedgerGame {
           this.stormTriggered = false; // Reset storm trigger
           this.celebrationEndTime = 0;
           soundManager.play('celebration');
-          // Play applause with reduced duration (full duration minus 3 seconds)
+          // Play applause with reduced duration (full duration minus 5 seconds, earlier stop)
           const fullDuration = soundManager.getBufferDuration('crowdApplause');
-          soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 3000));
+          soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 5000));
         }
       }
     ]);
@@ -3352,7 +3374,9 @@ export class VillageLedgerGame {
               this.state.showCloudsAnimation = false;
               // Auto-fix roof if player has wood
               if (this.state.inventory.wood >= 1 && !this.state.roofRepaired) {
-                soundManager.play('roofHammer');
+                // Play hammer sound shortened by 2 seconds
+                const hammerDuration = Math.max(1000, soundManager.getBufferDuration('roofHammer') - 2000);
+                soundManager.playForDuration('roofHammer', hammerDuration);
                 this.state.roofRepaired = true;
                 this.state.inventory.wood = 0;
                 this.showInventoryPopup('ROOF FIXED!');
@@ -3752,9 +3776,9 @@ export class VillageLedgerGame {
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
     
-    // Calculate fade out - start fading 3.5 seconds before end (2s longer fade)
+    // Calculate fade out - start fading 5 seconds before end (longer fade)
     const applauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
-    const fadeStartTime = Math.max(0, applauseDuration - 3.5);
+    const fadeStartTime = Math.max(0, applauseDuration - 5);
     const distToHome = Math.abs(this.player.x - this.playerHomeX);
     
     // Also start fading when approaching home (within 400 pixels, full fade at 250)
@@ -5061,7 +5085,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         case 'loop2_got_fish':
           // After viewing Stone Tablet, encourage settling with NPCs
           if (this.state.elderVerified || (this.state.woodcutterDebtRecorded && this.state.stoneWorkerDebtRecorded)) {
-            hint = 'Settle your debts with the Woodcutter and Stone-worker!';
+            hint = 'Debts verified! Settle with the Woodcutter and Stone-worker.';
           } else {
             hint = 'Visit the Stone Tablet to verify debts, then settle with NPCs...';
           }
@@ -5099,10 +5123,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
     const size = this.interactButtonSize;
     const x = this.canvas.width - size - 32;
-    // Center vertically on the land area (between ground line and dialogue box)
-    const landTop = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
-    const landBottom = this.canvas.height - this.dialogueBoxHeight;
-    const y = landTop + (landBottom - landTop - size) / 2;
+    // Center vertically on the ground horizon (between ground and dialogue box)
+    const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
+    const dialogueTop = this.canvas.height - this.dialogueBoxHeight;
+    const y = groundY + (dialogueTop - groundY - size) / 2;
 
     ctx.save();
     ctx.globalAlpha = this.interactButtonOpacity;

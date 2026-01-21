@@ -133,6 +133,8 @@ interface GameState {
   showRainfall: boolean; // Rainfall animation after clouds
   rainfallTimer: number;
   playerEnteredHut: boolean; // Player has entered the hut
+  playerFading: boolean; // Player is fading into hut
+  playerAlpha: number; // Player alpha for fade effect (0-1)
   showStoneTabletPopup: boolean; // Popup view of Stone Tablet
   showChoice: boolean;
   choiceOptions: { text: string; action: () => void }[];
@@ -402,6 +404,8 @@ export class VillageLedgerGame {
       showRainfall: false,
       rainfallTimer: 0,
       playerEnteredHut: false,
+      playerFading: false,
+      playerAlpha: 1,
       showStoneTabletPopup: false,
       showChoice: false,
       choiceOptions: []
@@ -969,11 +973,11 @@ export class VillageLedgerGame {
     }
   }
   
-  // Trigger the enter hut sequence - player disappears, then rain starts after 1.5s
+  // Trigger the enter hut sequence - player fades into hut, then rain starts
   private triggerEnterHutSequence(): void {
-    // Player enters hut (disappears)
-    this.state.playerEnteredHut = true;
-    this.player.visible = false;
+    // Start player fade animation
+    this.state.playerFading = true;
+    // Player alpha will decrease in update() until 0, then visible=false and playerEnteredHut=true
     
     // Wait 2.5 seconds before starting rain (after roof hammer sound completes)
     setTimeout(() => {
@@ -1003,6 +1007,7 @@ export class VillageLedgerGame {
                 // Restore player visibility for quiz
                 this.player.visible = true;
                 this.state.playerEnteredHut = false;
+                this.state.playerAlpha = 1; // Reset alpha
               } catch (e) {
                 console.error('Error in quiz transition:', e);
               }
@@ -1019,9 +1024,9 @@ export class VillageLedgerGame {
 
   // Trigger the return home sequence with clouds animation (unused - kept for reference)
   private triggerReturnHomeSequence(): void {
-    // Player enters hut (disappears)
-    this.state.playerEnteredHut = true;
-    this.player.visible = false;
+    // Start player fade animation
+    this.state.playerFading = true;
+    // Player alpha will decrease in update() until 0, then visible=false and playerEnteredHut=true
     
     // Start dark clouds animation (2.5 seconds)
     this.state.showCloudsAnimation = true;
@@ -1060,6 +1065,7 @@ export class VillageLedgerGame {
                 // Restore player visibility for quiz
                 this.player.visible = true;
                 this.state.playerEnteredHut = false;
+                this.state.playerAlpha = 1; // Reset alpha
               } catch (e) {
                 console.error('Error in quiz transition:', e);
               }
@@ -2761,11 +2767,20 @@ export class VillageLedgerGame {
           this.queueDialogue([
             {
               speaker: 'VILLAGE ELDER',
-              text: "Let me check the Stone Tablet... All debts are recorded clearly here."
+              text: "Let me check the Stone Tablet... All debts are recorded clearly here.",
+              onComplete: () => {
+                // Show enlarged tablet view
+                this.state.showStoneTabletPopup = true;
+                soundManager.play('stoneLedger');
+              }
             },
             {
               speaker: 'VILLAGE ELDER',
-              text: "Woodcutter: 1 Fish. Stone-worker: 2 Fish. The truth is carved in stone!"
+              text: "Woodcutter: 1 Fish. Stone-worker: 2 Fish. The truth is carved in stone!",
+              onComplete: () => {
+                // Close tablet popup when moving to next line
+                this.state.showStoneTabletPopup = false;
+              }
             },
             {
               speaker: 'VILLAGE ELDER',
@@ -3324,6 +3339,17 @@ export class VillageLedgerGame {
     // Update bob animation
     this.bobTimer += dt * 8;
     this.talkingTimer += dt * 18; // Faster timer for talking bounce (~3 cycles/sec)
+    
+    // Update player fade animation
+    if (this.state.playerFading) {
+      this.state.playerAlpha -= dt * 2; // Fade over ~0.5 seconds
+      if (this.state.playerAlpha <= 0) {
+        this.state.playerAlpha = 0;
+        this.state.playerFading = false;
+        this.player.visible = false;
+        this.state.playerEnteredHut = true;
+      }
+    }
 
     // Auto-walk feature: player walks to clicked target and interacts on arrival
     if (this.autoWalkTarget && !this.state.currentDialogue) {
@@ -3936,9 +3962,9 @@ export class VillageLedgerGame {
                 this.showInventoryPopup('ROOF FIXED!');
               }
               
-              // Player enters hut
-              this.state.playerEnteredHut = true;
-              this.player.visible = false;
+              // Player fades into hut
+              this.state.playerFading = true;
+              // Player alpha will decrease in update() until 0, then visible=false and playerEnteredHut=true
               
               // Start rainfall
               this.state.showRainfall = true;
@@ -3963,6 +3989,7 @@ export class VillageLedgerGame {
                       this.state.phase = 'quiz';
                       this.player.visible = true;
                       this.state.playerEnteredHut = false;
+                      this.state.playerAlpha = 1; // Reset alpha
                     } catch (e) {
                       console.error('Error in quiz transition:', e);
                     }
@@ -4046,8 +4073,15 @@ export class VillageLedgerGame {
       if (this.fisherman.visible) {
         this.drawCharacter(ctx, this.fisherman);
       }
-      // Draw player (in front of NPCs and markers)
-      this.drawCharacter(ctx, this.player);
+      // Draw player (in front of NPCs and markers) with alpha for fade effect
+      if (this.state.playerAlpha < 1) {
+        ctx.save();
+        ctx.globalAlpha = this.state.playerAlpha;
+        this.drawCharacter(ctx, this.player);
+        ctx.restore();
+      } else {
+        this.drawCharacter(ctx, this.player);
+      }
     }
 
     // Draw fishing pole in front of fisherman
@@ -6646,11 +6680,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       yOffset += 18;
     });
     
-    // Continue button
+    // Continue button - positioned below the text content, clamped to card bounds
     const btnW = 200;
     const btnH = 50;
     const btnX = (w - btnW) / 2;
-    const btnY = cardY + cardH - 65;
+    const maxBtnY = cardY + cardH - btnH - 15; // Maximum Y to keep button inside card
+    const btnY = Math.min(yOffset + 20, maxBtnY); // Position below text but clamp to card
     
     ctx.fillStyle = '#166534';
     ctx.beginPath();
@@ -6816,6 +6851,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       showRainfall: false,
       rainfallTimer: 0,
       playerEnteredHut: false,
+      playerFading: false,
+      playerAlpha: 1,
       showStoneTabletPopup: false,
       showChoice: false,
       choiceOptions: []
@@ -6921,6 +6958,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       showRainfall: false,
       rainfallTimer: 0,
       playerEnteredHut: false,
+      playerFading: false,
+      playerAlpha: 1,
       showStoneTabletPopup: false,
       showChoice: false,
       choiceOptions: []

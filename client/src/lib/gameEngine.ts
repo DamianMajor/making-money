@@ -5958,8 +5958,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         ctx.textAlign = 'right';
         ctx.fillText('v', w - 32, y + h - 20);
       }
-    } else {
-      // Hint text when no dialogue - using retro font at readable size
+    } else if (!this.state.showChoice) {
+      // Hint text when no dialogue and no choice dialogue - using retro font at readable size
       ctx.font = `12px ${this.retroFont}`;
       ctx.textAlign = 'center';
       ctx.fillStyle = 'rgba(201, 184, 150, 0.5)';

@@ -62,6 +62,9 @@ interface GameState {
   // Track if carving sound has been played (to prevent double-trigger)
   woodcutterCarvingSoundPlayed: boolean;
   stoneWorkerCarvingSoundPlayed: boolean;
+  // Track if receive sounds have been played (to prevent triple-trigger)
+  woodReceiveSoundPlayed: boolean;
+  stoneReceiveSoundPlayed: boolean;
   // Loop 1 settlement disputes - track who has been confronted
   woodcutterDisputed: boolean;
   stoneworkerDisputed: boolean;
@@ -334,6 +337,8 @@ export class VillageLedgerGame {
       stoneWorkerDebtRecorded: false,
       woodcutterCarvingSoundPlayed: false,
       stoneWorkerCarvingSoundPlayed: false,
+      woodReceiveSoundPlayed: false,
+      stoneReceiveSoundPlayed: false,
       woodcutterDisputed: false,
       stoneworkerDisputed: false,
       woodcutterSettled: false,
@@ -1128,68 +1133,96 @@ export class VillageLedgerGame {
   private handleWoodcutterInteraction(): void {
     const phase = this.state.phase;
     
-    // LOOP 1: Give wood immediately on credit (verbal promise) - no escort
+    // LOOP 1: Double coincidence of wants dialogue - verbal promise
     if (phase === 'need_wood') {
       this.queueDialogue([
         {
+          speaker: 'YOU',
+          text: "Hello! A storm is coming and I need wood to fix my roof. Can you help me?"
+        },
+        {
           speaker: 'WOODCUTTER',
-          text: "A storm is coming? Here, take this wood for your roof! You owe me a Sharp Stone and 1 Fish. I'll meet you at the Village Center later.",
+          text: "I can trade you wood, but I need fish in return. Do you have any fish?"
+        },
+        {
+          speaker: 'YOU',
+          text: "I don't have any fish right now..."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "Hmm, that's a problem. I want fish, but you don't have fish. Tell you what - take the wood now, and bring me a Sharp Stone and 1 Fish later. I'll meet you at the Village Center.",
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.state.obtainedWood = true;
-            this.state.woodIntroduced = true; // Wood shown in inventory HUD
-            this.state.stoneIntroduced = true; // Stone mentioned as payment
-            this.state.fishIntroduced = true; // Fish mentioned as payment
+            this.state.woodIntroduced = true;
+            this.state.stoneIntroduced = true;
+            this.state.fishIntroduced = true;
             this.showInventoryPopup('+1 WOOD');
             this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
-            // Woodcutter walks to village center (right of Elder to avoid overlap)
-            this.woodcutter.targetX = this.villageCenterX + 80; // Far enough from Elder
+            this.woodcutter.targetX = this.villageCenterX + 80;
           }
         }
       ]);
     }
-    // LOOP 2: First visit - offer choice
+    // LOOP 2: Double coincidence of wants with choice to record
     else if (phase === 'loop2_need_wood') {
-      this.state.showChoice = true;
-      this.state.choiceOptions = [
+      this.queueDialogue([
         {
-          text: "I promise to bring you a Sharp Stone and 1 Fish.",
-          action: () => {
-            this.state.showChoice = false;
-            this.queueDialogue([
-              {
-                speaker: 'WOODCUTTER',
-                text: "Very well, let's walk to the Village Center together. I'll give you the wood there.",
-                onComplete: () => {
-                  this.state.phase = 'loop2_escorting_woodcutter';
-                  this.state.escortingNPC = 'woodcutter';
-                  // Note: woodcutterDebtRecorded stays FALSE (verbal promise)
-                  // NPC will follow player via escort behavior
-                }
-              }
-            ]);
-          }
+          speaker: 'YOU',
+          text: "Hello! A storm is coming and I need wood to fix my roof. Can you help me?"
         },
         {
-          text: "Let's record this debt on the Stone Tablet first.",
-          action: () => {
-            this.state.showChoice = false;
-            this.queueDialogue([
+          speaker: 'WOODCUTTER',
+          text: "I can trade you wood, but I need fish in return. Do you have any fish?"
+        },
+        {
+          speaker: 'YOU',
+          text: "I don't have any fish right now..."
+        },
+        {
+          speaker: 'WOODCUTTER',
+          text: "Hmm, that's the problem with trading - you need what I have, but I don't need what you have. I'll lend you the wood on credit. Bring me a Sharp Stone and 1 Fish later. How should we seal this deal?",
+          onComplete: () => {
+            this.state.showChoice = true;
+            this.state.choiceOptions = [
               {
-                speaker: 'WOODCUTTER',
-                text: "A wise choice! Let's walk to the Stone Tablet together and record our agreement.",
-                onComplete: () => {
-                  this.state.phase = 'loop2_escorting_woodcutter';
-                  this.state.escortingNPC = 'woodcutter';
-                  this.state.woodcutterDebtRecorded = true; // Will record on tablet
-                  // NPC will follow player via escort behavior
+                text: "Just remember it",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.queueDialogue([
+                    {
+                      speaker: 'WOODCUTTER',
+                      text: "Very well, let's walk to the Village Center together. I'll give you the wood there.",
+                      onComplete: () => {
+                        this.state.phase = 'loop2_escorting_woodcutter';
+                        this.state.escortingNPC = 'woodcutter';
+                      }
+                    }
+                  ]);
+                }
+              },
+              {
+                text: "Record it",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.queueDialogue([
+                    {
+                      speaker: 'WOODCUTTER',
+                      text: "A wise choice! Let's walk to the Stone Tablet together and carve our agreement.",
+                      onComplete: () => {
+                        this.state.phase = 'loop2_escorting_woodcutter';
+                        this.state.escortingNPC = 'woodcutter';
+                        this.state.woodcutterDebtRecorded = true;
+                      }
+                    }
+                  ]);
                 }
               }
-            ]);
+            ];
           }
         }
-      ];
+      ]);
     }
     // Loop 2: Arrived at tablet during escort
     else if (phase === 'loop2_escorting_woodcutter') {
@@ -1231,7 +1264,11 @@ export class VillageLedgerGame {
                         this.state.woodIntroduced = true;
                         this.state.stoneIntroduced = true;
                         this.state.fishIntroduced = true;
-                        this.showInventoryPopup('+1 WOOD');
+                        // Only play receive sound once (prevent triple-trigger)
+                        if (!this.state.woodReceiveSoundPlayed) {
+                          this.state.woodReceiveSoundPlayed = true;
+                          this.showInventoryPopup('+1 WOOD');
+                        }
                         this.setMood('happy');
                         this.state.phase = 'loop2_got_wood';
                         this.state.escortingNPC = null;
@@ -1255,7 +1292,11 @@ export class VillageLedgerGame {
                 this.state.woodIntroduced = true;
                 this.state.stoneIntroduced = true;
                 this.state.fishIntroduced = true;
-                this.showInventoryPopup('+1 WOOD');
+                // Only play receive sound once (prevent triple-trigger)
+                if (!this.state.woodReceiveSoundPlayed) {
+                  this.state.woodReceiveSoundPlayed = true;
+                  this.showInventoryPopup('+1 WOOD');
+                }
                 this.setMood('happy');
                 this.state.phase = 'loop2_got_wood';
                 this.state.escortingNPC = null;
@@ -1533,67 +1574,95 @@ export class VillageLedgerGame {
   private handleStoneWorkerInteraction(): void {
     const phase = this.state.phase;
     
-    // LOOP 1: Give stone immediately on credit (verbal promise) - no escort
+    // LOOP 1: Double coincidence of wants - player offers wood, stone-worker wants fish
     if (phase === 'got_wood_need_stone') {
       this.queueDialogue([
         {
+          speaker: 'YOU',
+          text: "I need a sharp stone for the Woodcutter. I have some wood - would you trade for that?"
+        },
+        {
           speaker: 'STONE-WORKER',
-          text: "Need a sharp stone for the Woodcutter's axe? Here you go! You owe me 2 Fish. I'll meet you at the Village Center later.",
+          text: "Wood? No, I don't need wood. I need fish for my family."
+        },
+        {
+          speaker: 'YOU',
+          text: "I don't have any fish right now..."
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "Same problem as always! You have wood, I want fish. We can't trade directly. But I'll give you the stone on credit - bring me 2 Fish later. I'll meet you at the Village Center.",
           onComplete: () => {
             this.state.inventory.stone = 1;
             this.state.obtainedStone = true;
             this.state.stoneIntroduced = true;
-            this.state.fishIntroduced = true; // Fish mentioned as payment
+            this.state.fishIntroduced = true;
             this.showInventoryPopup('+1 SHARP STONE');
             this.setMood('happy');
             this.state.phase = 'got_stone_need_fish';
-            // Stone-worker walks to village center
             this.stoneWorker.targetX = this.villageCenterX - 100;
           }
         }
       ]);
     }
-    // LOOP 2: Offer choice to record or promise
+    // LOOP 2: Double coincidence of wants with choice to record
     else if (phase === 'loop2_got_wood') {
-      this.state.showChoice = true;
-      this.state.choiceOptions = [
+      this.queueDialogue([
         {
-          text: "I promise to pay you 2 fish later.",
-          action: () => {
-            this.state.showChoice = false;
-            this.queueDialogue([
-              {
-                speaker: 'STONE-WORKER',
-                text: "Very well, let's walk to the Village Center. I'll give you the stone there.",
-                onComplete: () => {
-                  this.state.phase = 'loop2_escorting_stoneworker';
-                  this.state.escortingNPC = 'stoneworker';
-                  // Note: stoneWorkerDebtRecorded stays FALSE (verbal promise)
-                  // NPC will follow player via escort behavior
-                }
-              }
-            ]);
-          }
+          speaker: 'YOU',
+          text: "I need a sharp stone for the Woodcutter. I have some wood - would you trade for that?"
         },
         {
-          text: "Let's record this debt on the Stone Tablet first.",
-          action: () => {
-            this.state.showChoice = false;
-            this.queueDialogue([
+          speaker: 'STONE-WORKER',
+          text: "Wood? No, I don't need wood. I need fish for my family."
+        },
+        {
+          speaker: 'YOU',
+          text: "I don't have any fish right now..."
+        },
+        {
+          speaker: 'STONE-WORKER',
+          text: "This is the challenge of trading! You don't have what I want. I'll lend you the stone on credit - bring me 2 Fish later. How should we seal this deal?",
+          onComplete: () => {
+            this.state.showChoice = true;
+            this.state.choiceOptions = [
               {
-                speaker: 'STONE-WORKER',
-                text: "A wise choice! Let's walk to the Stone Tablet together.",
-                onComplete: () => {
-                  this.state.phase = 'loop2_escorting_stoneworker';
-                  this.state.escortingNPC = 'stoneworker';
-                  this.state.stoneWorkerDebtRecorded = true; // Will record on tablet
-                  // NPC will follow player via escort behavior
+                text: "Just remember it",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.queueDialogue([
+                    {
+                      speaker: 'STONE-WORKER',
+                      text: "Very well, let's walk to the Village Center. I'll give you the stone there.",
+                      onComplete: () => {
+                        this.state.phase = 'loop2_escorting_stoneworker';
+                        this.state.escortingNPC = 'stoneworker';
+                      }
+                    }
+                  ]);
+                }
+              },
+              {
+                text: "Record it",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.queueDialogue([
+                    {
+                      speaker: 'STONE-WORKER',
+                      text: "A wise choice! Let's walk to the Stone Tablet together and carve our agreement.",
+                      onComplete: () => {
+                        this.state.phase = 'loop2_escorting_stoneworker';
+                        this.state.escortingNPC = 'stoneworker';
+                        this.state.stoneWorkerDebtRecorded = true;
+                      }
+                    }
+                  ]);
                 }
               }
-            ]);
+            ];
           }
         }
-      ];
+      ]);
     }
     // Loop 2: Arrived at tablet during escort
     else if (phase === 'loop2_escorting_stoneworker') {
@@ -1633,7 +1702,11 @@ export class VillageLedgerGame {
                         this.state.obtainedStone = true;
                         this.state.stoneIntroduced = true;
                         this.state.fishIntroduced = true;
-                        this.showInventoryPopup('+1 SHARP STONE');
+                        // Only play receive sound once (prevent triple-trigger)
+                        if (!this.state.stoneReceiveSoundPlayed) {
+                          this.state.stoneReceiveSoundPlayed = true;
+                          this.showInventoryPopup('+1 SHARP STONE');
+                        }
                         this.setMood('happy');
                         this.state.phase = 'loop2_got_stone';
                         this.state.escortingNPC = null;
@@ -1656,7 +1729,11 @@ export class VillageLedgerGame {
                 this.state.obtainedStone = true;
                 this.state.stoneIntroduced = true;
                 this.state.fishIntroduced = true;
-                this.showInventoryPopup('+1 SHARP STONE');
+                // Only play receive sound once (prevent triple-trigger)
+                if (!this.state.stoneReceiveSoundPlayed) {
+                  this.state.stoneReceiveSoundPlayed = true;
+                  this.showInventoryPopup('+1 SHARP STONE');
+                }
                 this.setMood('happy');
                 this.state.phase = 'loop2_got_stone';
                 this.state.escortingNPC = null;
@@ -1959,7 +2036,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: `I see you have ${berryCount} ${berryCount === 1 ? 'berry' : 'berries'}! How many fish do you want?`,
+          text: "I want some berries! I'll trade 1 fish for each berry you bring me.",
           onComplete: () => {
             // Build choice options based on how many berries the player has
             const choices: { text: string; action: () => void }[] = [];
@@ -3091,9 +3168,9 @@ export class VillageLedgerGame {
           this.villageElder.x += Math.sign(dx) * brawlSpeed * 0.5;
         }
       }
-      // Trigger boo sound overlapping with fight end (at 3s), then failure overlaps with boo
+      // Trigger boo sound overlapping with fight end (at 2s to overlap ending by 2 seconds)
       // Use exact timing check to prevent multiple triggers
-      if (this.state.brawlTimer > 3 && this.state.brawlTimer <= 3.05 && !this.booFailureTriggered) {
+      if (this.state.brawlTimer > 2 && this.state.brawlTimer <= 2.05 && !this.booFailureTriggered) {
         this.booFailureTriggered = true;
         soundManager.playBooThenFailure();
       }
@@ -3606,98 +3683,62 @@ export class VillageLedgerGame {
     const w = this.canvas.width;
     const h = this.canvas.height;
 
-    // Semi-transparent overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(0, 0, w, h);
-
-    // Choice card
-    const cardW = Math.min(500, w - 60);
-    const cardH = 200;
-    const cardX = (w - cardW) / 2;
-    const cardY = (h - cardH) / 2;
-
-    ctx.fillStyle = '#C9B896';
-    ctx.beginPath();
-    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
-    ctx.fill();
-    ctx.strokeStyle = '#8B7355';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
     // Detect if this is a settlement dispute (first option mentions "Tablet")
-    // vs procurement deal (first option is a promise)
     const firstOptionText = this.state.choiceOptions[0]?.text || '';
     const isSettlementPhase = firstOptionText.toLowerCase().includes('tablet');
     
-    // Title - different header for settlement vs procurement
-    ctx.font = `12px ${this.retroFont}`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#3D2914';
-    const headerText = isSettlementPhase ? 'How will you settle this debt?' : 'How many fish do you want?';
-    ctx.fillText(headerText, w / 2, cardY + 35);
+    // Horizontal choice buttons positioned inside the dialogue box area
+    const numChoices = this.state.choiceOptions.length;
+    const dialogueY = h - this.dialogueBoxHeight;
+    const padding = 15;
+    const btnSpacing = 10;
+    const btnH = 45;
+    
+    // Calculate button layout - fit horizontally with spacing
+    const totalAvailableWidth = w - (padding * 2) - ((numChoices - 1) * btnSpacing);
+    const btnW = Math.min(180, totalAvailableWidth / numChoices);
+    const totalButtonsWidth = (btnW * numChoices) + ((numChoices - 1) * btnSpacing);
+    const startX = (w - totalButtonsWidth) / 2;
+    const btnY = dialogueY + (this.dialogueBoxHeight - btnH) / 2;
 
-    // Draw choice buttons
+    // Draw choice buttons horizontally
     this.choiceButtonAreas = [];
     this.state.choiceOptions.forEach((option, i) => {
-      const btnW = cardW - 40;
-      const btnH = 50;
-      const btnX = cardX + 20;
-      const btnY = cardY + 55 + i * 65;
+      const btnX = startX + i * (btnW + btnSpacing);
 
       // Color logic:
       // Settlement phase: first option (consult tablet) = GREEN (smart), second (give in) = RED (risky)
-      // Procurement phase: first option (promise) = RED (risky), second (record) = GREEN (smart)
+      // Procurement phase: all options same color (neutral choice)
       let btnColor: string;
       if (isSettlementPhase) {
         btnColor = i === 0 ? '#22C55E' : '#DC2626'; // Green for tablet, Red for give-in
       } else {
-        btnColor = i === 0 ? '#DC2626' : '#22C55E'; // Red for promise, Green for record
+        // For fish trading choices, use a neutral tan color
+        btnColor = '#8B6914'; // Warm tan/gold
       }
+      
+      // Button background with border
       ctx.fillStyle = btnColor;
       ctx.beginPath();
       ctx.roundRect(btnX, btnY, btnW, btnH, 8);
       ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
-      // Draw button text with horizontal padding and wrapping (max 2 lines)
-      ctx.font = `10px ${this.retroFont}`;
+      // Draw button text centered
+      ctx.font = `bold 14px ${this.retroFont}`;
       ctx.fillStyle = '#FFF';
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
       
-      // Wrap text if too wide (with 20px padding on each side)
-      const maxTextWidth = btnW - 40;
-      const words = option.text.split(' ');
-      let lines: string[] = [];
-      let currentLine = '';
-      
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const testWidth = ctx.measureText(testLine).width;
-        if (testWidth > maxTextWidth && currentLine) {
-          lines.push(currentLine);
-          currentLine = word;
-        } else {
-          currentLine = testLine;
-        }
-      }
-      if (currentLine) lines.push(currentLine);
-      
-      // Limit to max 2 lines, truncate if needed
-      if (lines.length > 2) {
-        lines = lines.slice(0, 2);
-        lines[1] = lines[1].slice(0, -3) + '...';
-      }
-      
-      // Draw wrapped lines centered vertically
-      const lineHeight = 14;
-      const totalHeight = lines.length * lineHeight;
-      const startY = btnY + (btnH - totalHeight) / 2 + lineHeight / 2 + 4;
-      
-      lines.forEach((line, lineIndex) => {
-        ctx.fillText(line, w / 2, startY + lineIndex * lineHeight);
-      });
+      // Simple text (choices should be short like "1 Fish", "2 Fish")
+      ctx.fillText(option.text, btnX + btnW / 2, btnY + btnH / 2);
 
       this.choiceButtonAreas.push({ x: btnX, y: btnY, w: btnW, h: btnH, index: i });
     });
+    
+    ctx.textBaseline = 'alphabetic';
   }
 
   private choiceButtonAreas: { x: number; y: number; w: number; h: number; index: number }[] = [];
@@ -3954,19 +3995,34 @@ export class VillageLedgerGame {
     this.drawCloud(ctx, w * 0.4, h * 0.14, 180, centerCloudAlpha * 0.8, '#353550');
     this.drawCloud(ctx, w * 0.6, h * 0.16, 190, centerCloudAlpha * 0.8, '#353550');
     
-    // Text overlay at the end
+    // Text overlay at the end - fades in then fades out after 5 seconds
+    // Text appears at progress > 0.7 (t = 1.75s), should fade out by t = 6.75s
+    const textAppearTime = 1.75; // When text starts appearing
+    const textDuration = 5; // How long text stays fully visible
+    const textFadeOutTime = 1; // How long to fade out
+    
     if (progress > 0.7) {
-      const textAlpha = (progress - 0.7) / 0.3;
-      ctx.save();
-      ctx.globalAlpha = textAlpha;
-      ctx.font = `bold 24px ${this.retroFont}`;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#FFFFFF';
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 3;
-      ctx.strokeText('THE STORM APPROACHES...', w / 2, h / 2);
-      ctx.fillText('THE STORM APPROACHES...', w / 2, h / 2);
-      ctx.restore();
+      let textAlpha = (progress - 0.7) / 0.3; // Fade in
+      
+      // Calculate fade out (after 5 seconds of visibility)
+      const timeSinceAppear = t - textAppearTime;
+      if (timeSinceAppear > textDuration) {
+        const fadeOutProgress = (timeSinceAppear - textDuration) / textFadeOutTime;
+        textAlpha = Math.max(0, 1 - fadeOutProgress);
+      }
+      
+      if (textAlpha > 0) {
+        ctx.save();
+        ctx.globalAlpha = textAlpha;
+        ctx.font = `bold 24px ${this.retroFont}`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.strokeText('A storm approaches...', w / 2, h / 2);
+        ctx.fillText('A storm approaches...', w / 2, h / 2);
+        ctx.restore();
+      }
     }
   }
   
@@ -4012,6 +4068,34 @@ export class VillageLedgerGame {
     if (Math.sin(t * 3) > 0.98) {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
       ctx.fillRect(0, 0, w, h);
+    }
+    
+    // Continue showing "A storm approaches" text with fade
+    // Text appeared at 1.75s during clouds, should fade after 5s total visibility
+    // Rainfall starts at 2.5s, so text has been visible for 0.75s when rainfall begins
+    // Fade out when rainfallTimer + 0.75 > 5 (i.e., rainfallTimer > 4.25)
+    const textVisibleTime = t + 0.75; // Time since text first appeared
+    const textDuration = 5; // Total visibility before fade
+    const textFadeOutTime = 1; // Fade out duration
+    
+    if (textVisibleTime < textDuration + textFadeOutTime) {
+      let textAlpha = 1;
+      if (textVisibleTime > textDuration) {
+        textAlpha = Math.max(0, 1 - (textVisibleTime - textDuration) / textFadeOutTime);
+      }
+      
+      if (textAlpha > 0) {
+        ctx.save();
+        ctx.globalAlpha = textAlpha;
+        ctx.font = `bold 24px ${this.retroFont}`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.strokeText('A storm approaches...', w / 2, h / 2);
+        ctx.fillText('A storm approaches...', w / 2, h / 2);
+        ctx.restore();
+      }
     }
   }
   
@@ -5128,15 +5212,15 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           }
           break;
         case 'loop2_got_fish':
-          // After viewing Stone Tablet, encourage settling with NPCs
+          // After getting fish, direct to Stone Tablet or settling
           if (this.state.elderVerified || (this.state.woodcutterDebtRecorded && this.state.stoneWorkerDebtRecorded)) {
-            hint = 'Debts verified! Settle with the Woodcutter and Stone-worker.';
+            hint = 'Pay your debts to the Woodcutter and Stone-worker...';
           } else {
-            hint = 'Visit the Stone Tablet to verify debts, then settle with NPCs...';
+            hint = 'Go to the Stone Tablet to verify your debts...';
           }
           break;
         case 'loop2_verify_at_tablet':
-          hint = 'Go to the Stone Tablet to verify the disputed debt...';
+          hint = 'Settle your debts with the Woodcutter and Stone-worker...';
           break;
         case 'loop2_return':
           hint = 'Return home to fix your roof before the storm!';
@@ -5928,6 +6012,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stoneWorkerDebtRecorded: false,
       woodcutterCarvingSoundPlayed: false,
       stoneWorkerCarvingSoundPlayed: false,
+      woodReceiveSoundPlayed: false,
+      stoneReceiveSoundPlayed: false,
       woodcutterDisputed: false,
       stoneworkerDisputed: false,
       woodcutterSettled: false,
@@ -6025,6 +6111,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stoneWorkerDebtRecorded: false,
       woodcutterCarvingSoundPlayed: false,
       stoneWorkerCarvingSoundPlayed: false,
+      woodReceiveSoundPlayed: false,
+      stoneReceiveSoundPlayed: false,
       woodcutterDisputed: false,
       stoneworkerDisputed: false,
       woodcutterSettled: false,

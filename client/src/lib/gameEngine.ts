@@ -195,6 +195,9 @@ export class VillageLedgerGame {
   // Sound timing
   private lastFootstepTime: number = 0;
   private footstepInterval: number = 300;
+  private booFailureTriggered: boolean = false;
+  private stormTriggered: boolean = false;
+  private celebrationEndTime: number = 0;
   
   // Auto-walk feature: player walks to clicked target and interacts
   private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush' | 'stoneTablet' | 'location'; id?: string } | null = null;
@@ -271,7 +274,7 @@ export class VillageLedgerGame {
     this.berryBush = {
       id: 'berryBush',
       name: 'BERRY BUSH',
-      x: 2050,
+      x: 2150,
       y: 0,
       width: 70,
       height: 50,
@@ -912,49 +915,51 @@ export class VillageLedgerGame {
     }
   }
   
-  // Trigger the enter hut sequence - player disappears, then rain starts
+  // Trigger the enter hut sequence - player disappears, then rain starts after 1.5s
   private triggerEnterHutSequence(): void {
     // Player enters hut (disappears)
     this.state.playerEnteredHut = true;
     this.player.visible = false;
     
-    // Fade out day sounds and start rain immediately
-    soundManager.fadeOut('backgroundMusicDay', 1000);
-    soundManager.fadeOut('ambientVillage', 1000);
-    
-    // Start rainfall (5 seconds overlay on scene)
-    this.state.showRainfall = true;
-    this.state.rainfallTimer = 0;
-    soundManager.fadeIn('rain', 500);
-    soundManager.play('thunder');
-    
-    // Sequence: rainfall 5s → night transition 3s → quiz
+    // Wait 1.5 seconds before starting rain
     setTimeout(() => {
       try {
-        // Start night transition with fade (rain continues and fades)
-        this.state.showNightTransition = true;
-        this.state.nightTransitionTimer = 0;
-        soundManager.fadeIn('ambientNight', 1000);
-        soundManager.fadeIn('backgroundMusicNight', 2000);
+        // Start rainfall (5 seconds overlay on scene)
+        this.state.showRainfall = true;
+        this.state.rainfallTimer = 0;
+        soundManager.fadeIn('rain', 500);
         
+        // Sequence: rainfall 5s → night transition 3s → quiz
         setTimeout(() => {
           try {
-            this.state.showRainfall = false; // Turn off rain
-            soundManager.fadeOut('rain', 1000);
-            this.state.showNightTransition = false;
-            this.state.showQuiz = true;
-            this.state.phase = 'quiz';
-            // Restore player visibility for quiz
-            this.player.visible = true;
-            this.state.playerEnteredHut = false;
+            // Start night transition with fade (rain continues and fades)
+            this.state.showNightTransition = true;
+            this.state.nightTransitionTimer = 0;
+            soundManager.fadeIn('ambientNight', 1000);
+            soundManager.fadeIn('backgroundMusicNight', 2000);
+            
+            setTimeout(() => {
+              try {
+                this.state.showRainfall = false; // Turn off rain
+                soundManager.fadeOut('rain', 1000);
+                this.state.showNightTransition = false;
+                this.state.showQuiz = true;
+                this.state.phase = 'quiz';
+                // Restore player visibility for quiz
+                this.player.visible = true;
+                this.state.playerEnteredHut = false;
+              } catch (e) {
+                console.error('Error in quiz transition:', e);
+              }
+            }, 3000); // 3 second fade to night
           } catch (e) {
-            console.error('Error in quiz transition:', e);
+            console.error('Error in rainfall transition:', e);
           }
-        }, 3000); // 3 second fade to night
+        }, 5000); // 5 second rainfall
       } catch (e) {
-        console.error('Error in rainfall transition:', e);
+        console.error('Error starting rain:', e);
       }
-    }, 5000); // 5 second rainfall
+    }, 1500); // Wait 1.5 seconds after entering hut before rain starts
   }
 
   // Trigger the return home sequence with clouds animation (unused - kept for reference)
@@ -2929,7 +2934,9 @@ export class VillageLedgerGame {
         }
       }
       // Trigger boo sound overlapping with fight end (at 3s), then failure overlaps with boo
-      if (this.state.brawlTimer > 3 && this.state.brawlTimer <= 3.1) {
+      // Use exact timing check to prevent multiple triggers
+      if (this.state.brawlTimer > 3 && this.state.brawlTimer <= 3.05 && !this.booFailureTriggered) {
+        this.booFailureTriggered = true;
         soundManager.playBooThenFailure();
       }
       // End brawl at 4 seconds, show fail screen
@@ -2940,19 +2947,32 @@ export class VillageLedgerGame {
       }
     }
     
-    // Update celebration animation timer - confetti continues until applause stops or player nears home
+    // Update celebration animation timer - reduced applause duration (minus 3 seconds)
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
-      const applauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
+      const fullApplauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
+      const applauseDuration = Math.max(2, fullApplauseDuration - 3); // Reduce by 3 seconds, min 2s
       const distToHome = Math.abs(this.player.x - this.playerHomeX);
       
-      // End celebration when: applause ends OR player within 250 pixels of home
+      // End celebration when: reduced applause time OR player within 250 pixels of home
       if (this.state.celebrationTimer > applauseDuration || distToHome <= 250) {
         this.state.showCelebration = false;
+        this.celebrationEndTime = Date.now();
         // Fade out both celebration and applause sounds
         soundManager.fadeOut('crowdApplause', 500);
         soundManager.fadeOut('celebration', 500);
-        // Player must now manually walk home and interact with hut to trigger storm
+      }
+    }
+    
+    // Trigger storm 3 seconds after celebration ends OR when player within 400 pixels of home
+    if (this.state.phase === 'loop2_return' && !this.state.showCelebration && !this.stormTriggered && 
+        !this.state.showCloudsAnimation && !this.state.showRainfall && !this.state.showQuiz) {
+      const distToHome = Math.abs(this.player.x - this.playerHomeX);
+      const timeSinceCelebrationEnd = this.celebrationEndTime > 0 ? (Date.now() - this.celebrationEndTime) / 1000 : 0;
+      
+      if (distToHome <= 400 || timeSinceCelebrationEnd >= 3) {
+        this.stormTriggered = true;
+        this.triggerStormClouds();
       }
     }
     
@@ -3167,14 +3187,32 @@ export class VillageLedgerGame {
           this.state.showCelebration = true;
           this.state.celebrationTimer = 0;
           this.state.phase = 'loop2_return';
+          this.stormTriggered = false; // Reset storm trigger
+          this.celebrationEndTime = 0;
           soundManager.play('celebration');
-          soundManager.play('crowdApplause');
+          // Play applause with reduced duration (full duration minus 3 seconds)
+          const fullDuration = soundManager.getBufferDuration('crowdApplause');
+          soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 3000));
         }
       }
     ]);
   }
   
-  // Storm approaching after celebration - player goes home, fixes roof, enters hut, then rain
+  // Storm clouds appear - player must interact with hut to fix roof and enter
+  private triggerStormClouds(): void {
+    // Start clouds animation and thunder
+    this.state.showCloudsAnimation = true;
+    this.state.cloudsAnimationTimer = 0;
+    soundManager.fadeOut('backgroundMusicDay', 1000);
+    soundManager.fadeOut('backgroundMusicDay2', 1000);
+    soundManager.stopDaytimeMusic();
+    soundManager.fadeOut('ambientVillage', 1000);
+    soundManager.play('thunder');
+    // "A STORM IS APPROACHING..." text is drawn in drawCloudsAnimation
+    // Player must now interact with hut to proceed
+  }
+  
+  // Storm approaching after celebration - player goes home, fixes roof, enters hut, then rain (legacy)
   private triggerStormApproaching(): void {
     this.queueDialogue([
       {
@@ -3664,8 +3702,8 @@ export class VillageLedgerGame {
     // Center vertically in the playable area (above ground and dialogue box)
     const playableHeight = groundY;
     const celebY = (playableHeight / 2) + Math.sin(t * 5) * 10;
-    // Only show "DEBTS SETTLED!" text for first 3 seconds
-    if (t <= 3) {
+    // Only show "DEBTS SETTLED!" text for first 4 seconds
+    if (t <= 4) {
       ctx.strokeText('DEBTS SETTLED!', w / 2, celebY);
       ctx.fillText('DEBTS SETTLED!', w / 2, celebY);
     }
@@ -4044,48 +4082,52 @@ export class VillageLedgerGame {
   }
 
   private drawLocationMarkers(ctx: CanvasRenderingContext2D, groundY: number): void {
-    // Player Home marker (at x=100)
+    // Player Home marker (at x=100) - 20% larger
     const homeScreenX = this.playerHomeX - this.cameraX;
+    const hutScale = 1.2; // 20% larger
     if (homeScreenX > -100 && homeScreenX < this.canvas.width + 100) {
-      // Draw a simple house shape
+      // Draw a simple house shape (scaled 20% larger)
+      const hutWidth = 60 * hutScale;
+      const hutHeight = 60 * hutScale;
       ctx.fillStyle = '#4A3728';
-      ctx.fillRect(homeScreenX - 30, groundY - 60, 60, 60);
+      ctx.fillRect(homeScreenX - hutWidth/2, groundY - hutHeight, hutWidth, hutHeight);
       
-      // Draw roof
+      // Draw roof (scaled 20% larger)
       ctx.fillStyle = '#6B4423';
       ctx.beginPath();
-      ctx.moveTo(homeScreenX - 40, groundY - 60);
-      ctx.lineTo(homeScreenX, groundY - 100);
-      ctx.lineTo(homeScreenX + 40, groundY - 60);
+      ctx.moveTo(homeScreenX - 40 * hutScale, groundY - hutHeight);
+      ctx.lineTo(homeScreenX, groundY - 100 * hutScale);
+      ctx.lineTo(homeScreenX + 40 * hutScale, groundY - hutHeight);
       ctx.fill();
       
-      // Draw hole in roof if not repaired
+      // Draw hole in roof if not repaired (keep hole size the same!)
+      const holeY = groundY - (75 * hutScale); // Position scaled but hole size same
       if (!this.state.roofRepaired) {
-        // Hole in the roof (dark opening)
+        // Hole in the roof (dark opening) - SAME SIZE as before
         ctx.fillStyle = '#1a0f08';
         ctx.beginPath();
-        ctx.ellipse(homeScreenX + 10, groundY - 75, 15, 10, -0.3, 0, Math.PI * 2);
+        ctx.ellipse(homeScreenX + 12 * hutScale, holeY, 15, 10, -0.3, 0, Math.PI * 2);
         ctx.fill();
         // Jagged edges for the hole
         ctx.strokeStyle = '#4A3020';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.ellipse(homeScreenX + 10, groundY - 75, 16, 11, -0.3, 0, Math.PI * 2);
+        ctx.ellipse(homeScreenX + 12 * hutScale, holeY, 16, 11, -0.3, 0, Math.PI * 2);
         ctx.stroke();
       } else {
-        // Patch on the roof (lighter wood color)
+        // Patch on the roof (lighter wood color) - SAME SIZE as before
         ctx.fillStyle = '#8B6B4F';
         ctx.beginPath();
-        ctx.ellipse(homeScreenX + 10, groundY - 75, 15, 10, -0.3, 0, Math.PI * 2);
+        ctx.ellipse(homeScreenX + 12 * hutScale, holeY, 15, 10, -0.3, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = '#5D4E37';
         ctx.lineWidth = 2;
         ctx.stroke();
       }
       
-      // Door
+      // Door (scaled 20% larger)
       ctx.fillStyle = '#2D1F14';
-      ctx.fillRect(homeScreenX - 10, groundY - 35, 20, 35);
+      ctx.fillRect(homeScreenX - 12 * hutScale, groundY - 42 * hutScale, 24 * hutScale, 42 * hutScale);
       // Label
       ctx.font = `10px ${this.retroFont}`;
       ctx.textAlign = 'center';
@@ -5752,6 +5794,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.fisherman.x = this.fisherman.originalX || 3175;
     this.fisherman.targetX = undefined;
     
+    // Reset animation/sound flags
+    this.booFailureTriggered = false;
+    this.stormTriggered = false;
+    this.celebrationEndTime = 0;
+    
     // Resume ambient music and day background
     soundManager.stopLoop('backgroundMusicNight');
     soundManager.fadeIn('ambientVillage', 1000);
@@ -5838,6 +5885,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3175;
     this.fisherman.targetX = undefined;
+    
+    // Reset animation/sound flags for loop 2
+    this.booFailureTriggered = false;
+    this.stormTriggered = false;
+    this.celebrationEndTime = 0;
     
     setTimeout(() => this.triggerIntro(), 500);
   }

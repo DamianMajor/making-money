@@ -175,6 +175,7 @@ export class VillageLedgerGame {
 
   // Animation timers
   private bobTimer: number = 0;
+  private talkingTimer: number = 0; // Timer for talking bounce animation
   private dialogueCharIndex: number = 0;
   private dialogueTimer: number = 0;
   private continueArrowBlink: number = 0;
@@ -618,6 +619,9 @@ export class VillageLedgerGame {
       } else if (tappedTarget === 'stoneTablet') {
         const inRange = Math.abs(this.player.x - this.villageCenterX) < interactionRange;
         if (inRange) {
+          // Open the Stone Tablet popup view (same as clicking the HUD)
+          this.state.showStoneTabletPopup = true;
+          // Also trigger any game-related Stone Tablet interaction
           this.handleStoneTabletInteraction();
           this.autoWalkTarget = null;
           return;
@@ -2770,6 +2774,7 @@ export class VillageLedgerGame {
   private update(dt: number): void {
     // Update bob animation
     this.bobTimer += dt * 8;
+    this.talkingTimer += dt * 18; // Faster timer for talking bounce (~3 cycles/sec)
 
     // Auto-walk feature: player walks to clicked target and interacts on arrival
     if (this.autoWalkTarget && !this.state.currentDialogue) {
@@ -4414,7 +4419,23 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   // Apply render offset for soft collision visual separation (NPCs only)
   const renderOffset = char.renderOffsetX || 0;
   const screenX = char.x - this.cameraX + renderOffset;
-  const screenY = char.y + char.bobOffset;
+  
+  // Calculate talking bounce if this character is currently speaking
+  let talkingBounce = 0;
+  if (this.state.currentDialogue) {
+    const speaker = this.state.currentDialogue.speaker.toUpperCase();
+    const charName = char.name.toUpperCase();
+    // Match speaker to character (handle YOU -> player, others by name)
+    const isSpeaking = (speaker === 'YOU' && char.id === 'player') ||
+                       (speaker === charName) ||
+                       (speaker === 'STONE-WORKER' && charName === 'STONE-WORKER') ||
+                       (speaker === 'VILLAGE ELDER' && charName === 'VILLAGE ELDER');
+    if (isSpeaking) {
+      talkingBounce = Math.sin(this.talkingTimer) * 2.5; // Subtle 2.5px bounce
+    }
+  }
+  
+  const screenY = char.y + char.bobOffset + talkingBounce;
 
   // 1. Draw original shadow
   ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
@@ -4625,22 +4646,31 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
   }
 
-  // Large popup view of Stone Tablet - shown when clicking the HUD
+  // Large popup view of Stone Tablet - shown when clicking the HUD or in-world tablet
   private drawStoneTabletPopup(ctx: CanvasRenderingContext2D): void {
     const w = this.canvas.width;
     const h = this.canvas.height;
     
-    // Dark overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-    ctx.fillRect(0, 0, w, h);
+    // Check if dialogue is active - if so, leave room for dialogue box
+    const hasActiveDialogue = this.state.currentDialogue !== null;
+    const dialogueReserve = hasActiveDialogue ? this.dialogueBoxHeight + 20 : 0;
     
-    // Popup dimensions - larger than HUD for readability, wide enough for full debt text
-    // Loop 2 needs wider popup for longer debt text
+    // Lighter overlay when dialogue is showing so player can still see dialogue
+    ctx.fillStyle = hasActiveDialogue ? 'rgba(0, 0, 0, 0.55)' : 'rgba(0, 0, 0, 0.75)';
+    ctx.fillRect(0, 0, w, h - dialogueReserve);
+    
+    // Popup dimensions - smaller when dialogue is active to leave room for dialogue box
     const isLoop2OrLater = this.state.loop >= 2;
-    const popupWidth = Math.min(isLoop2OrLater ? 780 : 620, w - 40);
-    const popupHeight = Math.min(500, h - 120);
+    const baseWidth = isLoop2OrLater ? 780 : 620;
+    const baseHeight = hasActiveDialogue ? 350 : 500; // Shorter when dialogue showing
+    const popupWidth = Math.min(baseWidth, w - 40);
+    const popupHeight = Math.min(baseHeight, h - dialogueReserve - 60);
     const popupX = (w - popupWidth) / 2;
-    const popupY = (h - popupHeight) / 2;
+    // Position popup higher when dialogue is active
+    const availableHeight = h - dialogueReserve;
+    const popupY = hasActiveDialogue 
+      ? Math.max(20, (availableHeight - popupHeight) / 2)
+      : (h - popupHeight) / 2;
     
     // Stone texture background
     const stoneGradient = ctx.createLinearGradient(popupX, popupY, popupX + popupWidth, popupY + popupHeight);

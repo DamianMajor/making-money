@@ -779,8 +779,8 @@ export class VillageLedgerGame {
     const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
     const dialogueTop = this.canvas.height - this.dialogueBoxHeight;
     const btnY = groundY + (dialogueTop - groundY - size) / 2;
-    // Add padding around button for easier touch targeting
-    const padding = 20;
+    // Precise touch area - no extra padding beyond button bounds
+    const padding = 5;
     return x >= btnX - padding && x <= btnX + size + padding && 
            y >= btnY - padding && y <= btnY + size + padding;
   }
@@ -1057,7 +1057,7 @@ export class VillageLedgerGame {
           } catch (e) {
             console.error('Error in rainfall transition:', e);
           }
-        }, 15000); // 15 second rainfall (shortened by 1s)
+        }, 12000); // 12 second rainfall (reduced by 3s)
       } catch (e) {
         console.error('Error starting rain:', e);
       }
@@ -2397,15 +2397,23 @@ export class VillageLedgerGame {
 
   // Loop 2: Continue stone worker dialogue after trade offer (with record choice) - awards badge
   private continueStoneWorkerTradeDialogueLoop2(offeredItem: string | null): void {
+    const showChoiceButtons = () => {
+      this.state.showChoice = true;
+    };
+    
     const showRecordChoice = () => {
       // Award Double Coincidence badge after recognizing the pattern in loop 2
+      // Badge appears first, then choice buttons appear after dismissal
       if (!this.state.badges.includes('Double Coincidence of Wants')) {
         this.awardBadge(
           'Double Coincidence of Wants',
-          'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!'
+          'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!',
+          showChoiceButtons // Show choice after badge is dismissed
         );
+      } else {
+        // Badge already earned, show choice immediately
+        showChoiceButtons();
       }
-      this.state.showChoice = true;
       this.state.choiceOptions = [
         {
           text: "Just remember it",
@@ -4684,14 +4692,19 @@ export class VillageLedgerGame {
     }
     fadeAlpha = Math.max(0, Math.min(1, fadeAlpha));
     
-    // Draw confetti particles with fade
+    // Draw confetti particles with fade - diagonal falling pattern
     const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#9B59B6', '#2ECC71'];
     ctx.save();
     ctx.globalAlpha = fadeAlpha;
     for (let i = 0; i < 30; i++) {
       const seed = i * 137.5;
-      const x = (seed * 7.3 + t * 100) % w;
-      const y = ((seed * 3.7 + t * 150) % (groundY - 100)) + 50;
+      // Diagonal movement: X moves right as Y moves down
+      const baseX = seed * 7.3;
+      const baseY = seed * 3.7;
+      const fallSpeed = 120 + (i % 5) * 30; // Varied fall speeds
+      const driftSpeed = 80 + (i % 3) * 20; // Horizontal drift for diagonal effect
+      const x = (baseX + t * driftSpeed) % w;
+      const y = ((baseY + t * fallSpeed) % (groundY - 100)) + 50;
       const size = 4 + (i % 3) * 2;
       const colorIndex = i % confettiColors.length;
       const rotation = t * (5 + i % 3);
@@ -5187,6 +5200,13 @@ export class VillageLedgerGame {
         }
         this.state.showBadgePopup = false;
         this.state.pendingBadge = null;
+        
+        // Run callback after badge is dismissed
+        if (this.badgeDismissCallback) {
+          const callback = this.badgeDismissCallback;
+          this.badgeDismissCallback = null;
+          callback();
+        }
       }
     }
   }
@@ -5196,12 +5216,19 @@ export class VillageLedgerGame {
     this.state.tradeSelectionCallback = callback;
   }
 
-  private awardBadge(name: string, description: string): void {
+  // Callback to run after badge popup is dismissed
+  private badgeDismissCallback: (() => void) | null = null;
+  
+  private awardBadge(name: string, description: string, onDismiss?: () => void): void {
     // Don't award duplicates
     if (!this.state.badges.includes(name)) {
       this.state.pendingBadge = { name, description };
       this.state.showBadgePopup = true;
+      this.badgeDismissCallback = onDismiss || null;
       soundManager.play('quizCorrect');
+    } else if (onDismiss) {
+      // Badge already earned, call callback immediately
+      onDismiss();
     }
   }
 
@@ -5895,8 +5922,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.stroke();
     
     // Arrow pointing up to inventory (animated bounce) - custom drawn arrow
+    // Arrow stays at original position (closer to inventory), independent of hint box
     const bounceOffset = Math.sin(Date.now() * 0.008) * 5;
-    const arrowY = hintY - 10 + bounceOffset;
+    const arrowY = bottomY + 30 + bounceOffset; // Fixed position near inventory
     
     // Draw main arrow triangle
     ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;

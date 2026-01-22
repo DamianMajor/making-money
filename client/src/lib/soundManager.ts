@@ -532,8 +532,15 @@ export class SoundManager {
   public fadeIn(name: SoundName, duration: number = 1000): void {
     if (this.muted || !this.initialized || !this.audioContext) return;
     
-    // Stop existing loop of this sound
-    this.stopLoop(name);
+    // If sound is already playing, don't restart it (prevents double-triggering)
+    const existing = this.activeSources.get(name);
+    if (existing) {
+      // Just ensure volume is at target level
+      const config = SOUND_CONFIGS[name];
+      const currentTime = this.audioContext.currentTime;
+      existing.gainNode.gain.linearRampToValueAtTime(config.volume, currentTime + duration / 1000);
+      return;
+    }
     
     const config = SOUND_CONFIGS[name];
     const activeSound = this.createSource(name, config.loop);

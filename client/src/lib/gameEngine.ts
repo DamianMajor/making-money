@@ -587,8 +587,11 @@ export class VillageLedgerGame {
       }
     }
     
-    // Inventory hint is informational only - don't block other interactions
-    // It will be dismissed when inventory is tapped or after 5 seconds (auto-dismiss in update)
+    // Block all other actions while inventory hint is showing in loop 1
+    // Player must tap inventory to continue
+    if (this.state.showInventoryHint && this.state.loop === 1) {
+      return;
+    }
     
     // Handle fail screen touches
     if (this.state.showFail) {
@@ -5843,7 +5846,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const pulse = 0.7 + Math.sin(Date.now() * 0.006) * 0.3;
     
     // Draw hint box below inventory
-    const hintW = 280;
+    const hintW = 300;
     const hintH = 55;
     const hintX = centerX - hintW / 2;
     const hintY = bottomY + 40;

@@ -648,14 +648,14 @@ export class VillageLedgerGame {
       return;
     }
 
-    // Block input during night transition (cutscene) - but allow quiz touches above
-    if (this.state.showNightTransition) {
-      return;
-    }
-    
-    // Handle quiz review touches
+    // Handle quiz review touches (check before night transition block)
     if (this.state.showQuizReview) {
       this.handleQuizReviewTouch(x, y);
+      return;
+    }
+
+    // Block input during night transition (cutscene) - but allow quiz/quiz review above
+    if (this.state.showNightTransition) {
       return;
     }
 
@@ -905,6 +905,9 @@ export class VillageLedgerGame {
             speaker: 'YOU',
             text: "Just in time! Let me fix my roof before the storm hits!",
             onComplete: () => {
+              // Block player movement after roof repair until entering hut
+              this.state.playerBlockedForCarving = true;
+              
               // Play hammer sound shortened by 2 seconds
               const hammerDuration = Math.max(1000, soundManager.getBufferDuration('roofHammer') - 2000);
               soundManager.playForDuration('roofHammer', hammerDuration);
@@ -939,6 +942,9 @@ export class VillageLedgerGame {
           speaker: 'YOU',
           text: "Safe inside! The storm can come now.",
           onComplete: () => {
+            // Block player movement until entering hut
+            this.state.playerBlockedForCarving = true;
+            
             // Play 3 footsteps, then player enters hut
             setTimeout(() => {
               soundManager.play('footstepA', 1.0);
@@ -1309,8 +1315,8 @@ export class VillageLedgerGame {
         return;
       }
       
-      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
-      const woodcutterAtCenter = Math.abs(this.woodcutter.x - this.villageCenterX) < 150;
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 200;
+      const woodcutterAtCenter = Math.abs(this.woodcutter.x - this.villageCenterX) < 200;
       
       if (playerAtCenter && woodcutterAtCenter) {
         const recorded = this.state.woodcutterDebtRecorded;
@@ -1984,8 +1990,8 @@ export class VillageLedgerGame {
         return;
       }
       
-      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
-      const stoneWorkerAtCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 150;
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 200;
+      const stoneWorkerAtCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 200;
       
       if (playerAtCenter && stoneWorkerAtCenter) {
         const recorded = this.state.stoneWorkerDebtRecorded;
@@ -3437,6 +3443,7 @@ export class VillageLedgerGame {
         this.state.playerFading = false;
         this.player.visible = false;
         this.state.playerEnteredHut = true;
+        this.state.playerBlockedForCarving = false; // Release movement block after entering hut
       }
     }
 
@@ -5090,9 +5097,15 @@ export class VillageLedgerGame {
       ctx.restore();
     }
     
-    // Draw "THE END OF A GOOD DAY" text after transition
-    if (t > 2) {
-      const textAlpha = Math.min(1, (t - 2) / 1);
+    // Draw "THE END OF A GOOD DAY" text after transition (fade out 3s earlier - at t=4 instead of t=7)
+    if (t > 2 && t < 5) {
+      // Fade in from t=2 to t=3, then fade out from t=4 to t=5
+      let textAlpha = 1;
+      if (t < 3) {
+        textAlpha = (t - 2); // Fade in
+      } else if (t > 4) {
+        textAlpha = 1 - (t - 4); // Fade out
+      }
       ctx.save();
       ctx.globalAlpha = textAlpha;
       ctx.font = `20px ${this.retroFont}`;
@@ -5969,7 +5982,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Draw arrow stem
     ctx.fillRect(centerX - 5, arrowY - 4, 10, 12);
     
-    // Draw subtle outline
+    // Draw subtle outline for triangle
     ctx.strokeStyle = '#DAA520';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -5978,6 +5991,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.lineTo(centerX + 14, arrowY - 2);
     ctx.closePath();
     ctx.stroke();
+    
+    // Draw outline for stem
+    ctx.strokeRect(centerX - 5, arrowY - 4, 10, 12);
     
     // Hint text
     ctx.font = `bold 11px ${this.retroFont}`;
@@ -7110,10 +7126,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.lineWidth = 3;
     ctx.stroke();
     
-    ctx.font = `14px ${this.retroFont}`;
+    ctx.font = `bold 16px ${this.retroFont}`;
     ctx.fillStyle = '#FFF';
     ctx.textAlign = 'center';
-    ctx.fillText('FINISH', w / 2, btnY + btnH / 2 + 5);
+    ctx.textBaseline = 'middle';
+    ctx.fillText('FINISH', w / 2, btnY + btnH / 2);
+    ctx.textBaseline = 'alphabetic'; // Reset to default
     
     this.reviewContinueButton = { x: btnX, y: btnY, w: btnW, h: btnH };
     this.reviewPrevButton = null;

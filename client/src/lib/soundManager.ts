@@ -55,7 +55,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   brawl: { src: '/sounds/brawl.mp3', volume: 0.5, loop: false },
   ambientVillage: { src: '/sounds/ambient-village.mp3', volume: 0.2, loop: true },
   ambientNight: { src: '/sounds/ambient-night.mp3', volume: 0.3, loop: true },
-  rain: { src: '/sounds/rain.mp3', volume: 0.4, loop: true },
+  rain: { src: '/sounds/rain.mp3', volume: 0.4, loop: false },
   thunder: { src: '/sounds/thunder.mp3', volume: 0.6, loop: false },
   roofHammer: { src: '/sounds/roof-hammer.mp3', volume: 0.4, loop: false },
   backgroundMusicDay: { src: '/sounds/backgroundmusic-day.mp3', volume: 0.25, loop: false },

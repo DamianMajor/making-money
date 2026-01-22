@@ -5838,7 +5838,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const pulse = 0.7 + Math.sin(Date.now() * 0.006) * 0.3;
     
     // Draw hint box below inventory
-    const hintW = 260;
+    const hintW = 300;
     const hintH = 65;
     const hintX = centerX - hintW / 2;
     const hintY = bottomY + 40;

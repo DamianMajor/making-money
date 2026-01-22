@@ -75,6 +75,8 @@ interface GameState {
   // Track if carving sound has been played (to prevent double-trigger)
   woodcutterCarvingSoundPlayed: boolean;
   stoneWorkerCarvingSoundPlayed: boolean;
+  // Block player movement during carving sequence
+  playerBlockedForCarving: boolean;
   // Track if receive sounds have been played (to prevent triple-trigger)
   woodReceiveSoundPlayed: boolean;
   stoneReceiveSoundPlayed: boolean;
@@ -362,6 +364,7 @@ export class VillageLedgerGame {
       stoneWorkerDebtRecorded: false,
       woodcutterCarvingSoundPlayed: false,
       stoneWorkerCarvingSoundPlayed: false,
+      playerBlockedForCarving: false,
       woodReceiveSoundPlayed: false,
       stoneReceiveSoundPlayed: false,
       woodcutterDisputed: false,
@@ -654,6 +657,11 @@ export class VillageLedgerGame {
         this.dialogueCharIndex = this.state.currentDialogue.text.length;
         this.state.dialogueComplete = true;
       }
+      return;
+    }
+    
+    // Block player walking/interactions while carving (but allow dialogue above)
+    if (this.state.playerBlockedForCarving) {
       return;
     }
 
@@ -1032,24 +1040,24 @@ export class VillageLedgerGame {
               try {
                 this.state.showRainfall = false; // Turn off rain
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
-                this.state.showNightTransition = false;
-                // Delay quiz appearance by 3 seconds
+                // Keep night scene visible for 1 extra second, then show quiz with night background
                 setTimeout(() => {
                   this.state.showQuiz = true;
                   this.state.phase = 'quiz';
+                  // Keep showNightTransition true so night scene stays in background
                   // Restore player visibility for quiz
                   this.player.visible = true;
                   this.state.playerEnteredHut = false;
                   this.state.playerAlpha = 1; // Reset alpha
-                }, 3000);
+                }, 4000); // 4 seconds delay (1 more than before)
               } catch (e) {
                 console.error('Error in quiz transition:', e);
               }
-            }, 6000); // 6 second fade to night
+            }, 7000); // 7 second fade to night (1s longer for peaceful nighttime)
           } catch (e) {
             console.error('Error in rainfall transition:', e);
           }
-        }, 16000); // 16 second rainfall (extended by 11 seconds)
+        }, 15000); // 15 second rainfall (shortened by 1s)
       } catch (e) {
         console.error('Error starting rain:', e);
       }
@@ -1297,10 +1305,24 @@ export class VillageLedgerGame {
               speaker: 'WOODCUTTER',
               text: "Let me carve this agreement into the Stone Tablet...",
               onComplete: () => {
+                // Block player movement during carving
+                this.state.playerBlockedForCarving = true;
+                
                 // Only play carving sound once per carve (prevent double-trigger)
                 if (!this.state.woodcutterCarvingSoundPlayed) {
                   this.state.woodcutterCarvingSoundPlayed = true;
                   soundManager.playForDuration('stoneCarve', 2500);
+                  
+                  // Award Ledger badge 1 second after carving starts (if second entry)
+                  const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('WOODCUTTER'));
+                  if (!alreadyRecorded && this.state.ledgerEntries.length >= 1) {
+                    setTimeout(() => {
+                      this.awardBadge(
+                        'Ledger Master',
+                        'You recorded your second debt on the Stone Tablet! A shared ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
+                      );
+                    }, 1000);
+                  }
                 }
                 // After carving sound, record debt and deliver item
                 setTimeout(() => {
@@ -1308,15 +1330,6 @@ export class VillageLedgerGame {
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('WOODCUTTER'));
                   if (!alreadyRecorded) {
                     this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
-                    // Award Ledger badge after second entry
-                    if (this.state.ledgerEntries.length >= 2) {
-                      setTimeout(() => {
-                        this.awardBadge(
-                          'Ledger Master',
-                          'You recorded your second debt on the Stone Tablet! A shared ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
-                        );
-                      }, 2000);
-                    }
                   }
                   this.state.showHUD = true;
                   this.hudGlow = 1;
@@ -1326,6 +1339,8 @@ export class VillageLedgerGame {
                       speaker: 'WOODCUTTER',
                       text: "The debt is now recorded! Here's your Wood.",
                       onComplete: () => {
+                        // Unblock player movement after receiving item
+                        this.state.playerBlockedForCarving = false;
                         this.state.inventory.wood = 1;
                         this.state.obtainedWood = true;
                         this.state.woodIntroduced = true;
@@ -1965,10 +1980,24 @@ export class VillageLedgerGame {
               speaker: 'STONE-WORKER',
               text: "Let me carve this agreement into the Stone Tablet...",
               onComplete: () => {
+                // Block player movement during carving
+                this.state.playerBlockedForCarving = true;
+                
                 // Only play carving sound once per carve (prevent double-trigger)
                 if (!this.state.stoneWorkerCarvingSoundPlayed) {
                   this.state.stoneWorkerCarvingSoundPlayed = true;
                   soundManager.playForDuration('stoneCarve', 2500);
+                  
+                  // Award Ledger badge 1 second after carving starts (if second entry)
+                  const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('STONE-WORKER'));
+                  if (!alreadyRecorded && this.state.ledgerEntries.length >= 1) {
+                    setTimeout(() => {
+                      this.awardBadge(
+                        'Ledger Master',
+                        'You recorded your second debt on the Stone Tablet! A shared ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
+                      );
+                    }, 1000);
+                  }
                 }
                 // After carving sound, record debt and deliver item
                 setTimeout(() => {
@@ -1976,15 +2005,6 @@ export class VillageLedgerGame {
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('STONE-WORKER'));
                   if (!alreadyRecorded) {
                     this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
-                    // Award Ledger badge after second entry
-                    if (this.state.ledgerEntries.length >= 2) {
-                      setTimeout(() => {
-                        this.awardBadge(
-                          'Ledger Master',
-                          'You recorded your second debt on the Stone Tablet! A shared ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
-                        );
-                      }, 2000);
-                    }
                   }
                   this.hudGlow = 1;
                   // Now deliver the stone and move to final position
@@ -1993,6 +2013,8 @@ export class VillageLedgerGame {
                       speaker: 'STONE-WORKER',
                       text: "The debt is now recorded! Here's your Sharp Stone.",
                       onComplete: () => {
+                        // Unblock player movement after receiving item
+                        this.state.playerBlockedForCarving = false;
                         this.state.inventory.stone = 1;
                         this.state.obtainedStone = true;
                         this.state.stoneIntroduced = true;
@@ -2376,6 +2398,13 @@ export class VillageLedgerGame {
   // Loop 2: Continue stone worker dialogue after trade offer (with record choice) - awards badge
   private continueStoneWorkerTradeDialogueLoop2(offeredItem: string | null): void {
     const showRecordChoice = () => {
+      // Award Double Coincidence badge after recognizing the pattern in loop 2
+      if (!this.state.badges.includes('Double Coincidence of Wants')) {
+        this.awardBadge(
+          'Double Coincidence of Wants',
+          'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!'
+        );
+      }
       this.state.showChoice = true;
       this.state.choiceOptions = [
         {
@@ -3640,9 +3669,10 @@ export class VillageLedgerGame {
     }
 
     // Check if player completed Loop 2 successfully - trigger thunderstorm then night transition
-    // Skip if rain sequence already started (from hut interaction)
+    // Skip if rain sequence already started or player is fading into hut
     if (this.state.phase === 'complete_success' && this.player.x <= this.playerHomeX + 50 && 
-        !this.state.showThunderstorm && !this.state.showNightTransition && !this.rainSoundStarted) {
+        !this.state.showThunderstorm && !this.state.showNightTransition && 
+        !this.rainSoundStarted && !this.state.playerFading) {
       // Auto-fix roof if not already repaired
       if (!this.state.roofRepaired) {
         this.state.roofRepaired = true;
@@ -3752,14 +3782,12 @@ export class VillageLedgerGame {
     
     
     // Update night transition animation timer
+    // Note: Night transition is now controlled by setTimeout in triggerEnterHutSequence
+    // to allow night scene to persist in background during quiz
     if (this.state.showNightTransition) {
       this.state.nightTransitionTimer += dt;
-      // Night transition lasts 4 seconds, then show quiz
-      if (this.state.nightTransitionTimer > 4) {
-        this.state.showNightTransition = false;
-        this.state.phase = 'quiz';
-        this.state.showQuiz = true;
-      }
+      // Don't auto-show quiz here - let setTimeout chain handle it
+      // This allows night scene to stay visible during quiz
     }
   }
 
@@ -4720,9 +4748,9 @@ export class VillageLedgerGame {
     const h = this.canvas.height;
     const t = this.state.thunderstormTimer;
     
-    // Dark storm overlay that builds up
+    // Dark storm overlay that builds up (reduced darkness)
     const stormProgress = Math.min(1, t / 1.5);
-    const stormAlpha = stormProgress * 0.5;
+    const stormAlpha = stormProgress * 0.35;
     ctx.fillStyle = `rgba(30, 30, 50, ${stormAlpha})`;
     ctx.fillRect(0, 0, w, h);
     
@@ -4777,8 +4805,8 @@ export class VillageLedgerGame {
     const progress = Math.min(1, t / 2.5); // 0 to 1 over 2.5 seconds
     const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease out
     
-    // Darken the sky gradually
-    const darkenAlpha = easeProgress * 0.6;
+    // Darken the sky gradually (reduced darkness)
+    const darkenAlpha = easeProgress * 0.4;
     ctx.fillStyle = `rgba(30, 30, 50, ${darkenAlpha})`;
     ctx.fillRect(0, 0, w, h);
     
@@ -4839,8 +4867,8 @@ export class VillageLedgerGame {
     this.state.rainfallTimer += 1/60;
     const t = this.state.rainfallTimer;
     
-    // Dark stormy sky background
-    ctx.fillStyle = 'rgba(20, 20, 35, 0.85)';
+    // Dark stormy sky background (reduced darkness)
+    ctx.fillStyle = 'rgba(20, 20, 35, 0.65)';
     ctx.fillRect(0, 0, w, h);
     
     // Draw persistent clouds at top
@@ -5851,11 +5879,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Pulsing animation for arrow
     const pulse = 0.7 + Math.sin(Date.now() * 0.006) * 0.3;
     
-    // Draw hint box below inventory
+    // Draw hint box below inventory (positioned below the arrow)
     const hintW = 300;
     const hintH = 55;
     const hintX = centerX - hintW / 2;
-    const hintY = bottomY + 40;
+    const hintY = bottomY + 60;
     
     // Background
     ctx.fillStyle = 'rgba(45, 35, 28, 0.95)';
@@ -6932,8 +6960,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const btnW = 200;
     const btnH = 45;
     const btnX = (w - btnW) / 2;
-    const maxBtnY = cardY + cardH - btnH - 15; // Maximum Y to keep button inside card
-    const btnY = Math.min(yOffset + 25, maxBtnY); // Position below text with more padding
+    const maxBtnY = cardY + cardH - btnH - 25; // Maximum Y to keep button inside card with more bottom padding
+    const btnY = Math.min(yOffset + 35, maxBtnY); // Position below text with proper spacing
     
     ctx.fillStyle = '#166534';
     ctx.beginPath();
@@ -7063,6 +7091,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stoneWorkerDebtRecorded: false,
       woodcutterCarvingSoundPlayed: false,
       stoneWorkerCarvingSoundPlayed: false,
+      playerBlockedForCarving: false,
       woodReceiveSoundPlayed: false,
       stoneReceiveSoundPlayed: false,
       woodcutterDisputed: false,
@@ -7174,6 +7203,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stoneWorkerDebtRecorded: false,
       woodcutterCarvingSoundPlayed: false,
       stoneWorkerCarvingSoundPlayed: false,
+      playerBlockedForCarving: false,
       woodReceiveSoundPlayed: false,
       stoneReceiveSoundPlayed: false,
       woodcutterDisputed: false,

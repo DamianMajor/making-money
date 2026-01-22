@@ -57,6 +57,10 @@ interface GameState {
   // Show badge popup
   showBadgePopup: boolean;
   pendingBadge: { name: string; description: string } | null;
+  // Inventory hint for first trade
+  showInventoryHint: boolean;
+  inventoryHintShown: boolean; // Track if hint has been shown to avoid repeating
+  inventoryHintTimer: number; // Timer for auto-dismiss (seconds)
   // Trade selection state
   showTradeSelection: boolean;
   tradeSelectionCallback: ((item: string | null) => void) | null;
@@ -344,6 +348,9 @@ export class VillageLedgerGame {
       badges: [],
       showBadgePopup: false,
       pendingBadge: null,
+      showInventoryHint: false,
+      inventoryHintShown: false,
+      inventoryHintTimer: 0,
       showTradeSelection: false,
       tradeSelectionCallback: null,
       roofRepaired: false,
@@ -547,11 +554,15 @@ export class VillageLedgerGame {
       }
     }
     
-    // Check if clicking on inventory HUD to open popup
+    // Check if clicking on inventory HUD to open popup (also dismisses hint)
     if (this.inventoryButtonArea) {
       const btn = this.inventoryButtonArea;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.showInventoryDetailPopup = true;
+        // Also dismiss inventory hint if showing
+        if (this.state.showInventoryHint) {
+          this.state.showInventoryHint = false;
+        }
         soundManager.play('buttonClick');
         return;
       }
@@ -569,6 +580,9 @@ export class VillageLedgerGame {
         return;
       }
     }
+    
+    // Inventory hint is informational only - don't block other interactions
+    // It will be dismissed when inventory is tapped or after 5 seconds (auto-dismiss in update)
     
     // Handle fail screen touches
     if (this.state.showFail) {
@@ -988,7 +1002,7 @@ export class VillageLedgerGame {
         soundManager.fadeIn('rain', 2000); // 2 second fade in
         soundManager.play('thunder'); // Thunder plays directly when rain begins
         
-        // Sequence: rainfall 5s → night transition 3s → quiz
+        // Sequence: rainfall 16s → night transition 6s → quiz (3s delay)
         setTimeout(() => {
           try {
             // Start night transition with fade (rain continues and fades)
@@ -1000,22 +1014,25 @@ export class VillageLedgerGame {
             setTimeout(() => {
               try {
                 this.state.showRainfall = false; // Turn off rain
-                soundManager.fadeOut('rain', 3000);
+                soundManager.fadeOut('rain', 6000); // 6 second fade out
                 this.state.showNightTransition = false;
-                this.state.showQuiz = true;
-                this.state.phase = 'quiz';
-                // Restore player visibility for quiz
-                this.player.visible = true;
-                this.state.playerEnteredHut = false;
-                this.state.playerAlpha = 1; // Reset alpha
+                // Delay quiz appearance by 3 seconds
+                setTimeout(() => {
+                  this.state.showQuiz = true;
+                  this.state.phase = 'quiz';
+                  // Restore player visibility for quiz
+                  this.player.visible = true;
+                  this.state.playerEnteredHut = false;
+                  this.state.playerAlpha = 1; // Reset alpha
+                }, 3000);
               } catch (e) {
                 console.error('Error in quiz transition:', e);
               }
-            }, 3000); // 3 second fade to night
+            }, 6000); // 6 second fade to night
           } catch (e) {
             console.error('Error in rainfall transition:', e);
           }
-        }, 5000); // 5 second rainfall
+        }, 16000); // 16 second rainfall (extended by 11 seconds)
       } catch (e) {
         console.error('Error starting rain:', e);
       }
@@ -1035,7 +1052,7 @@ export class VillageLedgerGame {
     soundManager.fadeOut('ambientVillage', 1000);
     soundManager.play('thunder');
     
-    // Sequence: clouds 2.5s → rainfall 6s → night transition 3s → quiz
+    // Sequence: clouds 2.5s → rainfall 17s → night transition 6s → quiz (3s delay)
     setTimeout(() => {
       try {
         this.state.showCloudsAnimation = false;
@@ -1057,23 +1074,26 @@ export class VillageLedgerGame {
             setTimeout(() => {
               try {
                 this.state.showRainfall = false; // Now turn off rain
-                soundManager.fadeOut('rain', 3000);
+                soundManager.fadeOut('rain', 6000); // 6 second fade out
                 soundManager.fadeOut('ambientNight', 1000); // Fade out ambient night
                 this.state.showNightTransition = false;
-                this.state.showQuiz = true;
-                this.state.phase = 'quiz';
-                // Restore player visibility for quiz
-                this.player.visible = true;
-                this.state.playerEnteredHut = false;
-                this.state.playerAlpha = 1; // Reset alpha
+                // Delay quiz appearance by 3 seconds
+                setTimeout(() => {
+                  this.state.showQuiz = true;
+                  this.state.phase = 'quiz';
+                  // Restore player visibility for quiz
+                  this.player.visible = true;
+                  this.state.playerEnteredHut = false;
+                  this.state.playerAlpha = 1; // Reset alpha
+                }, 3000);
               } catch (e) {
                 console.error('Error in quiz transition:', e);
               }
-            }, 3000); // 3 second fade to night
+            }, 6000); // 6 second fade to night
           } catch (e) {
             console.error('Error in rainfall transition:', e);
           }
-        }, 6000); // 6 second rainfall (extended by 3 seconds)
+        }, 17000); // 17 second rainfall (extended by 11 seconds)
       } catch (e) {
         console.error('Error in clouds transition:', e);
       }
@@ -1183,6 +1203,12 @@ export class VillageLedgerGame {
           speaker: 'WOODCUTTER',
           text: "Sure, I can give you some wood. But I don't give things away for free! Do you have something to trade?",
           onComplete: () => {
+            // Show inventory hint on first trade interaction
+            if (!this.state.inventoryHintShown) {
+              this.state.showInventoryHint = true;
+              this.state.inventoryHintShown = true;
+              this.state.inventoryHintTimer = 0; // Start timer
+            }
             // Show Yes/No choice
             this.state.showChoice = true;
             this.state.choiceOptions = [
@@ -1284,7 +1310,7 @@ export class VillageLedgerGame {
                       setTimeout(() => {
                         this.awardBadge(
                           'Ledger Master',
-                          'You recorded your second debt on the Stone Tablet! A ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
+                          'You recorded your second debt on the Stone Tablet! A shared ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
                         );
                       }, 2000);
                     }
@@ -1918,7 +1944,7 @@ export class VillageLedgerGame {
                       setTimeout(() => {
                         this.awardBadge(
                           'Ledger Master',
-                          'You recorded your second debt on the Stone Tablet! A ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
+                          'You recorded your second debt on the Stone Tablet! A shared ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
                         );
                       }, 2000);
                     }
@@ -3631,20 +3657,20 @@ export class VillageLedgerGame {
       }
     }
     
-    // Update celebration animation timer - reduced applause duration (minus 5 seconds, earlier fade)
+    // Update celebration animation timer - reduced applause duration (minus 8 seconds, earlier fade)
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
       const fullApplauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
-      const applauseDuration = Math.max(2, fullApplauseDuration - 5); // Reduce by 5 seconds, min 2s
+      const applauseDuration = Math.max(2, fullApplauseDuration - 8); // Reduce by 8 seconds, min 2s
       const distToHome = Math.abs(this.player.x - this.playerHomeX);
       
       // End celebration when: reduced applause time OR player within 250 pixels of home
       if (this.state.celebrationTimer > applauseDuration || distToHome <= 250) {
         this.state.showCelebration = false;
         this.celebrationEndTime = Date.now();
-        // Fade out both celebration and applause sounds (3.5 seconds for smoother, longer fade)
-        soundManager.fadeOut('crowdApplause', 3500);
-        soundManager.fadeOut('celebration', 3500);
+        // Fade out both celebration and applause sounds (5 seconds for smoother fade)
+        soundManager.fadeOut('crowdApplause', 5000);
+        soundManager.fadeOut('celebration', 5000);
       }
     }
     
@@ -3678,6 +3704,14 @@ export class VillageLedgerGame {
       if (this.state.moodTimer <= 0) {
         this.state.playerMood = 'neutral';
         this.state.moodTimer = 0;
+      }
+    }
+    
+    // Auto-dismiss inventory hint after 5 seconds
+    if (this.state.showInventoryHint) {
+      this.state.inventoryHintTimer += dt;
+      if (this.state.inventoryHintTimer >= 5) {
+        this.state.showInventoryHint = false;
       }
     }
     
@@ -3874,9 +3908,9 @@ export class VillageLedgerGame {
           this.stormTriggered = false; // Reset storm trigger
           this.celebrationEndTime = 0;
           soundManager.play('celebration');
-          // Play applause with reduced duration (full duration minus 5 seconds, earlier stop)
+          // Play applause with reduced duration (full duration minus 8 seconds, earlier stop)
           const fullDuration = soundManager.getBufferDuration('crowdApplause');
-          soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 5000));
+          soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 8000));
         }
       }
     ]);
@@ -3936,32 +3970,35 @@ export class VillageLedgerGame {
               soundManager.fadeIn('rain', 500);
               soundManager.fadeIn('ambientNight', 500);
               
-              // Rain for 6 seconds, then night transition
+              // Rain for 17 seconds, then night transition
               setTimeout(() => {
                 try {
                   this.state.showNightTransition = true;
                   this.state.nightTransitionTimer = 0;
                   soundManager.fadeIn('backgroundMusicNight', 2000);
                   
-                  // After 3 second night transition, show quiz
+                  // After 6 second night transition, delay quiz by 3 more seconds
                   setTimeout(() => {
                     try {
                       this.state.showRainfall = false;
-                      soundManager.fadeOut('rain', 3000);
+                      soundManager.fadeOut('rain', 6000); // 6 second fade out
                       this.state.showNightTransition = false;
-                      this.state.showQuiz = true;
-                      this.state.phase = 'quiz';
-                      this.player.visible = true;
-                      this.state.playerEnteredHut = false;
-                      this.state.playerAlpha = 1; // Reset alpha
+                      // Delay quiz appearance by 3 seconds
+                      setTimeout(() => {
+                        this.state.showQuiz = true;
+                        this.state.phase = 'quiz';
+                        this.player.visible = true;
+                        this.state.playerEnteredHut = false;
+                        this.state.playerAlpha = 1; // Reset alpha
+                      }, 3000);
                     } catch (e) {
                       console.error('Error in quiz transition:', e);
                     }
-                  }, 3000);
+                  }, 6000);
                 } catch (e) {
                   console.error('Error in night transition:', e);
                 }
-              }, 6000); // 6 seconds of rain
+              }, 17000); // 17 seconds of rain (extended by 11 seconds)
             } catch (e) {
               console.error('Error in storm sequence:', e);
             }
@@ -4063,6 +4100,11 @@ export class VillageLedgerGame {
 
     // Draw inventory HUD at top of screen
     this.drawInventoryHUD(ctx);
+    
+    // Draw inventory hint if active (popup with arrow pointing to inventory)
+    if (this.state.showInventoryHint) {
+      this.drawInventoryHint(ctx);
+    }
     
     // Draw UI elements
     if (this.state.showHUD) {
@@ -5759,6 +5801,74 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
   }
   
+  // Draw inventory hint popup with arrow pointing to inventory box
+  private drawInventoryHint(ctx: CanvasRenderingContext2D): void {
+    if (!this.inventoryButtonArea) return;
+    
+    const invBox = this.inventoryButtonArea;
+    const centerX = invBox.x + invBox.w / 2;
+    const bottomY = invBox.y + invBox.h;
+    
+    // Pulsing animation for arrow
+    const pulse = 0.7 + Math.sin(Date.now() * 0.006) * 0.3;
+    
+    // Draw hint box below inventory
+    const hintW = 220;
+    const hintH = 60;
+    const hintX = centerX - hintW / 2;
+    const hintY = bottomY + 40;
+    
+    // Background
+    ctx.fillStyle = 'rgba(45, 35, 28, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(hintX, hintY, hintW, hintH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    // Arrow pointing up to inventory (animated bounce) - custom drawn arrow
+    const bounceOffset = Math.sin(Date.now() * 0.008) * 5;
+    const arrowY = hintY - 10 + bounceOffset;
+    
+    // Draw main arrow triangle
+    ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`;
+    ctx.beginPath();
+    ctx.moveTo(centerX, arrowY - 20);
+    ctx.lineTo(centerX - 14, arrowY - 2);
+    ctx.lineTo(centerX + 14, arrowY - 2);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Draw arrow stem
+    ctx.fillRect(centerX - 5, arrowY - 4, 10, 12);
+    
+    // Draw subtle outline
+    ctx.strokeStyle = '#DAA520';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(centerX, arrowY - 20);
+    ctx.lineTo(centerX - 14, arrowY - 2);
+    ctx.lineTo(centerX + 14, arrowY - 2);
+    ctx.closePath();
+    ctx.stroke();
+    
+    // Hint text
+    ctx.font = `bold 11px ${this.retroFont}`;
+    ctx.fillStyle = '#F5DEB3';
+    ctx.textAlign = 'center';
+    ctx.fillText('This is your Inventory!', centerX, hintY + 22);
+    
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = '#C9B896';
+    ctx.fillText('Tap it to see what you carry.', centerX, hintY + 40);
+    
+    // Small auto-dismiss note
+    ctx.font = `italic 8px ${this.retroFont}`;
+    ctx.fillStyle = '#8B7355';
+    ctx.fillText('(dismisses automatically)', centerX, hintY + 54);
+  }
+  
   private drawInventoryDetailPopup(ctx: CanvasRenderingContext2D, x: number, y: number): void {
     const popupWidth = 280;
     const itemHeight = 50;
@@ -5973,7 +6083,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           break;
         case 'got_stone_need_fish':
         case 'loop2_got_stone':
-          hint = 'Trade berries for fish with the Fisherman...';
+          hint = 'Get fish from the Fisherman...';
           break;
         case 'got_fish_ready_settle':
           hint = 'Return to Village Center to settle debts...';
@@ -6351,10 +6461,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       this.quizSubmitButton = { x: submitBtnX, y: submitBtnY, w: submitBtnW, h: submitBtnH };
     }
 
-    // Progress indicator
+    // Progress indicator - position higher to avoid overlap with submit button
     ctx.font = `10px ${this.retroFont}`;
     ctx.fillStyle = '#6B5344';
-    const progressY = isMultiSelect ? cardY + cardH - 15 : cardY + cardH - 30;
+    const progressY = cardY + 65; // Fixed position near top, below title
     ctx.fillText(`Question ${this.currentQuizQuestion + 1} of ${this.quizQuestions.length}`, w / 2, progressY);
   }
 
@@ -6768,28 +6878,28 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     yOffset += 10;
     
-    // Big takeaway
-    ctx.font = `bold 12px ${this.retroFont}`;
+    // Big takeaway - reduce spacing to prevent button overlap
+    ctx.font = `bold 11px ${this.retroFont}`;
     ctx.fillStyle = '#6B4423';
     ctx.textAlign = 'center';
     ctx.fillText('The Big Idea:', w / 2, yOffset);
-    yOffset += 22;
+    yOffset += 18;
     
-    ctx.font = `italic 11px ${this.retroFont}`;
+    ctx.font = `italic 10px ${this.retroFont}`;
     ctx.fillStyle = '#3D2914';
     const bigIdea = "Money is not just coins or paper - it's a system for keeping track of debts. When you work and get paid, you earn the right to collect value from others later. The Stone Tablet was an early ledger - today we use banks and computers, but the idea is the same!";
     const bigIdeaLines = this.wrapText(ctx, bigIdea, maxWidth);
     bigIdeaLines.forEach(line => {
       ctx.fillText(line, w / 2, yOffset);
-      yOffset += 18;
+      yOffset += 15;
     });
     
     // Continue button - positioned below the text content, clamped to card bounds
     const btnW = 200;
-    const btnH = 50;
+    const btnH = 45;
     const btnX = (w - btnW) / 2;
-    const maxBtnY = cardY + cardH - btnH - 15; // Maximum Y to keep button inside card
-    const btnY = Math.min(yOffset + 20, maxBtnY); // Position below text but clamp to card
+    const maxBtnY = cardY + cardH - btnH - 10; // Maximum Y to keep button inside card
+    const btnY = Math.min(yOffset + 10, maxBtnY); // Position below text but clamp to card
     
     ctx.fillStyle = '#166534';
     ctx.beginPath();
@@ -6895,6 +7005,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       badges: [],
       showBadgePopup: false,
       pendingBadge: null,
+      showInventoryHint: false,
+      inventoryHintShown: false,
+      inventoryHintTimer: 0,
       showTradeSelection: false,
       tradeSelectionCallback: null,
       roofRepaired: false,
@@ -7002,6 +7115,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       badges: [],
       showBadgePopup: false,
       pendingBadge: null,
+      showInventoryHint: false,
+      inventoryHintShown: false,
+      inventoryHintTimer: 0,
       showTradeSelection: false,
       tradeSelectionCallback: null,
       roofRepaired: false,

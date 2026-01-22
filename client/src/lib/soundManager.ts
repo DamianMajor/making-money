@@ -103,6 +103,10 @@ export class SoundManager {
   private daytimeMusicActive: boolean = false;
   private pendingLoops: Set<SoundName> = new Set();
   private pendingDaytimeMusic: boolean = false;
+  // Cross-fade rain loop system
+  private rainSources: ActiveSound[] = [];
+  private rainCrossfadeInterval: ReturnType<typeof setInterval> | null = null;
+  private rainActive: boolean = false;
 
   constructor() {
     this.loadFromStorage();
@@ -552,6 +556,109 @@ export class SoundManager {
     
     this.activeSources.set(name, activeSound);
     activeSound.source.start(0);
+  }
+
+  // Start rain with cross-fade looping to eliminate loop point seam
+  public startRainCrossfade(fadeInDuration: number = 2000): void {
+    if (this.muted || !this.initialized || !this.audioContext) return;
+    if (this.rainActive) return; // Already playing
+    
+    this.rainActive = true;
+    const config = SOUND_CONFIGS.rain;
+    const buffer = this.buffers.get('rain');
+    if (!buffer) return;
+    
+    // Calculate loop duration (slightly less than buffer duration for overlap)
+    const loopDuration = (buffer.duration - 1) * 1000; // 1 second overlap
+    const crossfadeDuration = 1500; // 1.5 second crossfade
+    
+    // Start first rain source with fade in
+    const startNewRainSource = () => {
+      if (!this.rainActive || !this.audioContext) return;
+      
+      const activeSound = this.createSource('rain', false); // Non-looping
+      if (!activeSound) return;
+      
+      const currentTime = this.audioContext.currentTime;
+      activeSound.gainNode.gain.setValueAtTime(0, currentTime);
+      activeSound.gainNode.gain.linearRampToValueAtTime(config.volume, currentTime + crossfadeDuration / 1000);
+      
+      this.rainSources.push(activeSound);
+      activeSound.source.start(0);
+      
+      // Schedule fade out before end
+      setTimeout(() => {
+        if (!this.rainActive || !this.audioContext) return;
+        const fadeOutTime = this.audioContext.currentTime;
+        activeSound.gainNode.gain.setValueAtTime(activeSound.gainNode.gain.value, fadeOutTime);
+        activeSound.gainNode.gain.linearRampToValueAtTime(0, fadeOutTime + crossfadeDuration / 1000);
+      }, loopDuration - crossfadeDuration);
+      
+      // Clean up after fade out
+      setTimeout(() => {
+        try { activeSound.source.stop(); } catch {}
+        const idx = this.rainSources.indexOf(activeSound);
+        if (idx !== -1) this.rainSources.splice(idx, 1);
+      }, loopDuration + 100);
+    };
+    
+    // Initial fade in
+    const firstSound = this.createSource('rain', false);
+    if (firstSound) {
+      const currentTime = this.audioContext.currentTime;
+      firstSound.gainNode.gain.setValueAtTime(0, currentTime);
+      firstSound.gainNode.gain.linearRampToValueAtTime(config.volume, currentTime + fadeInDuration / 1000);
+      this.rainSources.push(firstSound);
+      firstSound.source.start(0);
+      
+      // Schedule fade out before end
+      setTimeout(() => {
+        if (!this.rainActive || !this.audioContext) return;
+        const fadeOutTime = this.audioContext.currentTime;
+        firstSound.gainNode.gain.setValueAtTime(firstSound.gainNode.gain.value, fadeOutTime);
+        firstSound.gainNode.gain.linearRampToValueAtTime(0, fadeOutTime + crossfadeDuration / 1000);
+      }, loopDuration - crossfadeDuration);
+      
+      setTimeout(() => {
+        try { firstSound.source.stop(); } catch {}
+        const idx = this.rainSources.indexOf(firstSound);
+        if (idx !== -1) this.rainSources.splice(idx, 1);
+      }, loopDuration + 100);
+    }
+    
+    // Start interval to overlap new sources
+    this.rainCrossfadeInterval = setInterval(() => {
+      if (this.rainActive) {
+        startNewRainSource();
+      }
+    }, loopDuration - crossfadeDuration);
+  }
+
+  // Stop rain with fade out
+  public stopRainCrossfade(fadeOutDuration: number = 6000): void {
+    this.rainActive = false;
+    
+    if (this.rainCrossfadeInterval) {
+      clearInterval(this.rainCrossfadeInterval);
+      this.rainCrossfadeInterval = null;
+    }
+    
+    // Fade out all active rain sources
+    if (this.audioContext) {
+      const currentTime = this.audioContext.currentTime;
+      this.rainSources.forEach(source => {
+        source.gainNode.gain.setValueAtTime(source.gainNode.gain.value, currentTime);
+        source.gainNode.gain.linearRampToValueAtTime(0, currentTime + fadeOutDuration / 1000);
+      });
+    }
+    
+    // Clean up after fade out
+    setTimeout(() => {
+      this.rainSources.forEach(source => {
+        try { source.source.stop(); } catch {}
+      });
+      this.rainSources = [];
+    }, fadeOutDuration + 100);
   }
 
   public setMuted(muted: boolean): void {

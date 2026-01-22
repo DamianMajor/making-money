@@ -1057,7 +1057,7 @@ export class VillageLedgerGame {
           } catch (e) {
             console.error('Error in rainfall transition:', e);
           }
-        }, 12000); // 12 second rainfall (reduced by 3s)
+        }, 6000); // 6 second rainfall (halved again)
       } catch (e) {
         console.error('Error starting rain:', e);
       }
@@ -2294,7 +2294,7 @@ export class VillageLedgerGame {
 
   // Loop 1: Continue stone worker dialogue after trade offer - awards badge
   private continueStoneWorkerTradeDialogue(offeredItem: string | null): void {
-    const finishWithBadge = () => {
+    const finishGetStone = () => {
       this.state.inventory.stone = 1;
       this.state.obtainedStone = true;
       this.state.stoneIntroduced = true;
@@ -2303,14 +2303,34 @@ export class VillageLedgerGame {
       this.setMood('happy');
       this.state.phase = 'got_stone_need_fish';
       this.stoneWorker.targetX = this.villageCenterX - 100;
-      // Award badge after second encounter with double coincidence (only in loop 1)
-      if (this.state.loop === 1) {
-        setTimeout(() => {
-          this.awardBadge(
-            'Double Coincidence of Wants',
-            'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!'
-          );
-        }, 1000);
+    };
+
+    // Award badge after DCW line, then show credit offer
+    const awardBadgeThenCreditOffer = () => {
+      if (this.state.loop === 1 && !this.state.badges.includes('Double Coincidence of Wants')) {
+        this.awardBadge(
+          'Double Coincidence of Wants',
+          'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!',
+          () => {
+            // After badge is dismissed, show credit offer dialogue
+            this.queueDialogue([
+              {
+                speaker: 'STONE-WORKER',
+                text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
+                onComplete: finishGetStone
+              }
+            ]);
+          }
+        );
+      } else {
+        // No badge needed, go straight to credit offer
+        this.queueDialogue([
+          {
+            speaker: 'STONE-WORKER',
+            text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
+            onComplete: finishGetStone
+          }
+        ]);
       }
     };
 
@@ -2322,12 +2342,8 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Same problem as always! You don't have what I want, and I don't need what you have. This 'Double Coincidence of Wants' is quite troublesome!"
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
-          onComplete: finishWithBadge
+          text: "Same problem as always! You don't have what I want, and I don't need what you have. This 'Double Coincidence of Wants' is quite troublesome!",
+          onComplete: awardBadgeThenCreditOffer
         }
       ]);
     } else if (offeredItem === 'slingshot') {
@@ -2342,12 +2358,8 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Same problem as before! We can't trade because I don't want what you have. This 'Double Coincidence of Wants' keeps getting in the way!"
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
-          onComplete: finishWithBadge
+          text: "Same problem as before! We can't trade because I don't want what you have. This 'Double Coincidence of Wants' keeps getting in the way!",
+          onComplete: awardBadgeThenCreditOffer
         }
       ]);
     } else if (offeredItem === 'berries') {
@@ -2362,12 +2374,8 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Same problem as before! We can't trade because I don't want what you have. This 'Double Coincidence of Wants' keeps getting in the way!"
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
-          onComplete: finishWithBadge
+          text: "Same problem as before! We can't trade because I don't want what you have. This 'Double Coincidence of Wants' keeps getting in the way!",
+          onComplete: awardBadgeThenCreditOffer
         }
       ]);
     } else if (offeredItem === 'wood') {
@@ -2382,12 +2390,8 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Same problem as before! We can't trade because I don't want what you have. This 'Double Coincidence of Wants' keeps getting in the way!"
-        },
-        {
-          speaker: 'STONE-WORKER',
-          text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
-          onComplete: finishWithBadge
+          text: "Same problem as before! We can't trade because I don't want what you have. This 'Double Coincidence of Wants' keeps getting in the way!",
+          onComplete: awardBadgeThenCreditOffer
         }
       ]);
     } else {
@@ -2402,18 +2406,9 @@ export class VillageLedgerGame {
     };
     
     const showRecordChoice = () => {
-      // Award Double Coincidence badge after recognizing the pattern in loop 2
-      // Badge appears first, then choice buttons appear after dismissal
-      if (!this.state.badges.includes('Double Coincidence of Wants')) {
-        this.awardBadge(
-          'Double Coincidence of Wants',
-          'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!',
-          showChoiceButtons // Show choice after badge is dismissed
-        );
-      } else {
-        // Badge already earned, show choice immediately
-        showChoiceButtons();
-      }
+      // In loop 2, we don't award the badge (already earned in loop 1)
+      // Just show choice buttons immediately
+      showChoiceButtons();
       this.state.choiceOptions = [
         {
           text: "Just remember it",
@@ -6035,6 +6030,90 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.inventoryDetailPopupArea = { x: popupX, y, w: popupWidth, h: popupHeight };
   }
 
+  // Draw dialogue text with highlighting for special phrases like "Double Coincidence of Wants"
+  private drawDialogueTextWithHighlight(
+    ctx: CanvasRenderingContext2D, 
+    text: string, 
+    startX: number, 
+    startY: number, 
+    maxWidth: number, 
+    lineHeight: number
+  ): void {
+    const normalColor = '#F5F5DC';
+    const highlightColor = '#FFD700'; // Gold color for highlighted text
+    const highlightPhrase = "Double Coincidence of Wants";
+    const highlightPhraseAlt = "'Double Coincidence of Wants'"; // With quotes
+    
+    // Check if text contains the highlight phrase
+    const lowerText = text.toLowerCase();
+    const lowerPhrase = highlightPhrase.toLowerCase();
+    
+    if (!lowerText.includes(lowerPhrase)) {
+      // No highlight needed, use simple rendering
+      ctx.fillStyle = normalColor;
+      const words = text.split(' ');
+      let line = '';
+      let lineY = startY;
+      
+      for (const word of words) {
+        const testLine = line + word + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && line !== '') {
+          ctx.fillText(line.trim(), startX, lineY);
+          line = word + ' ';
+          lineY += lineHeight;
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line.trim(), startX, lineY);
+      return;
+    }
+    
+    // Find the phrase boundaries for highlighting
+    const phraseStart = lowerText.indexOf(lowerPhrase);
+    const phraseEnd = phraseStart + highlightPhrase.length;
+    
+    // Split text into before, phrase, and after
+    const beforePhrase = text.substring(0, phraseStart);
+    const phrase = text.substring(phraseStart, phraseEnd);
+    const afterPhrase = text.substring(phraseEnd);
+    
+    // Build segments with color info
+    const segments: { text: string; color: string }[] = [];
+    if (beforePhrase) segments.push({ text: beforePhrase, color: normalColor });
+    if (phrase) segments.push({ text: phrase, color: highlightColor });
+    if (afterPhrase) segments.push({ text: afterPhrase, color: normalColor });
+    
+    // Now render word by word, keeping track of which segment each word belongs to
+    let lineY = startY;
+    let lineX = startX;
+    let currentLineWidth = 0;
+    
+    for (const segment of segments) {
+      const words = segment.text.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        const word = words[i];
+        if (!word && i === 0) continue; // Skip empty leading word from split
+        
+        const wordWithSpace = word + (i < words.length - 1 || segment !== segments[segments.length - 1] ? ' ' : '');
+        const wordWidth = ctx.measureText(wordWithSpace).width;
+        
+        // Check if we need to wrap to next line
+        if (currentLineWidth + wordWidth > maxWidth && currentLineWidth > 0) {
+          lineY += lineHeight;
+          lineX = startX;
+          currentLineWidth = 0;
+        }
+        
+        // Draw the word
+        ctx.fillStyle = segment.color;
+        ctx.fillText(wordWithSpace, lineX + currentLineWidth, lineY);
+        currentLineWidth += wordWidth;
+      }
+    }
+  }
+
   private drawDialogueBox(ctx: CanvasRenderingContext2D): void {
     const x = 0;
     const y = this.canvas.height - this.dialogueBoxHeight;
@@ -6121,27 +6200,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       // Dialogue text with typewriter effect - using retro font at 16-18px per guidelines
       const displayText = this.state.currentDialogue.text.substring(0, this.dialogueCharIndex);
       ctx.font = `16px ${this.retroFont}`;
-      ctx.fillStyle = '#F5F5DC';
 
-      // Word wrap - adjusted for retro font spacing with 1.6 line height
+      // Word wrap with highlighting for "Double Coincidence of Wants"
       const maxWidth = w - textStartX - 50;
-      const words = displayText.split(' ');
-      let line = '';
-      let lineY = y + 70;
       const lineHeight = 32; // 16px * 1.6 = ~26, rounded up for readability
-
-      for (const word of words) {
-        const testLine = line + word + ' ';
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && line !== '') {
-          ctx.fillText(line.trim(), textStartX, lineY);
-          line = word + ' ';
-          lineY += lineHeight;
-        } else {
-          line = testLine;
-        }
-      }
-      ctx.fillText(line.trim(), textStartX, lineY);
+      
+      // Draw text with potential highlighting for DCW phrase
+      this.drawDialogueTextWithHighlight(ctx, displayText, textStartX, y + 70, maxWidth, lineHeight);
 
       // Continue indicator
       if (this.state.dialogueComplete) {
@@ -6281,14 +6346,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     
-    // Draw "INTERACT" text
-    ctx.font = `bold 18px ${this.uiFont}`;
-    ctx.fillText('INTERACT', x + size / 2, y + size / 2 - 10);
+    // Draw "INTERACT" text - smaller to give padding around text
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillText('INTERACT', x + size / 2, y + size / 2 - 8);
     
     // Draw target name below in smaller text
     if (targetName) {
-      ctx.font = `bold 12px ${this.uiFont}`;
-      ctx.fillText(`(${targetName})`, x + size / 2, y + size / 2 + 12);
+      ctx.font = `bold 10px ${this.uiFont}`;
+      ctx.fillText(`(${targetName})`, x + size / 2, y + size / 2 + 10);
     }
     
     ctx.textBaseline = 'alphabetic';

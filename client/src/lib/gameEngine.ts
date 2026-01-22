@@ -468,6 +468,20 @@ export class VillageLedgerGame {
 
     // Resize handler
     window.addEventListener('resize', this.resize.bind(this));
+    
+    // Keyboard handler for debug shortcuts
+    window.addEventListener('keydown', this.handleKeyDown.bind(this));
+  }
+
+  private handleKeyDown(e: KeyboardEvent): void {
+    // Press 'Q' to instantly show quiz for debugging
+    if (e.key === 'q' || e.key === 'Q') {
+      console.log('DEBUG: Q pressed - showing quiz');
+      this.state.showQuiz = true;
+      this.state.phase = 'quiz';
+      this.player.visible = true;
+      this.state.playerAlpha = 1;
+    }
   }
 
   private handleTouchStart(e: TouchEvent): void {
@@ -494,6 +508,7 @@ export class VillageLedgerGame {
 
   private handleMouseDown(e: MouseEvent): void {
     soundManager.init();
+    console.log('MouseDown:', e.clientX, e.clientY, 'showQuiz:', this.state.showQuiz, 'phase:', this.state.phase);
     this.processTouchStart(e.clientX, e.clientY);
   }
 
@@ -6656,6 +6671,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private handleQuizTouch(x: number, y: number): void {
+    console.log('handleQuizTouch called:', x, y, 'buttonAreas:', this.quizButtonAreas.length, 'feedback:', this.showQuizFeedback);
     // If showing feedback, check for retry and navigation buttons
     if (this.showQuizFeedback) {
       // Check retry button

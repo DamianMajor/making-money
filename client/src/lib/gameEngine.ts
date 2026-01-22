@@ -5005,9 +5005,13 @@ export class VillageLedgerGame {
       }
     }
     
-    // Fade from storm to night over 4 seconds (slower transition)
+    // Fade from storm to night over 4 seconds (smooth gradual transition)
     const fadeProgress = Math.min(1, t / 4);
-    const nightAlpha = 0.85 + fadeProgress * 0.1; // Start darker (storm already dark), end at 95%
+    // Use easing function for smoother fade: start slow, accelerate, then slow down
+    const easedProgress = fadeProgress < 0.5 
+      ? 2 * fadeProgress * fadeProgress 
+      : 1 - Math.pow(-2 * fadeProgress + 2, 2) / 2;
+    const nightAlpha = 0.3 + easedProgress * 0.6; // Start at 30%, smoothly fade to 90%
     
     // Draw dark overlay that increases as rain fades
     ctx.fillStyle = `rgba(10, 20, 50, ${nightAlpha})`;

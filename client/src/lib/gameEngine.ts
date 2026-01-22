@@ -475,6 +475,7 @@ export class VillageLedgerGame {
     soundManager.init();
     if (e.touches.length > 0) {
       const touch = e.touches[0];
+      console.log('TouchStart:', touch.clientX, touch.clientY, 'showQuiz:', this.state.showQuiz);
       this.processTouchStart(touch.clientX, touch.clientY);
     }
   }
@@ -632,6 +633,7 @@ export class VillageLedgerGame {
 
     // Handle quiz touches
     if (this.state.showQuiz) {
+      console.log('Routing to handleQuizTouch:', x, y);
       this.handleQuizTouch(x, y);
       return;
     }
@@ -6041,8 +6043,16 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   ): void {
     const normalColor = '#F5F5DC';
     const highlightColor = '#FFD700'; // Gold color for highlighted text
-    const highlightPhrase = "Double Coincidence of Wants";
-    const highlightPhraseAlt = "'Double Coincidence of Wants'"; // With quotes
+    
+    // Determine which phrase to highlight based on loop
+    // Loop 1: Highlight "Double Coincidence of Wants"
+    // Loop 2: Highlight "Ledger" during trade dialogues
+    let highlightPhrase: string;
+    if (this.state.loop === 1) {
+      highlightPhrase = "Double Coincidence of Wants";
+    } else {
+      highlightPhrase = "Ledger";
+    }
     
     // Check if text contains the highlight phrase
     const lowerText = text.toLowerCase();
@@ -6624,6 +6634,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private handleQuizTouch(x: number, y: number): void {
+    console.log('handleQuizTouch called:', x, y, 'buttonAreas:', this.quizButtonAreas.length, 'feedback:', this.showQuizFeedback);
+    
     // If showing feedback, check for retry and navigation buttons
     if (this.showQuizFeedback) {
       // Check retry button

@@ -508,7 +508,6 @@ export class VillageLedgerGame {
 
   private handleMouseDown(e: MouseEvent): void {
     soundManager.init();
-    console.log('MouseDown:', e.clientX, e.clientY, 'showQuiz:', this.state.showQuiz, 'phase:', this.state.phase);
     this.processTouchStart(e.clientX, e.clientY);
   }
 
@@ -643,14 +642,14 @@ export class VillageLedgerGame {
       return;
     }
     
-    // Block input during night transition (cutscene)
-    if (this.state.showNightTransition) {
+    // Handle quiz touches (check before night transition block since quiz shows over night scene)
+    if (this.state.showQuiz) {
+      this.handleQuizTouch(x, y);
       return;
     }
 
-    // Handle quiz touches
-    if (this.state.showQuiz) {
-      this.handleQuizTouch(x, y);
+    // Block input during night transition (cutscene) - but allow quiz touches above
+    if (this.state.showNightTransition) {
       return;
     }
     
@@ -6671,7 +6670,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private handleQuizTouch(x: number, y: number): void {
-    console.log('handleQuizTouch called:', x, y, 'buttonAreas:', this.quizButtonAreas.length, 'feedback:', this.showQuizFeedback);
     // If showing feedback, check for retry and navigation buttons
     if (this.showQuizFeedback) {
       // Check retry button

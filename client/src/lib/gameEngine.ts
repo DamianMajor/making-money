@@ -60,7 +60,7 @@ interface GameState {
   // Inventory hint for first trade
   showInventoryHint: boolean;
   inventoryHintShown: boolean; // Track if hint has been shown to avoid repeating
-  inventoryHintTimer: number; // Timer for auto-dismiss (seconds)
+  pendingChoiceAfterHint: boolean; // Show choice after hint is dismissed
   // Trade selection state
   showTradeSelection: boolean;
   tradeSelectionCallback: ((item: string | null) => void) | null;
@@ -220,6 +220,7 @@ export class VillageLedgerGame {
   private footstepInterval: number = 300;
   private booFailureTriggered: boolean = false;
   private stormTriggered: boolean = false;
+  private rainSoundStarted: boolean = false;
   private celebrationEndTime: number = 0;
   
   // Auto-walk feature: player walks to clicked target and interacts
@@ -350,7 +351,7 @@ export class VillageLedgerGame {
       pendingBadge: null,
       showInventoryHint: false,
       inventoryHintShown: false,
-      inventoryHintTimer: 0,
+      pendingChoiceAfterHint: false,
       showTradeSelection: false,
       tradeSelectionCallback: null,
       roofRepaired: false,
@@ -562,6 +563,11 @@ export class VillageLedgerGame {
         // Also dismiss inventory hint if showing
         if (this.state.showInventoryHint) {
           this.state.showInventoryHint = false;
+          // Show pending choice after hint is dismissed
+          if (this.state.pendingChoiceAfterHint) {
+            this.state.pendingChoiceAfterHint = false;
+            this.showWoodcutterTradeChoice();
+          }
         }
         soundManager.play('buttonClick');
         return;
@@ -999,8 +1005,11 @@ export class VillageLedgerGame {
         // Start rainfall (5 seconds overlay on scene)
         this.state.showRainfall = true;
         this.state.rainfallTimer = 0;
-        soundManager.fadeIn('rain', 2000); // 2 second fade in
-        soundManager.play('thunder'); // Thunder plays directly when rain begins
+        if (!this.rainSoundStarted) {
+          this.rainSoundStarted = true;
+          soundManager.fadeIn('rain', 2000); // 2 second fade in
+          soundManager.play('thunder'); // Thunder plays directly when rain begins
+        }
         
         // Sequence: rainfall 16s → night transition 6s → quiz (3s delay)
         setTimeout(() => {
@@ -1059,8 +1068,11 @@ export class VillageLedgerGame {
         // Start rainfall animation
         this.state.showRainfall = true;
         this.state.rainfallTimer = 0;
-        soundManager.fadeIn('rain', 500);
-        soundManager.fadeIn('ambientNight', 500); // Start ambient night sounds with storm
+        if (!this.rainSoundStarted) {
+          this.rainSoundStarted = true;
+          soundManager.fadeIn('rain', 500);
+          soundManager.fadeIn('ambientNight', 500); // Start ambient night sounds with storm
+        }
         
         setTimeout(() => {
           try {
@@ -1203,38 +1215,16 @@ export class VillageLedgerGame {
           speaker: 'WOODCUTTER',
           text: "Sure, I can give you some wood. But I don't give things away for free! Do you have something to trade?",
           onComplete: () => {
-            // Show inventory hint on first trade interaction
+            // Show inventory hint on first trade interaction - BEFORE yes/no choice
             if (!this.state.inventoryHintShown) {
               this.state.showInventoryHint = true;
               this.state.inventoryHintShown = true;
-              this.state.inventoryHintTimer = 0; // Start timer
+              // Hint stays visible until player taps inventory - choice appears after
+              this.state.pendingChoiceAfterHint = true;
+            } else {
+              // Show Yes/No choice immediately if hint already shown
+              this.showWoodcutterTradeChoice();
             }
-            // Show Yes/No choice
-            this.state.showChoice = true;
-            this.state.choiceOptions = [
-              {
-                text: "Yes, I do!",
-                action: () => {
-                  this.state.showChoice = false;
-                  // Show trade selection popup
-                  this.showTradeSelection((selectedItem) => {
-                    if (selectedItem === null || selectedItem === 'cancel') {
-                      // Player changed their mind
-                      this.continueWoodcutterTradeDialogue(null);
-                    } else {
-                      this.continueWoodcutterTradeDialogue(selectedItem);
-                    }
-                  });
-                }
-              },
-              {
-                text: "No, I don't",
-                action: () => {
-                  this.state.showChoice = false;
-                  this.continueWoodcutterTradeDialogue(null);
-                }
-              }
-            ];
           }
         }
       ]);
@@ -1281,6 +1271,11 @@ export class VillageLedgerGame {
     }
     // Loop 2: Arrived at tablet during escort
     else if (phase === 'loop2_escorting_woodcutter') {
+      // Prevent re-triggering dialogue if carving already started
+      if (this.state.woodcutterCarvingSoundPlayed || this.state.currentDialogue) {
+        return;
+      }
+      
       const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
       const woodcutterAtCenter = Math.abs(this.woodcutter.x - this.villageCenterX) < 150;
       
@@ -1633,6 +1628,35 @@ export class VillageLedgerGame {
     }
   }
 
+  // Show the yes/no trade choice for woodcutter (Loop 1)
+  private showWoodcutterTradeChoice(): void {
+    this.state.showChoice = true;
+    this.state.choiceOptions = [
+      {
+        text: "Yes, I do!",
+        action: () => {
+          this.state.showChoice = false;
+          // Show trade selection popup
+          this.showTradeSelection((selectedItem) => {
+            if (selectedItem === null || selectedItem === 'cancel') {
+              // Player changed their mind
+              this.continueWoodcutterTradeDialogue(null);
+            } else {
+              this.continueWoodcutterTradeDialogue(selectedItem);
+            }
+          });
+        }
+      },
+      {
+        text: "No, I don't",
+        action: () => {
+          this.state.showChoice = false;
+          this.continueWoodcutterTradeDialogue(null);
+        }
+      }
+    ];
+  }
+
   // Loop 1: Continue woodcutter dialogue after trade offer
   private continueWoodcutterTradeDialogue(offeredItem: string | null): void {
     if (offeredItem === null) {
@@ -1915,6 +1939,11 @@ export class VillageLedgerGame {
     }
     // Loop 2: Arrived at tablet during escort
     else if (phase === 'loop2_escorting_stoneworker') {
+      // Prevent re-triggering dialogue if carving already started
+      if (this.state.stoneWorkerCarvingSoundPlayed || this.state.currentDialogue) {
+        return;
+      }
+      
       const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 150;
       const stoneWorkerAtCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 150;
       
@@ -3707,13 +3736,6 @@ export class VillageLedgerGame {
       }
     }
     
-    // Auto-dismiss inventory hint after 5 seconds
-    if (this.state.showInventoryHint) {
-      this.state.inventoryHintTimer += dt;
-      if (this.state.inventoryHintTimer >= 5) {
-        this.state.showInventoryHint = false;
-      }
-    }
     
     // Update night transition animation timer
     if (this.state.showNightTransition) {
@@ -3967,8 +3989,11 @@ export class VillageLedgerGame {
               // Start rainfall
               this.state.showRainfall = true;
               this.state.rainfallTimer = 0;
-              soundManager.fadeIn('rain', 500);
-              soundManager.fadeIn('ambientNight', 500);
+              if (!this.rainSoundStarted) {
+                this.rainSoundStarted = true;
+                soundManager.fadeIn('rain', 500);
+                soundManager.fadeIn('ambientNight', 500);
+              }
               
               // Rain for 17 seconds, then night transition
               setTimeout(() => {
@@ -5813,8 +5838,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const pulse = 0.7 + Math.sin(Date.now() * 0.006) * 0.3;
     
     // Draw hint box below inventory
-    const hintW = 220;
-    const hintH = 60;
+    const hintW = 260;
+    const hintH = 65;
     const hintX = centerX - hintW / 2;
     const hintY = bottomY + 40;
     
@@ -5863,10 +5888,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = '#C9B896';
     ctx.fillText('Tap it to see what you carry.', centerX, hintY + 40);
     
-    // Small auto-dismiss note
-    ctx.font = `italic 8px ${this.retroFont}`;
-    ctx.fillStyle = '#8B7355';
-    ctx.fillText('(dismisses automatically)', centerX, hintY + 54);
+    // Tap instruction
+    ctx.font = `italic 9px ${this.retroFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('(tap on the inventory to continue)', centerX, hintY + 56);
   }
   
   private drawInventoryDetailPopup(ctx: CanvasRenderingContext2D, x: number, y: number): void {
@@ -6887,7 +6912,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     ctx.font = `italic 10px ${this.retroFont}`;
     ctx.fillStyle = '#3D2914';
-    const bigIdea = "Money is not just coins or paper - it's a system for keeping track of debts. When you work and get paid, you earn the right to collect value from others later. The Stone Tablet was an early ledger - today we use banks and computers, but the idea is the same!";
+    const bigIdea = "Money is not just coins or paper - it's a system for tracking debts. When you get paid, you earn the right to collect value later. The Stone Tablet was an early ledger - today we use banks and computers, but the idea is the same!";
     const bigIdeaLines = this.wrapText(ctx, bigIdea, maxWidth);
     bigIdeaLines.forEach(line => {
       ctx.fillText(line, w / 2, yOffset);
@@ -6948,10 +6973,21 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = '#22C55E';
     ctx.fillText('SUCCESS!', w / 2, cardY + 60);
 
-    // Score calculation
+    // Score calculation - handle both single-select and multi-select
     let correct = 0;
     this.state.quizAnswers.forEach((answer, i) => {
-      if (answer === this.quizQuestions[i].correct) correct++;
+      const q = this.quizQuestions[i];
+      if (q.multiSelect) {
+        // Multi-select: compare arrays
+        const correctArr = q.correct as number[];
+        const answerArr = answer as number[];
+        const isCorrect = correctArr.length === answerArr.length && 
+          correctArr.every(v => answerArr.includes(v));
+        if (isCorrect) correct++;
+      } else {
+        // Single-select: compare numbers
+        if (answer === q.correct) correct++;
+      }
     });
 
     ctx.font = `12px ${this.retroFont}`;
@@ -7007,7 +7043,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       pendingBadge: null,
       showInventoryHint: false,
       inventoryHintShown: false,
-      inventoryHintTimer: 0,
+      pendingChoiceAfterHint: false,
       showTradeSelection: false,
       tradeSelectionCallback: null,
       roofRepaired: false,
@@ -7089,6 +7125,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Reset animation/sound flags
     this.booFailureTriggered = false;
     this.stormTriggered = false;
+    this.rainSoundStarted = false;
     this.celebrationEndTime = 0;
     
     // Resume ambient music and day background
@@ -7117,7 +7154,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       pendingBadge: null,
       showInventoryHint: false,
       inventoryHintShown: false,
-      inventoryHintTimer: 0,
+      pendingChoiceAfterHint: false,
       showTradeSelection: false,
       tradeSelectionCallback: null,
       roofRepaired: false,
@@ -7196,6 +7233,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Reset animation/sound flags for loop 2
     this.booFailureTriggered = false;
     this.stormTriggered = false;
+    this.rainSoundStarted = false;
     this.celebrationEndTime = 0;
     
     setTimeout(() => this.triggerIntro(), 500);

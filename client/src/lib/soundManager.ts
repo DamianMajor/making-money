@@ -101,6 +101,8 @@ export class SoundManager {
   private brawlActive: boolean = false;
   private daytimeMusicLoopCount: number = 0;
   private daytimeMusicActive: boolean = false;
+  private pendingLoops: Set<SoundName> = new Set();
+  private pendingDaytimeMusic: boolean = false;
 
   constructor() {
     this.loadFromStorage();
@@ -161,6 +163,16 @@ export class SoundManager {
       // Play pending sounds
       this.pendingPlays.forEach(name => this.play(name));
       this.pendingPlays.clear();
+      
+      // Play pending loops
+      this.pendingLoops.forEach(name => this.playLoop(name));
+      this.pendingLoops.clear();
+      
+      // Start pending daytime music
+      if (this.pendingDaytimeMusic) {
+        this.pendingDaytimeMusic = false;
+        this.startDaytimeMusic();
+      }
     } catch (error) {
       console.error('Failed to initialize audio context:', error);
     }
@@ -230,7 +242,7 @@ export class SoundManager {
     if (this.muted) return;
     
     if (!this.initialized) {
-      this.pendingPlays.add(name);
+      this.pendingLoops.add(name);
       return;
     }
     
@@ -332,7 +344,12 @@ export class SoundManager {
   }
 
   public startDaytimeMusic(): void {
-    if (this.muted || !this.initialized) return;
+    if (this.muted) return;
+    
+    if (!this.initialized) {
+      this.pendingDaytimeMusic = true;
+      return;
+    }
     
     this.daytimeMusicActive = true;
     this.daytimeMusicLoopCount = 0;

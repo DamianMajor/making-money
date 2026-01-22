@@ -5838,8 +5838,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const pulse = 0.7 + Math.sin(Date.now() * 0.006) * 0.3;
     
     // Draw hint box below inventory
-    const hintW = 320;
-    const hintH = 65;
+    const hintW = 280;
+    const hintH = 50;
     const hintX = centerX - hintW / 2;
     const hintY = bottomY + 40;
     
@@ -5885,13 +5885,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillText('This is your Inventory!', centerX, hintY + 22);
     
     ctx.font = `10px ${this.retroFont}`;
-    ctx.fillStyle = '#C9B896';
-    ctx.fillText('Tap it to see what you carry.', centerX, hintY + 40);
-    
-    // Tap instruction
-    ctx.font = `italic 9px ${this.retroFont}`;
     ctx.fillStyle = '#FFD700';
-    ctx.fillText('(tap on the inventory to continue)', centerX, hintY + 56);
+    ctx.fillText('Tap it to see what you carry.', centerX, hintY + 40);
   }
   
   private drawInventoryDetailPopup(ctx: CanvasRenderingContext2D, x: number, y: number): void {

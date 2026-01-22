@@ -998,6 +998,11 @@ export class VillageLedgerGame {
   
   // Trigger the enter hut sequence - player fades into hut, then rain starts
   private triggerEnterHutSequence(): void {
+    // Prevent multiple calls - only trigger once per game
+    if (this.rainSoundStarted || this.state.playerFading) {
+      return;
+    }
+    
     // Start player fade animation
     this.state.playerFading = true;
     // Player alpha will decrease in update() until 0, then visible=false and playerEnteredHut=true
@@ -3635,8 +3640,9 @@ export class VillageLedgerGame {
     }
 
     // Check if player completed Loop 2 successfully - trigger thunderstorm then night transition
+    // Skip if rain sequence already started (from hut interaction)
     if (this.state.phase === 'complete_success' && this.player.x <= this.playerHomeX + 50 && 
-        !this.state.showThunderstorm && !this.state.showNightTransition) {
+        !this.state.showThunderstorm && !this.state.showNightTransition && !this.rainSoundStarted) {
       // Auto-fix roof if not already repaired
       if (!this.state.roofRepaired) {
         this.state.roofRepaired = true;
@@ -6926,8 +6932,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const btnW = 200;
     const btnH = 45;
     const btnX = (w - btnW) / 2;
-    const maxBtnY = cardY + cardH - btnH - 10; // Maximum Y to keep button inside card
-    const btnY = Math.min(yOffset + 10, maxBtnY); // Position below text but clamp to card
+    const maxBtnY = cardY + cardH - btnH - 15; // Maximum Y to keep button inside card
+    const btnY = Math.min(yOffset + 25, maxBtnY); // Position below text with more padding
     
     ctx.fillStyle = '#166534';
     ctx.beginPath();

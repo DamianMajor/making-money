@@ -473,10 +473,8 @@ export class VillageLedgerGame {
   private handleTouchStart(e: TouchEvent): void {
     e.preventDefault();
     soundManager.init();
-    console.log('=== TOUCH EVENT ===', 'touches:', e.touches.length, 'showQuiz:', this.state.showQuiz);
     if (e.touches.length > 0) {
       const touch = e.touches[0];
-      console.log('TouchStart clientX/Y:', touch.clientX, touch.clientY);
       this.processTouchStart(touch.clientX, touch.clientY);
     }
   }
@@ -533,12 +531,6 @@ export class VillageLedgerGame {
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
     
-    console.log('processTouchStart: x=', x, 'y=', y, 'showQuiz=', this.state.showQuiz, 
-      'showInventoryPopup=', this.showInventoryDetailPopup, 
-      'showBadge=', this.state.showBadgePopup,
-      'showChoice=', this.state.showChoice,
-      'dialogue=', !!this.state.currentDialogue);
-    
     // Handle Stone Tablet popup - click anywhere to close
     if (this.state.showStoneTabletPopup) {
       this.state.showStoneTabletPopup = false;
@@ -556,45 +548,48 @@ export class VillageLedgerGame {
       return;
     }
     
-    // Check if clicking on mute button
-    if (this.muteButtonArea) {
-      const btn = this.muteButtonArea;
-      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
-        soundManager.toggleMute();
-        soundManager.play('buttonClick');
-        return;
-      }
-    }
-    
-    // Check if clicking on inventory HUD to open popup (also dismisses hint)
-    if (this.inventoryButtonArea) {
-      const btn = this.inventoryButtonArea;
-      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
-        this.showInventoryDetailPopup = true;
-        // Also dismiss inventory hint if showing
-        if (this.state.showInventoryHint) {
-          this.state.showInventoryHint = false;
-          // Show pending choice after hint is dismissed
-          if (this.state.pendingChoiceAfterHint) {
-            this.state.pendingChoiceAfterHint = false;
-            this.showWoodcutterTradeChoice();
-          }
+    // Skip HUD checks when quiz is showing - quiz needs full screen interaction
+    if (!this.state.showQuiz && !this.state.showQuizReview) {
+      // Check if clicking on mute button
+      if (this.muteButtonArea) {
+        const btn = this.muteButtonArea;
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          soundManager.toggleMute();
+          soundManager.play('buttonClick');
+          return;
         }
-        soundManager.play('buttonClick');
-        return;
       }
-    }
-    
-    // Check if clicking on Stone Tablet HUD to open popup
-    if (this.state.showHUD) {
-      const hudX = this.canvas.width - this.hudWidth - 24;
-      const hudY = 24;
-      if (x >= hudX && x <= hudX + this.hudWidth && y >= hudY && y <= hudY + this.hudHeight) {
-        this.state.showStoneTabletPopup = true;
-        // Play stone ledger sound reduced by 1 second (getBufferDuration returns ms)
-        const ledgerDuration = Math.max(500, soundManager.getBufferDuration('stoneLedger') - 1000);
-        soundManager.playForDuration('stoneLedger', ledgerDuration);
-        return;
+      
+      // Check if clicking on inventory HUD to open popup (also dismisses hint)
+      if (this.inventoryButtonArea) {
+        const btn = this.inventoryButtonArea;
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          this.showInventoryDetailPopup = true;
+          // Also dismiss inventory hint if showing
+          if (this.state.showInventoryHint) {
+            this.state.showInventoryHint = false;
+            // Show pending choice after hint is dismissed
+            if (this.state.pendingChoiceAfterHint) {
+              this.state.pendingChoiceAfterHint = false;
+              this.showWoodcutterTradeChoice();
+            }
+          }
+          soundManager.play('buttonClick');
+          return;
+        }
+      }
+      
+      // Check if clicking on Stone Tablet HUD to open popup
+      if (this.state.showHUD) {
+        const hudX = this.canvas.width - this.hudWidth - 24;
+        const hudY = 24;
+        if (x >= hudX && x <= hudX + this.hudWidth && y >= hudY && y <= hudY + this.hudHeight) {
+          this.state.showStoneTabletPopup = true;
+          // Play stone ledger sound reduced by 1 second (getBufferDuration returns ms)
+          const ledgerDuration = Math.max(500, soundManager.getBufferDuration('stoneLedger') - 1000);
+          soundManager.playForDuration('stoneLedger', ledgerDuration);
+          return;
+        }
       }
     }
     
@@ -640,7 +635,6 @@ export class VillageLedgerGame {
 
     // Handle quiz touches
     if (this.state.showQuiz) {
-      console.log('Routing to handleQuizTouch:', x, y);
       this.handleQuizTouch(x, y);
       return;
     }
@@ -3027,7 +3021,11 @@ export class VillageLedgerGame {
           this.queueDialogue([
             {
               speaker: 'WOODCUTTER',
-              text: "Fine! The Tablet will prove I'm right! Let's go!",
+              text: "Fine! The Tablet will prove I'm right! Let's go!"
+            },
+            {
+              speaker: 'WOODCUTTER',
+              text: "...Wait. The Ledger says 1 Stone and 1 Fish. I was wrong... I apologize.",
               onComplete: () => {
                 this.state.phase = 'loop2_verify_at_tablet';
                 this.woodcutter.targetX = this.villageCenterX + 80;
@@ -3145,7 +3143,11 @@ export class VillageLedgerGame {
           this.queueDialogue([
             {
               speaker: 'STONE-WORKER',
-              text: "Fine! The Tablet will prove I'm right! Let's go!",
+              text: "Fine! The Tablet will prove I'm right! Let's go!"
+            },
+            {
+              speaker: 'STONE-WORKER',
+              text: "...Wait. The Ledger says 1 Wood and 2 Fish. I was wrong... I apologize.",
               onComplete: () => {
                 this.state.phase = 'loop2_verify_at_tablet';
                 this.stoneWorker.targetX = this.villageCenterX - 100;
@@ -4980,9 +4982,9 @@ export class VillageLedgerGame {
     const h = this.canvas.height;
     const t = this.state.nightTransitionTimer;
     
-    // Continue rain effect during night transition (fading out)
+    // Continue rain effect during night transition (fading out more slowly)
     if (this.state.showRainfall) {
-      const rainFade = Math.max(0, 1 - t / 2); // Fade rain over first 2 seconds
+      const rainFade = Math.max(0, 1 - t / 4); // Fade rain over first 4 seconds
       
       // Rain drops animation (continuing from rainfall)
       ctx.strokeStyle = `rgba(180, 200, 255, ${0.4 * rainFade})`;
@@ -5003,8 +5005,8 @@ export class VillageLedgerGame {
       }
     }
     
-    // Fade from storm to night over first 2 seconds
-    const fadeProgress = Math.min(1, t / 2);
+    // Fade from storm to night over 4 seconds (slower transition)
+    const fadeProgress = Math.min(1, t / 4);
     const nightAlpha = 0.85 + fadeProgress * 0.1; // Start darker (storm already dark), end at 95%
     
     // Draw dark overlay that increases as rain fades
@@ -5675,7 +5677,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Popup dimensions - smaller when dialogue is active to leave room for dialogue box
     const isLoop2OrLater = this.state.loop >= 2;
     const baseWidth = isLoop2OrLater ? 780 : 620;
-    const baseHeight = hasActiveDialogue ? 350 : 500; // Shorter when dialogue showing
+    const baseHeight = hasActiveDialogue ? 350 : 550; // Taller to fit Elder's quotes with spacing
     const popupWidth = Math.min(baseWidth, w - 40);
     const popupHeight = Math.min(baseHeight, h - dialogueReserve - 60);
     const popupX = (w - popupWidth) / 2;
@@ -5724,7 +5726,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       
       const wisdomLines = [
         '"A promise remembered',
-        'only by one is easily',
+        'by one is easily',
         'forgotten by another."',
         '',
         '"When debts are carved',
@@ -5733,8 +5735,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ];
       
       wisdomLines.forEach((line, i) => {
-        ctx.fillText(line, popupX + popupWidth / 2, popupY + 120 + i * 34);
+        ctx.fillText(line, popupX + popupWidth / 2, popupY + 110 + i * 34);
       });
+      
+      // Tap to close instruction - below the wisdom quotes
+      ctx.font = `12px ${this.uiFont}`;
+      ctx.fillStyle = '#8B7355';
+      ctx.fillText('Tap anywhere to close', popupX + popupWidth / 2, popupY + popupHeight - 25);
     } else {
       // Loop 2+: Show NAME/DEBT columns - 25/75 split for short names and long debt text
       ctx.font = `bold 18px ${this.uiFont}`;
@@ -5771,11 +5778,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       }
     }
     
-    // Tap to close instruction
-    ctx.font = `12px ${this.uiFont}`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#8B7355';
-    ctx.fillText('Tap anywhere to close', popupX + popupWidth / 2, popupY + popupHeight - 35);
+    // Tap to close instruction - only for Loop 2+ (Loop 1 draws its own above)
+    if (!isLoop1) {
+      ctx.font = `12px ${this.uiFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#8B7355';
+      ctx.fillText('Tap anywhere to close', popupX + popupWidth / 2, popupY + popupHeight - 25);
+    }
   }
 
   private drawInventoryHUD(ctx: CanvasRenderingContext2D): void {
@@ -6643,8 +6652,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private handleQuizTouch(x: number, y: number): void {
-    console.log('handleQuizTouch called:', x, y, 'buttonAreas:', this.quizButtonAreas.length, 'feedback:', this.showQuizFeedback);
-    
     // If showing feedback, check for retry and navigation buttons
     if (this.showQuizFeedback) {
       // Check retry button

@@ -473,9 +473,10 @@ export class VillageLedgerGame {
   private handleTouchStart(e: TouchEvent): void {
     e.preventDefault();
     soundManager.init();
+    console.log('=== TOUCH EVENT ===', 'touches:', e.touches.length, 'showQuiz:', this.state.showQuiz);
     if (e.touches.length > 0) {
       const touch = e.touches[0];
-      console.log('TouchStart:', touch.clientX, touch.clientY, 'showQuiz:', this.state.showQuiz);
+      console.log('TouchStart clientX/Y:', touch.clientX, touch.clientY);
       this.processTouchStart(touch.clientX, touch.clientY);
     }
   }
@@ -531,6 +532,12 @@ export class VillageLedgerGame {
     const scaleY = this.canvas.height / rect.height;
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
+    
+    console.log('processTouchStart: x=', x, 'y=', y, 'showQuiz=', this.state.showQuiz, 
+      'showInventoryPopup=', this.showInventoryDetailPopup, 
+      'showBadge=', this.state.showBadgePopup,
+      'showChoice=', this.state.showChoice,
+      'dialogue=', !!this.state.currentDialogue);
     
     // Handle Stone Tablet popup - click anywhere to close
     if (this.state.showStoneTabletPopup) {
@@ -1146,7 +1153,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'VILLAGE ELDER',
-          text: "This tablet holds great power, young one. A promise remembered only by one is easily forgotten by another."
+          text: "This tablet holds great power, young one. A promise remembered by one is easily forgotten by another."
         },
         {
           speaker: 'VILLAGE ELDER',
@@ -1693,7 +1700,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "That's the problem! I want fish, but you don't have fish. You need what I have, but I don't need what you have. This problem is called the 'Double Coincidence of Wants'."
+          text: "That's the problem! I want fish, but you don't have fish. You want what I have, but I don't want what you have. This problem is called the 'Double Coincidence of Wants'."
         },
         {
           speaker: 'WOODCUTTER',
@@ -1723,7 +1730,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "That's the problem! You have a slingshot, but I don't want a slingshot. I want fish, but you don't have fish. This is called the 'Double Coincidence of Wants'."
+          text: "That's the problem! I have something you want, but you don't have something I want. This is called the 'Double Coincidence of Wants'."
         },
         {
           speaker: 'WOODCUTTER',
@@ -1796,7 +1803,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "Ah, the old Double Coincidence of Wants! Last time we just relied on memory... that didn't end well. A shared ledger might work better!",
+          text: "Ah, the old 'Double Coincidence of Wants'! Last time we just relied on memory... that didn't end well. A shared Ledger might work better!",
           onComplete: () => {
             this.showRecordOrRememberChoice();
           }
@@ -1812,7 +1819,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "Ah, that Double Coincidence of Wants problem again! Last time we each kept our own mental ledger... and we know how that ended.",
+          text: "Ah, that 'Double Coincidence of Wants' problem again! Last time we each kept our own mental Ledger... and we know how that ended.",
           onComplete: () => {
             this.showRecordOrRememberChoice();
           }
@@ -2312,7 +2319,7 @@ export class VillageLedgerGame {
       if (this.state.loop === 1 && !this.state.badges.includes('Double Coincidence of Wants')) {
         this.awardBadge(
           'Double Coincidence of Wants',
-          'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!',
+          'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has at the same time. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!',
           () => {
             // After badge is dismissed, show credit offer dialogue
             this.queueDialogue([
@@ -2456,7 +2463,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "The Double Coincidence strikes again! But this time, let's use a shared ledger instead of trusting memory.",
+          text: "The 'Double Coincidence of Wants' strikes again! But this time, let's use a shared Ledger instead of trusting memory.",
           onComplete: showRecordChoice
         }
       ]);
@@ -5768,7 +5775,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.font = `12px ${this.uiFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#8B7355';
-    ctx.fillText('Tap anywhere to close', popupX + popupWidth / 2, popupY + popupHeight - 20);
+    ctx.fillText('Tap anywhere to close', popupX + popupWidth / 2, popupY + popupHeight - 35);
   }
 
   private drawInventoryHUD(ctx: CanvasRenderingContext2D): void {
@@ -6278,7 +6285,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           hint = 'Settle your debts with the Woodcutter and Stone-worker...';
           break;
         case 'loop2_return':
-          hint = 'Return home to fix your roof before the storm!';
+          hint = this.state.roofRepaired 
+            ? 'Return home before the storm!' 
+            : 'Return home to fix your roof before the storm!';
           break;
         case 'confrontation':
         case 'brawl':

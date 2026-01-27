@@ -4158,25 +4158,9 @@ export class VillageLedgerGame {
     // Draw parallax background elements
     this.drawBackground(ctx);
 
-    // Draw ground
+    // Ground Y position for character placement
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
-    const groundGradient = ctx.createLinearGradient(0, groundY, 0, h - this.dialogueBoxHeight);
-    groundGradient.addColorStop(0, '#8B7355');
-    groundGradient.addColorStop(0.3, '#6B5344');
-    groundGradient.addColorStop(1, '#5D4837');
-    ctx.fillStyle = groundGradient;
-    ctx.fillRect(0, groundY, w, this.groundHeight);
-
-    // Draw grass line
-    ctx.strokeStyle = '#4A7C59';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    for (let x = -this.cameraX % 30; x < w; x += 30) {
-      const grassHeight = 8 + Math.sin(x * 0.1) * 3;
-      ctx.moveTo(x, groundY);
-      ctx.lineTo(x, groundY - grassHeight);
-    }
-    ctx.stroke();
+    // Note: Brown procedural ground removed - using parallax grass layer instead
 
     // Draw location markers FIRST (behind characters) - Stone Tablet and Home
     this.drawLocationMarkers(ctx, groundY);
@@ -5454,22 +5438,23 @@ export class VillageLedgerGame {
       const backmidOffset = this.cameraX * 0.3;
       const frontmidOffset = this.cameraX * 0.6;
       
-      // Get image dimensions
+      // Use native image dimensions (3600x768) - no scaling for crisp graphics
       const imgWidth = this.parallaxLayers.sky.naturalWidth;
       const imgHeight = this.parallaxLayers.sky.naturalHeight;
       
-      // Scale to fill canvas height while maintaining aspect ratio
-      const scale = h / imgHeight;
-      const scaledWidth = imgWidth * scale;
+      // Position images so bottom aligns with ground level (above dialogue box)
+      // The grass portion of frontmid should be at the bottom of playable area
+      const groundY = h - this.groundHeight - this.dialogueBoxHeight;
+      const yOffset = groundY + this.groundHeight - imgHeight;
       
       // Draw sky layer (farthest back, slowest parallax)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, scaledWidth, h);
+      this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, imgWidth, imgHeight, yOffset);
       
       // Draw backmid layer (mountains)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.backmid, backmidOffset, scaledWidth, h);
+      this.drawParallaxLayer(ctx, this.parallaxLayers.backmid, backmidOffset, imgWidth, imgHeight, yOffset);
       
       // Draw frontmid layer (closest, fastest parallax)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, scaledWidth, h);
+      this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, imgWidth, imgHeight, yOffset);
     } else {
       // Fallback solid background while loading
       ctx.fillStyle = '#87CEEB';
@@ -5481,22 +5466,23 @@ export class VillageLedgerGame {
     ctx: CanvasRenderingContext2D, 
     img: HTMLImageElement, 
     offset: number,
-    scaledWidth: number,
-    height: number
+    imgWidth: number,
+    imgHeight: number,
+    yOffset: number
   ): void {
     const w = this.canvas.width;
     
     // Calculate starting X position with wrapping for seamless scrolling
-    const startX = -(offset % scaledWidth);
+    const startX = -(offset % imgWidth);
     
-    // Draw enough copies to cover the screen
-    for (let x = startX; x < w; x += scaledWidth) {
-      ctx.drawImage(img, x, 0, scaledWidth, height);
+    // Draw enough copies to cover the screen at native resolution
+    for (let x = startX; x < w; x += imgWidth) {
+      ctx.drawImage(img, x, yOffset, imgWidth, imgHeight);
     }
     
     // Handle left edge if needed
     if (startX > 0) {
-      ctx.drawImage(img, startX - scaledWidth, 0, scaledWidth, height);
+      ctx.drawImage(img, startX - imgWidth, yOffset, imgWidth, imgHeight);
     }
   }
 

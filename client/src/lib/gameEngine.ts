@@ -5457,9 +5457,10 @@ export class VillageLedgerGame {
       const imgWidth = this.parallaxLayers.sky.naturalWidth;
       const imgHeight = this.parallaxLayers.sky.naturalHeight;
       
-      // Position images so bottom aligns with ground level
-      const groundY = h - this.groundHeight - this.dialogueBoxHeight;
-      const yOffset = groundY + this.groundHeight - imgHeight;
+      // Position images at top of canvas (y=0) for proper layering
+      // Sky shows clouds at top, frontmid shows ground at bottom
+      // Images are designed to overlay with transparent areas
+      const yOffset = 0;
       
       // Draw sky layer (farthest back, slowest parallax)
       this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, imgWidth, imgHeight, yOffset, w);

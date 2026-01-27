@@ -209,6 +209,18 @@ export class VillageLedgerGame {
   private faceImages: Record<string, HTMLImageElement> = {};
   private moodTimer: number = 0;
   
+  // Parallax background layers
+  private parallaxLayers: {
+    sky: HTMLImageElement;
+    backmid: HTMLImageElement;
+    frontmid: HTMLImageElement;
+  } = {
+    sky: new Image(),
+    backmid: new Image(),
+    frontmid: new Image()
+  };
+  private parallaxLoaded: boolean = false;
+  
   // Sound mute button
   private muteButtonArea: { x: number; y: number; w: number; h: number } | null = null;
   
@@ -249,6 +261,23 @@ export class VillageLedgerGame {
       img.src = `/assets/${mood}.PNG`;
       this.faceImages[mood] = img;
     });
+
+    // Load parallax background layers
+    this.parallaxLayers.sky.src = '/sky.png';
+    this.parallaxLayers.backmid.src = '/backmid.png';
+    this.parallaxLayers.frontmid.src = '/frontmid.png';
+    
+    // Track when all layers are loaded
+    let loadedCount = 0;
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= 3) {
+        this.parallaxLoaded = true;
+      }
+    };
+    this.parallaxLayers.sky.onload = checkAllLoaded;
+    this.parallaxLayers.backmid.onload = checkAllLoaded;
+    this.parallaxLayers.frontmid.onload = checkAllLoaded;
 
     // Initialize player at home (far left)
     this.player = {
@@ -5412,47 +5441,62 @@ export class VillageLedgerGame {
 
   private drawBackground(ctx: CanvasRenderingContext2D): void {
     const w = this.canvas.width;
-    const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
-
-    // Far background - distant mountains
-    ctx.fillStyle = '#C9B8A5';
-    for (let i = 0; i < 5; i++) {
-      const x = (i * 500 - this.cameraX * 0.2) % (w + 400) - 200;
-      ctx.beginPath();
-      ctx.moveTo(x, groundY);
-      ctx.lineTo(x + 150, groundY - 120);
-      ctx.lineTo(x + 300, groundY);
-      ctx.fill();
+    const h = this.canvas.height;
+    
+    // Use parallax layers if loaded, otherwise fallback to solid color
+    if (this.parallaxLoaded) {
+      // Calculate parallax offsets - slower layers scroll less
+      // Sky (farthest) - very slow parallax (0.1x)
+      // Backmid (mountains) - slow parallax (0.3x)
+      // Frontmid (trees/grass) - medium parallax (0.6x)
+      
+      const skyOffset = this.cameraX * 0.1;
+      const backmidOffset = this.cameraX * 0.3;
+      const frontmidOffset = this.cameraX * 0.6;
+      
+      // Get image dimensions
+      const imgWidth = this.parallaxLayers.sky.naturalWidth;
+      const imgHeight = this.parallaxLayers.sky.naturalHeight;
+      
+      // Scale to fill canvas height while maintaining aspect ratio
+      const scale = h / imgHeight;
+      const scaledWidth = imgWidth * scale;
+      
+      // Draw sky layer (farthest back, slowest parallax)
+      this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, scaledWidth, h);
+      
+      // Draw backmid layer (mountains)
+      this.drawParallaxLayer(ctx, this.parallaxLayers.backmid, backmidOffset, scaledWidth, h);
+      
+      // Draw frontmid layer (closest, fastest parallax)
+      this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, scaledWidth, h);
+    } else {
+      // Fallback solid background while loading
+      ctx.fillStyle = '#87CEEB';
+      ctx.fillRect(0, 0, w, h);
     }
-
-    // Mid background - village buildings (reduced count, removed rightmost two)
-    ctx.fillStyle = '#A89080';
-    for (let i = 0; i < 6; i++) {
-      const x = (i * 300 - this.cameraX * 0.4) % (w + 300) - 150;
-      const buildingWidth = 60 + (i % 3) * 20;
-      const buildingHeight = 50 + (i % 2) * 30;
-
-      // Building body
-      ctx.fillRect(x, groundY - buildingHeight, buildingWidth, buildingHeight);
-
-      // Roof
-      ctx.fillStyle = '#8B7355';
-      ctx.beginPath();
-      ctx.moveTo(x - 10, groundY - buildingHeight);
-      ctx.lineTo(x + buildingWidth / 2, groundY - buildingHeight - 30);
-      ctx.lineTo(x + buildingWidth + 10, groundY - buildingHeight);
-      ctx.fill();
-      ctx.fillStyle = '#A89080';
+  }
+  
+  private drawParallaxLayer(
+    ctx: CanvasRenderingContext2D, 
+    img: HTMLImageElement, 
+    offset: number,
+    scaledWidth: number,
+    height: number
+  ): void {
+    const w = this.canvas.width;
+    
+    // Calculate starting X position with wrapping for seamless scrolling
+    const startX = -(offset % scaledWidth);
+    
+    // Draw enough copies to cover the screen
+    for (let x = startX; x < w; x += scaledWidth) {
+      ctx.drawImage(img, x, 0, scaledWidth, height);
     }
-
-    // Near decorative elements
-    ctx.fillStyle = '#6B8E5E';
-    for (let i = 0; i < 12; i++) {
-      const x = (i * 200 - this.cameraX * 0.7) % (w + 200) - 100;
-      // Bush
-      ctx.beginPath();
-      ctx.arc(x, groundY, 25, Math.PI, 0);
-      ctx.fill();
+    
+    // Handle left edge if needed
+    if (startX > 0) {
+      ctx.drawImage(img, startX - scaledWidth, 0, scaledWidth, height);
     }
   }
 

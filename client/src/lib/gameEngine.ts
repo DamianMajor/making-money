@@ -5444,35 +5444,45 @@ export class VillageLedgerGame {
   private drawBackground(ctx: CanvasRenderingContext2D): void {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
+    const dpr = window.devicePixelRatio || 1;
     
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
-      // Calculate parallax offsets - slower layers scroll less
-      // Sky (farthest) - very slow parallax (0.1x)
-      // Backmid (mountains) - slow parallax (0.3x)
-      // Frontmid (trees/grass) - medium parallax (0.6x)
+      // Save the current transform and reset to identity for 1:1 pixel rendering
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       
+      // Disable image smoothing for crisp pixel-perfect rendering
+      ctx.imageSmoothingEnabled = false;
+      
+      // Calculate parallax offsets - slower layers scroll less
       const skyOffset = this.cameraX * 0.1;
       const backmidOffset = this.cameraX * 0.3;
       const frontmidOffset = this.cameraX * 0.6;
       
-      // Use native image dimensions (3600x768) - no scaling for crisp graphics
+      // Use native image dimensions (3600x768)
       const imgWidth = this.parallaxLayers.sky.naturalWidth;
       const imgHeight = this.parallaxLayers.sky.naturalHeight;
       
-      // Position images so bottom aligns with ground level (above dialogue box)
-      // The grass portion of frontmid should be at the bottom of playable area
+      // Position images so bottom aligns with ground level (in device pixels)
       const groundY = h - this.groundHeight - this.dialogueBoxHeight;
-      const yOffset = groundY + this.groundHeight - imgHeight;
+      const yOffset = (groundY + this.groundHeight - imgHeight) * dpr;
+      
+      // Screen width in device pixels
+      const screenWidthDevice = w * dpr;
       
       // Draw sky layer (farthest back, slowest parallax)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, imgWidth, imgHeight, yOffset);
+      this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset * dpr, imgWidth, imgHeight, yOffset, screenWidthDevice);
       
       // Draw backmid layer (mountains)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.backmid, backmidOffset, imgWidth, imgHeight, yOffset);
+      this.drawParallaxLayer(ctx, this.parallaxLayers.backmid, backmidOffset * dpr, imgWidth, imgHeight, yOffset, screenWidthDevice);
       
       // Draw frontmid layer (closest, fastest parallax)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, imgWidth, imgHeight, yOffset);
+      this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset * dpr, imgWidth, imgHeight, yOffset, screenWidthDevice);
+      
+      // Restore the DPR transform for other drawing operations
+      ctx.restore();
+      ctx.imageSmoothingEnabled = true;
     } else {
       // Fallback solid background while loading
       ctx.fillStyle = '#87CEEB';
@@ -5486,21 +5496,20 @@ export class VillageLedgerGame {
     offset: number,
     imgWidth: number,
     imgHeight: number,
-    yOffset: number
+    yOffset: number,
+    screenWidth: number
   ): void {
-    const w = this.logicalWidth;
-    
     // Calculate starting X position with wrapping for seamless scrolling
     const startX = -(offset % imgWidth);
     
-    // Draw enough copies to cover the screen at native resolution
-    for (let x = startX; x < w; x += imgWidth) {
-      ctx.drawImage(img, x, yOffset, imgWidth, imgHeight);
+    // Draw enough copies to cover the screen at native 1:1 resolution
+    for (let x = startX; x < screenWidth; x += imgWidth) {
+      ctx.drawImage(img, x, yOffset);
     }
     
     // Handle left edge if needed
     if (startX > 0) {
-      ctx.drawImage(img, startX - imgWidth, yOffset, imgWidth, imgHeight);
+      ctx.drawImage(img, startX - imgWidth, yOffset);
     }
   }
 

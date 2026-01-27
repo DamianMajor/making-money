@@ -157,6 +157,10 @@ export class VillageLedgerGame {
   private worldWidth: number = 3500;
   private groundHeight: number = 100;
 
+  // Logical dimensions (CSS pixels, not device pixels)
+  private logicalWidth: number = 0;
+  private logicalHeight: number = 0;
+
   // Camera
   private cameraX: number = 0;
   private cameraTargetX: number = 0;
@@ -568,11 +572,9 @@ export class VillageLedgerGame {
 
   private processTouchStart(clientX: number, clientY: number): void {
     const rect = this.canvas.getBoundingClientRect();
-    // Scale coordinates to match canvas internal dimensions
-    const scaleX = this.canvas.width / rect.width;
-    const scaleY = this.canvas.height / rect.height;
-    const x = (clientX - rect.left) * scaleX;
-    const y = (clientY - rect.top) * scaleY;
+    // Use CSS pixel coordinates (context is scaled for DPR automatically)
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
     
     // Handle Stone Tablet popup - click anywhere to close
     if (this.state.showStoneTabletPopup) {
@@ -624,7 +626,7 @@ export class VillageLedgerGame {
       
       // Check if clicking on Stone Tablet HUD to open popup
       if (this.state.showHUD) {
-        const hudX = this.canvas.width - this.hudWidth - 24;
+        const hudX = this.logicalWidth - this.hudWidth - 24;
         const hudY = 24;
         if (x >= hudX && x <= hudX + this.hudWidth && y >= hudY && y <= hudY + this.hudHeight) {
           this.state.showStoneTabletPopup = true;
@@ -807,23 +809,23 @@ export class VillageLedgerGame {
   private processTouchMove(clientX: number): void {
     if (!this.touchActive) return;
     const rect = this.canvas.getBoundingClientRect();
-    const scaleX = this.canvas.width / rect.width;
-    const x = (clientX - rect.left) * scaleX;
+    // Use CSS pixel coordinates
+    const x = clientX - rect.left;
     this.touchX = x;
     this.updateMoveDirection(x);
   }
 
   private updateMoveDirection(x: number): void {
-    const halfWidth = this.canvas.width / 2;
+    const halfWidth = this.logicalWidth / 2;
     this.moveDirection = x < halfWidth ? -1 : 1;
   }
 
   private isInteractButtonTouched(x: number, y: number): boolean {
     const size = this.interactButtonSize;
-    const btnX = this.canvas.width - size - 32;
+    const btnX = this.logicalWidth - size - 32;
     // Center vertically on the ground horizon line (between ground and dialogue box)
-    const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
-    const dialogueTop = this.canvas.height - this.dialogueBoxHeight;
+    const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
+    const dialogueTop = this.logicalHeight - this.dialogueBoxHeight;
     const btnY = groundY + (dialogueTop - groundY - size) / 2;
     // Precise touch area - no extra padding beyond button bounds
     const padding = 5;
@@ -834,7 +836,7 @@ export class VillageLedgerGame {
   // Check if player tapped directly on an NPC, home hut, stone tablet, or berry bush
   // Prioritizes the NPC closest to the player when multiple hitboxes overlap
   private getTappedInteractable(x: number, y: number): Character | 'home' | 'stoneTablet' | null {
-    const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
+    const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     
     // Check if tapping on home hut (at playerHomeX = 100)
     const homeScreenX = this.playerHomeX - this.cameraX;
@@ -3410,18 +3412,33 @@ export class VillageLedgerGame {
   public resize(): void {
     const rect = this.canvas.parentElement?.getBoundingClientRect();
     if (rect) {
-      this.canvas.width = rect.width;
-      this.canvas.height = rect.height;
+      // Get device pixel ratio for crisp rendering on HiDPI displays
+      const dpr = window.devicePixelRatio || 1;
+      
+      // Set canvas internal resolution to match device pixels
+      this.canvas.width = rect.width * dpr;
+      this.canvas.height = rect.height * dpr;
+      
+      // Set CSS size to maintain visual dimensions
+      this.canvas.style.width = `${rect.width}px`;
+      this.canvas.style.height = `${rect.height}px`;
+      
+      // Scale context so drawing coordinates match CSS pixels
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    // Update UI dimensions based on canvas size
-    this.dialogueBoxHeight = this.canvas.height * 0.2;
-    this.hudWidth = Math.min(260, this.canvas.width * 0.25);
-    this.hudHeight = Math.min(185, this.canvas.height * 0.25);
-    this.interactButtonSize = Math.min(90, this.canvas.width * 0.11); // 10% smaller
+    // Store logical dimensions (CSS pixels) for rendering and UI
+    this.logicalWidth = this.canvas.width / (window.devicePixelRatio || 1);
+    this.logicalHeight = this.canvas.height / (window.devicePixelRatio || 1);
+
+    // Update UI dimensions based on logical canvas size
+    this.dialogueBoxHeight = this.logicalHeight * 0.2;
+    this.hudWidth = Math.min(260, this.logicalWidth * 0.25);
+    this.hudHeight = Math.min(185, this.logicalHeight * 0.25);
+    this.interactButtonSize = Math.min(90, this.logicalWidth * 0.11); // 10% smaller
 
     // Calculate ground Y position
-    const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
+    const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     this.player.y = groundY - this.player.height;
 
     // All NPCs are now at ground level (including Elder who is always visible)
@@ -3596,8 +3613,8 @@ export class VillageLedgerGame {
     this.enforceNPCSpacing();
 
     // Update camera
-    this.cameraTargetX = this.player.x - this.canvas.width / 2;
-    this.cameraTargetX = Math.max(0, Math.min(this.worldWidth - this.canvas.width, this.cameraTargetX));
+    this.cameraTargetX = this.player.x - this.logicalWidth / 2;
+    this.cameraTargetX = Math.max(0, Math.min(this.worldWidth - this.logicalWidth, this.cameraTargetX));
     this.cameraX += (this.cameraTargetX - this.cameraX) * this.cameraSmoothing;
 
     // Check NPC and location proximity
@@ -4141,10 +4158,11 @@ export class VillageLedgerGame {
 
   private render(): void {
     const ctx = this.ctx;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    // Use logical dimensions for all rendering (CSS pixels, not device pixels)
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
 
-    // Clear canvas
+    // Clear canvas (use full device pixel size for complete clear)
     ctx.clearRect(0, 0, w, h);
 
     // Draw sky gradient
@@ -4304,8 +4322,8 @@ export class VillageLedgerGame {
   }
 
   private drawChoiceDialogue(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
 
     // Detect if this is a settlement dispute (first option mentions "Tablet")
     const firstOptionText = this.state.choiceOptions[0]?.text || '';
@@ -4398,8 +4416,8 @@ export class VillageLedgerGame {
   private badgePopupButtonArea: { x: number; y: number; w: number; h: number } | null = null;
 
   private drawTradeSelectionPopup(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     
     // Collect available items (count > 0)
     const availableItems: { name: string; count: number; color: string }[] = [];
@@ -4505,8 +4523,8 @@ export class VillageLedgerGame {
   private drawBadgePopup(ctx: CanvasRenderingContext2D): void {
     if (!this.state.pendingBadge) return;
     
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     
     // Popup dimensions - increased height for text and button spacing
     const popupWidth = 420;
@@ -4625,8 +4643,8 @@ export class VillageLedgerGame {
   }
 
   private drawBrawlAnimation(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     // Center brawl on player's screen position (covers player + Woodcutter + Stoneworker, not Elder)
     const playerScreenX = this.player.x - this.cameraX;
     const centerX = Math.max(150, Math.min(w - 150, playerScreenX));
@@ -4711,8 +4729,8 @@ export class VillageLedgerGame {
   }
 
   private drawCelebrationAnimation(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
     
@@ -4797,8 +4815,8 @@ export class VillageLedgerGame {
   }
   
   private drawThunderstorm(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     const t = this.state.thunderstormTimer;
     
     // Dark storm overlay that builds up (reduced darkness)
@@ -4847,8 +4865,8 @@ export class VillageLedgerGame {
   }
   
   private drawCloudsAnimation(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     
     // Update timer
     this.state.cloudsAnimationTimer += 1/60;
@@ -4913,8 +4931,8 @@ export class VillageLedgerGame {
   }
   
   private drawRainfallAnimation(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     
     // Update timer
     this.state.rainfallTimer += 1/60;
@@ -5012,8 +5030,8 @@ export class VillageLedgerGame {
   }
   
   private drawNightTransition(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     const t = this.state.nightTransitionTimer;
     
     // Continue rain effect during night transition (fading out more slowly)
@@ -5136,8 +5154,8 @@ export class VillageLedgerGame {
   }
 
   private drawFailScreen(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
 
     // Dark overlay
     ctx.fillStyle = 'rgba(139, 0, 0, 0.9)';
@@ -5286,7 +5304,7 @@ export class VillageLedgerGame {
     // Player Home marker (at x=100) - 20% larger
     const homeScreenX = this.playerHomeX - this.cameraX;
     const hutScale = 1.2; // 20% larger
-    if (homeScreenX > -100 && homeScreenX < this.canvas.width + 100) {
+    if (homeScreenX > -100 && homeScreenX < this.logicalWidth + 100) {
       // Draw a simple house shape (scaled 20% larger)
       const hutWidth = 60 * hutScale;
       const hutHeight = 60 * hutScale;
@@ -5338,7 +5356,7 @@ export class VillageLedgerGame {
 
     // Village Center / Elder's Rock marker (at x=1500)
     const centerScreenX = this.villageCenterX - this.cameraX;
-    if (centerScreenX > -100 && centerScreenX < this.canvas.width + 100) {
+    if (centerScreenX > -100 && centerScreenX < this.logicalWidth + 100) {
       // Draw a large blank rock
       ctx.fillStyle = '#8B8B8B';
       ctx.beginPath();
@@ -5365,7 +5383,7 @@ export class VillageLedgerGame {
     const fishingHoleX = 3200;
     const pondScreenX = fishingHoleX - this.cameraX - 60; // Shift left
     const pondYOffset = 25; // Shift down
-    if (pondScreenX > -150 && pondScreenX < this.canvas.width + 150) {
+    if (pondScreenX > -150 && pondScreenX < this.logicalWidth + 150) {
       // Draw pond/water
       ctx.fillStyle = '#4A90B8';
       ctx.beginPath();
@@ -5404,7 +5422,7 @@ export class VillageLedgerGame {
     const pondYOffset = 25;
     const poleOffsetX = -10; // Adjusted pole position (moved right 40 from -50)
     
-    if (pondScreenX > -150 && pondScreenX < this.canvas.width + 150) {
+    if (pondScreenX > -150 && pondScreenX < this.logicalWidth + 150) {
       // Fishing pole (held by Fisherman, angled over pond)
       ctx.strokeStyle = '#8B6914';
       ctx.lineWidth = 3;
@@ -5424,8 +5442,8 @@ export class VillageLedgerGame {
   }
 
   private drawBackground(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
@@ -5470,7 +5488,7 @@ export class VillageLedgerGame {
     imgHeight: number,
     yOffset: number
   ): void {
-    const w = this.canvas.width;
+    const w = this.logicalWidth;
     
     // Calculate starting X position with wrapping for seamless scrolling
     const startX = -(offset % imgWidth);
@@ -5604,7 +5622,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private drawStoneTabletHUD(ctx: CanvasRenderingContext2D): void {
-    const x = this.canvas.width - this.hudWidth - 24;
+    const x = this.logicalWidth - this.hudWidth - 24;
     const y = 24;
     const w = this.hudWidth;
     const h = this.hudHeight;
@@ -5724,8 +5742,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   // Large popup view of Stone Tablet - shown when clicking the HUD or in-world tablet
   private drawStoneTabletPopup(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     
     // Check if dialogue is active - if so, leave room for dialogue box
     const hasActiveDialogue = this.state.currentDialogue !== null;
@@ -5867,7 +5885,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const panelHeight = iconSize + padding * 1.5;
     
     // Position to the left of Stone Tablet HUD (which is at canvas.width - hudWidth - 24)
-    const stoneTabletHudX = this.canvas.width - this.hudWidth - 24;
+    const stoneTabletHudX = this.logicalWidth - this.hudWidth - 24;
     const stoneTabletHudY = 24; // Stone Tablet HUD is at y=24
     const panelX = stoneTabletHudX - panelWidth - 12; // 12px gap from Stone Tablet HUD
     const yPos = stoneTabletHudY; // Align top edge with Stone Tablet HUD
@@ -6206,8 +6224,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   private drawDialogueBox(ctx: CanvasRenderingContext2D): void {
     const x = 0;
-    const y = this.canvas.height - this.dialogueBoxHeight;
-    const w = this.canvas.width;
+    const y = this.logicalHeight - this.dialogueBoxHeight;
+    const w = this.logicalWidth;
     const h = this.dialogueBoxHeight;
 
     // Background
@@ -6388,10 +6406,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     if (this.interactButtonOpacity <= 0) return;
 
     const size = this.interactButtonSize;
-    const x = this.canvas.width - size - 32;
+    const x = this.logicalWidth - size - 32;
     // Center vertically on the ground horizon (between ground and dialogue box)
-    const groundY = this.canvas.height - this.groundHeight - this.dialogueBoxHeight;
-    const dialogueTop = this.canvas.height - this.dialogueBoxHeight;
+    const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
+    const dialogueTop = this.logicalHeight - this.dialogueBoxHeight;
     const y = groundY + (dialogueTop - groundY - size) / 2;
 
     ctx.save();
@@ -6543,8 +6561,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private quizReviewScrollOffset: number = 0;
 
   private drawQuizOverlay(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
 
     // Dark overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
@@ -6834,8 +6852,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private retryQuizButton: { x: number; y: number; w: number; h: number } | null = null;
   
   private drawQuizFeedback(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     
     // Dark overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
@@ -7060,8 +7078,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
   
   private drawQuizReview(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
     
     // Dark overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
@@ -7169,8 +7187,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private drawSuccessScreen(ctx: CanvasRenderingContext2D): void {
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
 
     // Dark overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';

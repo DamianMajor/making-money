@@ -5449,9 +5449,12 @@ export class VillageLedgerGame {
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
       // Calculate parallax offsets - slower layers scroll less
-      const skyOffset = this.cameraX * 0.1;
-      const backmidOffset = this.cameraX * 0.3;
-      const frontmidOffset = this.cameraX * 0.6;
+      // Sky (farthest) - very slow parallax
+      // Backmid (mountains) - slow parallax  
+      // Frontmid (ground) - moves 1:1 with camera (no parallax, characters walk on it)
+      const skyOffset = this.cameraX * 0.2;
+      const backmidOffset = this.cameraX * 0.5;
+      const frontmidOffset = this.cameraX * 1.0;
       
       // Use native image dimensions (3600x768)
       const imgWidth = this.parallaxLayers.sky.naturalWidth;

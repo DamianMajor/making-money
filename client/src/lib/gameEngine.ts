@@ -3412,24 +3412,22 @@ export class VillageLedgerGame {
   public resize(): void {
     const rect = this.canvas.parentElement?.getBoundingClientRect();
     if (rect) {
-      // Get device pixel ratio for crisp rendering on HiDPI displays
-      const dpr = window.devicePixelRatio || 1;
-      
-      // Set canvas internal resolution to match device pixels
-      this.canvas.width = rect.width * dpr;
-      this.canvas.height = rect.height * dpr;
+      // Set canvas to CSS pixel dimensions (no DPR scaling)
+      // This ensures 768px images display at 1:1 without upscaling blur
+      this.canvas.width = rect.width;
+      this.canvas.height = rect.height;
       
       // Set CSS size to maintain visual dimensions
       this.canvas.style.width = `${rect.width}px`;
       this.canvas.style.height = `${rect.height}px`;
       
-      // Scale context so drawing coordinates match CSS pixels
-      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      // Reset transform to identity (no scaling)
+      this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
 
-    // Store logical dimensions (CSS pixels) for rendering and UI
-    this.logicalWidth = this.canvas.width / (window.devicePixelRatio || 1);
-    this.logicalHeight = this.canvas.height / (window.devicePixelRatio || 1);
+    // Logical dimensions equal canvas dimensions (no DPR)
+    this.logicalWidth = this.canvas.width;
+    this.logicalHeight = this.canvas.height;
 
     // Update UI dimensions based on logical canvas size
     this.dialogueBoxHeight = this.logicalHeight * 0.2;
@@ -5444,17 +5442,12 @@ export class VillageLedgerGame {
   private drawBackground(ctx: CanvasRenderingContext2D): void {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
-    const dpr = window.devicePixelRatio || 1;
+    
+    // Disable image smoothing for crisp pixel-perfect rendering
+    ctx.imageSmoothingEnabled = false;
     
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
-      // Save the current transform and reset to identity for 1:1 pixel rendering
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      
-      // Disable image smoothing for crisp pixel-perfect rendering
-      ctx.imageSmoothingEnabled = false;
-      
       // Calculate parallax offsets - slower layers scroll less
       const skyOffset = this.cameraX * 0.1;
       const backmidOffset = this.cameraX * 0.3;
@@ -5464,30 +5457,26 @@ export class VillageLedgerGame {
       const imgWidth = this.parallaxLayers.sky.naturalWidth;
       const imgHeight = this.parallaxLayers.sky.naturalHeight;
       
-      // Position images so bottom aligns with ground level (in device pixels)
+      // Position images so bottom aligns with ground level
       const groundY = h - this.groundHeight - this.dialogueBoxHeight;
-      const yOffset = (groundY + this.groundHeight - imgHeight) * dpr;
-      
-      // Screen width in device pixels
-      const screenWidthDevice = w * dpr;
+      const yOffset = groundY + this.groundHeight - imgHeight;
       
       // Draw sky layer (farthest back, slowest parallax)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset * dpr, imgWidth, imgHeight, yOffset, screenWidthDevice);
+      this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, imgWidth, imgHeight, yOffset, w);
       
       // Draw backmid layer (mountains)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.backmid, backmidOffset * dpr, imgWidth, imgHeight, yOffset, screenWidthDevice);
+      this.drawParallaxLayer(ctx, this.parallaxLayers.backmid, backmidOffset, imgWidth, imgHeight, yOffset, w);
       
       // Draw frontmid layer (closest, fastest parallax)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset * dpr, imgWidth, imgHeight, yOffset, screenWidthDevice);
-      
-      // Restore the DPR transform for other drawing operations
-      ctx.restore();
-      ctx.imageSmoothingEnabled = true;
+      this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, imgWidth, imgHeight, yOffset, w);
     } else {
       // Fallback solid background while loading
       ctx.fillStyle = '#87CEEB';
       ctx.fillRect(0, 0, w, h);
     }
+    
+    // Re-enable image smoothing for other elements
+    ctx.imageSmoothingEnabled = true;
   }
   
   private drawParallaxLayer(
@@ -5502,7 +5491,7 @@ export class VillageLedgerGame {
     // Calculate starting X position with wrapping for seamless scrolling
     const startX = -(offset % imgWidth);
     
-    // Draw enough copies to cover the screen at native 1:1 resolution
+    // Draw at native 1:1 resolution
     for (let x = startX; x < screenWidth; x += imgWidth) {
       ctx.drawImage(img, x, yOffset);
     }

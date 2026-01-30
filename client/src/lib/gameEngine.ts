@@ -5454,20 +5454,16 @@ export class VillageLedgerGame {
       const backmidOffset = this.cameraX * 0.15;
       const frontmidOffset = this.cameraX * 1.0;
       
-      // Use native image dimensions (3600x768)
-      const imgWidth = this.parallaxLayers.sky.naturalWidth;
-      const imgHeight = this.parallaxLayers.sky.naturalHeight;
+      // Sky layer - static, positioned at top
+      const skyWidth = this.parallaxLayers.sky.naturalWidth;
+      const skyHeight = this.parallaxLayers.sky.naturalHeight;
+      this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, skyWidth, skyHeight, 0, w);
       
-      // Position images at top of canvas (y=0) for proper layering
-      // Sky shows clouds at top, frontmid shows ground at bottom
-      // Images are designed to overlay with transparent areas
-      const yOffset = 0;
-      
-      // Draw sky layer (static background)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, imgWidth, imgHeight, yOffset, w);
-      
-      // Draw frontmid layer (ground, moves with camera)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, imgWidth, imgHeight, yOffset, w);
+      // Frontmid layer - moves with camera, bottom aligned with top of dialogue box
+      const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
+      const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
+      const frontYOffset = h - this.dialogueBoxHeight - frontHeight;
+      this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, frontWidth, frontHeight, frontYOffset, w);
     } else {
       // Fallback solid background while loading
       ctx.fillStyle = '#87CEEB';

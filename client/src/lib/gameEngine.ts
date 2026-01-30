@@ -218,10 +218,14 @@ export class VillageLedgerGame {
     sky: HTMLImageElement;
     backmid: HTMLImageElement;
     frontmid: HTMLImageElement;
+    tree1: HTMLImageElement;
+    tree2: HTMLImageElement;
   } = {
     sky: new Image(),
     backmid: new Image(),
-    frontmid: new Image()
+    frontmid: new Image(),
+    tree1: new Image(),
+    tree2: new Image()
   };
   private parallaxLoaded: boolean = false;
   
@@ -270,18 +274,22 @@ export class VillageLedgerGame {
     this.parallaxLayers.sky.src = '/sky.png';
     this.parallaxLayers.backmid.src = '/backmid.png';
     this.parallaxLayers.frontmid.src = '/frontmid.png';
+    this.parallaxLayers.tree1.src = '/tree1.png';
+    this.parallaxLayers.tree2.src = '/tree2.png';
     
     // Track when all layers are loaded
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 3) {
+      if (loadedCount >= 5) {
         this.parallaxLoaded = true;
       }
     };
     this.parallaxLayers.sky.onload = checkAllLoaded;
     this.parallaxLayers.backmid.onload = checkAllLoaded;
     this.parallaxLayers.frontmid.onload = checkAllLoaded;
+    this.parallaxLayers.tree1.onload = checkAllLoaded;
+    this.parallaxLayers.tree2.onload = checkAllLoaded;
 
     // Initialize player at home (far left)
     this.player = {
@@ -5449,12 +5457,13 @@ export class VillageLedgerGame {
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
       // Calculate parallax offsets
-      // Sky stays static, mountains move slowly, ground moves with camera
-      const skyOffset = this.cameraX * 0;
-      const backmidOffset = this.cameraX * 0.15;
+      // Sky moves very slowly (0.1x), ground moves with camera (1.0x)
+      // Foreground trees move faster than camera (1.5x) for depth effect
+      const skyOffset = this.cameraX * 0.1;
       const frontmidOffset = this.cameraX * 1.0;
+      const foregroundOffset = this.cameraX * 1.5;
       
-      // Sky layer - static, positioned at top
+      // Sky layer - slow parallax, positioned at top
       const skyWidth = this.parallaxLayers.sky.naturalWidth;
       const skyHeight = this.parallaxLayers.sky.naturalHeight;
       this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, skyWidth, skyHeight, 0, w);
@@ -5464,6 +5473,9 @@ export class VillageLedgerGame {
       const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
       const frontYOffset = h - this.dialogueBoxHeight - frontHeight;
       this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, frontWidth, frontHeight, frontYOffset, w);
+      
+      // Draw foreground trees (extreme foreground, fast parallax)
+      this.drawForegroundTrees(ctx, foregroundOffset, h);
     } else {
       // Fallback solid background while loading
       ctx.fillStyle = '#87CEEB';
@@ -5472,6 +5484,34 @@ export class VillageLedgerGame {
     
     // Re-enable image smoothing for other elements
     ctx.imageSmoothingEnabled = true;
+  }
+  
+  private drawForegroundTrees(ctx: CanvasRenderingContext2D, offset: number, canvasHeight: number): void {
+    const tree1 = this.parallaxLayers.tree1;
+    const tree2 = this.parallaxLayers.tree2;
+    
+    // Position trees at specific world positions - they will scroll past quickly
+    // Tree positions in world coordinates (spread across the 3500px world)
+    const treePositions = [
+      { img: tree1, worldX: 200 },
+      { img: tree2, worldX: 800 },
+      { img: tree1, worldX: 1500 },
+      { img: tree2, worldX: 2200 },
+      { img: tree1, worldX: 2900 },
+      { img: tree2, worldX: 3400 }
+    ];
+    
+    const treeYOffset = canvasHeight - this.dialogueBoxHeight - tree1.naturalHeight;
+    
+    for (const tree of treePositions) {
+      // Calculate screen position with fast parallax offset
+      const screenX = tree.worldX - offset;
+      
+      // Only draw if visible on screen (with some buffer)
+      if (screenX > -tree.img.naturalWidth && screenX < this.logicalWidth + 100) {
+        ctx.drawImage(tree.img, screenX, treeYOffset);
+      }
+    }
   }
   
   private drawParallaxLayer(

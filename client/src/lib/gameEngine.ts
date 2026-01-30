@@ -5463,13 +5463,10 @@ export class VillageLedgerGame {
       // Images are designed to overlay with transparent areas
       const yOffset = 0;
       
-      // Draw sky layer (farthest back, slowest parallax)
+      // Draw sky layer (static background)
       this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, imgWidth, imgHeight, yOffset, w);
       
-      // Draw backmid layer (mountains)
-      this.drawParallaxLayer(ctx, this.parallaxLayers.backmid, backmidOffset, imgWidth, imgHeight, yOffset, w);
-      
-      // Draw frontmid layer (closest, fastest parallax)
+      // Draw frontmid layer (ground, moves with camera)
       this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, imgWidth, imgHeight, yOffset, w);
     } else {
       // Fallback solid background while loading

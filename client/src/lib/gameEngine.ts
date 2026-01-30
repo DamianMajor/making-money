@@ -4171,6 +4171,12 @@ export class VillageLedgerGame {
     // Clear canvas (use full device pixel size for complete clear)
     ctx.clearRect(0, 0, w, h);
 
+    // Show loading screen while parallax images are loading
+    if (!this.parallaxLoaded) {
+      this.drawLoadingScreen(ctx, w, h);
+      return;
+    }
+
     // Draw sky gradient
     const skyGradient = ctx.createLinearGradient(0, 0, 0, h - this.dialogueBoxHeight);
     skyGradient.addColorStop(0, '#87CEEB');
@@ -4260,6 +4266,14 @@ export class VillageLedgerGame {
     // Draw trade selection popup if active
     if (this.state.showTradeSelection) {
       this.drawTradeSelectionPopup(ctx);
+    }
+    
+    // Draw foreground trees LAST (in front of all game elements, behind UI)
+    if (this.parallaxLoaded) {
+      const foregroundOffset = this.cameraX * 2.5;
+      ctx.imageSmoothingEnabled = false;
+      this.drawForegroundTrees(ctx, foregroundOffset, h);
+      ctx.imageSmoothingEnabled = true;
     }
 
     // Draw badge popup if active
@@ -5474,8 +5488,7 @@ export class VillageLedgerGame {
       const frontYOffset = h - this.dialogueBoxHeight - frontHeight;
       this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, frontWidth, frontHeight, frontYOffset, w);
       
-      // Draw foreground trees (extreme foreground, fast parallax)
-      this.drawForegroundTrees(ctx, foregroundOffset, h);
+      // Note: Foreground trees are drawn separately in render() AFTER all game elements
     } else {
       // Fallback solid background while loading
       ctx.fillStyle = '#87CEEB';
@@ -5486,6 +5499,26 @@ export class VillageLedgerGame {
     ctx.imageSmoothingEnabled = true;
   }
   
+  private drawLoadingScreen(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    // Dark brown background matching game aesthetic
+    ctx.fillStyle = '#3D2817';
+    ctx.fillRect(0, 0, w, h);
+    
+    // Title
+    ctx.fillStyle = '#D4A574';
+    ctx.font = 'bold 32px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('VILLAGE LEDGER', w / 2, h / 2 - 40);
+    
+    // Loading text with animated dots
+    const dots = '.'.repeat(Math.floor(Date.now() / 400) % 4);
+    ctx.font = '20px "Courier New", monospace';
+    ctx.fillStyle = '#A88B5A';
+    ctx.fillText('Loading' + dots, w / 2, h / 2 + 20);
+    
+    ctx.textAlign = 'left';
+  }
+
   private drawForegroundTrees(ctx: CanvasRenderingContext2D, offset: number, canvasHeight: number): void {
     const tree1 = this.parallaxLayers.tree1;
     const tree2 = this.parallaxLayers.tree2;

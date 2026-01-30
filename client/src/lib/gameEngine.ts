@@ -5458,10 +5458,10 @@ export class VillageLedgerGame {
     if (this.parallaxLoaded) {
       // Calculate parallax offsets
       // Sky moves very slowly (0.1x), ground moves with camera (1.0x)
-      // Foreground trees move faster than camera (1.5x) for depth effect
+      // Foreground trees move much faster than camera (2.5x) for close-up depth effect
       const skyOffset = this.cameraX * 0.1;
       const frontmidOffset = this.cameraX * 1.0;
-      const foregroundOffset = this.cameraX * 1.5;
+      const foregroundOffset = this.cameraX * 2.5;
       
       // Sky layer - slow parallax, positioned at top
       const skyWidth = this.parallaxLayers.sky.naturalWidth;
@@ -5490,15 +5490,10 @@ export class VillageLedgerGame {
     const tree1 = this.parallaxLayers.tree1;
     const tree2 = this.parallaxLayers.tree2;
     
-    // Position trees at specific world positions - they will scroll past quickly
-    // Tree positions in world coordinates (spread across the 3500px world)
+    // Each tree appears only once, spread across the world
     const treePositions = [
-      { img: tree1, worldX: 200 },
-      { img: tree2, worldX: 800 },
-      { img: tree1, worldX: 1500 },
-      { img: tree2, worldX: 2200 },
-      { img: tree1, worldX: 2900 },
-      { img: tree2, worldX: 3400 }
+      { img: tree1, worldX: 600 },
+      { img: tree2, worldX: 2400 }
     ];
     
     const treeYOffset = canvasHeight - this.dialogueBoxHeight - tree1.naturalHeight;

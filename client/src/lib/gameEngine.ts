@@ -280,7 +280,7 @@ export class VillageLedgerGame {
     this.parallaxLayers.tree2.src = '/tree2.png';
     this.parallaxLayers.tree3.src = '/tree3.png';
     
-    // Track when all layers are loaded
+    // Track when all layers are loaded (or failed - proceed anyway)
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
@@ -288,12 +288,19 @@ export class VillageLedgerGame {
         this.parallaxLoaded = true;
       }
     };
-    this.parallaxLayers.sky.onload = checkAllLoaded;
-    this.parallaxLayers.backmid.onload = checkAllLoaded;
-    this.parallaxLayers.frontmid.onload = checkAllLoaded;
-    this.parallaxLayers.tree1.onload = checkAllLoaded;
-    this.parallaxLayers.tree2.onload = checkAllLoaded;
-    this.parallaxLayers.tree3.onload = checkAllLoaded;
+    // Count both successful loads and errors to prevent blocking
+    const images = [
+      this.parallaxLayers.sky,
+      this.parallaxLayers.backmid, 
+      this.parallaxLayers.frontmid,
+      this.parallaxLayers.tree1,
+      this.parallaxLayers.tree2,
+      this.parallaxLayers.tree3
+    ];
+    images.forEach(img => {
+      img.onload = checkAllLoaded;
+      img.onerror = checkAllLoaded; // Count errors too so we don't get stuck
+    });
 
     // Initialize player at home (far left)
     this.player = {

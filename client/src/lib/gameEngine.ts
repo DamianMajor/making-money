@@ -220,12 +220,14 @@ export class VillageLedgerGame {
     frontmid: HTMLImageElement;
     tree1: HTMLImageElement;
     tree2: HTMLImageElement;
+    tree3: HTMLImageElement;
   } = {
     sky: new Image(),
     backmid: new Image(),
     frontmid: new Image(),
     tree1: new Image(),
-    tree2: new Image()
+    tree2: new Image(),
+    tree3: new Image()
   };
   private parallaxLoaded: boolean = false;
   
@@ -276,12 +278,13 @@ export class VillageLedgerGame {
     this.parallaxLayers.frontmid.src = '/frontmid.png';
     this.parallaxLayers.tree1.src = '/tree1.png';
     this.parallaxLayers.tree2.src = '/tree2.png';
+    this.parallaxLayers.tree3.src = '/tree3.png';
     
     // Track when all layers are loaded
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 5) {
+      if (loadedCount >= 6) {
         this.parallaxLoaded = true;
       }
     };
@@ -290,6 +293,7 @@ export class VillageLedgerGame {
     this.parallaxLayers.frontmid.onload = checkAllLoaded;
     this.parallaxLayers.tree1.onload = checkAllLoaded;
     this.parallaxLayers.tree2.onload = checkAllLoaded;
+    this.parallaxLayers.tree3.onload = checkAllLoaded;
 
     // Initialize player at home (far left)
     this.player = {
@@ -5522,11 +5526,13 @@ export class VillageLedgerGame {
   private drawForegroundTrees(ctx: CanvasRenderingContext2D, offset: number, canvasHeight: number): void {
     const tree1 = this.parallaxLayers.tree1;
     const tree2 = this.parallaxLayers.tree2;
+    const tree3 = this.parallaxLayers.tree3;
     
     // Each tree appears only once, spread across the world
     const treePositions = [
-      { img: tree1, worldX: 600 },
-      { img: tree2, worldX: 2400 }
+      { img: tree1, worldX: 400 },
+      { img: tree2, worldX: 1600 },
+      { img: tree3, worldX: 2800 }
     ];
     
     const treeYOffset = canvasHeight - this.dialogueBoxHeight - tree1.naturalHeight;

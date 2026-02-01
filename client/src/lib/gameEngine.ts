@@ -5532,13 +5532,12 @@ export class VillageLedgerGame {
 
   private drawForegroundTrees(ctx: CanvasRenderingContext2D, offset: number, canvasHeight: number): void {
     const tree1 = this.parallaxLayers.tree1;
-    const tree2 = this.parallaxLayers.tree2;
     
-    // Only two trees, positioned at far edges so they don't block sprites in middle
-    // With 2.5x parallax, trees at these positions will only appear at world edges
+    // Use same tree image twice, positioned to avoid blocking sprites
+    // Second tree moved left to not cover pond/fisherman area (fisherman ~3150)
     const treePositions = [
       { img: tree1, worldX: -300 },   // Far left edge
-      { img: tree2, worldX: 3200 }    // Far right edge
+      { img: tree1, worldX: 2600 }    // Right side, before fisherman/pond
     ];
     
     // Target height: from top (0) to top of dialogue box

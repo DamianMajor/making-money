@@ -4253,8 +4253,16 @@ export class VillageLedgerGame {
     if (this.inventoryPopup) {
       this.drawInventoryPopup(ctx);
     }
+    
+    // Draw foreground trees (in front of game elements, but BEHIND UI)
+    if (this.parallaxLoaded) {
+      const foregroundOffset = this.cameraX * 2.5;
+      ctx.imageSmoothingEnabled = false;
+      this.drawForegroundTrees(ctx, foregroundOffset, h);
+      ctx.imageSmoothingEnabled = true;
+    }
 
-    // Draw inventory HUD at top of screen
+    // Draw inventory HUD at top of screen (on top of trees)
     this.drawInventoryHUD(ctx);
     
     // Draw inventory hint if active (popup with arrow pointing to inventory)
@@ -4277,14 +4285,6 @@ export class VillageLedgerGame {
     // Draw trade selection popup if active
     if (this.state.showTradeSelection) {
       this.drawTradeSelectionPopup(ctx);
-    }
-    
-    // Draw foreground trees LAST (in front of all game elements, behind UI)
-    if (this.parallaxLoaded) {
-      const foregroundOffset = this.cameraX * 2.5;
-      ctx.imageSmoothingEnabled = false;
-      this.drawForegroundTrees(ctx, foregroundOffset, h);
-      ctx.imageSmoothingEnabled = true;
     }
 
     // Draw badge popup if active
@@ -5542,7 +5542,8 @@ export class VillageLedgerGame {
       { img: tree3, worldX: 2800 }
     ];
     
-    const treeYOffset = canvasHeight - this.dialogueBoxHeight - tree1.naturalHeight;
+    // Align trees to top of screen (Y=0)
+    const treeYOffset = 0;
     
     for (const tree of treePositions) {
       // Calculate screen position with fast parallax offset

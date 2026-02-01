@@ -5535,23 +5535,29 @@ export class VillageLedgerGame {
     const tree2 = this.parallaxLayers.tree2;
     const tree3 = this.parallaxLayers.tree3;
     
-    // Each tree appears only once, spread across the world
+    // Spread trees far apart so only one visible at a time
+    // Positions chosen to avoid overlapping with game sprites (Home ~150, NPCs spread 500-3200)
     const treePositions = [
-      { img: tree1, worldX: 400 },
-      { img: tree2, worldX: 1600 },
-      { img: tree3, worldX: 2800 }
+      { img: tree1, worldX: -200 },   // Far left, appears when walking right
+      { img: tree2, worldX: 1100 },   // Middle area, between NPCs
+      { img: tree3, worldX: 2500 }    // Right side, before fishing area
     ];
     
-    // Align trees to top of screen (Y=0)
-    const treeYOffset = 0;
+    // Target height: from top (0) to top of dialogue box
+    const targetHeight = canvasHeight - this.dialogueBoxHeight;
     
     for (const tree of treePositions) {
       // Calculate screen position with fast parallax offset
       const screenX = tree.worldX - offset;
       
       // Only draw if visible on screen (with some buffer)
-      if (screenX > -tree.img.naturalWidth && screenX < this.logicalWidth + 100) {
-        ctx.drawImage(tree.img, screenX, treeYOffset);
+      if (screenX > -tree.img.naturalWidth * 2 && screenX < this.logicalWidth + 100) {
+        // Scale tree to fill full height from top to dialogue box
+        const scaleY = targetHeight / tree.img.naturalHeight;
+        const scaledWidth = tree.img.naturalWidth * scaleY;
+        
+        ctx.drawImage(tree.img, 0, 0, tree.img.naturalWidth, tree.img.naturalHeight,
+                      screenX, 0, scaledWidth, targetHeight);
       }
     }
   }

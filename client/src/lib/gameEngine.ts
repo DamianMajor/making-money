@@ -5502,11 +5502,14 @@ export class VillageLedgerGame {
       this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, skyWidth, skyHeight, 0, w);
       
       // Thin trees layer - between background and midground (further back)
-      // Scale horizontally to 75% to make trunks appear thinner
-      const thinWidth = this.parallaxLayers.treesThin.naturalWidth * 0.75;
+      // Scale horizontally to 75% to make trunks appear thinner, no tiling
       const thinHeight = this.parallaxLayers.treesThin.naturalHeight;
       const thinYOffset = h - this.dialogueBoxHeight - thinHeight;
-      this.drawParallaxLayerScaled(ctx, this.parallaxLayers.treesThin, treesThinOffset, thinWidth, thinHeight, thinYOffset, w, 0.75);
+      const thinScaledWidth = this.parallaxLayers.treesThin.naturalWidth * 0.75;
+      const thinScreenX = -treesThinOffset;
+      ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, 
+        this.parallaxLayers.treesThin.naturalWidth, this.parallaxLayers.treesThin.naturalHeight,
+        thinScreenX, thinYOffset, thinScaledWidth, thinHeight);
       
       // Thick trees layer - between thin trees and midground (closer)
       const thickWidth = this.parallaxLayers.treesThick.naturalWidth;

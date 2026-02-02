@@ -217,6 +217,8 @@ export class VillageLedgerGame {
   private parallaxLayers: {
     sky: HTMLImageElement;
     backmid: HTMLImageElement;
+    treesThin: HTMLImageElement;
+    treesThick: HTMLImageElement;
     frontmid: HTMLImageElement;
     tree1: HTMLImageElement;
     tree2: HTMLImageElement;
@@ -224,6 +226,8 @@ export class VillageLedgerGame {
   } = {
     sky: new Image(),
     backmid: new Image(),
+    treesThin: new Image(),
+    treesThick: new Image(),
     frontmid: new Image(),
     tree1: new Image(),
     tree2: new Image(),
@@ -275,6 +279,8 @@ export class VillageLedgerGame {
     // Load parallax background layers
     this.parallaxLayers.sky.src = '/sky.png';
     this.parallaxLayers.backmid.src = '/backmid.png';
+    this.parallaxLayers.treesThin.src = '/trees-thin.png';
+    this.parallaxLayers.treesThick.src = '/trees-thick.png';
     this.parallaxLayers.frontmid.src = '/frontmid.png';
     this.parallaxLayers.tree1.src = '/tree1.png';
     this.parallaxLayers.tree2.src = '/tree2.png';
@@ -284,14 +290,16 @@ export class VillageLedgerGame {
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 6) {
+      if (loadedCount >= 8) {
         this.parallaxLoaded = true;
       }
     };
     // Count both successful loads and errors to prevent blocking
     const images = [
       this.parallaxLayers.sky,
-      this.parallaxLayers.backmid, 
+      this.parallaxLayers.backmid,
+      this.parallaxLayers.treesThin,
+      this.parallaxLayers.treesThick,
       this.parallaxLayers.frontmid,
       this.parallaxLayers.tree1,
       this.parallaxLayers.tree2,
@@ -5481,17 +5489,29 @@ export class VillageLedgerGame {
     
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
-      // Calculate parallax offsets
-      // Sky moves very slowly (0.1x), ground moves with camera (1.0x)
-      // Foreground trees move much faster than camera (2.5x) for close-up depth effect
+      // Calculate parallax offsets - layers from back to front
+      // Sky (0.1x) -> Thin trees (0.3x) -> Thick trees (0.5x) -> Midground (1.0x)
       const skyOffset = this.cameraX * 0.1;
+      const treesThinOffset = this.cameraX * 0.3;   // Further back, slower
+      const treesThickOffset = this.cameraX * 0.5;  // Closer, faster
       const frontmidOffset = this.cameraX * 1.0;
-      const foregroundOffset = this.cameraX * 2.5;
       
       // Sky layer - slow parallax, positioned at top
       const skyWidth = this.parallaxLayers.sky.naturalWidth;
       const skyHeight = this.parallaxLayers.sky.naturalHeight;
       this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, skyWidth, skyHeight, 0, w);
+      
+      // Thin trees layer - between background and midground (further back)
+      const thinWidth = this.parallaxLayers.treesThin.naturalWidth;
+      const thinHeight = this.parallaxLayers.treesThin.naturalHeight;
+      const thinYOffset = h - this.dialogueBoxHeight - thinHeight;
+      this.drawParallaxLayer(ctx, this.parallaxLayers.treesThin, treesThinOffset, thinWidth, thinHeight, thinYOffset, w);
+      
+      // Thick trees layer - between thin trees and midground (closer)
+      const thickWidth = this.parallaxLayers.treesThick.naturalWidth;
+      const thickHeight = this.parallaxLayers.treesThick.naturalHeight;
+      const thickYOffset = h - this.dialogueBoxHeight - thickHeight;
+      this.drawParallaxLayer(ctx, this.parallaxLayers.treesThick, treesThickOffset, thickWidth, thickHeight, thickYOffset, w);
       
       // Frontmid layer - moves with camera, bottom aligned with top of dialogue box
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;

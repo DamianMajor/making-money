@@ -5502,10 +5502,11 @@ export class VillageLedgerGame {
       this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, skyWidth, skyHeight, 0, w);
       
       // Thin trees layer - between background and midground (further back)
-      const thinWidth = this.parallaxLayers.treesThin.naturalWidth;
+      // Scale horizontally to 75% to make trunks appear thinner
+      const thinWidth = this.parallaxLayers.treesThin.naturalWidth * 0.75;
       const thinHeight = this.parallaxLayers.treesThin.naturalHeight;
       const thinYOffset = h - this.dialogueBoxHeight - thinHeight;
-      this.drawParallaxLayer(ctx, this.parallaxLayers.treesThin, treesThinOffset, thinWidth, thinHeight, thinYOffset, w);
+      this.drawParallaxLayerScaled(ctx, this.parallaxLayers.treesThin, treesThinOffset, thinWidth, thinHeight, thinYOffset, w, 0.75);
       
       // Thick trees layer - between thin trees and midground (closer)
       const thickWidth = this.parallaxLayers.treesThick.naturalWidth;
@@ -5599,6 +5600,33 @@ export class VillageLedgerGame {
     // Handle left edge if needed
     if (startX > 0) {
       ctx.drawImage(img, startX - imgWidth, yOffset);
+    }
+  }
+  
+  private drawParallaxLayerScaled(
+    ctx: CanvasRenderingContext2D, 
+    img: HTMLImageElement, 
+    offset: number,
+    imgWidth: number,
+    imgHeight: number,
+    yOffset: number,
+    screenWidth: number,
+    scaleX: number
+  ): void {
+    // Calculate scaled dimensions
+    const scaledWidth = img.naturalWidth * scaleX;
+    
+    // Calculate starting X position with wrapping for seamless scrolling
+    const startX = -(offset % scaledWidth);
+    
+    // Draw scaled horizontally
+    for (let x = startX; x < screenWidth; x += scaledWidth) {
+      ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, x, yOffset, scaledWidth, imgHeight);
+    }
+    
+    // Handle left edge if needed
+    if (startX > 0) {
+      ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, startX - scaledWidth, yOffset, scaledWidth, imgHeight);
     }
   }
 

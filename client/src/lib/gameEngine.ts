@@ -5497,10 +5497,10 @@ export class VillageLedgerGame {
       const frontmidOffset = this.cameraX * 1.0;
       
       // Background layer - slow parallax, positioned so forest floor is visible above dialogue box
-      // No stretching, no tiling - draw at natural size
+      // No stretching, no tiling - draw at natural size, shifted up 200px
       const skyWidth = this.parallaxLayers.sky.naturalWidth;
       const skyHeight = this.parallaxLayers.sky.naturalHeight;
-      const skyYOffset = h - this.dialogueBoxHeight - skyHeight;
+      const skyYOffset = h - this.dialogueBoxHeight - skyHeight - 200;
       const skyScreenX = -skyOffset;
       ctx.drawImage(this.parallaxLayers.sky, skyScreenX, skyYOffset);
       

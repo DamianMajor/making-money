@@ -5528,13 +5528,6 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       
-      // Shrubs layer - between trees and footpath, positioned 140px lower
-      const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
-      const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
-      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsHeight + 140;
-      const shrubsScreenX = -frontmidOffset;
-      ctx.drawImage(this.parallaxLayers.shrubs, shrubsScreenX, shrubsYOffset);
-      
       // Frontmid layer (footpath) - moves with camera, bottom aligned with top of dialogue box
       // No scaling - 3500px width matches world width
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
@@ -5542,6 +5535,13 @@ export class VillageLedgerGame {
       const frontYOffset = h - this.dialogueBoxHeight - frontHeight;
       const frontScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.frontmid, frontScreenX, frontYOffset);
+      
+      // Shrubs layer - on top of footpath, positioned 140px lower
+      const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
+      const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
+      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsHeight + 140;
+      const shrubsScreenX = -frontmidOffset;
+      ctx.drawImage(this.parallaxLayers.shrubs, shrubsScreenX, shrubsYOffset);
       
       // Note: Foreground trees are drawn separately in render() AFTER all game elements
     } else {

@@ -5529,31 +5529,23 @@ export class VillageLedgerGame {
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       
       // Shrubs layer - behind footpath, compressed vertically by 20%, positioned 25px lower
-      // Dimmed to 85% opacity to reduce rim lighting brightness
       const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
       const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
       const shrubsScaledHeight = shrubsHeight * 0.8;
       const shrubsYOffset = h - this.dialogueBoxHeight - shrubsScaledHeight + 25;
       const shrubsScreenX = -frontmidOffset;
-      ctx.save();
-      ctx.globalAlpha = 0.85;
       ctx.drawImage(this.parallaxLayers.shrubs, 0, 0, shrubsWidth, shrubsHeight,
         shrubsScreenX, shrubsYOffset, shrubsWidth, shrubsScaledHeight);
-      ctx.restore();
       
       // Frontmid layer (footpath) - moves with camera, bottom aligned with top of dialogue box
       // Compressed vertically by 20% (80% height), drawn on top of shrubs
-      // Dimmed to 90% opacity to reduce brightness
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
       const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
       const frontScaledHeight = frontHeight * 0.8;
       const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight;
       const frontScreenX = -frontmidOffset;
-      ctx.save();
-      ctx.globalAlpha = 0.9;
       ctx.drawImage(this.parallaxLayers.frontmid, 0, 0, frontWidth, frontHeight,
         frontScreenX, frontYOffset, frontWidth, frontScaledHeight);
-      ctx.restore();
       
       // Note: Foreground trees are drawn separately in render() AFTER all game elements
     } else {

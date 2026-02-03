@@ -5528,12 +5528,14 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       
-      // Shrubs layer - behind footpath, positioned 25px lower
+      // Shrubs layer - behind footpath, compressed vertically by 20%, positioned 25px lower
       const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
       const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
-      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsHeight + 25;
+      const shrubsScaledHeight = shrubsHeight * 0.8;
+      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsScaledHeight + 25;
       const shrubsScreenX = -frontmidOffset;
-      ctx.drawImage(this.parallaxLayers.shrubs, shrubsScreenX, shrubsYOffset);
+      ctx.drawImage(this.parallaxLayers.shrubs, 0, 0, shrubsWidth, shrubsHeight,
+        shrubsScreenX, shrubsYOffset, shrubsWidth, shrubsScaledHeight);
       
       // Frontmid layer (footpath) - moves with camera, bottom aligned with top of dialogue box
       // Compressed vertically by 20% (80% height), drawn on top of shrubs

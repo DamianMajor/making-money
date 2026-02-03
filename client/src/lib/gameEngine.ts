@@ -219,7 +219,6 @@ export class VillageLedgerGame {
     backmid: HTMLImageElement;
     treesThin: HTMLImageElement;
     treesThick: HTMLImageElement;
-    shrubs: HTMLImageElement;
     frontmid: HTMLImageElement;
     tree1: HTMLImageElement;
     tree2: HTMLImageElement;
@@ -229,7 +228,6 @@ export class VillageLedgerGame {
     backmid: new Image(),
     treesThin: new Image(),
     treesThick: new Image(),
-    shrubs: new Image(),
     frontmid: new Image(),
     tree1: new Image(),
     tree2: new Image(),
@@ -283,7 +281,6 @@ export class VillageLedgerGame {
     this.parallaxLayers.backmid.src = '/backmid.png';
     this.parallaxLayers.treesThin.src = '/trees-thin.png';
     this.parallaxLayers.treesThick.src = '/trees-thick.png';
-    this.parallaxLayers.shrubs.src = '/shrubs.png';
     this.parallaxLayers.frontmid.src = '/frontmid.png';
     this.parallaxLayers.tree1.src = '/tree1.png';
     this.parallaxLayers.tree2.src = '/tree2.png';
@@ -293,7 +290,7 @@ export class VillageLedgerGame {
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 9) {
+      if (loadedCount >= 8) {
         this.parallaxLoaded = true;
       }
     };
@@ -303,7 +300,6 @@ export class VillageLedgerGame {
       this.parallaxLayers.backmid,
       this.parallaxLayers.treesThin,
       this.parallaxLayers.treesThick,
-      this.parallaxLayers.shrubs,
       this.parallaxLayers.frontmid,
       this.parallaxLayers.tree1,
       this.parallaxLayers.tree2,
@@ -5494,11 +5490,10 @@ export class VillageLedgerGame {
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
       // Calculate parallax offsets - layers from back to front
-      // Sky (0.1x) -> Thin trees (0.3x) -> Thick trees (0.5x) -> Shrubs (1.0x) -> Midground (1.0x)
+      // Sky (0.1x) -> Thin trees (0.3x) -> Thick trees (0.5x) -> Frontmid+Shrubs (1.0x)
       const skyOffset = this.cameraX * 0.1;
       const treesThinOffset = this.cameraX * 0.3;   // Further back, slower
       const treesThickOffset = this.cameraX * 0.5;  // Closer, faster
-      const shrubsOffset = this.cameraX * 1.0;      // Locked to frontmid path
       const frontmidOffset = this.cameraX * 1.0;
       
       // Sky layer - slow parallax, positioned at top, stretched to 125% vertical height
@@ -5542,27 +5537,13 @@ export class VillageLedgerGame {
       ctx.fillStyle = 'rgba(200, 210, 220, 0.15)';
       ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
       
-      // Shrubs layer - between thick trees and frontmid, positioned near top of path
-      const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
-      const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
-      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsHeight - 30;
-      const shrubsScreenX = -shrubsOffset;
-      ctx.drawImage(this.parallaxLayers.shrubs, shrubsScreenX, shrubsYOffset);
-      
-      // Light haze on shrubs (subtle - closest to foreground)
-      ctx.fillStyle = 'rgba(200, 210, 220, 0.05)';
-      ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
-      
-      // Frontmid layer - moves with camera, bottom aligned with top of dialogue box
-      // Compressed to 50% vertical height, no tiling (3500px matches world width)
+      // Frontmid layer (with merged shrubs) - moves with camera, bottom aligned with top of dialogue box
+      // No scaling - 3500px width matches world width, shrubs are pre-merged
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
       const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
-      const frontScaledHeight = frontHeight * 0.5;
-      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight;
+      const frontYOffset = h - this.dialogueBoxHeight - frontHeight;
       const frontScreenX = -frontmidOffset;
-      ctx.drawImage(this.parallaxLayers.frontmid, 
-        0, 0, frontWidth, frontHeight,
-        frontScreenX, frontYOffset, frontWidth, frontScaledHeight);
+      ctx.drawImage(this.parallaxLayers.frontmid, frontScreenX, frontYOffset);
       
       // Note: Foreground trees are drawn separately in render() AFTER all game elements
     } else {

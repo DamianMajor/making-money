@@ -5536,12 +5536,14 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.shrubs, shrubsScreenX, shrubsYOffset);
       
       // Frontmid layer (footpath) - moves with camera, bottom aligned with top of dialogue box
-      // No scaling - 3500px width matches world width, drawn on top of shrubs
+      // Compressed vertically by 20% (80% height), drawn on top of shrubs
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
       const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
-      const frontYOffset = h - this.dialogueBoxHeight - frontHeight;
+      const frontScaledHeight = frontHeight * 0.8;
+      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight;
       const frontScreenX = -frontmidOffset;
-      ctx.drawImage(this.parallaxLayers.frontmid, frontScreenX, frontYOffset);
+      ctx.drawImage(this.parallaxLayers.frontmid, 0, 0, frontWidth, frontHeight,
+        frontScreenX, frontYOffset, frontWidth, frontScaledHeight);
       
       // Note: Foreground trees are drawn separately in render() AFTER all game elements
     } else {

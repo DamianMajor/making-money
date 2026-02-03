@@ -5502,11 +5502,11 @@ export class VillageLedgerGame {
       this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, skyWidth, skyHeight, 0, w);
       
       // Thin trees layer - between background and midground (further back)
-      // Scale horizontally to 75% to make trunks appear thinner, no tiling, offset +400px
+      // Scale horizontally to 75% to make trunks appear thinner, no tiling, offset +150px
       const thinHeight = this.parallaxLayers.treesThin.naturalHeight;
       const thinYOffset = h - this.dialogueBoxHeight - thinHeight;
       const thinScaledWidth = this.parallaxLayers.treesThin.naturalWidth * 0.75;
-      const thinScreenX = -treesThinOffset + 400;
+      const thinScreenX = -treesThinOffset + 150;
       ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, 
         this.parallaxLayers.treesThin.naturalWidth, this.parallaxLayers.treesThin.naturalHeight,
         thinScreenX, thinYOffset, thinScaledWidth, thinHeight);
@@ -5561,32 +5561,7 @@ export class VillageLedgerGame {
   }
 
   private drawForegroundTrees(ctx: CanvasRenderingContext2D, offset: number, canvasHeight: number): void {
-    const tree1 = this.parallaxLayers.tree1;
-    
-    // Use same tree image twice, positioned to avoid blocking sprites
-    // Second tree moved left to not cover pond/fisherman area (fisherman ~3150)
-    const treePositions = [
-      { img: tree1, worldX: -300 },   // Far left edge
-      { img: tree1, worldX: 2600 }    // Right side, before fisherman/pond
-    ];
-    
-    // Target height: from top (0) to top of dialogue box
-    const targetHeight = canvasHeight - this.dialogueBoxHeight;
-    
-    for (const tree of treePositions) {
-      // Calculate screen position with fast parallax offset
-      const screenX = tree.worldX - offset;
-      
-      // Only draw if visible on screen (with some buffer)
-      if (screenX > -tree.img.naturalWidth * 2 && screenX < this.logicalWidth + 100) {
-        // Scale tree to fill full height from top to dialogue box
-        const scaleY = targetHeight / tree.img.naturalHeight;
-        const scaledWidth = tree.img.naturalWidth * scaleY;
-        
-        ctx.drawImage(tree.img, 0, 0, tree.img.naturalWidth, tree.img.naturalHeight,
-                      screenX, 0, scaledWidth, targetHeight);
-      }
-    }
+    // Foreground trees removed per user request
   }
   
   private drawParallaxLayer(

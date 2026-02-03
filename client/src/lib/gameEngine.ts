@@ -5515,20 +5515,20 @@ export class VillageLedgerGame {
       }
       
       // Thin trees layer - between background and midground (further back)
-      // Scale horizontally to 60% to make trunks appear thinner, no tiling, offset +500px
+      // Scale horizontally to 50% to make trunks appear thinner, no tiling, offset +500px
       const thinHeight = this.parallaxLayers.treesThin.naturalHeight;
       const thinYOffset = h - this.dialogueBoxHeight - thinHeight;
-      const thinScaledWidth = this.parallaxLayers.treesThin.naturalWidth * 0.60;
+      const thinScaledWidth = this.parallaxLayers.treesThin.naturalWidth * 0.50;
       const thinScreenX = -treesThinOffset + 500;
       ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, 
         this.parallaxLayers.treesThin.naturalWidth, this.parallaxLayers.treesThin.naturalHeight,
         thinScreenX, thinYOffset, thinScaledWidth, thinHeight);
       
       // Thick trees layer - between thin trees and midground (closer)
-      // No tiling, offset 0px, scaled to 125% width
+      // No tiling, offset 0px, scaled to 90% width
       const thickWidth = this.parallaxLayers.treesThick.naturalWidth;
       const thickHeight = this.parallaxLayers.treesThick.naturalHeight;
-      const thickScaledWidth = thickWidth * 1.25;
+      const thickScaledWidth = thickWidth * 0.90;
       const thickYOffset = h - this.dialogueBoxHeight - thickHeight;
       const thickScreenX = -treesThickOffset + 0;
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickWidth, thickHeight,
@@ -5540,6 +5540,11 @@ export class VillageLedgerGame {
       const shrubsYOffset = h - this.dialogueBoxHeight - shrubsHeight - 30;
       const shrubsScreenX = -shrubsOffset;
       ctx.drawImage(this.parallaxLayers.shrubs, shrubsScreenX, shrubsYOffset);
+      
+      // Atmospheric haze overlay - covers thin trees, thick trees, and shrubs layers
+      // Creates depth by adding a subtle fog effect between background and foreground
+      ctx.fillStyle = 'rgba(200, 210, 220, 0.15)';
+      ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
       
       // Frontmid layer - moves with camera, bottom aligned with top of dialogue box
       // Compressed to 50% vertical height, no tiling (3500px matches world width)

@@ -220,6 +220,7 @@ export class VillageLedgerGame {
     treesThin: HTMLImageElement;
     treesThick: HTMLImageElement;
     frontmid: HTMLImageElement;
+    shrubs: HTMLImageElement;
     tree1: HTMLImageElement;
     tree2: HTMLImageElement;
     tree3: HTMLImageElement;
@@ -229,6 +230,7 @@ export class VillageLedgerGame {
     treesThin: new Image(),
     treesThick: new Image(),
     frontmid: new Image(),
+    shrubs: new Image(),
     tree1: new Image(),
     tree2: new Image(),
     tree3: new Image()
@@ -282,6 +284,7 @@ export class VillageLedgerGame {
     this.parallaxLayers.treesThin.src = '/trees-thin.png';
     this.parallaxLayers.treesThick.src = '/trees-thick.png';
     this.parallaxLayers.frontmid.src = '/frontmid.png';
+    this.parallaxLayers.shrubs.src = '/shrubs.png';
     this.parallaxLayers.tree1.src = '/tree1.png';
     this.parallaxLayers.tree2.src = '/tree2.png';
     this.parallaxLayers.tree3.src = '/tree3.png';
@@ -290,7 +293,7 @@ export class VillageLedgerGame {
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 8) {
+      if (loadedCount >= 9) {
         this.parallaxLoaded = true;
       }
     };
@@ -301,6 +304,7 @@ export class VillageLedgerGame {
       this.parallaxLayers.treesThin,
       this.parallaxLayers.treesThick,
       this.parallaxLayers.frontmid,
+      this.parallaxLayers.shrubs,
       this.parallaxLayers.tree1,
       this.parallaxLayers.tree2,
       this.parallaxLayers.tree3
@@ -5524,13 +5528,20 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       
-      // Frontmid layer (with merged shrubs) - moves with camera, bottom aligned with top of dialogue box
-      // No scaling - 3500px width matches world width, shrubs are pre-merged
+      // Frontmid layer (footpath) - moves with camera, bottom aligned with top of dialogue box
+      // No scaling - 3500px width matches world width
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
       const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
       const frontYOffset = h - this.dialogueBoxHeight - frontHeight;
       const frontScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.frontmid, frontScreenX, frontYOffset);
+      
+      // Shrubs layer - separate from footpath, positioned 30px lower
+      const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
+      const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
+      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsHeight + 30;
+      const shrubsScreenX = -frontmidOffset;
+      ctx.drawImage(this.parallaxLayers.shrubs, shrubsScreenX, shrubsYOffset);
       
       // Note: Foreground trees are drawn separately in render() AFTER all game elements
     } else {

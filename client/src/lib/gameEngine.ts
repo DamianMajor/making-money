@@ -219,6 +219,7 @@ export class VillageLedgerGame {
     backmid: HTMLImageElement;
     treesThin: HTMLImageElement;
     treesThick: HTMLImageElement;
+    shrubs: HTMLImageElement;
     frontmid: HTMLImageElement;
     tree1: HTMLImageElement;
     tree2: HTMLImageElement;
@@ -228,6 +229,7 @@ export class VillageLedgerGame {
     backmid: new Image(),
     treesThin: new Image(),
     treesThick: new Image(),
+    shrubs: new Image(),
     frontmid: new Image(),
     tree1: new Image(),
     tree2: new Image(),
@@ -281,6 +283,7 @@ export class VillageLedgerGame {
     this.parallaxLayers.backmid.src = '/backmid.png';
     this.parallaxLayers.treesThin.src = '/trees-thin.png';
     this.parallaxLayers.treesThick.src = '/trees-thick.png';
+    this.parallaxLayers.shrubs.src = '/shrubs.png';
     this.parallaxLayers.frontmid.src = '/frontmid.png';
     this.parallaxLayers.tree1.src = '/tree1.png';
     this.parallaxLayers.tree2.src = '/tree2.png';
@@ -290,7 +293,7 @@ export class VillageLedgerGame {
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 8) {
+      if (loadedCount >= 9) {
         this.parallaxLoaded = true;
       }
     };
@@ -300,6 +303,7 @@ export class VillageLedgerGame {
       this.parallaxLayers.backmid,
       this.parallaxLayers.treesThin,
       this.parallaxLayers.treesThick,
+      this.parallaxLayers.shrubs,
       this.parallaxLayers.frontmid,
       this.parallaxLayers.tree1,
       this.parallaxLayers.tree2,
@@ -5490,10 +5494,11 @@ export class VillageLedgerGame {
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
       // Calculate parallax offsets - layers from back to front
-      // Sky (0.1x) -> Thin trees (0.3x) -> Thick trees (0.5x) -> Midground (1.0x)
+      // Sky (0.1x) -> Thin trees (0.3x) -> Thick trees (0.5x) -> Shrubs (0.75x) -> Midground (1.0x)
       const skyOffset = this.cameraX * 0.1;
       const treesThinOffset = this.cameraX * 0.3;   // Further back, slower
       const treesThickOffset = this.cameraX * 0.5;  // Closer, faster
+      const shrubsOffset = this.cameraX * 0.75;     // Between thick trees and frontmid
       const frontmidOffset = this.cameraX * 1.0;
       
       // Sky layer - slow parallax, positioned at top, stretched to 125% vertical height
@@ -5528,6 +5533,13 @@ export class VillageLedgerGame {
       const thickScreenX = -treesThickOffset + 0;
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickWidth, thickHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickHeight);
+      
+      // Shrubs layer - between thick trees and frontmid, bottom aligned
+      const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
+      const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
+      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsHeight;
+      const shrubsScreenX = -shrubsOffset;
+      ctx.drawImage(this.parallaxLayers.shrubs, shrubsScreenX, shrubsYOffset);
       
       // Frontmid layer - moves with camera, bottom aligned with top of dialogue box
       // Compressed to 50% vertical height, no tiling (3500px matches world width)

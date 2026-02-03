@@ -5519,10 +5519,12 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.treesThick, thickScreenX, thickYOffset);
       
       // Frontmid layer - moves with camera, bottom aligned with top of dialogue box
+      // Compressed to 50% vertical height
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
       const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
-      const frontYOffset = h - this.dialogueBoxHeight - frontHeight;
-      this.drawParallaxLayer(ctx, this.parallaxLayers.frontmid, frontmidOffset, frontWidth, frontHeight, frontYOffset, w);
+      const frontScaledHeight = frontHeight * 0.5;
+      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight;
+      this.drawParallaxLayerScaled(ctx, this.parallaxLayers.frontmid, frontmidOffset, frontWidth, frontHeight, frontScaledHeight, frontYOffset, w);
       
       // Note: Foreground trees are drawn separately in render() AFTER all game elements
     } else {

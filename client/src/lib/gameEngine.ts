@@ -5534,10 +5534,10 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickWidth, thickHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickHeight);
       
-      // Shrubs layer - between thick trees and frontmid, moved down 300px
+      // Shrubs layer - between thick trees and frontmid, moved down 175px
       const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
       const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
-      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsHeight + 300;
+      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsHeight + 175;
       const shrubsScreenX = -shrubsOffset;
       ctx.drawImage(this.parallaxLayers.shrubs, shrubsScreenX, shrubsYOffset);
       

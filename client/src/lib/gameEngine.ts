@@ -5496,46 +5496,29 @@ export class VillageLedgerGame {
       const treesThickOffset = this.cameraX * 0.5;  // Closer, faster
       const frontmidOffset = this.cameraX * 1.0;
       
-      // Sky layer - slow parallax, positioned at top, stretched to 125% vertical height
+      // Background layer - slow parallax, positioned so forest floor is visible above dialogue box
+      // No stretching, no tiling - draw at natural size
       const skyWidth = this.parallaxLayers.sky.naturalWidth;
       const skyHeight = this.parallaxLayers.sky.naturalHeight;
-      const skyScaledHeight = skyHeight * 1.25;
-      // Draw sky with vertical stretching, tiled horizontally
-      const skyStartX = -(skyOffset % skyWidth);
-      for (let x = skyStartX; x < w; x += skyWidth) {
-        ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight, x, 0, skyWidth, skyScaledHeight);
-      }
-      if (skyStartX > 0) {
-        ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight, skyStartX - skyWidth, 0, skyWidth, skyScaledHeight);
-      }
+      const skyYOffset = h - this.dialogueBoxHeight - skyHeight;
+      const skyScreenX = -skyOffset;
+      ctx.drawImage(this.parallaxLayers.sky, skyScreenX, skyYOffset);
       
       // Thin trees layer - between background and midground (further back)
-      // Scale horizontally to 50% to make trunks appear thinner, no tiling, offset +500px
+      // Draw at natural size, no scaling
+      const thinWidth = this.parallaxLayers.treesThin.naturalWidth;
       const thinHeight = this.parallaxLayers.treesThin.naturalHeight;
       const thinYOffset = h - this.dialogueBoxHeight - thinHeight;
-      const thinScaledWidth = this.parallaxLayers.treesThin.naturalWidth * 0.50;
-      const thinScreenX = -treesThinOffset + 500;
-      ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, 
-        this.parallaxLayers.treesThin.naturalWidth, this.parallaxLayers.treesThin.naturalHeight,
-        thinScreenX, thinYOffset, thinScaledWidth, thinHeight);
-      
-      // Haze on thin trees (strongest - furthest back)
-      ctx.fillStyle = 'rgba(200, 210, 220, 0.20)';
-      ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
+      const thinScreenX = -treesThinOffset;
+      ctx.drawImage(this.parallaxLayers.treesThin, thinScreenX, thinYOffset);
       
       // Thick trees layer - between thin trees and midground (closer)
-      // No tiling, offset 0px, scaled to 90% width
+      // Draw at natural size, no scaling
       const thickWidth = this.parallaxLayers.treesThick.naturalWidth;
       const thickHeight = this.parallaxLayers.treesThick.naturalHeight;
-      const thickScaledWidth = thickWidth * 0.90;
       const thickYOffset = h - this.dialogueBoxHeight - thickHeight;
-      const thickScreenX = -treesThickOffset + 0;
-      ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickWidth, thickHeight,
-        thickScreenX, thickYOffset, thickScaledWidth, thickHeight);
-      
-      // Haze on thick trees (medium)
-      ctx.fillStyle = 'rgba(200, 210, 220, 0.15)';
-      ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
+      const thickScreenX = -treesThickOffset;
+      ctx.drawImage(this.parallaxLayers.treesThick, thickScreenX, thickYOffset);
       
       // Frontmid layer (with merged shrubs) - moves with camera, bottom aligned with top of dialogue box
       // No scaling - 3500px width matches world width, shrubs are pre-merged

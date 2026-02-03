@@ -5524,6 +5524,10 @@ export class VillageLedgerGame {
         this.parallaxLayers.treesThin.naturalWidth, this.parallaxLayers.treesThin.naturalHeight,
         thinScreenX, thinYOffset, thinScaledWidth, thinHeight);
       
+      // Haze on thin trees (strongest - furthest back)
+      ctx.fillStyle = 'rgba(200, 210, 220, 0.20)';
+      ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
+      
       // Thick trees layer - between thin trees and midground (closer)
       // No tiling, offset 0px, scaled to 90% width
       const thickWidth = this.parallaxLayers.treesThick.naturalWidth;
@@ -5534,6 +5538,10 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickWidth, thickHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickHeight);
       
+      // Haze on thick trees (medium)
+      ctx.fillStyle = 'rgba(200, 210, 220, 0.15)';
+      ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
+      
       // Shrubs layer - between thick trees and frontmid, positioned near top of path
       const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
       const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
@@ -5541,9 +5549,8 @@ export class VillageLedgerGame {
       const shrubsScreenX = -shrubsOffset;
       ctx.drawImage(this.parallaxLayers.shrubs, shrubsScreenX, shrubsYOffset);
       
-      // Atmospheric haze overlay - covers thin trees, thick trees, and shrubs layers
-      // Creates depth by adding a subtle fog effect between background and foreground
-      ctx.fillStyle = 'rgba(200, 210, 220, 0.15)';
+      // Light haze on shrubs (subtle - closest to foreground)
+      ctx.fillStyle = 'rgba(200, 210, 220, 0.05)';
       ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
       
       // Frontmid layer - moves with camera, bottom aligned with top of dialogue box

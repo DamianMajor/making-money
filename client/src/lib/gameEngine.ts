@@ -5505,20 +5505,26 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.sky, skyScreenX, skyYOffset);
       
       // Thin trees layer - between background and midground (further back)
-      // Draw at natural size, no scaling
-      const thinWidth = this.parallaxLayers.treesThin.naturalWidth;
-      const thinHeight = this.parallaxLayers.treesThin.naturalHeight;
-      const thinYOffset = h - this.dialogueBoxHeight - thinHeight;
+      // Scale to 40% width so all trees fit on screen with 0.3x parallax
+      const thinNaturalWidth = this.parallaxLayers.treesThin.naturalWidth;
+      const thinNaturalHeight = this.parallaxLayers.treesThin.naturalHeight;
+      const thinScaledWidth = thinNaturalWidth * 0.4;
+      const thinScaledHeight = thinNaturalHeight * 0.4;
+      const thinYOffset = h - this.dialogueBoxHeight - thinScaledHeight;
       const thinScreenX = -treesThinOffset;
-      ctx.drawImage(this.parallaxLayers.treesThin, thinScreenX, thinYOffset);
+      ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, thinNaturalWidth, thinNaturalHeight,
+        thinScreenX, thinYOffset, thinScaledWidth, thinScaledHeight);
       
       // Thick trees layer - between thin trees and midground (closer)
-      // Draw at natural size, no scaling
-      const thickWidth = this.parallaxLayers.treesThick.naturalWidth;
-      const thickHeight = this.parallaxLayers.treesThick.naturalHeight;
-      const thickYOffset = h - this.dialogueBoxHeight - thickHeight;
+      // Scale to 50% width so all trees fit on screen with 0.5x parallax
+      const thickNaturalWidth = this.parallaxLayers.treesThick.naturalWidth;
+      const thickNaturalHeight = this.parallaxLayers.treesThick.naturalHeight;
+      const thickScaledWidth = thickNaturalWidth * 0.5;
+      const thickScaledHeight = thickNaturalHeight * 0.5;
+      const thickYOffset = h - this.dialogueBoxHeight - thickScaledHeight;
       const thickScreenX = -treesThickOffset;
-      ctx.drawImage(this.parallaxLayers.treesThick, thickScreenX, thickYOffset);
+      ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
+        thickScreenX, thickYOffset, thickScaledWidth, thickScaledHeight);
       
       // Frontmid layer (with merged shrubs) - moves with camera, bottom aligned with top of dialogue box
       // No scaling - 3500px width matches world width, shrubs are pre-merged

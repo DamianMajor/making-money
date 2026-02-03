@@ -155,7 +155,7 @@ export class VillageLedgerGame {
 
   // World dimensions - expanded for full narrative
   private worldWidth: number = 3500;
-  private groundHeight: number = 100;
+  private groundHeight: number = 60;
 
   // Logical dimensions (CSS pixels, not device pixels)
   private logicalWidth: number = 0;

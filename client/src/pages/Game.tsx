@@ -35,36 +35,34 @@ export default function Game() {
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 w-full overflow-hidden bg-background flex items-center justify-center"
+      className="fixed inset-0 w-full h-full overflow-hidden bg-background"
       data-testid="game-container"
     >
-      <div className="w-full relative" style={{ maxHeight: '770px', height: '770px' }}>
-        <canvas
-          ref={canvasRef}
-          className="w-full h-full touch-none select-none"
-          data-testid="game-canvas"
-          style={{ 
-            touchAction: 'none',
-            WebkitTouchCallout: 'none',
-            WebkitUserSelect: 'none',
-            userSelect: 'none'
-          }}
-        />
-        <div 
-          className="absolute top-4 left-4 flex items-center gap-3 px-4 py-3 rounded-md"
-          style={{ 
-            background: 'rgba(45, 35, 28, 0.9)',
-            border: '2px solid #8B7355'
-          }}
-          data-testid="game-title"
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full touch-none select-none"
+        data-testid="game-canvas"
+        style={{ 
+          touchAction: 'none',
+          WebkitTouchCallout: 'none',
+          WebkitUserSelect: 'none',
+          userSelect: 'none'
+        }}
+      />
+      <div 
+        className="absolute top-4 left-4 flex items-center gap-3 px-4 py-3 rounded-md"
+        style={{ 
+          background: 'rgba(45, 35, 28, 0.9)',
+          border: '2px solid #8B7355'
+        }}
+        data-testid="game-title"
+      >
+        <span 
+          className="font-bold text-[#C9B896]"
+          style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '10px' }}
         >
-          <span 
-            className="font-bold text-[#C9B896]"
-            style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '10px' }}
-          >
-            VILLAGE LEDGER
-          </span>
-        </div>
+          VILLAGE LEDGER
+        </span>
       </div>
     </div>
   );

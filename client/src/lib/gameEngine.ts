@@ -5496,10 +5496,18 @@ export class VillageLedgerGame {
       const treesThickOffset = this.cameraX * 0.5;  // Closer, faster
       const frontmidOffset = this.cameraX * 1.0;
       
-      // Sky layer - slow parallax, positioned at top
+      // Sky layer - slow parallax, positioned at top, stretched to 125% vertical height
       const skyWidth = this.parallaxLayers.sky.naturalWidth;
       const skyHeight = this.parallaxLayers.sky.naturalHeight;
-      this.drawParallaxLayer(ctx, this.parallaxLayers.sky, skyOffset, skyWidth, skyHeight, 0, w);
+      const skyScaledHeight = skyHeight * 1.25;
+      // Draw sky with vertical stretching, tiled horizontally
+      const skyStartX = -(skyOffset % skyWidth);
+      for (let x = skyStartX; x < w; x += skyWidth) {
+        ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight, x, 0, skyWidth, skyScaledHeight);
+      }
+      if (skyStartX > 0) {
+        ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight, skyStartX - skyWidth, 0, skyWidth, skyScaledHeight);
+      }
       
       // Thin trees layer - between background and midground (further back)
       // Scale horizontally to 75% to make trunks appear thinner, no tiling, offset -100px

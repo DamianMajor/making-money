@@ -3475,7 +3475,7 @@ export class VillageLedgerGame {
     this.logicalHeight = this.canvas.height;
 
     // Update UI dimensions based on logical canvas size
-    this.dialogueBoxHeight = this.logicalHeight * 0.2 + 30;
+    this.dialogueBoxHeight = this.logicalHeight * 0.2 + 50;
     this.hudWidth = Math.min(260, this.logicalWidth * 0.25);
     this.hudHeight = Math.min(185, this.logicalHeight * 0.25);
     this.interactButtonSize = Math.min(90, this.logicalWidth * 0.11); // 10% smaller
@@ -5516,12 +5516,14 @@ export class VillageLedgerGame {
       const frontmidOffset = this.cameraX * 1.0;
       
       // Background layer - slow parallax, starts at top of screen
-      // No stretching, no tiling - draw at natural size
+      // Stretched vertically by 20%, anchored at top
       const skyWidth = this.parallaxLayers.sky.naturalWidth;
       const skyHeight = this.parallaxLayers.sky.naturalHeight;
+      const skyScaledHeight = skyHeight * 1.2;
       const skyYOffset = 0;
       const skyScreenX = -skyOffset;
-      ctx.drawImage(this.parallaxLayers.sky, skyScreenX, skyYOffset);
+      ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight,
+        skyScreenX, skyYOffset, skyWidth, skyScaledHeight);
       
       // Thin trees layer - between background and midground (further back)
       // Full 100% width - original size
@@ -5562,12 +5564,12 @@ export class VillageLedgerGame {
       this.drawLayerHaze(ctx, w, h, 0.35);
       
       // Frontmid layer (footpath) - moves with camera
-      // Scaled to 92% height, bottom aligned with dialogue box top
+      // Scaled to 92% height, moved up 20px from dialogue box
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
       const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
       const frontScaledHeight = frontHeight * 0.92;
-      // Position so bottom of footpath meets top of dialogue box
-      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight;
+      // Position 20px above dialogue box
+      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight - 20;
       const frontScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.frontmid, 0, 0, frontWidth, frontHeight,
         frontScreenX, frontYOffset, frontWidth, frontScaledHeight);

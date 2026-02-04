@@ -5526,10 +5526,10 @@ export class VillageLedgerGame {
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
       // Calculate parallax offsets - layers from back to front
-      // Sky (0.1x) -> Thin trees (0.08x) -> Thick trees (0.18x) -> Fog (0.45x) -> Frontmid+Shrubs (1.0x)
-      const skyOffset = this.cameraX * 0.1;
-      const treesThinOffset = this.cameraX * 0.08;   // Very distant, slow parallax
-      const treesThickOffset = this.cameraX * 0.18;  // Distant, slower parallax
+      // Sky (0.05x) -> Thin trees (0.12x) -> Thick trees (0.22x) -> Fog (0.45x) -> Frontmid+Shrubs (1.0x)
+      const skyOffset = this.cameraX * 0.05;         // Furthest back, slowest
+      const treesThinOffset = this.cameraX * 0.12;   // Distant, but faster than sky
+      const treesThickOffset = this.cameraX * 0.22;  // Closer, faster than thin trees
       const fogOffset = this.cameraX * 0.45;         // Midground fog layer
       const frontmidOffset = this.cameraX * 1.0;
       

@@ -5588,6 +5588,12 @@ export class VillageLedgerGame {
       // Draw foreground dust particles (between thick trees and shrubs - behind shrubs/footpath/sprites)
       this.drawForegroundDustParticles(ctx, w, h);
       
+      // Solid ground fill beneath the path to prevent "dropping off" visual
+      // This fills any transparent areas at the bottom of the path image
+      const groundFillY = h - this.dialogueBoxHeight - this.groundHeight - 20;
+      ctx.fillStyle = '#2a2318'; // Dark earthy brown matching path edge
+      ctx.fillRect(0, groundFillY, w, this.groundHeight + 40);
+      
       // Combined path and shrubs layer - single image for efficiency
       const pathShrubsWidth = this.parallaxLayers.pathShrubs.naturalWidth;
       const pathShrubsHeight = this.parallaxLayers.pathShrubs.naturalHeight;

@@ -5559,7 +5559,7 @@ export class VillageLedgerGame {
       const thinNaturalHeight = this.parallaxLayers.treesThin.naturalHeight;
       const thinScaledWidth = thinNaturalWidth * 0.56;
       const thinYOffset = h - this.dialogueBoxHeight - thinNaturalHeight;
-      const thinScreenX = -treesThinOffset - 250; // Offset 250px to the left
+      const thinScreenX = -treesThinOffset + 50; // Offset 300px to the right from -250
       ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, thinNaturalWidth, thinNaturalHeight,
         thinScreenX, thinYOffset, thinScaledWidth, thinNaturalHeight);
       
@@ -5575,7 +5575,7 @@ export class VillageLedgerGame {
       const thickNaturalHeight = this.parallaxLayers.treesThick.naturalHeight;
       const thickScaledWidth = thickNaturalWidth * 0.56;
       const thickYOffset = h - this.dialogueBoxHeight - thickNaturalHeight;
-      const thickScreenX = -treesThickOffset - 100; // Offset 100px to the left
+      const thickScreenX = -treesThickOffset + 50; // Offset 150px to the right from -100
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       

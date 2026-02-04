@@ -5530,7 +5530,7 @@ export class VillageLedgerGame {
       const skyOffset = this.cameraX * 0.1;
       const treesThinOffset = this.cameraX * 0.15;   // Further back, slower
       const treesThickOffset = this.cameraX * 0.3;  // Closer, slightly faster
-      const frontmidOffset = this.cameraX * 0.7;
+      const frontmidOffset = this.cameraX * 1.0;
       
       // Background layer - slow parallax, starts at top of screen
       // Dynamically scale so the full image is viewable by far right of world

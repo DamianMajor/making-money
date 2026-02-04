@@ -320,7 +320,7 @@ export class VillageLedgerGame {
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 9) {
+      if (loadedCount >= 8) {
         this.parallaxLoaded = true;
         // Initialize dust particles once layers are loaded
         this.initializeDustParticles();

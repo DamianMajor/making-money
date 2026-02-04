@@ -5693,9 +5693,8 @@ export class VillageLedgerGame {
   
   private drawBackDustParticles(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     const t = this.atmosphereTimer;
-    // Calculate footpath cutoff - don't draw particles on the footpath
-    const footpathHeight = this.parallaxLayers.frontmid ? this.parallaxLayers.frontmid.naturalHeight * 0.92 : 100;
-    const maxY = h - this.dialogueBoxHeight - footpathHeight;
+    // Calculate shrubs cutoff - don't draw particles on the footpath (below shrubs level)
+    const maxY = h - this.dialogueBoxHeight; // Temporarily allow all particles above dialogue
     
     // Back-layer dust particles between sky and thin trees (slowest)
     ctx.save();
@@ -5727,9 +5726,8 @@ export class VillageLedgerGame {
   
   private drawMidDustParticles(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     const t = this.atmosphereTimer;
-    // Calculate footpath cutoff - don't draw particles on the footpath
-    const footpathHeight = this.parallaxLayers.frontmid ? this.parallaxLayers.frontmid.naturalHeight * 0.92 : 100;
-    const maxY = h - this.dialogueBoxHeight - footpathHeight;
+    // Calculate shrubs cutoff - don't draw particles on the footpath (below shrubs level)
+    const maxY = h - this.dialogueBoxHeight; // Temporarily allow all particles above dialogue
     
     // Mid-layer dust particles between thin and thick trees
     ctx.save();
@@ -5811,9 +5809,8 @@ export class VillageLedgerGame {
     ctx.restore();
     
     // 3. Floating foreground dust particles
-    // Calculate footpath cutoff - don't draw particles on the footpath
-    const footpathHeight = this.parallaxLayers.frontmid ? this.parallaxLayers.frontmid.naturalHeight * 0.92 : 100;
-    const maxY = h - this.dialogueBoxHeight - footpathHeight;
+    // Calculate shrubs cutoff - don't draw particles on the footpath (below shrubs level)
+    const maxY = h - this.dialogueBoxHeight; // Temporarily allow all particles above dialogue
     
     ctx.save();
     for (const particle of this.dustParticles) {

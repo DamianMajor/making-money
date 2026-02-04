@@ -5646,7 +5646,7 @@ export class VillageLedgerGame {
       this.dustParticles.push({
         x: Math.random() * this.worldWidth,
         y: Math.random() * viewHeight, // Full viewing area above dialogue box
-        size: 1 + Math.random() * 2,
+        size: 2.0 + Math.random() * 2.0, // 2.0-4.0
         speed: 5 + Math.random() * 15, // Slow horizontal drift
         drift: Math.random() * Math.PI * 2, // Phase for vertical wobble
         alpha: 0.2 + Math.random() * 0.4,
@@ -5674,7 +5674,7 @@ export class VillageLedgerGame {
       this.backDustParticles.push({
         x: Math.random() * this.worldWidth,
         y: Math.random() * viewHeight,
-        size: 0.8 + Math.random() * 1.2, // Original size (0.8-2.0)
+        size: 0.5 + Math.random() * 1.0, // 0.5-1.5
         speed: 2 + Math.random() * 6,
         drift: Math.random() * Math.PI * 2,
         alpha: 0.4 + Math.random() * 0.35, // Middle ground (0.4-0.75)

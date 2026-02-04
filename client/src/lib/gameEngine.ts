@@ -5555,7 +5555,7 @@ export class VillageLedgerGame {
       const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
       const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
       const shrubsScaledHeight = shrubsHeight * 0.8;
-      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsScaledHeight - 25;
+      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsScaledHeight - 5;
       const shrubsScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.shrubs, 0, 0, shrubsWidth, shrubsHeight,
         shrubsScreenX, shrubsYOffset, shrubsWidth, shrubsScaledHeight);
@@ -5568,8 +5568,8 @@ export class VillageLedgerGame {
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
       const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
       const frontScaledHeight = frontHeight * 0.92;
-      // Position 20px above dialogue box
-      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight - 20;
+      // Position at dialogue box top
+      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight;
       const frontScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.frontmid, 0, 0, frontWidth, frontHeight,
         frontScreenX, frontYOffset, frontWidth, frontScaledHeight);

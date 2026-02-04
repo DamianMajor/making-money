@@ -213,6 +213,18 @@ export class VillageLedgerGame {
   private faceImages: Record<string, HTMLImageElement> = {};
   private moodTimer: number = 0;
   
+  // Atmospheric effects
+  private atmosphereTimer: number = 0;
+  private dustParticles: Array<{
+    x: number;
+    y: number;
+    size: number;
+    speed: number;
+    drift: number;
+    alpha: number;
+    phase: number;
+  }> = [];
+  
   // Parallax background layers
   private parallaxLayers: {
     sky: HTMLImageElement;
@@ -295,6 +307,8 @@ export class VillageLedgerGame {
       loadedCount++;
       if (loadedCount >= 9) {
         this.parallaxLoaded = true;
+        // Initialize dust particles once layers are loaded
+        this.initializeDustParticles();
       }
     };
     // Count both successful loads and errors to prevent blocking
@@ -3509,6 +3523,7 @@ export class VillageLedgerGame {
     // Update bob animation
     this.bobTimer += dt * 8;
     this.talkingTimer += dt * 18; // Faster timer for talking bounce (~3 cycles/sec)
+    this.atmosphereTimer += dt; // For atmospheric haze and dust animation
     
     // Update player fade animation
     if (this.state.playerFading) {
@@ -5548,6 +5563,9 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.frontmid, 0, 0, frontWidth, frontHeight,
         frontScreenX, frontYOffset, frontWidth, frontScaledHeight);
       
+      // Draw atmospheric effects (golden haze, wispy motion, dust particles)
+      this.drawAtmosphericEffects(ctx, w, h);
+      
       // Note: Foreground trees are drawn separately in render() AFTER all game elements
     } else {
       // Fallback solid background while loading
@@ -5557,6 +5575,103 @@ export class VillageLedgerGame {
     
     // Re-enable image smoothing for other elements
     ctx.imageSmoothingEnabled = true;
+  }
+  
+  private initializeDustParticles(): void {
+    // Create 40 floating dust particles spread across the scene
+    this.dustParticles = [];
+    for (let i = 0; i < 40; i++) {
+      this.dustParticles.push({
+        x: Math.random() * this.worldWidth,
+        y: Math.random() * 400, // Upper portion of screen
+        size: 1 + Math.random() * 2,
+        speed: 5 + Math.random() * 15, // Slow horizontal drift
+        drift: Math.random() * Math.PI * 2, // Phase for vertical wobble
+        alpha: 0.2 + Math.random() * 0.4,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+  
+  private drawAtmosphericEffects(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const t = this.atmosphereTimer;
+    
+    // 1. Golden haze overlay with subtle movement
+    ctx.save();
+    
+    // Create multiple wispy haze layers with slow drift
+    for (let layer = 0; layer < 3; layer++) {
+      const layerOffset = layer * 0.7;
+      const wispX = Math.sin(t * 0.15 + layerOffset) * 30;
+      const wispY = Math.cos(t * 0.1 + layerOffset * 0.5) * 10;
+      
+      // Golden gradient for each wisp layer
+      const gradient = ctx.createRadialGradient(
+        w * 0.5 + wispX + layer * 100, h * 0.3 + wispY, 0,
+        w * 0.5 + wispX + layer * 100, h * 0.3 + wispY, w * 0.8
+      );
+      
+      const alpha = 0.04 + Math.sin(t * 0.2 + layer) * 0.01;
+      gradient.addColorStop(0, `rgba(218, 165, 32, ${alpha * 1.5})`); // Goldenrod center
+      gradient.addColorStop(0.4, `rgba(205, 133, 63, ${alpha})`); // Peru
+      gradient.addColorStop(1, 'rgba(139, 90, 43, 0)'); // Fade out
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
+    }
+    
+    // 2. Horizontal wispy bands that drift slowly
+    for (let band = 0; band < 4; band++) {
+      const bandY = 80 + band * 70 + Math.sin(t * 0.08 + band * 1.2) * 15;
+      const bandAlpha = 0.03 + Math.sin(t * 0.15 + band * 0.8) * 0.01;
+      
+      const bandGradient = ctx.createLinearGradient(0, bandY - 40, 0, bandY + 40);
+      bandGradient.addColorStop(0, 'rgba(218, 165, 32, 0)');
+      bandGradient.addColorStop(0.5, `rgba(218, 165, 32, ${bandAlpha})`);
+      bandGradient.addColorStop(1, 'rgba(218, 165, 32, 0)');
+      
+      ctx.fillStyle = bandGradient;
+      ctx.fillRect(0, bandY - 40, w, 80);
+    }
+    
+    ctx.restore();
+    
+    // 3. Floating dust particles
+    ctx.save();
+    for (const particle of this.dustParticles) {
+      // Update particle position with slow drift
+      const worldX = particle.x + t * particle.speed;
+      const wrappedX = ((worldX % this.worldWidth) + this.worldWidth) % this.worldWidth;
+      
+      // Convert to screen position with parallax (dust moves slower than foreground)
+      const screenX = wrappedX - this.cameraX * 0.7;
+      
+      // Only draw if on screen
+      if (screenX >= -10 && screenX <= w + 10) {
+        // Gentle vertical wobble
+        const wobbleY = Math.sin(t * 0.5 + particle.drift) * 8;
+        const screenY = particle.y + wobbleY;
+        
+        // Twinkling alpha
+        const twinkle = 0.7 + Math.sin(t * 2 + particle.phase) * 0.3;
+        const finalAlpha = particle.alpha * twinkle;
+        
+        // Draw glowing dust mote
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, particle.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 223, 150, ${finalAlpha})`;
+        ctx.fill();
+        
+        // Subtle glow around larger particles
+        if (particle.size > 1.5) {
+          ctx.beginPath();
+          ctx.arc(screenX, screenY, particle.size * 2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 200, 100, ${finalAlpha * 0.2})`;
+          ctx.fill();
+        }
+      }
+    }
+    ctx.restore();
   }
   
   private drawLoadingScreen(ctx: CanvasRenderingContext2D, w: number, h: number): void {

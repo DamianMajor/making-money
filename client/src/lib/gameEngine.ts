@@ -5538,11 +5538,12 @@ export class VillageLedgerGame {
         shrubsScreenX, shrubsYOffset, shrubsWidth, shrubsScaledHeight);
       
       // Frontmid layer (footpath) - moves with camera, moved up 30px from dialogue box
-      // Compressed vertically by 20% (80% height), drawn on top of shrubs
+      // Scaled to 92% height (80% * 1.15), anchored at top so expansion goes downward
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
       const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
-      const frontScaledHeight = frontHeight * 0.8;
-      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight - 30;
+      const frontScaledHeight = frontHeight * 0.92;
+      // Anchor Y position based on original 80% height so top stays fixed
+      const frontYOffset = h - this.dialogueBoxHeight - (frontHeight * 0.8) - 30;
       const frontScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.frontmid, 0, 0, frontWidth, frontHeight,
         frontScreenX, frontYOffset, frontWidth, frontScaledHeight);

@@ -5588,12 +5588,6 @@ export class VillageLedgerGame {
       // Draw foreground dust particles (between thick trees and shrubs - behind shrubs/footpath/sprites)
       this.drawForegroundDustParticles(ctx, w, h);
       
-      // Solid ground fill beneath the path to prevent "dropping off" visual
-      // This fills any transparent areas at the bottom of the path image
-      const groundFillY = h - this.dialogueBoxHeight - this.groundHeight - 20;
-      ctx.fillStyle = '#2a2318'; // Dark earthy brown matching path edge
-      ctx.fillRect(0, groundFillY, w, this.groundHeight + 40);
-      
       // Combined path and shrubs layer - single image for efficiency
       const pathShrubsWidth = this.parallaxLayers.pathShrubs.naturalWidth;
       const pathShrubsHeight = this.parallaxLayers.pathShrubs.naturalHeight;
@@ -5674,18 +5668,38 @@ export class VillageLedgerGame {
       // Vertical breathing animation
       const breathe = Math.sin(t * 0.04 + wisp.phaseOffset) * 5;
       
-      // Create vertical gradient for fog wisp (denser at bottom, fading up)
-      const gradient = ctx.createLinearGradient(0, fogTop + breathe, 0, fogTop + fogHeight);
-      
       // Muted earthy fog colors
       const alpha = wisp.intensity * (0.8 + Math.sin(t * 0.03 + wisp.phaseOffset) * 0.2);
-      gradient.addColorStop(0, `rgba(180, 160, 140, 0)`); // Transparent at top
-      gradient.addColorStop(0.3, `rgba(160, 145, 125, ${alpha * 0.4})`); // Building
-      gradient.addColorStop(0.6, `rgba(140, 130, 115, ${alpha * 0.7})`); // Denser
-      gradient.addColorStop(1, `rgba(120, 110, 100, ${alpha})`); // Densest at bottom
       
-      ctx.fillStyle = gradient;
-      ctx.fillRect(wispX, fogTop + breathe, wisp.width, fogHeight);
+      // Create a temporary canvas for the wisp with soft horizontal edges
+      const wispCanvas = document.createElement('canvas');
+      wispCanvas.width = wisp.width;
+      wispCanvas.height = fogHeight;
+      const wispCtx = wispCanvas.getContext('2d')!;
+      
+      // Draw vertical gradient for fog wisp (denser at bottom, fading up)
+      const vertGradient = wispCtx.createLinearGradient(0, 0, 0, fogHeight);
+      vertGradient.addColorStop(0, `rgba(180, 160, 140, 0)`); // Transparent at top
+      vertGradient.addColorStop(0.3, `rgba(160, 145, 125, ${alpha * 0.4})`); // Building
+      vertGradient.addColorStop(0.6, `rgba(140, 130, 115, ${alpha * 0.7})`); // Denser
+      vertGradient.addColorStop(1, `rgba(120, 110, 100, ${alpha})`); // Densest at bottom
+      
+      wispCtx.fillStyle = vertGradient;
+      wispCtx.fillRect(0, 0, wisp.width, fogHeight);
+      
+      // Apply horizontal fade mask using destination-in composite
+      wispCtx.globalCompositeOperation = 'destination-in';
+      const fadeWidth = wisp.width * 0.2; // 20% fade on each edge
+      const horizGradient = wispCtx.createLinearGradient(0, 0, wisp.width, 0);
+      horizGradient.addColorStop(0, 'rgba(0,0,0,0)'); // Transparent left edge
+      horizGradient.addColorStop(fadeWidth / wisp.width, 'rgba(0,0,0,1)'); // Fade in
+      horizGradient.addColorStop(1 - fadeWidth / wisp.width, 'rgba(0,0,0,1)'); // Solid middle
+      horizGradient.addColorStop(1, 'rgba(0,0,0,0)'); // Transparent right edge
+      wispCtx.fillStyle = horizGradient;
+      wispCtx.fillRect(0, 0, wisp.width, fogHeight);
+      
+      // Draw the wisp canvas to main canvas
+      ctx.drawImage(wispCanvas, wispX, fogTop + breathe);
     }
     
     ctx.restore();

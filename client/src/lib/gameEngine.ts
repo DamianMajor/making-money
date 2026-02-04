@@ -5509,20 +5509,20 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.sky, skyScreenX, skyYOffset);
       
       // Thin trees layer - between background and midground (further back)
-      // Scale to 40% width (horizontal only) so all trees fit on screen with 0.3x parallax
+      // Scale to 48% width (horizontal only) - 20% increase from 40%
       const thinNaturalWidth = this.parallaxLayers.treesThin.naturalWidth;
       const thinNaturalHeight = this.parallaxLayers.treesThin.naturalHeight;
-      const thinScaledWidth = thinNaturalWidth * 0.4;
+      const thinScaledWidth = thinNaturalWidth * 0.48;
       const thinYOffset = h - this.dialogueBoxHeight - thinNaturalHeight;
       const thinScreenX = -treesThinOffset;
       ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, thinNaturalWidth, thinNaturalHeight,
         thinScreenX, thinYOffset, thinScaledWidth, thinNaturalHeight);
       
       // Thick trees layer - between thin trees and midground (closer)
-      // Scale to 50% width (horizontal only) so all trees fit on screen with 0.5x parallax
+      // Scale to 62.5% width (horizontal only) - 25% increase from 50%
       const thickNaturalWidth = this.parallaxLayers.treesThick.naturalWidth;
       const thickNaturalHeight = this.parallaxLayers.treesThick.naturalHeight;
-      const thickScaledWidth = thickNaturalWidth * 0.5;
+      const thickScaledWidth = thickNaturalWidth * 0.625;
       const thickYOffset = h - this.dialogueBoxHeight - thickNaturalHeight;
       const thickScreenX = -treesThickOffset;
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,

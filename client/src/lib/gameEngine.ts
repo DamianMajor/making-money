@@ -5639,10 +5639,10 @@ export class VillageLedgerGame {
   }
   
   private initializeDustParticles(): void {
-    // Create 85 foreground floating dust particles
+    // Create 130 foreground floating dust particles
     this.dustParticles = [];
     const viewHeight = this.logicalHeight - this.dialogueBoxHeight;
-    for (let i = 0; i < 85; i++) {
+    for (let i = 0; i < 130; i++) {
       this.dustParticles.push({
         x: Math.random() * this.worldWidth,
         y: Math.random() * viewHeight, // Full viewing area above dialogue box
@@ -5654,9 +5654,9 @@ export class VillageLedgerGame {
       });
     }
     
-    // Create 180 mid-layer dust particles between thin and thick trees
+    // Create 170 mid-layer dust particles between thin and thick trees
     this.midDustParticles = [];
-    for (let i = 0; i < 180; i++) {
+    for (let i = 0; i < 170; i++) {
       this.midDustParticles.push({
         x: Math.random() * this.worldWidth,
         y: Math.random() * viewHeight,
@@ -5668,9 +5668,9 @@ export class VillageLedgerGame {
       });
     }
     
-    // Create 220 back-layer dust particles between sky and thin trees
+    // Create 200 back-layer dust particles between sky and thin trees
     this.backDustParticles = [];
-    for (let i = 0; i < 220; i++) {
+    for (let i = 0; i < 200; i++) {
       this.backDustParticles.push({
         x: Math.random() * this.worldWidth,
         y: Math.random() * viewHeight,

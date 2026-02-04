@@ -224,6 +224,15 @@ export class VillageLedgerGame {
     alpha: number;
     phase: number;
   }> = [];
+  private midDustParticles: Array<{
+    x: number;
+    y: number;
+    size: number;
+    speed: number;
+    drift: number;
+    alpha: number;
+    phase: number;
+  }> = [];
   
   // Parallax background layers
   private parallaxLayers: {
@@ -5534,12 +5543,15 @@ export class VillageLedgerGame {
       const thinNaturalHeight = this.parallaxLayers.treesThin.naturalHeight;
       const thinScaledWidth = thinNaturalWidth * 1.0;
       const thinYOffset = h - this.dialogueBoxHeight - thinNaturalHeight;
-      const thinScreenX = -treesThinOffset;
+      const thinScreenX = -treesThinOffset - 250; // Offset 250px to the left
       ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, thinNaturalWidth, thinNaturalHeight,
         thinScreenX, thinYOffset, thinScaledWidth, thinNaturalHeight);
       
       // Apply haze to thin trees layer
       this.drawLayerHaze(ctx, w, h, 0.6);
+      
+      // Draw mid-layer dust particles (between thin and thick trees)
+      this.drawMidDustParticles(ctx, w, h);
       
       // Thick trees layer - between thin trees and midground (closer)
       // Full 100% width - original size
@@ -5547,7 +5559,7 @@ export class VillageLedgerGame {
       const thickNaturalHeight = this.parallaxLayers.treesThick.naturalHeight;
       const thickScaledWidth = thickNaturalWidth * 1.0;
       const thickYOffset = h - this.dialogueBoxHeight - thickNaturalHeight;
-      const thickScreenX = -treesThickOffset;
+      const thickScreenX = -treesThickOffset - 100; // Offset 100px to the left
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       
@@ -5637,6 +5649,57 @@ export class VillageLedgerGame {
         phase: Math.random() * Math.PI * 2
       });
     }
+    
+    // Create 80 mid-layer dust particles (half count, half size) between tree layers
+    this.midDustParticles = [];
+    for (let i = 0; i < 80; i++) {
+      this.midDustParticles.push({
+        x: Math.random() * this.worldWidth,
+        y: Math.random() * viewHeight,
+        size: 0.5 + Math.random() * 1, // Half the size (0.5-1.5 vs 1-3)
+        speed: 3 + Math.random() * 10, // Slightly slower drift
+        drift: Math.random() * Math.PI * 2,
+        alpha: 0.15 + Math.random() * 0.3, // Slightly more transparent
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+  
+  private drawMidDustParticles(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const t = this.atmosphereTimer;
+    
+    // Mid-layer dust particles between thin and thick trees
+    // Uses parallax speed between thin (0.15) and thick (0.25) trees
+    ctx.save();
+    for (const particle of this.midDustParticles) {
+      const worldX = particle.x + t * particle.speed;
+      const wrappedX = ((worldX % this.worldWidth) + this.worldWidth) % this.worldWidth;
+      
+      // Parallax at 0.2x (between thin 0.15 and thick 0.25)
+      const screenX = wrappedX - this.cameraX * 0.2;
+      
+      if (screenX >= -10 && screenX <= w + 10) {
+        const wobbleY = Math.sin(t * 0.5 + particle.drift) * 6;
+        const screenY = particle.y + wobbleY;
+        
+        const twinkle = 0.7 + Math.sin(t * 2 + particle.phase) * 0.3;
+        const finalAlpha = particle.alpha * twinkle;
+        
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, particle.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 223, 150, ${finalAlpha})`;
+        ctx.fill();
+        
+        // Subtle glow for larger particles
+        if (particle.size > 1) {
+          ctx.beginPath();
+          ctx.arc(screenX, screenY, particle.size * 2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 200, 100, ${finalAlpha * 0.15})`;
+          ctx.fill();
+        }
+      }
+    }
+    ctx.restore();
   }
   
   private drawAtmosphericEffects(ctx: CanvasRenderingContext2D, w: number, h: number): void {

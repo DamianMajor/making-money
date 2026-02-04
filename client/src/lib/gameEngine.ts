@@ -5533,12 +5533,19 @@ export class VillageLedgerGame {
       const frontmidOffset = this.cameraX * 1.0;
       
       // Background layer - slow parallax, starts at top of screen
-      // Compressed horizontally by 25%, natural height
+      // Dynamically scale so the full image is viewable by far right of world
       const skyWidth = this.parallaxLayers.sky.naturalWidth;
       const skyHeight = this.parallaxLayers.sky.naturalHeight;
-      const skyScaledWidth = skyWidth * 0.75;
+      // Use the same parallax factor as skyOffset (0.1)
+      const skyParallax = 0.1;
+      const maxCameraX = Math.max(0, this.worldWidth - w);
+      const maxSkyOffset = maxCameraX * skyParallax;
+      // Scale so right edge of sky meets right edge of screen at max camera
+      const targetWidth = Math.max(w, w + maxSkyOffset);
+      const skyScale = targetWidth / skyWidth;
+      const skyScaledWidth = skyWidth * skyScale;
       const skyYOffset = 0;
-      const skyScreenX = -skyOffset;
+      const skyScreenX = -this.cameraX * skyParallax;
       ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight,
         skyScreenX, skyYOffset, skyScaledWidth, skyHeight);
       

@@ -4306,8 +4306,8 @@ export class VillageLedgerGame {
       this.drawForegroundTrees(ctx, foregroundOffset, h);
       ctx.imageSmoothingEnabled = true;
       
-      // Draw atmospheric effects (golden haze, dust particles) in front of everything except UI
-      this.drawAtmosphericEffects(ctx, w, h);
+      // Draw atmospheric haze overlay (in front of everything except UI)
+      this.drawAtmosphericHaze(ctx, w, h);
     }
 
     // Draw inventory HUD at top of screen (on top of trees)
@@ -5578,6 +5578,9 @@ export class VillageLedgerGame {
       // Apply haze to thick trees layer
       this.drawLayerHaze(ctx, w, h, 0.5);
       
+      // Draw foreground dust particles (between thick trees and shrubs - behind shrubs/footpath/sprites)
+      this.drawForegroundDustParticles(ctx, w, h);
+      
       // Shrubs layer - behind footpath, compressed vertically by 20%, moved up 50px from original
       const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
       const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
@@ -5765,10 +5768,48 @@ export class VillageLedgerGame {
     ctx.restore();
   }
   
-  private drawAtmosphericEffects(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  private drawForegroundDustParticles(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const t = this.atmosphereTimer;
+    const maxY = h - this.dialogueBoxHeight; // All particles above dialogue box
+    
+    // Foreground dust particles - drawn between thick trees and shrubs
+    ctx.save();
+    for (const particle of this.dustParticles) {
+      const worldX = particle.x + t * particle.speed;
+      const wrappedX = ((worldX % this.worldWidth) + this.worldWidth) % this.worldWidth;
+      
+      // Parallax at 0.4x (between thick trees 0.25 and shrubs 1.0)
+      const screenX = wrappedX - this.cameraX * 0.4;
+      
+      if (screenX >= -10 && screenX <= w + 10) {
+        const wobbleY = Math.sin(t * 0.5 + particle.drift) * 8;
+        const screenY = particle.y + wobbleY;
+        
+        if (screenY > maxY) continue;
+        
+        const twinkle = 0.7 + Math.sin(t * 2 + particle.phase) * 0.3;
+        const finalAlpha = particle.alpha * twinkle;
+        
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, particle.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 223, 150, ${finalAlpha})`;
+        ctx.fill();
+        
+        if (particle.size > 1.5) {
+          ctx.beginPath();
+          ctx.arc(screenX, screenY, particle.size * 2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 200, 100, ${finalAlpha * 0.2})`;
+          ctx.fill();
+        }
+      }
+    }
+    ctx.restore();
+  }
+  
+  private drawAtmosphericHaze(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     const t = this.atmosphereTimer;
     
-    // 1. Golden haze overlay with subtle movement
+    // Golden haze overlay with subtle movement (in front of everything except UI)
     ctx.save();
     
     // Create multiple wispy haze layers with slow drift
@@ -5777,22 +5818,21 @@ export class VillageLedgerGame {
       const wispX = Math.sin(t * 0.15 + layerOffset) * 30;
       const wispY = Math.cos(t * 0.1 + layerOffset * 0.5) * 10;
       
-      // Golden gradient for each wisp layer
       const gradient = ctx.createRadialGradient(
         w * 0.5 + wispX + layer * 100, h * 0.3 + wispY, 0,
         w * 0.5 + wispX + layer * 100, h * 0.3 + wispY, w * 0.8
       );
       
       const alpha = 0.04 + Math.sin(t * 0.2 + layer) * 0.01;
-      gradient.addColorStop(0, `rgba(218, 165, 32, ${alpha * 1.5})`); // Goldenrod center
-      gradient.addColorStop(0.4, `rgba(205, 133, 63, ${alpha})`); // Peru
-      gradient.addColorStop(1, 'rgba(139, 90, 43, 0)'); // Fade out
+      gradient.addColorStop(0, `rgba(218, 165, 32, ${alpha * 1.5})`);
+      gradient.addColorStop(0.4, `rgba(205, 133, 63, ${alpha})`);
+      gradient.addColorStop(1, 'rgba(139, 90, 43, 0)');
       
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
     }
     
-    // 2. Horizontal wispy bands that drift slowly
+    // Horizontal wispy bands that drift slowly
     for (let band = 0; band < 4; band++) {
       const bandY = 80 + band * 70 + Math.sin(t * 0.08 + band * 1.2) * 15;
       const bandAlpha = 0.03 + Math.sin(t * 0.15 + band * 0.8) * 0.01;
@@ -5806,49 +5846,6 @@ export class VillageLedgerGame {
       ctx.fillRect(0, bandY - 40, w, 80);
     }
     
-    ctx.restore();
-    
-    // 3. Floating foreground dust particles
-    // Calculate shrubs cutoff - don't draw particles on the footpath (below shrubs level)
-    const maxY = h - this.dialogueBoxHeight; // Temporarily allow all particles above dialogue
-    
-    ctx.save();
-    for (const particle of this.dustParticles) {
-      // Update particle position with slow drift
-      const worldX = particle.x + t * particle.speed;
-      const wrappedX = ((worldX % this.worldWidth) + this.worldWidth) % this.worldWidth;
-      
-      // Convert to screen position with parallax (foreground dust - slowest parallax)
-      const screenX = wrappedX - this.cameraX * 0.5;
-      
-      // Only draw if on screen
-      if (screenX >= -10 && screenX <= w + 10) {
-        // Gentle vertical wobble
-        const wobbleY = Math.sin(t * 0.5 + particle.drift) * 8;
-        const screenY = particle.y + wobbleY;
-        
-        // Skip if on footpath
-        if (screenY > maxY) continue;
-        
-        // Twinkling alpha
-        const twinkle = 0.7 + Math.sin(t * 2 + particle.phase) * 0.3;
-        const finalAlpha = particle.alpha * twinkle;
-        
-        // Draw glowing dust mote
-        ctx.beginPath();
-        ctx.arc(screenX, screenY, particle.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 223, 150, ${finalAlpha})`;
-        ctx.fill();
-        
-        // Subtle glow around larger particles
-        if (particle.size > 1.5) {
-          ctx.beginPath();
-          ctx.arc(screenX, screenY, particle.size * 2, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 200, 100, ${finalAlpha * 0.2})`;
-          ctx.fill();
-        }
-      }
-    }
     ctx.restore();
   }
   

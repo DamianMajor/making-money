@@ -4287,6 +4287,9 @@ export class VillageLedgerGame {
       ctx.imageSmoothingEnabled = false;
       this.drawForegroundTrees(ctx, foregroundOffset, h);
       ctx.imageSmoothingEnabled = true;
+      
+      // Draw atmospheric effects (golden haze, dust particles) in front of everything except UI
+      this.drawAtmosphericEffects(ctx, w, h);
     }
 
     // Draw inventory HUD at top of screen (on top of trees)
@@ -5577,9 +5580,7 @@ export class VillageLedgerGame {
       // Apply haze to footpath layer
       this.drawLayerHaze(ctx, w, h, 0.2);
       
-      // Draw atmospheric effects (wispy motion, dust particles)
-      this.drawAtmosphericEffects(ctx, w, h);
-      
+      // Note: Atmospheric effects (haze, dust) are drawn in render() AFTER all game elements
       // Note: Foreground trees are drawn separately in render() AFTER all game elements
     } else {
       // Fallback solid background while loading
@@ -5624,10 +5625,11 @@ export class VillageLedgerGame {
   private initializeDustParticles(): void {
     // Create 160 floating dust particles spread across the scene (quadrupled)
     this.dustParticles = [];
+    const viewHeight = this.logicalHeight - this.dialogueBoxHeight;
     for (let i = 0; i < 160; i++) {
       this.dustParticles.push({
         x: Math.random() * this.worldWidth,
-        y: Math.random() * 400, // Upper portion of screen
+        y: Math.random() * viewHeight, // Full viewing area above dialogue box
         size: 1 + Math.random() * 2,
         speed: 5 + Math.random() * 15, // Slow horizontal drift
         drift: Math.random() * Math.PI * 2, // Phase for vertical wobble

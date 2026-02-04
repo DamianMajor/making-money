@@ -5585,15 +5585,14 @@ export class VillageLedgerGame {
       this.drawForegroundDustParticles(ctx, w, h);
       
       // Combined path and shrubs layer - single image for efficiency
-      // Right-aligned: right edge of image aligns with right edge of world (3500px)
+      // Right-aligned: when camera is at rightmost position, image right edge = screen right edge
       const pathShrubsWidth = this.parallaxLayers.pathShrubs.naturalWidth;
       const pathShrubsHeight = this.parallaxLayers.pathShrubs.naturalHeight;
       // Position at bottom of game area (just above dialogue box)
       const pathShrubsYOffset = h - this.dialogueBoxHeight - pathShrubsHeight;
-      // Calculate where the world's right edge (worldWidth) appears on screen with 0.7x parallax
-      const worldRightScreenX = this.worldWidth - frontmidOffset;
-      // Position image so its right edge aligns with world's right edge
-      const pathShrubsScreenX = worldRightScreenX - pathShrubsWidth;
+      // Calculate position so right edge aligns with screen edge at max camera position
+      const pathMaxCameraX = this.worldWidth - w;
+      const pathShrubsScreenX = w - pathShrubsWidth + (pathMaxCameraX - this.cameraX) * 0.7;
       ctx.drawImage(this.parallaxLayers.pathShrubs, 0, 0, pathShrubsWidth, pathShrubsHeight,
         pathShrubsScreenX, pathShrubsYOffset, pathShrubsWidth, pathShrubsHeight);
       

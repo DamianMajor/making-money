@@ -3461,7 +3461,7 @@ export class VillageLedgerGame {
     this.logicalHeight = this.canvas.height;
 
     // Update UI dimensions based on logical canvas size
-    this.dialogueBoxHeight = this.logicalHeight * 0.2;
+    this.dialogueBoxHeight = this.logicalHeight * 0.2 + 30;
     this.hudWidth = Math.min(260, this.logicalWidth * 0.25);
     this.hudHeight = Math.min(185, this.logicalHeight * 0.25);
     this.interactButtonSize = Math.min(90, this.logicalWidth * 0.11); // 10% smaller
@@ -5528,21 +5528,21 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       
-      // Shrubs layer - behind footpath, compressed vertically by 20%, positioned 25px lower
+      // Shrubs layer - behind footpath, compressed vertically by 20%, moved up 50px from original
       const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
       const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
       const shrubsScaledHeight = shrubsHeight * 0.8;
-      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsScaledHeight + 25;
+      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsScaledHeight - 25;
       const shrubsScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.shrubs, 0, 0, shrubsWidth, shrubsHeight,
         shrubsScreenX, shrubsYOffset, shrubsWidth, shrubsScaledHeight);
       
-      // Frontmid layer (footpath) - moves with camera, bottom aligned with top of dialogue box
+      // Frontmid layer (footpath) - moves with camera, moved up 30px from dialogue box
       // Compressed vertically by 20% (80% height), drawn on top of shrubs
       const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
       const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
       const frontScaledHeight = frontHeight * 0.8;
-      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight;
+      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight - 30;
       const frontScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.frontmid, 0, 0, frontWidth, frontHeight,
         frontScreenX, frontYOffset, frontWidth, frontScaledHeight);
@@ -6356,8 +6356,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const w = this.logicalWidth;
     const h = this.dialogueBoxHeight;
 
-    // Background
-    ctx.fillStyle = 'rgba(45, 35, 28, 0.95)';
+    // Background - fully opaque to prevent layer bleed-through
+    ctx.fillStyle = '#2D231C';
     ctx.fillRect(x, y, w, h);
 
     // Border

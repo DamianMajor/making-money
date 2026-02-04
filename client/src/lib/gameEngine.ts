@@ -5652,11 +5652,12 @@ export class VillageLedgerGame {
     const fogHeight = 180; // Height of the fog band
     const fogTop = groundY - fogHeight + 40; // Start slightly above ground
     
-    // Create multiple fog wisps at different positions for natural look
+    // Create multiple fog wisps at different positions for natural look (denser fog)
     const fogWisps = [
-      { xBase: 0, width: w * 1.5, intensity: 0.15, speed: 0.08, phaseOffset: 0 },
-      { xBase: w * 0.3, width: w * 1.2, intensity: 0.12, speed: 0.05, phaseOffset: 1.5 },
-      { xBase: w * 0.6, width: w * 1.3, intensity: 0.1, speed: 0.06, phaseOffset: 3.0 },
+      { xBase: 0, width: w * 1.5, intensity: 0.35, speed: 0.08, phaseOffset: 0 },
+      { xBase: w * 0.3, width: w * 1.2, intensity: 0.30, speed: 0.05, phaseOffset: 1.5 },
+      { xBase: w * 0.6, width: w * 1.3, intensity: 0.25, speed: 0.06, phaseOffset: 3.0 },
+      { xBase: w * 0.1, width: w * 1.4, intensity: 0.20, speed: 0.04, phaseOffset: 4.5 },
     ];
     
     for (const wisp of fogWisps) {

@@ -5533,6 +5533,9 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, thinNaturalWidth, thinNaturalHeight,
         thinScreenX, thinYOffset, thinScaledWidth, thinNaturalHeight);
       
+      // Apply haze to thin trees layer
+      this.drawLayerHaze(ctx, w, h, 0.6);
+      
       // Thick trees layer - between thin trees and midground (closer)
       // Full 100% width - original size
       const thickNaturalWidth = this.parallaxLayers.treesThick.naturalWidth;
@@ -5543,6 +5546,9 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       
+      // Apply haze to thick trees layer
+      this.drawLayerHaze(ctx, w, h, 0.5);
+      
       // Shrubs layer - behind footpath, compressed vertically by 20%, moved up 50px from original
       const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
       const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
@@ -5551,6 +5557,9 @@ export class VillageLedgerGame {
       const shrubsScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.shrubs, 0, 0, shrubsWidth, shrubsHeight,
         shrubsScreenX, shrubsYOffset, shrubsWidth, shrubsScaledHeight);
+      
+      // Apply haze to shrubs layer
+      this.drawLayerHaze(ctx, w, h, 0.35);
       
       // Frontmid layer (footpath) - moves with camera
       // Scaled to 92% height, bottom aligned with dialogue box top
@@ -5563,7 +5572,10 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.frontmid, 0, 0, frontWidth, frontHeight,
         frontScreenX, frontYOffset, frontWidth, frontScaledHeight);
       
-      // Draw atmospheric effects (golden haze, wispy motion, dust particles)
+      // Apply haze to footpath layer
+      this.drawLayerHaze(ctx, w, h, 0.2);
+      
+      // Draw atmospheric effects (wispy motion, dust particles)
       this.drawAtmosphericEffects(ctx, w, h);
       
       // Note: Foreground trees are drawn separately in render() AFTER all game elements
@@ -5577,10 +5589,40 @@ export class VillageLedgerGame {
     ctx.imageSmoothingEnabled = true;
   }
   
+  private drawLayerHaze(ctx: CanvasRenderingContext2D, w: number, h: number, intensity: number): void {
+    // Draw golden haze overlay for individual layers
+    // Intensity: 0.0 (none) to 1.0 (full) - further layers get more haze
+    const t = this.atmosphereTimer;
+    
+    ctx.save();
+    
+    // Animated wisp offset for gentle motion
+    const wispX = Math.sin(t * 0.12) * 20;
+    const wispY = Math.cos(t * 0.08) * 8;
+    
+    // Create golden radial gradient with animation
+    const gradient = ctx.createRadialGradient(
+      w * 0.5 + wispX, h * 0.35 + wispY, 0,
+      w * 0.5 + wispX, h * 0.35 + wispY, w * 0.9
+    );
+    
+    const baseAlpha = 0.06 * intensity;
+    const pulseAlpha = baseAlpha + Math.sin(t * 0.15) * 0.01 * intensity;
+    
+    gradient.addColorStop(0, `rgba(218, 165, 32, ${pulseAlpha * 1.3})`); // Goldenrod center
+    gradient.addColorStop(0.5, `rgba(205, 133, 63, ${pulseAlpha})`); // Peru mid
+    gradient.addColorStop(1, 'rgba(139, 90, 43, 0)'); // Fade out
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
+    
+    ctx.restore();
+  }
+  
   private initializeDustParticles(): void {
-    // Create 40 floating dust particles spread across the scene
+    // Create 160 floating dust particles spread across the scene (quadrupled)
     this.dustParticles = [];
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 160; i++) {
       this.dustParticles.push({
         x: Math.random() * this.worldWidth,
         y: Math.random() * 400, // Upper portion of screen

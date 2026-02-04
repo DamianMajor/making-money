@@ -618,8 +618,8 @@ export class VillageLedgerGame {
     
     // If it was a quick tap (< holdThreshold), walk to that exact point
     if (holdDuration < this.holdThreshold && this.touchActive) {
-      // Convert screen X to world X position (accounting for 0.7x parallax)
-      const worldX = this.touchStartX + this.cameraX * 0.7;
+      // Convert screen X to world X position
+      const worldX = this.touchStartX + this.cameraX;
       // Clamp to world bounds
       const clampedWorldX = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, worldX));
       this.autoWalkTarget = { x: clampedWorldX, type: 'location' };
@@ -898,7 +898,7 @@ export class VillageLedgerGame {
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     
     // Check if tapping on home hut (at playerHomeX = 100)
-    const homeScreenX = this.playerHomeX - this.cameraX * 0.7;
+    const homeScreenX = this.playerHomeX - this.cameraX;
     const homeHitbox = { x: homeScreenX - 50, y: groundY - 120, width: 100, height: 120 };
     if (x >= homeHitbox.x && x <= homeHitbox.x + homeHitbox.width &&
         y >= homeHitbox.y && y <= homeHitbox.y + homeHitbox.height) {
@@ -910,7 +910,7 @@ export class VillageLedgerGame {
     
     for (const npc of this.npcs) {
       if (!npc.visible) continue;
-      const npcScreenX = npc.x - this.cameraX * 0.7;
+      const npcScreenX = npc.x - this.cameraX;
       // Use same Y calculation as drawCharacter (npc.y is set to groundY - height in resize)
       const npcScreenY = npc.y + (npc.bobOffset || 0);
       // Generous hitbox for tap targeting
@@ -937,7 +937,7 @@ export class VillageLedgerGame {
     }
     
     // Check if tapping on Stone Tablet (at villageCenterX = 1600) - AFTER NPCs
-    const tabletScreenX = this.villageCenterX - this.cameraX * 0.7;
+    const tabletScreenX = this.villageCenterX - this.cameraX;
     const tabletHitbox = { x: tabletScreenX - 40, y: groundY - 100, width: 80, height: 100 };
     if (x >= tabletHitbox.x && x <= tabletHitbox.x + tabletHitbox.width &&
         y >= tabletHitbox.y && y <= tabletHitbox.y + tabletHitbox.height) {
@@ -4721,7 +4721,7 @@ export class VillageLedgerGame {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
     // Center brawl on player's screen position (covers player + Woodcutter + Stoneworker, not Elder)
-    const playerScreenX = this.player.x - this.cameraX * 0.7;
+    const playerScreenX = this.player.x - this.cameraX;
     const centerX = Math.max(150, Math.min(w - 150, playerScreenX));
     // Position brawl on the ground (above dialogue box, at character level)
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
@@ -4853,9 +4853,9 @@ export class VillageLedgerGame {
     
     // Draw dancing NPCs indicator - bouncing motion for NPCs at village center
     // Get the screen positions for NPCs at center
-    const woodcutterScreenX = this.woodcutter.x - this.cameraX * 0.7;
-    const stoneWorkerScreenX = this.stoneWorker.x - this.cameraX * 0.7;
-    const elderScreenX = this.villageElder.x - this.cameraX * 0.7;
+    const woodcutterScreenX = this.woodcutter.x - this.cameraX;
+    const stoneWorkerScreenX = this.stoneWorker.x - this.cameraX;
+    const elderScreenX = this.villageElder.x - this.cameraX;
     
     // Draw musical notes above dancing characters
     ctx.font = '20px Arial';
@@ -5377,7 +5377,7 @@ export class VillageLedgerGame {
 
   private drawLocationMarkers(ctx: CanvasRenderingContext2D, groundY: number): void {
     // Player Home marker (at x=100) - 20% larger
-    const homeScreenX = this.playerHomeX - this.cameraX * 0.7;
+    const homeScreenX = this.playerHomeX - this.cameraX;
     const hutScale = 1.2; // 20% larger
     if (homeScreenX > -100 && homeScreenX < this.logicalWidth + 100) {
       // Draw a simple house shape (scaled 20% larger)
@@ -5430,7 +5430,7 @@ export class VillageLedgerGame {
     }
 
     // Village Center / Elder's Rock marker (at x=1500)
-    const centerScreenX = this.villageCenterX - this.cameraX * 0.7;
+    const centerScreenX = this.villageCenterX - this.cameraX;
     if (centerScreenX > -100 && centerScreenX < this.logicalWidth + 100) {
       // Draw a large blank rock
       ctx.fillStyle = '#8B8B8B';
@@ -5915,7 +5915,7 @@ export class VillageLedgerGame {
 private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   // Apply render offset for soft collision visual separation (NPCs only)
   const renderOffset = char.renderOffsetX || 0;
-  const screenX = char.x - this.cameraX * 0.7 + renderOffset;
+  const screenX = char.x - this.cameraX + renderOffset;
   
   // Calculate talking bounce if this character is currently speaking AND text is still typing
   // Don't bounce if NPC is carving into the ledger
@@ -5986,7 +5986,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private drawInventoryPopup(ctx: CanvasRenderingContext2D): void {
     if (!this.inventoryPopup) return;
 
-    const screenX = this.player.x - this.cameraX * 0.7;
+    const screenX = this.player.x - this.cameraX;
     const screenY = this.player.y - 40 - this.inventoryPopup.y;
 
     const alpha = Math.min(1, this.inventoryPopup.timer);
@@ -6000,7 +6000,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private drawDestinationMarker(ctx: CanvasRenderingContext2D, groundY: number): void {
     if (!this.autoWalkTarget) return;
     
-    const screenX = this.autoWalkTarget.x - this.cameraX * 0.7;
+    const screenX = this.autoWalkTarget.x - this.cameraX;
     const markerY = groundY - 5;
     
     // Pulsing animation

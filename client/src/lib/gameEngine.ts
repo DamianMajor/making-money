@@ -5456,7 +5456,7 @@ export class VillageLedgerGame {
     // Fishing Hole / Pond at Fisherman's location (x=3200)
     // Shifted left by 60px and down by 25px so pond sits below ground horizon
     const fishingHoleX = 3200;
-    const pondScreenX = fishingHoleX - this.cameraX - 60; // Shift left
+    const pondScreenX = fishingHoleX - this.cameraX * 0.7 - 60; // Shift left, use 0.7x parallax like sprites
     const pondYOffset = 25; // Shift down
     if (pondScreenX > -150 && pondScreenX < this.logicalWidth + 150) {
       // Draw pond/water
@@ -5493,7 +5493,7 @@ export class VillageLedgerGame {
   // Draw fishing pole in front of fisherman (called after NPCs are drawn)
   private drawFishingPole(ctx: CanvasRenderingContext2D, groundY: number): void {
     const fishingHoleX = 3200;
-    const pondScreenX = fishingHoleX - this.cameraX - 60; // Same offset as pond
+    const pondScreenX = fishingHoleX - this.cameraX * 0.7 - 60; // Same offset as pond, 0.7x parallax
     const pondYOffset = 25;
     const poleOffsetX = -10; // Adjusted pole position (moved right 40 from -50)
     
@@ -5585,12 +5585,12 @@ export class VillageLedgerGame {
       this.drawForegroundDustParticles(ctx, w, h);
       
       // Combined path and shrubs layer - single image for efficiency
-      // Right-aligned to world coordinates: image right edge at worldWidth (3500)
+      // Right-aligned: image right edge at worldWidth (3500), using 0.7x parallax like sprites
       const pathShrubsWidth = this.parallaxLayers.pathShrubs.naturalWidth;
       const pathShrubsHeight = this.parallaxLayers.pathShrubs.naturalHeight;
       // Position at bottom of game area (just above dialogue box)
       const pathShrubsYOffset = h - this.dialogueBoxHeight - pathShrubsHeight;
-      // Position image so right edge is at worldWidth, using same 0.7x parallax as sprites
+      // Right edge at worldWidth: screenX = (worldWidth - imageWidth) - cameraX * 0.7
       const pathShrubsScreenX = (this.worldWidth - pathShrubsWidth) - frontmidOffset;
       ctx.drawImage(this.parallaxLayers.pathShrubs, 0, 0, pathShrubsWidth, pathShrubsHeight,
         pathShrubsScreenX, pathShrubsYOffset, pathShrubsWidth, pathShrubsHeight);

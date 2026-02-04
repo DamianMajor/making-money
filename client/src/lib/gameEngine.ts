@@ -5674,10 +5674,10 @@ export class VillageLedgerGame {
       this.backDustParticles.push({
         x: Math.random() * this.worldWidth,
         y: Math.random() * viewHeight,
-        size: 1.2 + Math.random() * 1.8, // Larger and more visible (1.2-3.0)
+        size: 0.8 + Math.random() * 1.2, // Original size (0.8-2.0)
         speed: 2 + Math.random() * 6,
         drift: Math.random() * Math.PI * 2,
-        alpha: 0.5 + Math.random() * 0.4, // Much more visible (0.5-0.9)
+        alpha: 0.4 + Math.random() * 0.35, // Middle ground (0.4-0.75)
         phase: Math.random() * Math.PI * 2
       });
     }

@@ -249,8 +249,7 @@ export class VillageLedgerGame {
     backmid: HTMLImageElement;
     treesThin: HTMLImageElement;
     treesThick: HTMLImageElement;
-    frontmid: HTMLImageElement;
-    shrubs: HTMLImageElement;
+    pathShrubs: HTMLImageElement;
     tree1: HTMLImageElement;
     tree2: HTMLImageElement;
     tree3: HTMLImageElement;
@@ -259,8 +258,7 @@ export class VillageLedgerGame {
     backmid: new Image(),
     treesThin: new Image(),
     treesThick: new Image(),
-    frontmid: new Image(),
-    shrubs: new Image(),
+    pathShrubs: new Image(),
     tree1: new Image(),
     tree2: new Image(),
     tree3: new Image()
@@ -313,8 +311,7 @@ export class VillageLedgerGame {
     this.parallaxLayers.backmid.src = '/backmid.png';
     this.parallaxLayers.treesThin.src = '/trees-thin.png';
     this.parallaxLayers.treesThick.src = '/trees-thick.png';
-    this.parallaxLayers.frontmid.src = '/frontmid.png';
-    this.parallaxLayers.shrubs.src = '/shrubs.png';
+    this.parallaxLayers.pathShrubs.src = '/path-shrubs.png';
     this.parallaxLayers.tree1.src = '/tree1.png';
     this.parallaxLayers.tree2.src = '/tree2.png';
     this.parallaxLayers.tree3.src = '/tree3.png';
@@ -335,8 +332,7 @@ export class VillageLedgerGame {
       this.parallaxLayers.backmid,
       this.parallaxLayers.treesThin,
       this.parallaxLayers.treesThick,
-      this.parallaxLayers.frontmid,
-      this.parallaxLayers.shrubs,
+      this.parallaxLayers.pathShrubs,
       this.parallaxLayers.tree1,
       this.parallaxLayers.tree2,
       this.parallaxLayers.tree3
@@ -5581,30 +5577,16 @@ export class VillageLedgerGame {
       // Draw foreground dust particles (between thick trees and shrubs - behind shrubs/footpath/sprites)
       this.drawForegroundDustParticles(ctx, w, h);
       
-      // Shrubs layer - behind footpath, compressed vertically by 20%, moved up 50px from original
-      const shrubsWidth = this.parallaxLayers.shrubs.naturalWidth;
-      const shrubsHeight = this.parallaxLayers.shrubs.naturalHeight;
-      const shrubsScaledHeight = shrubsHeight * 0.8;
-      const shrubsYOffset = h - this.dialogueBoxHeight - shrubsScaledHeight - 5;
-      const shrubsScreenX = -frontmidOffset;
-      ctx.drawImage(this.parallaxLayers.shrubs, 0, 0, shrubsWidth, shrubsHeight,
-        shrubsScreenX, shrubsYOffset, shrubsWidth, shrubsScaledHeight);
+      // Combined path and shrubs layer - single image for efficiency
+      const pathShrubsWidth = this.parallaxLayers.pathShrubs.naturalWidth;
+      const pathShrubsHeight = this.parallaxLayers.pathShrubs.naturalHeight;
+      // Position at bottom of game area (just above dialogue box)
+      const pathShrubsYOffset = h - this.dialogueBoxHeight - pathShrubsHeight;
+      const pathShrubsScreenX = -frontmidOffset;
+      ctx.drawImage(this.parallaxLayers.pathShrubs, 0, 0, pathShrubsWidth, pathShrubsHeight,
+        pathShrubsScreenX, pathShrubsYOffset, pathShrubsWidth, pathShrubsHeight);
       
-      // Apply haze to shrubs layer
-      this.drawLayerHaze(ctx, w, h, 0.35);
-      
-      // Frontmid layer (footpath) - moves with camera
-      // Scaled to 92% height, moved up 20px from dialogue box
-      const frontWidth = this.parallaxLayers.frontmid.naturalWidth;
-      const frontHeight = this.parallaxLayers.frontmid.naturalHeight;
-      const frontScaledHeight = frontHeight * 0.92;
-      // Position at dialogue box top
-      const frontYOffset = h - this.dialogueBoxHeight - frontScaledHeight;
-      const frontScreenX = -frontmidOffset;
-      ctx.drawImage(this.parallaxLayers.frontmid, 0, 0, frontWidth, frontHeight,
-        frontScreenX, frontYOffset, frontWidth, frontScaledHeight);
-      
-      // Apply haze to footpath layer
+      // Apply subtle haze to path/shrubs layer
       this.drawLayerHaze(ctx, w, h, 0.2);
       
       // Note: Atmospheric effects (haze, dust) are drawn in render() AFTER all game elements
@@ -5665,30 +5647,30 @@ export class VillageLedgerGame {
       });
     }
     
-    // Create 160 mid-layer dust particles (half size) between thin and thick trees
+    // Create 160 mid-layer dust particles between thin and thick trees
     this.midDustParticles = [];
     for (let i = 0; i < 160; i++) {
       this.midDustParticles.push({
         x: Math.random() * this.worldWidth,
         y: Math.random() * viewHeight,
-        size: 0.5 + Math.random() * 1, // Half the size (0.5-1.5 vs 1-3)
-        speed: 3 + Math.random() * 10, // Slightly slower drift
+        size: 1.0 + Math.random() * 1.5, // Increased size (1.0-2.5)
+        speed: 3 + Math.random() * 10,
         drift: Math.random() * Math.PI * 2,
-        alpha: 0.15 + Math.random() * 0.3, // Slightly more transparent
+        alpha: 0.35 + Math.random() * 0.35, // More visible (0.35-0.7)
         phase: Math.random() * Math.PI * 2
       });
     }
     
-    // Create 80 back-layer dust particles between sky and thin trees (smallest, slowest)
+    // Create 80 back-layer dust particles between sky and thin trees
     this.backDustParticles = [];
     for (let i = 0; i < 80; i++) {
       this.backDustParticles.push({
         x: Math.random() * this.worldWidth,
         y: Math.random() * viewHeight,
-        size: 0.3 + Math.random() * 0.7, // Even smaller (0.3-1.0)
-        speed: 2 + Math.random() * 6, // Slowest drift
+        size: 0.8 + Math.random() * 1.2, // Bigger (0.8-2.0)
+        speed: 2 + Math.random() * 6,
         drift: Math.random() * Math.PI * 2,
-        alpha: 0.1 + Math.random() * 0.2, // Most transparent
+        alpha: 0.3 + Math.random() * 0.3, // More visible (0.3-0.6)
         phase: Math.random() * Math.PI * 2
       });
     }

@@ -5533,14 +5533,14 @@ export class VillageLedgerGame {
       const frontmidOffset = this.cameraX * 1.0;
       
       // Background layer - slow parallax, starts at top of screen
-      // Stretched vertically by 20%, anchored at top
+      // Compressed horizontally by 25%, natural height
       const skyWidth = this.parallaxLayers.sky.naturalWidth;
       const skyHeight = this.parallaxLayers.sky.naturalHeight;
-      const skyScaledHeight = skyHeight * 1.2;
+      const skyScaledWidth = skyWidth * 0.75;
       const skyYOffset = 0;
       const skyScreenX = -skyOffset;
       ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight,
-        skyScreenX, skyYOffset, skyWidth, skyScaledHeight);
+        skyScreenX, skyYOffset, skyScaledWidth, skyHeight);
       
       // Draw back-layer dust particles (between sky and thin trees)
       this.drawBackDustParticles(ctx, w, h);

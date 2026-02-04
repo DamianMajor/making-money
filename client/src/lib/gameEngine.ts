@@ -233,6 +233,15 @@ export class VillageLedgerGame {
     alpha: number;
     phase: number;
   }> = [];
+  private backDustParticles: Array<{
+    x: number;
+    y: number;
+    size: number;
+    speed: number;
+    drift: number;
+    alpha: number;
+    phase: number;
+  }> = [];
   
   // Parallax background layers
   private parallaxLayers: {
@@ -5537,6 +5546,9 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight,
         skyScreenX, skyYOffset, skyWidth, skyScaledHeight);
       
+      // Draw back-layer dust particles (between sky and thin trees)
+      this.drawBackDustParticles(ctx, w, h);
+      
       // Thin trees layer - between background and midground (further back)
       // Full 100% width - original size
       const thinNaturalWidth = this.parallaxLayers.treesThin.naturalWidth;
@@ -5650,7 +5662,7 @@ export class VillageLedgerGame {
       });
     }
     
-    // Create 160 mid-layer dust particles (half size) between tree layers
+    // Create 160 mid-layer dust particles (half size) between thin and thick trees
     this.midDustParticles = [];
     for (let i = 0; i < 160; i++) {
       this.midDustParticles.push({
@@ -5663,24 +5675,77 @@ export class VillageLedgerGame {
         phase: Math.random() * Math.PI * 2
       });
     }
+    
+    // Create 80 back-layer dust particles between sky and thin trees (smallest, slowest)
+    this.backDustParticles = [];
+    for (let i = 0; i < 80; i++) {
+      this.backDustParticles.push({
+        x: Math.random() * this.worldWidth,
+        y: Math.random() * viewHeight,
+        size: 0.3 + Math.random() * 0.7, // Even smaller (0.3-1.0)
+        speed: 2 + Math.random() * 6, // Slowest drift
+        drift: Math.random() * Math.PI * 2,
+        alpha: 0.1 + Math.random() * 0.2, // Most transparent
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+  }
+  
+  private drawBackDustParticles(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const t = this.atmosphereTimer;
+    // Calculate footpath cutoff - don't draw particles on the footpath
+    const footpathHeight = this.parallaxLayers.frontmid ? this.parallaxLayers.frontmid.naturalHeight * 0.92 : 100;
+    const maxY = h - this.dialogueBoxHeight - footpathHeight;
+    
+    // Back-layer dust particles between sky and thin trees (slowest)
+    ctx.save();
+    for (const particle of this.backDustParticles) {
+      const worldX = particle.x + t * particle.speed;
+      const wrappedX = ((worldX % this.worldWidth) + this.worldWidth) % this.worldWidth;
+      
+      // Parallax at 0.12x (slower than thin trees 0.15)
+      const screenX = wrappedX - this.cameraX * 0.12;
+      
+      if (screenX >= -10 && screenX <= w + 10) {
+        const wobbleY = Math.sin(t * 0.4 + particle.drift) * 4;
+        const screenY = particle.y + wobbleY;
+        
+        // Skip if on footpath
+        if (screenY > maxY) continue;
+        
+        const twinkle = 0.7 + Math.sin(t * 1.5 + particle.phase) * 0.3;
+        const finalAlpha = particle.alpha * twinkle;
+        
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, particle.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 223, 150, ${finalAlpha})`;
+        ctx.fill();
+      }
+    }
+    ctx.restore();
   }
   
   private drawMidDustParticles(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     const t = this.atmosphereTimer;
+    // Calculate footpath cutoff - don't draw particles on the footpath
+    const footpathHeight = this.parallaxLayers.frontmid ? this.parallaxLayers.frontmid.naturalHeight * 0.92 : 100;
+    const maxY = h - this.dialogueBoxHeight - footpathHeight;
     
     // Mid-layer dust particles between thin and thick trees
-    // Uses parallax speed between thin (0.15) and thick (0.25) trees
     ctx.save();
     for (const particle of this.midDustParticles) {
       const worldX = particle.x + t * particle.speed;
       const wrappedX = ((worldX % this.worldWidth) + this.worldWidth) % this.worldWidth;
       
-      // Parallax at 0.2x (between thin 0.15 and thick 0.25)
-      const screenX = wrappedX - this.cameraX * 0.2;
+      // Parallax at 0.3x (faster, between thick trees and foreground)
+      const screenX = wrappedX - this.cameraX * 0.3;
       
       if (screenX >= -10 && screenX <= w + 10) {
         const wobbleY = Math.sin(t * 0.5 + particle.drift) * 6;
         const screenY = particle.y + wobbleY;
+        
+        // Skip if on footpath
+        if (screenY > maxY) continue;
         
         const twinkle = 0.7 + Math.sin(t * 2 + particle.phase) * 0.3;
         const finalAlpha = particle.alpha * twinkle;
@@ -5745,21 +5810,28 @@ export class VillageLedgerGame {
     
     ctx.restore();
     
-    // 3. Floating dust particles
+    // 3. Floating foreground dust particles
+    // Calculate footpath cutoff - don't draw particles on the footpath
+    const footpathHeight = this.parallaxLayers.frontmid ? this.parallaxLayers.frontmid.naturalHeight * 0.92 : 100;
+    const maxY = h - this.dialogueBoxHeight - footpathHeight;
+    
     ctx.save();
     for (const particle of this.dustParticles) {
       // Update particle position with slow drift
       const worldX = particle.x + t * particle.speed;
       const wrappedX = ((worldX % this.worldWidth) + this.worldWidth) % this.worldWidth;
       
-      // Convert to screen position with parallax (dust moves slower than foreground)
-      const screenX = wrappedX - this.cameraX * 0.7;
+      // Convert to screen position with parallax (foreground dust - slowest parallax)
+      const screenX = wrappedX - this.cameraX * 0.5;
       
       // Only draw if on screen
       if (screenX >= -10 && screenX <= w + 10) {
         // Gentle vertical wobble
         const wobbleY = Math.sin(t * 0.5 + particle.drift) * 8;
         const screenY = particle.y + wobbleY;
+        
+        // Skip if on footpath
+        if (screenY > maxY) continue;
         
         // Twinkling alpha
         const twinkle = 0.7 + Math.sin(t * 2 + particle.phase) * 0.3;

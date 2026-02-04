@@ -5526,10 +5526,11 @@ export class VillageLedgerGame {
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
       // Calculate parallax offsets - layers from back to front
-      // Sky (0.1x) -> Thin trees (0.15x) -> Thick trees (0.25x) -> Frontmid+Shrubs (1.0x)
+      // Sky (0.1x) -> Thin trees (0.08x) -> Thick trees (0.18x) -> Fog (0.45x) -> Frontmid+Shrubs (1.0x)
       const skyOffset = this.cameraX * 0.1;
-      const treesThinOffset = this.cameraX * 0.15;   // Further back, slower
-      const treesThickOffset = this.cameraX * 0.3;  // Closer, slightly faster
+      const treesThinOffset = this.cameraX * 0.08;   // Very distant, slow parallax
+      const treesThickOffset = this.cameraX * 0.18;  // Distant, slower parallax
+      const fogOffset = this.cameraX * 0.45;         // Midground fog layer
       const frontmidOffset = this.cameraX * 1.0;
       
       // Background layer - slow parallax, starts at top of screen
@@ -5580,6 +5581,9 @@ export class VillageLedgerGame {
       
       // Apply haze to thick trees layer
       this.drawLayerHaze(ctx, w, h, 0.5);
+      
+      // Draw low ground fog/mist layer (midground transition element)
+      this.drawGroundFog(ctx, w, h, fogOffset);
       
       // Draw foreground dust particles (between thick trees and shrubs - behind shrubs/footpath/sprites)
       this.drawForegroundDustParticles(ctx, w, h);
@@ -5634,6 +5638,48 @@ export class VillageLedgerGame {
     
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, w, h - this.dialogueBoxHeight);
+    
+    ctx.restore();
+  }
+  
+  private drawGroundFog(ctx: CanvasRenderingContext2D, w: number, h: number, fogOffset: number): void {
+    const t = this.atmosphereTimer;
+    const groundY = h - this.groundHeight - this.dialogueBoxHeight;
+    
+    ctx.save();
+    
+    // Fog band sits at ground level, creates transition between trees and path
+    const fogHeight = 180; // Height of the fog band
+    const fogTop = groundY - fogHeight + 40; // Start slightly above ground
+    
+    // Create multiple fog wisps at different positions for natural look
+    const fogWisps = [
+      { xBase: 0, width: w * 1.5, intensity: 0.15, speed: 0.08, phaseOffset: 0 },
+      { xBase: w * 0.3, width: w * 1.2, intensity: 0.12, speed: 0.05, phaseOffset: 1.5 },
+      { xBase: w * 0.6, width: w * 1.3, intensity: 0.1, speed: 0.06, phaseOffset: 3.0 },
+    ];
+    
+    for (const wisp of fogWisps) {
+      // Animate horizontal drift with parallax
+      const driftX = Math.sin(t * wisp.speed + wisp.phaseOffset) * 30;
+      const wispX = wisp.xBase - fogOffset * 0.5 + driftX;
+      
+      // Vertical breathing animation
+      const breathe = Math.sin(t * 0.04 + wisp.phaseOffset) * 5;
+      
+      // Create vertical gradient for fog wisp (denser at bottom, fading up)
+      const gradient = ctx.createLinearGradient(0, fogTop + breathe, 0, fogTop + fogHeight);
+      
+      // Muted earthy fog colors
+      const alpha = wisp.intensity * (0.8 + Math.sin(t * 0.03 + wisp.phaseOffset) * 0.2);
+      gradient.addColorStop(0, `rgba(180, 160, 140, 0)`); // Transparent at top
+      gradient.addColorStop(0.3, `rgba(160, 145, 125, ${alpha * 0.4})`); // Building
+      gradient.addColorStop(0.6, `rgba(140, 130, 115, ${alpha * 0.7})`); // Denser
+      gradient.addColorStop(1, `rgba(120, 110, 100, ${alpha})`); // Densest at bottom
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(wispX, fogTop + breathe, wisp.width, fogHeight);
+    }
     
     ctx.restore();
   }

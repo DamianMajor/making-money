@@ -5529,7 +5529,7 @@ export class VillageLedgerGame {
       // Sky (0.1x) -> Thin trees (0.15x) -> Thick trees (0.25x) -> Frontmid+Shrubs (1.0x)
       const skyOffset = this.cameraX * 0.1;
       const treesThinOffset = this.cameraX * 0.15;   // Further back, slower
-      const treesThickOffset = this.cameraX * 0.25;  // Closer, but still slow
+      const treesThickOffset = this.cameraX * 0.3;  // Closer, slightly faster
       const frontmidOffset = this.cameraX * 1.0;
       
       // Background layer - slow parallax, starts at top of screen

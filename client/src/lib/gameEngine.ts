@@ -5565,7 +5565,7 @@ export class VillageLedgerGame {
         thinScreenX, thinYOffset, thinScaledWidth, thinNaturalHeight);
       
       // Apply haze to thin trees layer
-      this.drawLayerHaze(ctx, w, h, 0.6);
+      this.drawLayerHaze(ctx, w, h, 0.75);
       
       // Draw mid-layer dust particles (between thin and thick trees)
       this.drawMidDustParticles(ctx, w, h);
@@ -5581,7 +5581,7 @@ export class VillageLedgerGame {
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       
       // Apply haze to thick trees layer
-      this.drawLayerHaze(ctx, w, h, 0.5);
+      this.drawLayerHaze(ctx, w, h, 0.65);
       
       // Draw low ground fog/mist layer (midground transition element)
       this.drawGroundFog(ctx, w, h, fogOffset);

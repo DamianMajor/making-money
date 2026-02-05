@@ -5592,13 +5592,13 @@ export class VillageLedgerGame {
       // Combined path and shrubs layer - single image for efficiency
       const pathShrubsWidth = this.parallaxLayers.pathShrubs.naturalWidth;
       const pathShrubsHeight = this.parallaxLayers.pathShrubs.naturalHeight;
-      // Draw at natural width, offset so right edge of image aligns with right edge of screen at max camera
-      const pathExtraWidth = pathShrubsWidth - this.worldWidth; // 4500 - 3800 = 700
-      // Position at bottom of game area (just above dialogue box), shifted down 50px
-      const pathShrubsYOffset = h - this.dialogueBoxHeight - pathShrubsHeight + 50;
-      const pathShrubsScreenX = -frontmidOffset - pathExtraWidth;
+      // Stretch path to world width to ensure full coverage
+      const pathDrawWidth = this.worldWidth;
+      // Position at bottom of game area (just above dialogue box)
+      const pathShrubsYOffset = h - this.dialogueBoxHeight - pathShrubsHeight;
+      const pathShrubsScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.pathShrubs, 0, 0, pathShrubsWidth, pathShrubsHeight,
-        pathShrubsScreenX, pathShrubsYOffset, pathShrubsWidth, pathShrubsHeight);
+        pathShrubsScreenX, pathShrubsYOffset, pathDrawWidth, pathShrubsHeight);
       
       // Apply subtle haze to path/shrubs layer
       this.drawLayerHaze(ctx, w, h, 0.2);

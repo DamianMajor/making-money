@@ -5829,7 +5829,7 @@ export class VillageLedgerGame {
   
   private drawForegroundDustParticles(ctx: CanvasRenderingContext2D, w: number, h: number): void {
     const t = this.atmosphereTimer;
-    const maxY = h - this.dialogueBoxHeight; // All particles above dialogue box
+    const maxY = h - this.dialogueBoxHeight + 40; // Particles can overlap top 40px of walking path
     
     // Foreground dust particles - drawn between thick trees and shrubs
     ctx.save();

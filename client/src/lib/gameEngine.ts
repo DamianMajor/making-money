@@ -5554,34 +5554,30 @@ export class VillageLedgerGame {
       // Draw back-layer dust particles (between sky and thin trees)
       this.drawBackDustParticles(ctx, w, h);
       
-      // Thin trees layer - between background and midground (further back)
-      // Full 100% width - original size
-      const thinNaturalWidth = this.parallaxLayers.treesThin.naturalWidth;
-      const thinNaturalHeight = this.parallaxLayers.treesThin.naturalHeight;
-      const thinScaledWidth = thinNaturalWidth * 0.56;
-      const thinYOffset = h - this.dialogueBoxHeight - thinNaturalHeight;
-      const thinScreenX = -treesThinOffset + 50; // Offset 300px to the right from -250
-      ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, thinNaturalWidth, thinNaturalHeight,
-        thinScreenX, thinYOffset, thinScaledWidth, thinNaturalHeight);
-      
-      // Apply haze to thin trees layer
-      this.drawLayerHaze(ctx, w, h, 0.75);
+      // DISABLED: Thin trees layer - between background and midground (further back)
+      // Kept for potential re-enabling
+      // const thinNaturalWidth = this.parallaxLayers.treesThin.naturalWidth;
+      // const thinNaturalHeight = this.parallaxLayers.treesThin.naturalHeight;
+      // const thinScaledWidth = thinNaturalWidth * 0.56;
+      // const thinYOffset = h - this.dialogueBoxHeight - thinNaturalHeight;
+      // const thinScreenX = -treesThinOffset + 50;
+      // ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, thinNaturalWidth, thinNaturalHeight,
+      //   thinScreenX, thinYOffset, thinScaledWidth, thinNaturalHeight);
+      // this.drawLayerHaze(ctx, w, h, 0.75);
       
       // Draw mid-layer dust particles (between thin and thick trees)
       this.drawMidDustParticles(ctx, w, h);
       
-      // Thick trees layer - between thin trees and midground (closer)
-      // Full 100% width - original size
-      const thickNaturalWidth = this.parallaxLayers.treesThick.naturalWidth;
-      const thickNaturalHeight = this.parallaxLayers.treesThick.naturalHeight;
-      const thickScaledWidth = thickNaturalWidth * 0.56;
-      const thickYOffset = h - this.dialogueBoxHeight - thickNaturalHeight;
-      const thickScreenX = -treesThickOffset + 50; // Offset 150px to the right from -100
-      ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
-        thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
-      
-      // Apply haze to thick trees layer
-      this.drawLayerHaze(ctx, w, h, 0.65);
+      // DISABLED: Thick trees layer - between thin trees and midground (closer)
+      // Kept for potential re-enabling
+      // const thickNaturalWidth = this.parallaxLayers.treesThick.naturalWidth;
+      // const thickNaturalHeight = this.parallaxLayers.treesThick.naturalHeight;
+      // const thickScaledWidth = thickNaturalWidth * 0.56;
+      // const thickYOffset = h - this.dialogueBoxHeight - thickNaturalHeight;
+      // const thickScreenX = -treesThickOffset + 50;
+      // ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
+      //   thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
+      // this.drawLayerHaze(ctx, w, h, 0.65);
       
       // Draw low ground fog/mist layer (midground transition element)
       this.drawGroundFog(ctx, w, h, fogOffset);

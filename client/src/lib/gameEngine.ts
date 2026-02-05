@@ -5545,8 +5545,8 @@ export class VillageLedgerGame {
       const targetWidth = Math.max(w, w + maxSkyOffset);
       const skyScale = targetWidth / skyWidth;
       const skyScaledWidth = skyWidth * skyScale;
-      // Position sky so its bottom edge aligns with top of dialogue box (hint area), shifted up 70px
-      const skyYOffset = (h - this.dialogueBoxHeight) - skyHeight - 70;
+      // Position sky so its bottom edge aligns with top of dialogue box (hint area), shifted up 270px
+      const skyYOffset = (h - this.dialogueBoxHeight) - skyHeight - 270;
       const skyScreenX = -this.cameraX * skyParallax;
       ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight,
         skyScreenX, skyYOffset, skyScaledWidth, skyHeight);

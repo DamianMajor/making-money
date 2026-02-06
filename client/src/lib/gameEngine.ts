@@ -5557,7 +5557,7 @@ export class VillageLedgerGame {
       // Thin trees layer - between background and midground (further back)
       const thinNaturalWidth = this.parallaxLayers.treesThin.naturalWidth;
       const thinNaturalHeight = this.parallaxLayers.treesThin.naturalHeight;
-      const thinScaledWidth = thinNaturalWidth * 0.56;
+      const thinScaledWidth = thinNaturalWidth * 0.42;
       const thinYOffset = h - this.dialogueBoxHeight - thinNaturalHeight;
       const thinScreenX = -treesThinOffset + 50;
       ctx.filter = 'blur(1px)';
@@ -5572,7 +5572,7 @@ export class VillageLedgerGame {
       // Thick trees layer - between thin trees and midground (closer)
       const thickNaturalWidth = this.parallaxLayers.treesThick.naturalWidth;
       const thickNaturalHeight = this.parallaxLayers.treesThick.naturalHeight;
-      const thickScaledWidth = thickNaturalWidth * 0.56;
+      const thickScaledWidth = thickNaturalWidth * 0.42;
       const thickYOffset = h - this.dialogueBoxHeight - thickNaturalHeight;
       const thickScreenX = -treesThickOffset + 50;
       ctx.filter = 'blur(0.375px)';

@@ -5546,7 +5546,7 @@ export class VillageLedgerGame {
       const skyScale = targetWidth / skyWidth;
       const skyScaledWidth = skyWidth * skyScale;
       // Position sky at top of play area
-      const skyYOffset = -80;
+      const skyYOffset = -30;
       const skyScreenX = -this.cameraX * skyParallax;
       ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight,
         skyScreenX, skyYOffset, skyScaledWidth, skyHeight);

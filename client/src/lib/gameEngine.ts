@@ -2724,6 +2724,14 @@ export class VillageLedgerGame {
               });
             }
             
+            choices.push({
+              text: "Cancel",
+              action: () => {
+                this.state.showChoice = false;
+                this.queueDialogue([{ speaker: 'FISHERMAN', text: "No worries! Come back when you're ready to trade." }]);
+              }
+            });
+            
             this.state.showChoice = true;
             this.state.choiceOptions = choices;
           }
@@ -3137,8 +3145,41 @@ export class VillageLedgerGame {
               speaker: 'WOODCUTTER',
               text: "...Wait. The Ledger says 1 Stone and 1 Fish. I was wrong... I apologize.",
               onComplete: () => {
-                this.state.phase = 'loop2_verify_at_tablet';
+                this.state.elderVerified = true;
                 this.woodcutter.targetX = this.villageCenterX + 80;
+                const hasStone = this.state.inventory.stone >= 1;
+                const hasFish = this.state.inventory.fish >= 1;
+                if (hasStone && hasFish) {
+                  this.state.inventory.stone -= 1;
+                  this.state.inventory.fish -= 1;
+                  soundManager.play('settle');
+                  this.state.woodcutterSettled = true;
+                  if (this.state.woodcutterDebtRecorded) {
+                    this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
+                      e.name === 'Woodcutter' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+                    );
+                  }
+                  this.hudGlow = 1;
+                  this.setMood('happy');
+                  this.showInventoryPopup('-1 STONE, -1 FISH (DEBT SETTLED)');
+                  this.queueDialogue([
+                    {
+                      speaker: 'WOODCUTTER',
+                      text: "The Tablet shows 1 Stone + 1 Fish. Here, I'll take what's fair. Debt settled!",
+                      onComplete: () => {
+                        this.checkAllDebtsSettled();
+                      }
+                    }
+                  ]);
+                } else {
+                  this.state.phase = 'loop2_verify_at_tablet';
+                  this.queueDialogue([
+                    {
+                      speaker: 'WOODCUTTER',
+                      text: `You still need to bring me ${!hasStone ? '1 Stone' : ''}${!hasStone && !hasFish ? ' and ' : ''}${!hasFish ? '1 Fish' : ''} as recorded on the Tablet.`
+                    }
+                  ]);
+                }
               }
             }
           ]);
@@ -3259,8 +3300,41 @@ export class VillageLedgerGame {
               speaker: 'STONE-WORKER',
               text: "...Wait. The Ledger says 1 Wood and 2 Fish. I was wrong... I apologize.",
               onComplete: () => {
-                this.state.phase = 'loop2_verify_at_tablet';
+                this.state.elderVerified = true;
                 this.stoneWorker.targetX = this.villageCenterX - 100;
+                const hasWood = this.state.inventory.wood >= 1;
+                const hasFish = this.state.inventory.fish >= 2;
+                if (hasWood && hasFish) {
+                  this.state.inventory.wood -= 1;
+                  this.state.inventory.fish -= 2;
+                  soundManager.play('settle');
+                  this.state.stoneWorkerSettled = true;
+                  if (this.state.stoneWorkerDebtRecorded) {
+                    this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
+                      e.name === 'Stone-Worker' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+                    );
+                  }
+                  this.hudGlow = 1;
+                  this.setMood('happy');
+                  this.showInventoryPopup('-1 WOOD, -2 FISH (DEBT SETTLED)');
+                  this.queueDialogue([
+                    {
+                      speaker: 'STONE-WORKER',
+                      text: "The Tablet shows 1 Wood + 2 Fish. Here, I'll take what's fair. Debt settled!",
+                      onComplete: () => {
+                        this.checkAllDebtsSettled();
+                      }
+                    }
+                  ]);
+                } else {
+                  this.state.phase = 'loop2_verify_at_tablet';
+                  this.queueDialogue([
+                    {
+                      speaker: 'STONE-WORKER',
+                      text: `You still need to bring me ${!hasWood ? '1 Wood' : ''}${!hasWood && !hasFish ? ' and ' : ''}${!hasFish ? '2 Fish' : ''} as recorded on the Tablet.`
+                    }
+                  ]);
+                }
               }
             }
           ]);
@@ -6607,20 +6681,19 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   // Draw dialogue text with highlighting for special phrases like "Double Coincidence of Wants"
+  // charLimit: optional typewriter limit - colors are based on full text, but only chars up to charLimit are rendered
   private drawDialogueTextWithHighlight(
     ctx: CanvasRenderingContext2D, 
     text: string, 
     startX: number, 
     startY: number, 
     maxWidth: number, 
-    lineHeight: number
+    lineHeight: number,
+    charLimit?: number
   ): void {
     const normalColor = '#F5F5DC';
-    const highlightColor = '#FFD700'; // Gold color for highlighted text
+    const highlightColor = '#FFD700';
     
-    // Determine which phrase to highlight based on loop
-    // Loop 1: Highlight "Double Coincidence of Wants"
-    // Loop 2: Highlight "Ledger" during trade dialogues
     let highlightPhrase: string;
     if (this.state.loop === 1) {
       highlightPhrase = "Double Coincidence of Wants";
@@ -6628,73 +6701,54 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       highlightPhrase = "Ledger";
     }
     
-    // Check if text contains the highlight phrase
     const lowerText = text.toLowerCase();
     const lowerPhrase = highlightPhrase.toLowerCase();
     
-    if (!lowerText.includes(lowerPhrase)) {
-      // No highlight needed, use simple rendering
-      ctx.fillStyle = normalColor;
-      const words = text.split(' ');
-      let line = '';
-      let lineY = startY;
-      
-      for (const word of words) {
-        const testLine = line + word + ' ';
-        const metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && line !== '') {
-          ctx.fillText(line.trim(), startX, lineY);
-          line = word + ' ';
-          lineY += lineHeight;
-        } else {
-          line = testLine;
-        }
+    // Build a per-character color map based on the FULL text
+    const charColors: string[] = new Array(text.length).fill(normalColor);
+    let searchFrom = 0;
+    while (true) {
+      const idx = lowerText.indexOf(lowerPhrase, searchFrom);
+      if (idx === -1) break;
+      for (let i = idx; i < idx + highlightPhrase.length; i++) {
+        charColors[i] = highlightColor;
       }
-      ctx.fillText(line.trim(), startX, lineY);
-      return;
+      searchFrom = idx + highlightPhrase.length;
     }
     
-    // Find the phrase boundaries for highlighting
-    const phraseStart = lowerText.indexOf(lowerPhrase);
-    const phraseEnd = phraseStart + highlightPhrase.length;
+    // Determine how many characters to actually render
+    const visibleLength = charLimit !== undefined ? Math.min(charLimit, text.length) : text.length;
+    const visibleText = text.substring(0, visibleLength);
     
-    // Split text into before, phrase, and after
-    const beforePhrase = text.substring(0, phraseStart);
-    const phrase = text.substring(phraseStart, phraseEnd);
-    const afterPhrase = text.substring(phraseEnd);
-    
-    // Build segments with color info
-    const segments: { text: string; color: string }[] = [];
-    if (beforePhrase) segments.push({ text: beforePhrase, color: normalColor });
-    if (phrase) segments.push({ text: phrase, color: highlightColor });
-    if (afterPhrase) segments.push({ text: afterPhrase, color: normalColor });
-    
-    // Now render word by word, keeping track of which segment each word belongs to
+    // Render word by word with correct colors, using word wrapping
+    const words = visibleText.split(' ');
     let lineY = startY;
     let lineX = startX;
     let currentLineWidth = 0;
+    let globalCharIdx = 0;
     
-    for (const segment of segments) {
-      const words = segment.text.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        const word = words[i];
-        if (!word && i === 0) continue; // Skip empty leading word from split
-        
-        const wordWithSpace = word + (i < words.length - 1 || segment !== segments[segments.length - 1] ? ' ' : '');
-        const wordWidth = ctx.measureText(wordWithSpace).width;
-        
-        // Check if we need to wrap to next line
-        if (currentLineWidth + wordWidth > maxWidth && currentLineWidth > 0) {
-          lineY += lineHeight;
-          lineX = startX;
-          currentLineWidth = 0;
-        }
-        
-        // Draw the word
-        ctx.fillStyle = segment.color;
-        ctx.fillText(wordWithSpace, lineX + currentLineWidth, lineY);
-        currentLineWidth += wordWidth;
+    for (let wi = 0; wi < words.length; wi++) {
+      const word = words[wi];
+      const isLastWord = wi === words.length - 1;
+      const wordWithSpace = word + (isLastWord ? '' : ' ');
+      const wordWidth = ctx.measureText(wordWithSpace).width;
+      
+      if (currentLineWidth + wordWidth > maxWidth && currentLineWidth > 0) {
+        lineY += lineHeight;
+        lineX = startX;
+        currentLineWidth = 0;
       }
+      
+      // Render each character of the word with its correct color
+      let charX = lineX + currentLineWidth;
+      for (let ci = 0; ci < wordWithSpace.length; ci++) {
+        const ch = wordWithSpace[ci];
+        ctx.fillStyle = charColors[globalCharIdx] || normalColor;
+        ctx.fillText(ch, charX, lineY);
+        charX += ctx.measureText(ch).width;
+        globalCharIdx++;
+      }
+      currentLineWidth += wordWidth;
     }
   }
 
@@ -6782,7 +6836,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillText(`[${this.state.currentDialogue.speaker}]`, textStartX, y + 36);
 
       // Dialogue text with typewriter effect - using retro font at 16-18px per guidelines
-      const displayText = this.state.currentDialogue.text.substring(0, this.dialogueCharIndex);
+      const fullText = this.state.currentDialogue.text;
       ctx.font = `16px ${this.retroFont}`;
 
       // Word wrap with highlighting for "Double Coincidence of Wants"
@@ -6790,7 +6844,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const lineHeight = 32; // 16px * 1.6 = ~26, rounded up for readability
       
       // Draw text with potential highlighting for DCW phrase
-      this.drawDialogueTextWithHighlight(ctx, displayText, textStartX, y + 70, maxWidth, lineHeight);
+      // Pass full text for color calculation, charIndex for typewriter truncation
+      this.drawDialogueTextWithHighlight(ctx, fullText, textStartX, y + 70, maxWidth, lineHeight, this.dialogueCharIndex);
 
       // Continue indicator
       if (this.state.dialogueComplete) {

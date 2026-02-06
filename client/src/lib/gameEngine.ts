@@ -5574,7 +5574,7 @@ export class VillageLedgerGame {
       const thickNaturalHeight = this.parallaxLayers.treesThick.naturalHeight;
       const thickScaledWidth = thickNaturalWidth * 0.42;
       const thickYOffset = h - this.dialogueBoxHeight - thickNaturalHeight;
-      const thickScreenX = -treesThickOffset + 50;
+      const thickScreenX = -treesThickOffset + 100; // Offset 100px to the right (was 50)
       ctx.filter = 'blur(0.375px)';
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);

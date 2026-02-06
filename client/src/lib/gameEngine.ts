@@ -5658,9 +5658,6 @@ export class VillageLedgerGame {
       // Draw low ground fog/mist layer (midground transition element)
       this.drawGroundFog(ctx, w, h, fogOffset);
       
-      // Draw foreground dust particles (between thick trees and shrubs - behind shrubs/footpath/sprites)
-      this.drawForegroundDustParticles(ctx, w, h);
-      
       // Combined path and shrubs layer - single image for efficiency
       const pathShrubsWidth = this.parallaxLayers.pathShrubs.naturalWidth;
       const pathShrubsHeight = this.parallaxLayers.pathShrubs.naturalHeight;
@@ -5674,6 +5671,9 @@ export class VillageLedgerGame {
       
       // Apply subtle haze to path/shrubs layer
       this.drawLayerHaze(ctx, w, h, 0.2);
+      
+      // Draw foreground dust particles AFTER shrubs so they overlap top 20% of foreground layer
+      this.drawForegroundDustParticles(ctx, w, h, pathShrubsYOffset);
       
       // Note: Atmospheric effects (haze, dust) are drawn in render() AFTER all game elements
       // Note: Foreground trees are drawn separately in render() AFTER all game elements
@@ -5899,9 +5899,12 @@ export class VillageLedgerGame {
     ctx.restore();
   }
   
-  private drawForegroundDustParticles(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  private drawForegroundDustParticles(ctx: CanvasRenderingContext2D, w: number, h: number, foregroundY?: number): void {
     const t = this.atmosphereTimer;
-    const maxY = h - this.dialogueBoxHeight + 40; // Particles can overlap top 40px of walking path
+    // Allow particles to overlap the top 20% of the foreground (path/shrubs) layer
+    const foregroundTop = foregroundY !== undefined ? foregroundY : (h - this.dialogueBoxHeight);
+    const foregroundHeight = (h - this.dialogueBoxHeight) - foregroundTop;
+    const maxY = foregroundTop + foregroundHeight * 0.2;
     
     // Foreground dust particles - drawn between thick trees and shrubs
     ctx.save();

@@ -5589,7 +5589,7 @@ export class VillageLedgerGame {
       // Stretch path to world width to ensure full coverage
       const pathDrawWidth = this.worldWidth;
       // Position at bottom of game area (just above dialogue box)
-      const pathShrubsYOffset = h - this.dialogueBoxHeight - pathShrubsHeight;
+      const pathShrubsYOffset = h - this.dialogueBoxHeight - pathShrubsHeight + 70;
       const pathShrubsScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.pathShrubs, 0, 0, pathShrubsWidth, pathShrubsHeight,
         pathShrubsScreenX, pathShrubsYOffset, pathDrawWidth, pathShrubsHeight);

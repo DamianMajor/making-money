@@ -103,6 +103,7 @@ export class SoundManager {
   private daytimeMusicActive: boolean = false;
   private pendingLoops: Set<SoundName> = new Set();
   private pendingDaytimeMusic: boolean = false;
+  private initializing: boolean = false;
   // Cross-fade rain loop system
   private rainSources: ActiveSound[] = [];
   private rainCrossfadeInterval: ReturnType<typeof setInterval> | null = null;
@@ -137,35 +138,49 @@ export class SoundManager {
   }
 
   public async init(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized || this.initializing) return;
+    this.initializing = true;
+    
+    console.log('[SoundManager] init() called, muted:', this.muted, 'volume:', this.masterVolume);
     
     try {
       this.audioContext = new AudioContext();
+      console.log('[SoundManager] AudioContext state:', this.audioContext.state);
       if (this.audioContext.state === 'suspended') {
         await this.audioContext.resume();
+        console.log('[SoundManager] AudioContext resumed, state:', this.audioContext.state);
       }
       this.masterGain = this.audioContext.createGain();
       this.masterGain.connect(this.audioContext.destination);
       this.masterGain.gain.value = this.muted ? 0 : this.masterVolume;
       
       // Load all audio buffers
+      let loadedCount = 0;
+      let failedCount = 0;
       const loadPromises = Object.entries(SOUND_CONFIGS).map(async ([name, config]) => {
         try {
           const response = await fetch(config.src);
           if (!response.ok) {
-            console.warn(`Sound not found: ${config.src}`);
+            console.warn(`[SoundManager] Sound not found: ${config.src} (${response.status})`);
+            failedCount++;
             return;
           }
           const arrayBuffer = await response.arrayBuffer();
           const audioBuffer = await this.audioContext!.decodeAudioData(arrayBuffer);
           this.buffers.set(name as SoundName, audioBuffer);
+          loadedCount++;
         } catch (error) {
-          console.warn(`Failed to load sound: ${config.src}`, error);
+          console.warn(`[SoundManager] Failed to load sound: ${config.src}`, error);
+          failedCount++;
         }
       });
       
       await Promise.all(loadPromises);
       this.initialized = true;
+      this.initializing = false;
+      
+      console.log(`[SoundManager] Initialized: ${loadedCount} loaded, ${failedCount} failed`);
+      console.log('[SoundManager] Pending plays:', Array.from(this.pendingPlays), 'Pending loops:', Array.from(this.pendingLoops), 'Pending daytime:', this.pendingDaytimeMusic);
       
       // Play pending sounds
       this.pendingPlays.forEach(name => this.play(name));
@@ -181,7 +196,8 @@ export class SoundManager {
         this.startDaytimeMusic();
       }
     } catch (error) {
-      console.error('Failed to initialize audio context:', error);
+      console.error('[SoundManager] Failed to initialize audio context:', error);
+      this.initializing = false;
     }
   }
 

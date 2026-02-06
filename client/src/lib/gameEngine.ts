@@ -5560,8 +5560,10 @@ export class VillageLedgerGame {
       const thinScaledWidth = thinNaturalWidth * 0.56;
       const thinYOffset = h - this.dialogueBoxHeight - thinNaturalHeight;
       const thinScreenX = -treesThinOffset + 50;
+      ctx.filter = 'blur(2px)';
       ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, thinNaturalWidth, thinNaturalHeight,
         thinScreenX, thinYOffset, thinScaledWidth, thinNaturalHeight);
+      ctx.filter = 'none';
       this.drawLayerHaze(ctx, w, h, 0.75);
       
       // Draw mid-layer dust particles (between thin and thick trees)
@@ -5573,8 +5575,10 @@ export class VillageLedgerGame {
       const thickScaledWidth = thickNaturalWidth * 0.56;
       const thickYOffset = h - this.dialogueBoxHeight - thickNaturalHeight;
       const thickScreenX = -treesThickOffset + 50;
+      ctx.filter = 'blur(1.5px)';
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
+      ctx.filter = 'none';
       this.drawLayerHaze(ctx, w, h, 0.65);
       
       // Draw low ground fog/mist layer (midground transition element)

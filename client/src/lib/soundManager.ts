@@ -141,6 +141,9 @@ export class SoundManager {
     
     try {
       this.audioContext = new AudioContext();
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
       this.masterGain = this.audioContext.createGain();
       this.masterGain.connect(this.audioContext.destination);
       this.masterGain.gain.value = this.muted ? 0 : this.masterVolume;
@@ -221,6 +224,10 @@ export class SoundManager {
       this.pendingPlays.add(name);
       return;
     }
+
+    if (this.audioContext?.state === 'suspended') {
+      this.audioContext.resume();
+    }
     
     const config = SOUND_CONFIGS[name];
     const activeSound = this.createSource(name, config.loop, pitch);
@@ -248,6 +255,10 @@ export class SoundManager {
     if (!this.initialized) {
       this.pendingLoops.add(name);
       return;
+    }
+
+    if (this.audioContext?.state === 'suspended') {
+      this.audioContext.resume();
     }
     
     // Stop existing loop of this sound

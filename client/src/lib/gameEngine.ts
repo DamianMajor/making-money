@@ -5904,7 +5904,7 @@ export class VillageLedgerGame {
     // Allow particles to overlap the top 20% of the foreground (path/shrubs) layer
     const foregroundTop = foregroundY !== undefined ? foregroundY : (h - this.dialogueBoxHeight);
     const foregroundHeight = (h - this.dialogueBoxHeight) - foregroundTop;
-    const maxY = foregroundTop + foregroundHeight * 0.2;
+    const maxY = foregroundTop + foregroundHeight * 0.4;
     
     // Foreground dust particles - drawn between thick trees and shrubs
     ctx.save();

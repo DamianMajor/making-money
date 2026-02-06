@@ -5560,7 +5560,7 @@ export class VillageLedgerGame {
       const thinScaledWidth = thinNaturalWidth * 0.56;
       const thinYOffset = h - this.dialogueBoxHeight - thinNaturalHeight;
       const thinScreenX = -treesThinOffset + 50;
-      ctx.filter = 'blur(2px)';
+      ctx.filter = 'blur(1px)';
       ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, thinNaturalWidth, thinNaturalHeight,
         thinScreenX, thinYOffset, thinScaledWidth, thinNaturalHeight);
       ctx.filter = 'none';
@@ -5575,7 +5575,7 @@ export class VillageLedgerGame {
       const thickScaledWidth = thickNaturalWidth * 0.56;
       const thickYOffset = h - this.dialogueBoxHeight - thickNaturalHeight;
       const thickScreenX = -treesThickOffset + 50;
-      ctx.filter = 'blur(1.5px)';
+      ctx.filter = 'blur(0.75px)';
       ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       ctx.filter = 'none';

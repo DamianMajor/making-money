@@ -253,6 +253,7 @@ export class VillageLedgerGame {
     tree1: HTMLImageElement;
     tree2: HTMLImageElement;
     tree3: HTMLImageElement;
+    treeTall: HTMLImageElement;
   } = {
     sky: new Image(),
     backmid: new Image(),
@@ -261,7 +262,8 @@ export class VillageLedgerGame {
     pathShrubs: new Image(),
     tree1: new Image(),
     tree2: new Image(),
-    tree3: new Image()
+    tree3: new Image(),
+    treeTall: new Image()
   };
   private parallaxLoaded: boolean = false;
   
@@ -315,12 +317,13 @@ export class VillageLedgerGame {
     this.parallaxLayers.tree1.src = '/tree1.png';
     this.parallaxLayers.tree2.src = '/tree2.png';
     this.parallaxLayers.tree3.src = '/tree3.png';
+    this.parallaxLayers.treeTall.src = '/tree-tall.png';
     
     // Track when all layers are loaded (or failed - proceed anyway)
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 8) {
+      if (loadedCount >= 9) {
         this.parallaxLoaded = true;
         // Initialize dust particles once layers are loaded
         this.initializeDustParticles();
@@ -335,7 +338,8 @@ export class VillageLedgerGame {
       this.parallaxLayers.pathShrubs,
       this.parallaxLayers.tree1,
       this.parallaxLayers.tree2,
-      this.parallaxLayers.tree3
+      this.parallaxLayers.tree3,
+      this.parallaxLayers.treeTall
     ];
     images.forEach(img => {
       img.onload = checkAllLoaded;
@@ -5654,6 +5658,17 @@ export class VillageLedgerGame {
         thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
       ctx.filter = 'none';
       this.drawLayerHaze(ctx, w, h, 0.65);
+      
+      // Draw single tall tree in front of thick trees, 400px from left of play area
+      if (this.parallaxLayers.treeTall.naturalWidth > 0) {
+        const tallW = this.parallaxLayers.treeTall.naturalWidth;
+        const tallH = this.parallaxLayers.treeTall.naturalHeight;
+        const tallWorldX = 400;
+        const tallScreenX = tallWorldX - this.cameraX * 0.25;
+        const tallYOffset = h - this.dialogueBoxHeight - tallH;
+        ctx.drawImage(this.parallaxLayers.treeTall, 0, 0, tallW, tallH,
+          tallScreenX, tallYOffset, tallW, tallH);
+      }
       
       // Draw low ground fog/mist layer (midground transition element)
       this.drawGroundFog(ctx, w, h, fogOffset);

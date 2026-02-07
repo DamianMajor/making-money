@@ -6126,7 +6126,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const bushW = bushImg.naturalWidth * bushScale;
     const bushH = bushImg.naturalHeight * bushScale;
     const bushX = screenX - bushW / 2;
-    const bushY = char.y + char.height - bushH + char.bobOffset + talkingBounce;
+    const bushY = char.y + char.height - bushH - 25;
     ctx.drawImage(bushImg, bushX, bushY, bushW, bushH);
     
     ctx.font = `7px ${this.retroFont}`;

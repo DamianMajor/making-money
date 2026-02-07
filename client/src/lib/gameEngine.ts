@@ -6087,9 +6087,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   const screenY = char.y + char.bobOffset + talkingBounce;
 
   // 1. Draw original shadow
+  const shadowYOffset = char.id === 'berryBush' ? -25 : 0;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
   ctx.beginPath();
-  ctx.ellipse(screenX, char.y + char.height + 5, char.width * 0.4, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(screenX, char.y + char.height + 5 + shadowYOffset, char.width * 0.4, 8, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const x = screenX - char.width / 2;

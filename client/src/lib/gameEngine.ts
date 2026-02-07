@@ -5633,37 +5633,13 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight,
         skyScreenX, skyYOffset, skyScaledWidth, skyHeight);
       
-      // Draw back-layer dust particles (between sky and thin trees)
+      // Draw back-layer dust particles
       this.drawBackDustParticles(ctx, w, h);
       
-      // Thin trees layer - between background and midground (further back)
-      const thinNaturalWidth = this.parallaxLayers.treesThin.naturalWidth;
-      const thinNaturalHeight = this.parallaxLayers.treesThin.naturalHeight;
-      const thinScaledWidth = thinNaturalWidth * 0.42;
-      const thinYOffset = h - this.dialogueBoxHeight - thinNaturalHeight;
-      const thinScreenX = -treesThinOffset + 50;
-      ctx.filter = 'blur(1px)';
-      ctx.drawImage(this.parallaxLayers.treesThin, 0, 0, thinNaturalWidth, thinNaturalHeight,
-        thinScreenX, thinYOffset, thinScaledWidth, thinNaturalHeight);
-      ctx.filter = 'none';
-      this.drawLayerHaze(ctx, w, h, 0.75);
-      
-      // Draw mid-layer dust particles (between thin and thick trees)
+      // Draw mid-layer dust particles
       this.drawMidDustParticles(ctx, w, h);
       
-      // Thick trees layer - between thin trees and midground (closer)
-      const thickNaturalWidth = this.parallaxLayers.treesThick.naturalWidth;
-      const thickNaturalHeight = this.parallaxLayers.treesThick.naturalHeight;
-      const thickScaledWidth = thickNaturalWidth * 0.42;
-      const thickYOffset = h - this.dialogueBoxHeight - thickNaturalHeight;
-      const thickScreenX = -treesThickOffset + 100; // Offset 100px to the right (was 50)
-      ctx.filter = 'blur(0.375px)';
-      ctx.drawImage(this.parallaxLayers.treesThick, 0, 0, thickNaturalWidth, thickNaturalHeight,
-        thickScreenX, thickYOffset, thickScaledWidth, thickNaturalHeight);
-      ctx.filter = 'none';
-      this.drawLayerHaze(ctx, w, h, 0.65);
-      
-      // Draw single tall tree in front of thick trees, 400px from left of play area
+      // Draw single tall tree, 400px from left of play area
       if (this.parallaxLayers.treeTall.naturalWidth > 0) {
         const tallW = this.parallaxLayers.treeTall.naturalWidth;
         const tallH = this.parallaxLayers.treeTall.naturalHeight;

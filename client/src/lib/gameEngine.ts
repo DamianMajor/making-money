@@ -254,6 +254,7 @@ export class VillageLedgerGame {
     tree2: HTMLImageElement;
     tree3: HTMLImageElement;
     treeTall: HTMLImageElement;
+    berryBush: HTMLImageElement;
   } = {
     sky: new Image(),
     backmid: new Image(),
@@ -263,7 +264,8 @@ export class VillageLedgerGame {
     tree1: new Image(),
     tree2: new Image(),
     tree3: new Image(),
-    treeTall: new Image()
+    treeTall: new Image(),
+    berryBush: new Image()
   };
   private parallaxLoaded: boolean = false;
   
@@ -318,12 +320,13 @@ export class VillageLedgerGame {
     this.parallaxLayers.tree2.src = '/tree2.png';
     this.parallaxLayers.tree3.src = '/tree3.png';
     this.parallaxLayers.treeTall.src = '/tree-tall.png';
+    this.parallaxLayers.berryBush.src = '/berry-bush.png';
     
     // Track when all layers are loaded (or failed - proceed anyway)
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 9) {
+      if (loadedCount >= 10) {
         this.parallaxLoaded = true;
         // Initialize dust particles once layers are loaded
         this.initializeDustParticles();
@@ -339,7 +342,8 @@ export class VillageLedgerGame {
       this.parallaxLayers.tree1,
       this.parallaxLayers.tree2,
       this.parallaxLayers.tree3,
-      this.parallaxLayers.treeTall
+      this.parallaxLayers.treeTall,
+      this.parallaxLayers.berryBush
     ];
     images.forEach(img => {
       img.onload = checkAllLoaded;
@@ -6115,7 +6119,27 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   const x = screenX - char.width / 2;
   const y = screenY;
 
-  // 2. Draw character body (Keep original blue/green/orange colors)
+  // 2. Berry bush uses sprite image instead of placeholder rectangle
+  if (char.id === 'berryBush' && this.parallaxLayers.berryBush.naturalWidth > 0) {
+    const bushImg = this.parallaxLayers.berryBush;
+    const bushScale = char.height / bushImg.naturalHeight * 1.8;
+    const bushW = bushImg.naturalWidth * bushScale;
+    const bushH = bushImg.naturalHeight * bushScale;
+    const bushX = screenX - bushW / 2;
+    const bushY = char.y + char.height - bushH + char.bobOffset + talkingBounce;
+    ctx.drawImage(bushImg, bushX, bushY, bushW, bushH);
+    
+    ctx.font = `7px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    const labelWidth = ctx.measureText(char.name).width + 16;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(screenX - labelWidth / 2, bushY - 10, labelWidth, 18);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(char.name, screenX, bushY + 4);
+    return;
+  }
+
+  // Draw character body (Keep original blue/green/orange colors)
   ctx.fillStyle = char.color;
   ctx.strokeStyle = char.outlineColor;
   ctx.lineWidth = 3;

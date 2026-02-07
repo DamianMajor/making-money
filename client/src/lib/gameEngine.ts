@@ -5666,8 +5666,15 @@ export class VillageLedgerGame {
         const tallWorldX = 400;
         const tallScreenX = tallWorldX - this.cameraX * 0.25;
         const tallYOffset = h - this.dialogueBoxHeight - tallH;
+        ctx.save();
+        ctx.filter = 'blur(0.3px)';
+        ctx.globalAlpha = 0.85;
         ctx.drawImage(this.parallaxLayers.treeTall, 0, 0, tallW, tallH,
           tallScreenX, tallYOffset, tallW, tallH);
+        ctx.filter = 'none';
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+        this.drawLayerHaze(ctx, w, h, 0.55);
       }
       
       // Draw low ground fog/mist layer (midground transition element)

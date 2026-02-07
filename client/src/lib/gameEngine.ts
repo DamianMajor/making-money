@@ -247,25 +247,29 @@ export class VillageLedgerGame {
   private parallaxLayers: {
     sky: HTMLImageElement;
     backmid: HTMLImageElement;
-    treesThin: HTMLImageElement;
-    treesThick: HTMLImageElement;
-    pathShrubs: HTMLImageElement;
+    treesFar: HTMLImageElement;
+    treesClose: HTMLImageElement;
+    walkingPath: HTMLImageElement;
+    hutBrokenOpen: HTMLImageElement;
+    hutFixedOpen: HTMLImageElement;
+    hutFixedClosed: HTMLImageElement;
     tree1: HTMLImageElement;
     tree2: HTMLImageElement;
     tree3: HTMLImageElement;
-    treeTall: HTMLImageElement;
     berryBush: HTMLImageElement;
     bushNoBerries: HTMLImageElement;
   } = {
     sky: new Image(),
     backmid: new Image(),
-    treesThin: new Image(),
-    treesThick: new Image(),
-    pathShrubs: new Image(),
+    treesFar: new Image(),
+    treesClose: new Image(),
+    walkingPath: new Image(),
+    hutBrokenOpen: new Image(),
+    hutFixedOpen: new Image(),
+    hutFixedClosed: new Image(),
     tree1: new Image(),
     tree2: new Image(),
     tree3: new Image(),
-    treeTall: new Image(),
     berryBush: new Image(),
     bushNoBerries: new Image()
   };
@@ -317,23 +321,25 @@ export class VillageLedgerGame {
     // Load parallax background layers
     this.parallaxLayers.sky.src = '/sky.png';
     this.parallaxLayers.backmid.src = '/backmid.png';
-    this.parallaxLayers.treesThin.src = '/trees-thin.png';
-    this.parallaxLayers.treesThick.src = '/trees-thick.png';
-    this.parallaxLayers.pathShrubs.src = '/path-shrubs.png';
+    this.parallaxLayers.treesFar.src = '/trees-far.png';
+    this.parallaxLayers.treesClose.src = '/trees-close.png';
+    this.parallaxLayers.walkingPath.src = '/walking-path.png';
+    this.parallaxLayers.hutBrokenOpen.src = '/hut-broken-open.png';
+    this.parallaxLayers.hutFixedOpen.src = '/hut-fixed-open.png';
+    this.parallaxLayers.hutFixedClosed.src = '/hut-fixed-closed.png';
     this.parallaxLayers.tree1.src = '/tree1.png';
     this.parallaxLayers.tree2.src = '/tree2.png';
     this.parallaxLayers.tree3.src = '/tree3.png';
-    this.parallaxLayers.treeTall.src = '/tree-tall.png';
     this.parallaxLayers.berryBush.src = '/berry-bush.png';
     this.parallaxLayers.bushNoBerries.src = '/bush-no-berries.png';
     
     // Track when all layers are loaded (or failed - proceed anyway)
     let loadedCount = 0;
+    const totalImages = 13;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 11) {
+      if (loadedCount >= totalImages) {
         this.parallaxLoaded = true;
-        // Initialize dust particles once layers are loaded
         this.initializeDustParticles();
       }
     };
@@ -341,13 +347,15 @@ export class VillageLedgerGame {
     const images = [
       this.parallaxLayers.sky,
       this.parallaxLayers.backmid,
-      this.parallaxLayers.treesThin,
-      this.parallaxLayers.treesThick,
-      this.parallaxLayers.pathShrubs,
+      this.parallaxLayers.treesFar,
+      this.parallaxLayers.treesClose,
+      this.parallaxLayers.walkingPath,
+      this.parallaxLayers.hutBrokenOpen,
+      this.parallaxLayers.hutFixedOpen,
+      this.parallaxLayers.hutFixedClosed,
       this.parallaxLayers.tree1,
       this.parallaxLayers.tree2,
       this.parallaxLayers.tree3,
-      this.parallaxLayers.treeTall,
       this.parallaxLayers.berryBush,
       this.parallaxLayers.bushNoBerries
     ];
@@ -5472,53 +5480,9 @@ export class VillageLedgerGame {
   }
 
   private drawLocationMarkers(ctx: CanvasRenderingContext2D, groundY: number): void {
-    // Player Home marker (at x=100) - 20% larger
+    // Player Home label (hut graphic is now rendered as part of the foreground layer)
     const homeScreenX = this.playerHomeX - this.cameraX;
-    const hutScale = 1.2; // 20% larger
     if (homeScreenX > -100 && homeScreenX < this.logicalWidth + 100) {
-      // Draw a simple house shape (scaled 20% larger)
-      const hutWidth = 60 * hutScale;
-      const hutHeight = 60 * hutScale;
-      ctx.fillStyle = '#4A3728';
-      ctx.fillRect(homeScreenX - hutWidth/2, groundY - hutHeight, hutWidth, hutHeight);
-      
-      // Draw roof (scaled 20% larger)
-      ctx.fillStyle = '#6B4423';
-      ctx.beginPath();
-      ctx.moveTo(homeScreenX - 40 * hutScale, groundY - hutHeight);
-      ctx.lineTo(homeScreenX, groundY - 100 * hutScale);
-      ctx.lineTo(homeScreenX + 40 * hutScale, groundY - hutHeight);
-      ctx.fill();
-      
-      // Draw hole in roof if not repaired (keep hole size the same!)
-      const holeY = groundY - (75 * hutScale); // Position scaled but hole size same
-      if (!this.state.roofRepaired) {
-        // Hole in the roof (dark opening) - SAME SIZE as before
-        ctx.fillStyle = '#1a0f08';
-        ctx.beginPath();
-        ctx.ellipse(homeScreenX + 12 * hutScale, holeY, 15, 10, -0.3, 0, Math.PI * 2);
-        ctx.fill();
-        // Jagged edges for the hole
-        ctx.strokeStyle = '#4A3020';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.ellipse(homeScreenX + 12 * hutScale, holeY, 16, 11, -0.3, 0, Math.PI * 2);
-        ctx.stroke();
-      } else {
-        // Patch on the roof (lighter wood color) - SAME SIZE as before
-        ctx.fillStyle = '#8B6B4F';
-        ctx.beginPath();
-        ctx.ellipse(homeScreenX + 12 * hutScale, holeY, 15, 10, -0.3, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#5D4E37';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
-      
-      // Door (scaled 20% larger)
-      ctx.fillStyle = '#2D1F14';
-      ctx.fillRect(homeScreenX - 12 * hutScale, groundY - 42 * hutScale, 24 * hutScale, 42 * hutScale);
-      // Label
       ctx.font = `10px ${this.retroFont}`;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#FFF';
@@ -5622,10 +5586,10 @@ export class VillageLedgerGame {
     // Use parallax layers if loaded, otherwise fallback to solid color
     if (this.parallaxLoaded) {
       // Calculate parallax offsets - layers from back to front
-      // Sky (0.05x) -> Thin trees (0.12x) -> Thick trees (0.22x) -> Fog (0.45x) -> Frontmid+Shrubs (1.0x)
+      // Sky (0.05x) -> Trees far (0.12x) -> Trees close (0.22x) -> Fog (0.45x) -> Walking path + Hut (1.0x)
       const skyOffset = this.cameraX * 0.05;         // Furthest back, slowest
-      const treesThinOffset = this.cameraX * 0.12;   // Distant, but faster than sky
-      const treesThickOffset = this.cameraX * 0.22;  // Closer, faster than thin trees
+      const treesFarOffset = this.cameraX * 0.12;     // Distant, slower parallax
+      const treesCloseOffset = this.cameraX * 0.22;  // Closer, faster parallax
       const fogOffset = this.cameraX * 0.45;         // Midground fog layer
       const frontmidOffset = this.cameraX * 1.0;
       
@@ -5653,43 +5617,69 @@ export class VillageLedgerGame {
       // Draw mid-layer dust particles
       this.drawMidDustParticles(ctx, w, h);
       
-      // Draw single tall tree, 400px from left of play area
-      if (this.parallaxLayers.treeTall.naturalWidth > 0) {
-        const tallW = this.parallaxLayers.treeTall.naturalWidth;
-        const tallH = this.parallaxLayers.treeTall.naturalHeight;
-        const tallWorldX = 400;
-        const tallScreenX = tallWorldX - this.cameraX * 0.25;
-        const tallYOffset = h - this.dialogueBoxHeight - tallH;
+      // Trees far layer (distant trees with parallax)
+      if (this.parallaxLayers.treesFar.naturalWidth > 0) {
+        const treesFarW = this.parallaxLayers.treesFar.naturalWidth;
+        const treesFarH = this.parallaxLayers.treesFar.naturalHeight;
+        const treesFarDrawWidth = this.worldWidth;
+        const treesFarYOffset = h - this.dialogueBoxHeight - treesFarH + 55;
+        const treesFarScreenX = -treesFarOffset;
         ctx.save();
-        ctx.filter = 'blur(0.3px)';
         ctx.globalAlpha = 0.85;
-        ctx.drawImage(this.parallaxLayers.treeTall, 0, 0, tallW, tallH,
-          tallScreenX, tallYOffset, tallW, tallH);
-        ctx.filter = 'none';
+        ctx.drawImage(this.parallaxLayers.treesFar, 0, 0, treesFarW, treesFarH,
+          treesFarScreenX, treesFarYOffset, treesFarDrawWidth, treesFarH);
         ctx.globalAlpha = 1.0;
         ctx.restore();
-        this.drawLayerHaze(ctx, w, h, 0.55);
+        this.drawLayerHaze(ctx, w, h, 0.45);
+      }
+
+      // Trees close layer (closer trees with faster parallax)
+      if (this.parallaxLayers.treesClose.naturalWidth > 0) {
+        const treesCloseW = this.parallaxLayers.treesClose.naturalWidth;
+        const treesCloseH = this.parallaxLayers.treesClose.naturalHeight;
+        const treesCloseDrawWidth = this.worldWidth;
+        const treesCloseYOffset = h - this.dialogueBoxHeight - treesCloseH + 55;
+        const treesCloseScreenX = -treesCloseOffset;
+        ctx.save();
+        ctx.globalAlpha = 0.9;
+        ctx.drawImage(this.parallaxLayers.treesClose, 0, 0, treesCloseW, treesCloseH,
+          treesCloseScreenX, treesCloseYOffset, treesCloseDrawWidth, treesCloseH);
+        ctx.globalAlpha = 1.0;
+        ctx.restore();
+        this.drawLayerHaze(ctx, w, h, 0.3);
       }
       
       // Draw low ground fog/mist layer (midground transition element)
       this.drawGroundFog(ctx, w, h, fogOffset);
       
-      // Combined path and shrubs layer - single image for efficiency
-      const pathShrubsWidth = this.parallaxLayers.pathShrubs.naturalWidth;
-      const pathShrubsHeight = this.parallaxLayers.pathShrubs.naturalHeight;
-      // Stretch path to world width to ensure full coverage
+      // Walking path foreground layer
+      const walkingPathWidth = this.parallaxLayers.walkingPath.naturalWidth;
+      const walkingPathHeight = this.parallaxLayers.walkingPath.naturalHeight;
       const pathDrawWidth = this.worldWidth;
-      // Position at bottom of game area (just above dialogue box)
-      const pathShrubsYOffset = h - this.dialogueBoxHeight - pathShrubsHeight + 55;
-      const pathShrubsScreenX = -frontmidOffset;
-      ctx.drawImage(this.parallaxLayers.pathShrubs, 0, 0, pathShrubsWidth, pathShrubsHeight,
-        pathShrubsScreenX, pathShrubsYOffset, pathDrawWidth, pathShrubsHeight);
+      const walkingPathYOffset = h - this.dialogueBoxHeight - walkingPathHeight + 55;
+      const walkingPathScreenX = -frontmidOffset;
+      ctx.drawImage(this.parallaxLayers.walkingPath, 0, 0, walkingPathWidth, walkingPathHeight,
+        walkingPathScreenX, walkingPathYOffset, pathDrawWidth, walkingPathHeight);
       
-      // Apply subtle haze to path/shrubs layer
+      // Draw hut overlay (same dimensions as walking path, aligned on top)
+      let hutImg: HTMLImageElement;
+      if (this.state.playerEnteredHut) {
+        hutImg = this.parallaxLayers.hutFixedClosed;
+      } else if (this.state.roofRepaired) {
+        hutImg = this.parallaxLayers.hutFixedOpen;
+      } else {
+        hutImg = this.parallaxLayers.hutBrokenOpen;
+      }
+      if (hutImg.naturalWidth > 0) {
+        ctx.drawImage(hutImg, 0, 0, hutImg.naturalWidth, hutImg.naturalHeight,
+          walkingPathScreenX, walkingPathYOffset, pathDrawWidth, walkingPathHeight);
+      }
+      
+      // Apply subtle haze to foreground
       this.drawLayerHaze(ctx, w, h, 0.2);
       
-      // Draw foreground dust particles AFTER shrubs so they overlap top 20% of foreground layer
-      this.drawForegroundDustParticles(ctx, w, h, pathShrubsYOffset);
+      // Draw foreground dust particles AFTER foreground so they overlap top 20%
+      this.drawForegroundDustParticles(ctx, w, h, walkingPathYOffset);
       
       // Note: Atmospheric effects (haze, dust) are drawn in render() AFTER all game elements
       // Note: Foreground trees are drawn separately in render() AFTER all game elements

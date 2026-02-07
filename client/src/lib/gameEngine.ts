@@ -255,6 +255,7 @@ export class VillageLedgerGame {
     tree3: HTMLImageElement;
     treeTall: HTMLImageElement;
     berryBush: HTMLImageElement;
+    bushNoBerries: HTMLImageElement;
   } = {
     sky: new Image(),
     backmid: new Image(),
@@ -265,7 +266,8 @@ export class VillageLedgerGame {
     tree2: new Image(),
     tree3: new Image(),
     treeTall: new Image(),
-    berryBush: new Image()
+    berryBush: new Image(),
+    bushNoBerries: new Image()
   };
   private parallaxLoaded: boolean = false;
   
@@ -321,12 +323,13 @@ export class VillageLedgerGame {
     this.parallaxLayers.tree3.src = '/tree3.png';
     this.parallaxLayers.treeTall.src = '/tree-tall.png';
     this.parallaxLayers.berryBush.src = '/berry-bush.png';
+    this.parallaxLayers.bushNoBerries.src = '/bush-no-berries.png';
     
     // Track when all layers are loaded (or failed - proceed anyway)
     let loadedCount = 0;
     const checkAllLoaded = () => {
       loadedCount++;
-      if (loadedCount >= 10) {
+      if (loadedCount >= 11) {
         this.parallaxLoaded = true;
         // Initialize dust particles once layers are loaded
         this.initializeDustParticles();
@@ -343,7 +346,8 @@ export class VillageLedgerGame {
       this.parallaxLayers.tree2,
       this.parallaxLayers.tree3,
       this.parallaxLayers.treeTall,
-      this.parallaxLayers.berryBush
+      this.parallaxLayers.berryBush,
+      this.parallaxLayers.bushNoBerries
     ];
     images.forEach(img => {
       img.onload = checkAllLoaded;
@@ -6098,7 +6102,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   // 2. Berry bush uses sprite image instead of placeholder rectangle
   if (char.id === 'berryBush' && this.parallaxLayers.berryBush.naturalWidth > 0) {
-    const bushImg = this.parallaxLayers.berryBush;
+    const bushIsEmpty = this.state.resourcesDepleted || 
+                        (this.state.inventory.berries >= 3 && !this.state.extraBerryAvailable);
+    const bushImg = (bushIsEmpty && this.parallaxLayers.bushNoBerries.naturalWidth > 0)
+      ? this.parallaxLayers.bushNoBerries
+      : this.parallaxLayers.berryBush;
     const bushScale = char.height / bushImg.naturalHeight * 1.8;
     const bushW = bushImg.naturalWidth * bushScale;
     const bushH = bushImg.naturalHeight * bushScale;

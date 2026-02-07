@@ -5489,29 +5489,7 @@ export class VillageLedgerGame {
       ctx.fillText('HOME', homeScreenX, groundY - 110);
     }
 
-    // Village Center / Elder's Rock marker (at x=1500)
-    const centerScreenX = this.villageCenterX - this.cameraX;
-    if (centerScreenX > -100 && centerScreenX < this.logicalWidth + 100) {
-      // Draw a large blank rock
-      ctx.fillStyle = '#8B8B8B';
-      ctx.beginPath();
-      ctx.moveTo(centerScreenX - 50, groundY);
-      ctx.lineTo(centerScreenX - 60, groundY - 80);
-      ctx.lineTo(centerScreenX - 30, groundY - 120);
-      ctx.lineTo(centerScreenX + 30, groundY - 110);
-      ctx.lineTo(centerScreenX + 55, groundY - 70);
-      ctx.lineTo(centerScreenX + 45, groundY);
-      ctx.fill();
-      // Rock texture lines
-      ctx.strokeStyle = '#6B6B6B';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(centerScreenX - 40, groundY - 60);
-      ctx.lineTo(centerScreenX + 20, groundY - 55);
-      ctx.moveTo(centerScreenX - 20, groundY - 90);
-      ctx.lineTo(centerScreenX + 30, groundY - 85);
-      ctx.stroke();
-    }
+    // Village Center / Stone Tablet area (at x=1500) - graphic removed, interaction area preserved
     
     // Fishing Hole / Pond at Fisherman's location (x=3200)
     // Shifted left by 60px and down by 25px so pond sits below ground horizon
@@ -5588,8 +5566,8 @@ export class VillageLedgerGame {
       // Calculate parallax offsets - layers from back to front
       // Sky (0.05x) -> Trees far (0.12x) -> Trees close (0.22x) -> Fog (0.45x) -> Walking path + Hut (1.0x)
       const skyOffset = this.cameraX * 0.05;         // Furthest back, slowest
-      const treesFarOffset = this.cameraX * 0.12;     // Distant, slower parallax
-      const treesCloseOffset = this.cameraX * 0.22;  // Closer, faster parallax
+      const treesFarOffset = this.cameraX * 0.35;     // Distant, moderate parallax
+      const treesCloseOffset = this.cameraX * 0.55;  // Closer, faster parallax
       const fogOffset = this.cameraX * 0.45;         // Midground fog layer
       const frontmidOffset = this.cameraX * 1.0;
       

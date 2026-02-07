@@ -282,6 +282,8 @@ export class VillageLedgerGame {
   // Sound timing
   private lastFootstepTime: number = 0;
   private footstepInterval: number = 300;
+  private bushShakeTimer: number = 0;
+  private bushShakeDuration: number = 300;
   private booFailureTriggered: boolean = false;
   private stormTriggered: boolean = false;
   private rainSoundStarted: boolean = false;
@@ -2784,6 +2786,9 @@ export class VillageLedgerGame {
   // CREDIT-FIRST: Always interactable - allows player to pick up to 3 berries at any time
   // Extra berry spawns after giving in to inflated demand
   private handleBerryBushInteraction(): void {
+    // Trigger shake animation
+    this.bushShakeTimer = this.bushShakeDuration;
+    
     // Check if bush is empty FIRST before playing sounds
     const bushIsEmpty = this.state.resourcesDepleted || 
                         (this.state.inventory.berries >= 3 && !this.state.extraBerryAvailable);
@@ -3624,6 +3629,11 @@ export class VillageLedgerGame {
     this.bobTimer += dt * 8;
     this.talkingTimer += dt * 18; // Faster timer for talking bounce (~3 cycles/sec)
     this.atmosphereTimer += dt; // For atmospheric haze and dust animation
+    
+    // Update bush shake timer
+    if (this.bushShakeTimer > 0) {
+      this.bushShakeTimer = Math.max(0, this.bushShakeTimer - dt * 1000);
+    }
     
     // Update player fade animation
     if (this.state.playerFading) {
@@ -6110,8 +6120,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const bushScale = char.height / bushImg.naturalHeight * 1.8;
     const bushW = bushImg.naturalWidth * bushScale;
     const bushH = bushImg.naturalHeight * bushScale;
-    const bushX = screenX - bushW / 2;
+    let bushX = screenX - bushW / 2;
     const bushY = char.y + char.height - bushH - 25;
+    if (this.bushShakeTimer > 0) {
+      const shakeProgress = this.bushShakeTimer / this.bushShakeDuration;
+      bushX += Math.sin(shakeProgress * Math.PI * 8) * 3 * shakeProgress;
+    }
     ctx.drawImage(bushImg, bushX, bushY, bushW, bushH);
     
     ctx.font = `7px ${this.retroFont}`;
@@ -7168,14 +7182,18 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     for (const word of words) {
       const testLine = line + word + ' ';
       if (ctx.measureText(testLine).width > maxWidth && line !== '') {
-        ctx.fillText(line.trim(), w / 2, lineY);
+        ctx.font = `12px ${this.retroFont}`;
+        ctx.textAlign = 'center';
+        this.drawHighlightedText(ctx, line.trim(), w / 2, lineY, '#3D2914', 'center');
         line = word + ' ';
         lineY += 28;
       } else {
         line = testLine;
       }
     }
-    ctx.fillText(line.trim(), w / 2, lineY);
+    ctx.font = `12px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    this.drawHighlightedText(ctx, line.trim(), w / 2, lineY, '#3D2914', 'center');
 
     // Options as buttons - smaller for multi-select to fit submit button
     this.quizButtonAreas = [];
@@ -7254,7 +7272,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       let optLineY = btnY + (btnH - totalTextHeight) / 2 + optLineHeight / 2 + 4;
       
       for (const line of optLines) {
-        ctx.fillText(line, textCenterX, optLineY);
+        ctx.font = `10px ${this.retroFont}`;
+        ctx.textAlign = 'center';
+        this.drawHighlightedText(ctx, line, textCenterX, optLineY, '#FFF', 'center');
         optLineY += optLineHeight;
       }
 
@@ -7513,10 +7533,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     // Explanation with more room
     ctx.font = `italic 10px ${this.retroFont}`;
-    ctx.fillStyle = '#5D4837';
     const explanationLines = this.wrapText(ctx, q.explanation, maxWidth);
     explanationLines.forEach(line => {
-      ctx.fillText(line, cardX + 30, yOffset);
+      ctx.font = `italic 10px ${this.retroFont}`;
+      ctx.textAlign = 'left';
+      this.drawHighlightedText(ctx, line, cardX + 30, yOffset, '#5D4837');
       yOffset += 18;
     });
     
@@ -7589,6 +7610,63 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private prevFeedbackButton: { x: number; y: number; w: number; h: number } | null = null;
   private nextFeedbackButton: { x: number; y: number; w: number; h: number } | null = null;
   
+  private drawHighlightedText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    normalColor: string,
+    align: 'left' | 'center' = 'left'
+  ): void {
+    const highlightColor = '#DAA520';
+    const keywords = ['double coincidence of wants', 'ledger', 'debts', 'debt'];
+    const lowerText = text.toLowerCase();
+    const charColors: string[] = new Array(text.length).fill(normalColor);
+    
+    for (const keyword of keywords) {
+      let searchFrom = 0;
+      while (true) {
+        const idx = lowerText.indexOf(keyword, searchFrom);
+        if (idx === -1) break;
+        const beforeChar = idx > 0 ? lowerText[idx - 1] : ' ';
+        const afterChar = idx + keyword.length < lowerText.length ? lowerText[idx + keyword.length] : ' ';
+        const isWordBoundary = (c: string) => !c.match(/[a-z0-9]/i);
+        if (isWordBoundary(beforeChar) && isWordBoundary(afterChar)) {
+          for (let i = idx; i < idx + keyword.length; i++) {
+            charColors[i] = highlightColor;
+          }
+        }
+        searchFrom = idx + keyword.length;
+      }
+    }
+    
+    if (align === 'center') {
+      const totalWidth = ctx.measureText(text).width;
+      x = x - totalWidth / 2;
+    }
+    
+    const originalFont = ctx.font;
+    let curX = x;
+    let i = 0;
+    while (i < text.length) {
+      let j = i;
+      while (j < text.length && charColors[j] === charColors[i]) j++;
+      const segment = text.substring(i, j);
+      ctx.fillStyle = charColors[i];
+      if (charColors[i] === highlightColor) {
+        const sizeMatch = originalFont.match(/(\d+px)/);
+        const size = sizeMatch ? sizeMatch[1] : '12px';
+        ctx.font = `bold ${size} ${this.retroFont}`;
+      } else {
+        ctx.font = originalFont;
+      }
+      ctx.fillText(segment, curX, y);
+      curX += ctx.measureText(segment).width;
+      i = j;
+    }
+    ctx.font = originalFont;
+  }
+
   private wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
     const words = text.split(' ');
     const lines: string[] = [];
@@ -7617,6 +7695,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const btn = this.reviewContinueButton;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.state.showQuizReview = false;
+        this.state.showNightTransition = false;
         this.state.showSuccess = true;
         this.state.phase = 'complete';
         // Fade out ambient night when quiz completes
@@ -7650,9 +7729,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.fillRect(0, 0, w, h);
     
-    // Card dimensions
+    // Card dimensions - tall enough to fit all content
     const cardW = Math.min(700, w - 40);
-    const cardH = Math.min(520, h - 40);
+    const cardH = Math.min(560, h - 20);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
     
@@ -7700,36 +7779,37 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     lessons.forEach(lesson => {
       const lines = this.wrapText(ctx, lesson, maxWidth);
       lines.forEach(line => {
-        ctx.fillText(line, cardX + 30, yOffset);
+        ctx.font = `12px ${this.retroFont}`;
+        ctx.textAlign = 'left';
+        this.drawHighlightedText(ctx, line, cardX + 30, yOffset, '#5D4837');
         yOffset += 18;
       });
-      yOffset += 8;
+      yOffset += 6;
     });
     
-    yOffset += 10;
+    yOffset += 5;
     
-    // Big takeaway - reduce spacing to prevent button overlap
     ctx.font = `bold 11px ${this.retroFont}`;
     ctx.fillStyle = '#6B4423';
     ctx.textAlign = 'center';
     ctx.fillText('The Big Idea:', w / 2, yOffset);
-    yOffset += 18;
+    yOffset += 16;
     
-    ctx.font = `italic 10px ${this.retroFont}`;
-    ctx.fillStyle = '#3D2914';
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.textAlign = 'center';
     const bigIdea = "Money is not just coins or paper - it's a system for tracking debts. When you get paid, you earn the right to collect value later. The Stone Tablet was an early ledger - today we use banks and computers, but the idea is the same!";
     const bigIdeaLines = this.wrapText(ctx, bigIdea, maxWidth);
     bigIdeaLines.forEach(line => {
-      ctx.fillText(line, w / 2, yOffset);
-      yOffset += 15;
+      this.drawHighlightedText(ctx, line, w / 2, yOffset, '#3D2914', 'center');
+      yOffset += 14;
     });
     
     // Continue button - positioned below the text content, clamped to card bounds
     const btnW = 200;
     const btnH = 45;
     const btnX = (w - btnW) / 2;
-    const maxBtnY = cardY + cardH - btnH - 25; // Maximum Y to keep button inside card with more bottom padding
-    const btnY = Math.min(yOffset + 35, maxBtnY); // Position below text with proper spacing
+    const maxBtnY = cardY + cardH - btnH - 15;
+    const btnY = Math.min(yOffset + 20, maxBtnY);
     
     ctx.fillStyle = '#166534';
     ctx.beginPath();

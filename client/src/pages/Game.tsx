@@ -4,9 +4,12 @@ import { VillageLedgerGame } from '@/lib/gameEngine';
 const MONEY_ICONS = [
   'money-shell', 'money-beads', 'money-goldbar', 'money-coin', 'money-raistone',
   'money-cattle', 'money-salt', 'money-teabrick', 'money-feather', 'money-cocoa',
-  'money-banknote', 'money-creditcard', 'money-moderncoins', 'money-binary1', 'money-binary2',
-  'money-bitcoin'
+  'money-banknote', 'money-creditcard', 'money-moderncoins', 'money-bitcoin',
+  'money-yen', 'money-yuan', 'money-euro'
 ];
+
+const HIGH_FREQ_ICONS = ['money-banknote', 'money-yen', 'money-yuan', 'money-euro'];
+const MAX_SIZE_ICONS = ['money-cattle'];
 
 interface FallingItem {
   x: number;
@@ -74,8 +77,19 @@ function MoneyRainCanvas() {
       itemsRef.current = items;
     }
 
+    function pickIconIndex(): number {
+      if (Math.random() < 0.4) {
+        const hfName = HIGH_FREQ_ICONS[Math.floor(Math.random() * HIGH_FREQ_ICONS.length)];
+        const idx = MONEY_ICONS.indexOf(hfName);
+        if (idx >= 0) return idx;
+      }
+      return Math.floor(Math.random() * MONEY_ICONS.length);
+    }
+
     function createItem(w: number, h: number, randomY: boolean): FallingItem {
-      const size = 24 + Math.random() * 48;
+      const iconIndex = pickIconIndex();
+      const iconName = MONEY_ICONS[iconIndex];
+      const size = MAX_SIZE_ICONS.includes(iconName) ? 72 : 24 + Math.random() * 48;
       return {
         x: Math.random() * w,
         y: randomY ? Math.random() * h : -size - Math.random() * 100,
@@ -84,7 +98,7 @@ function MoneyRainCanvas() {
         swaySpeed: 0.3 + Math.random() * 0.6,
         swayOffset: Math.random() * Math.PI * 2,
         size,
-        iconIndex: Math.floor(Math.random() * MONEY_ICONS.length),
+        iconIndex,
         rotation: Math.random() * Math.PI * 2,
         rotationSpeed: (Math.random() - 0.5) * 0.3,
         sparkleTimer: Math.random() * 5,
@@ -92,6 +106,23 @@ function MoneyRainCanvas() {
         opacity: 0.3 + Math.random() * 0.4,
       };
     }
+
+    const matrixCharSize = 14;
+    const matrixCols = 4;
+    const matrixStripWidth = matrixCols * matrixCharSize;
+    const matrixStripX = Math.floor(Math.random() * (canvas.width - matrixStripWidth));
+    const matrixRows = Math.ceil(canvas.height / matrixCharSize) + 2;
+    const matrixChars: string[][] = [];
+    const matrixTimers: number[][] = [];
+    for (let r = 0; r < matrixRows; r++) {
+      matrixChars[r] = [];
+      matrixTimers[r] = [];
+      for (let c = 0; c < matrixCols; c++) {
+        matrixChars[r][c] = Math.random() < 0.5 ? '1' : '0';
+        matrixTimers[r][c] = Math.random() * 2;
+      }
+    }
+    let matrixScrollOffset = 0;
 
     let lastTime = performance.now();
     function animate(now: number) {
@@ -151,6 +182,47 @@ function MoneyRainCanvas() {
 
         ctx!.restore();
       }
+
+      matrixScrollOffset += dt * 60;
+      if (matrixScrollOffset >= matrixCharSize) {
+        matrixScrollOffset -= matrixCharSize;
+        for (let r = matrixRows - 1; r > 0; r--) {
+          for (let c = 0; c < matrixCols; c++) {
+            matrixChars[r][c] = matrixChars[r - 1][c];
+          }
+        }
+        for (let c = 0; c < matrixCols; c++) {
+          matrixChars[0][c] = Math.random() < 0.5 ? '1' : '0';
+        }
+      }
+      for (let r = 0; r < matrixRows; r++) {
+        for (let c = 0; c < matrixCols; c++) {
+          matrixTimers[r][c] += dt;
+          if (matrixTimers[r][c] > 0.15 + Math.random() * 0.3) {
+            matrixTimers[r][c] = 0;
+            if (Math.random() < 0.3) {
+              matrixChars[r][c] = matrixChars[r][c] === '1' ? '0' : '1';
+            }
+          }
+        }
+      }
+      ctx!.save();
+      ctx!.font = `${matrixCharSize}px monospace`;
+      ctx!.textAlign = 'left';
+      ctx!.textBaseline = 'top';
+      for (let r = 0; r < matrixRows; r++) {
+        const drawY = r * matrixCharSize + matrixScrollOffset - matrixCharSize;
+        if (drawY < -matrixCharSize || drawY > h) continue;
+        const rowProgress = r / matrixRows;
+        const fadeAlpha = rowProgress < 0.1 ? rowProgress / 0.1 : rowProgress > 0.85 ? (1 - rowProgress) / 0.15 : 1;
+        for (let c = 0; c < matrixCols; c++) {
+          const brightness = 120 + Math.floor(Math.random() * 135);
+          ctx!.globalAlpha = 0.6 * fadeAlpha;
+          ctx!.fillStyle = `rgb(0, ${brightness}, 0)`;
+          ctx!.fillText(matrixChars[r][c], matrixStripX + c * matrixCharSize, drawY);
+        }
+      }
+      ctx!.restore();
 
       animFrameRef.current = requestAnimationFrame(animate);
     }

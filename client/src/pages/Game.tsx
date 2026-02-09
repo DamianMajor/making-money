@@ -118,23 +118,25 @@ function MoneyRainCanvas() {
 
     const STOCK_POINTS = 300;
     const STOCK_STEP = 8;
-    const stockNorm: number[] = [];
-    let stockVal = 0.85;
-    let stockVel = -0.02;
+    const stockYValues: number[] = [];
+    let osc = 0;
+    let oscVel = 0;
     const minVel = 0.06;
-    const upBias = -0.04;
     for (let i = 0; i < STOCK_POINTS; i++) {
-      let nudge = (Math.random() - 0.5) * 0.5 + upBias;
-      stockVel += nudge;
-      stockVel *= 0.94;
-      if (Math.abs(stockVel) < minVel) stockVel = stockVel >= 0 ? minVel : -minVel;
-      stockVal += stockVel;
-      stockVal = Math.max(-1, Math.min(1, stockVal));
-      if (stockVal >= 1 || stockVal <= -1) stockVel *= -0.5;
-      stockNorm.push(stockVal);
+      let nudge = (Math.random() - 0.5) * 0.5;
+      oscVel += nudge;
+      oscVel *= 0.92;
+      if (Math.abs(oscVel) < minVel) oscVel = oscVel >= 0 ? minVel : -minVel;
+      osc += oscVel;
+      osc = Math.max(-1, Math.min(1, osc));
+      if (osc >= 1 || osc <= -1) oscVel *= -0.5;
+      const progress = i / (STOCK_POINTS - 1);
+      const baseline = 0.85 - progress * 1.5;
+      stockYValues.push(baseline + osc * 0.2);
     }
     let stockScrollX = 0;
     const STOCK_SPEED = 30;
+    let stockProgress = 1;
 
     let lastTime = performance.now();
     function animate(now: number) {
@@ -148,38 +150,40 @@ function MoneyRainCanvas() {
       stockScrollX += STOCK_SPEED * dt;
       if (stockScrollX >= STOCK_STEP) {
         stockScrollX -= STOCK_STEP;
-        let nudge = (Math.random() - 0.5) * 0.5 + upBias;
-        stockVel += nudge;
-        stockVel *= 0.94;
-        if (Math.abs(stockVel) < minVel) stockVel = stockVel >= 0 ? minVel : -minVel;
-        stockVal += stockVel;
-        stockVal = Math.max(-1, Math.min(1, stockVal));
-        if (stockVal >= 1 || stockVal <= -1) stockVel *= -0.5;
-        stockNorm.push(stockVal);
-        if (stockNorm.length > STOCK_POINTS + 50) stockNorm.splice(0, 50);
+        let nudge = (Math.random() - 0.5) * 0.5;
+        oscVel += nudge;
+        oscVel *= 0.92;
+        if (Math.abs(oscVel) < minVel) oscVel = oscVel >= 0 ? minVel : -minVel;
+        osc += oscVel;
+        osc = Math.max(-1, Math.min(1, osc));
+        if (osc >= 1 || osc <= -1) oscVel *= -0.5;
+        stockProgress += 1 / STOCK_POINTS;
+        const baseline = 0.85 - stockProgress * 1.5;
+        stockYValues.push(baseline + osc * 0.2);
+        if (stockYValues.length > STOCK_POINTS + 50) stockYValues.splice(0, 50);
       }
 
       const midY = h * 0.5;
-      const amp = h * 0.25;
+      const amp = h * 0.4;
       ctx!.save();
       ctx!.lineWidth = 1.5;
       ctx!.globalAlpha = 0.25;
-      const startIdx = Math.max(0, stockNorm.length - STOCK_POINTS);
+      const startIdx = Math.max(0, stockYValues.length - STOCK_POINTS);
       const offsetX = -stockScrollX;
       const arrowStopX = w * 0.78;
-      const lastVisibleIdx = stockNorm.length - 1;
+      const lastVisibleIdx = stockYValues.length - 1;
       const lastX = (lastVisibleIdx - startIdx) * STOCK_STEP + offsetX;
       const secondLastX = (lastVisibleIdx - 1 - startIdx) * STOCK_STEP + offsetX;
-      const lastY = midY + stockNorm[lastVisibleIdx] * amp;
-      const secondLastY = midY + stockNorm[lastVisibleIdx - 1] * amp;
+      const lastY = midY + stockYValues[lastVisibleIdx] * amp;
+      const secondLastY = midY + stockYValues[lastVisibleIdx - 1] * amp;
       const lineEndX = Math.min(lastX, arrowStopX);
-      for (let i = startIdx; i < stockNorm.length - 1; i++) {
+      for (let i = startIdx; i < stockYValues.length - 1; i++) {
         const x1 = (i - startIdx) * STOCK_STEP + offsetX;
         const x2 = (i - startIdx + 1) * STOCK_STEP + offsetX;
         if (x2 < 0) continue;
         if (x1 > lineEndX) break;
-        const y1 = midY + stockNorm[i] * amp;
-        const y2 = midY + stockNorm[i + 1] * amp;
+        const y1 = midY + stockYValues[i] * amp;
+        const y2 = midY + stockYValues[i + 1] * amp;
         const goingUp = y2 < y1;
         ctx!.strokeStyle = goingUp ? '#00cc44' : '#cc2222';
         ctx!.shadowColor = goingUp ? '#00ff55' : '#ff3333';
@@ -197,12 +201,12 @@ function MoneyRainCanvas() {
         const angle = Math.atan2(lastY - secondLastY, lastX - secondLastX);
         const t = (lineEndX - secondLastX) / ((lastX - secondLastX) || 1);
         const tipY = secondLastY + t * (lastY - secondLastY);
-        const arrowLen = 10;
+        const arrowLen = 12;
         const goingUp = lastY < secondLastY;
         const arrowColor = goingUp ? '#00cc44' : '#cc2222';
         ctx!.fillStyle = arrowColor;
         ctx!.shadowColor = goingUp ? '#00ff55' : '#ff3333';
-        ctx!.shadowBlur = 4;
+        ctx!.shadowBlur = 6;
         ctx!.beginPath();
         ctx!.moveTo(tipX, tipY);
         ctx!.lineTo(tipX - arrowLen * Math.cos(angle - 0.4), tipY - arrowLen * Math.sin(angle - 0.4));

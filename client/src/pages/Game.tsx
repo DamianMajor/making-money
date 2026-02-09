@@ -3,7 +3,8 @@ import { VillageLedgerGame } from '@/lib/gameEngine';
 
 const MONEY_ICONS = [
   'money-shell', 'money-beads', 'money-goldbar', 'money-coin', 'money-raistone',
-  'money-cattle', 'money-salt', 'money-teabrick', 'money-feather', 'money-cocoa'
+  'money-cattle', 'money-salt', 'money-teabrick', 'money-feather', 'money-cocoa',
+  'money-banknote', 'money-creditcard', 'money-moderncoins', 'money-binary1', 'money-binary2'
 ];
 
 interface FallingItem {

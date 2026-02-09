@@ -7358,9 +7358,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.fillRect(0, 0, w, h);
 
-    // Quiz card
+    // Quiz card - taller for the "What is Money?" question to show reflection answer
     const cardW = Math.min(600, w - 60);
-    const cardH = 400;
+    const q = this.quizQuestions[this.currentQuizQuestion];
+    const isMoneyQuestion = q.multiSelect === true;
+    const reflectionAnswer = isMoneyQuestion ? localStorage.getItem('makingMoney_moneyAnswer') : null;
+    const cardH = (isMoneyQuestion && reflectionAnswer) ? 500 : 400;
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
 
@@ -7380,7 +7383,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillText('KNOWLEDGE SCROLL', w / 2, cardY + 40);
 
     // Question
-    const q = this.quizQuestions[this.currentQuizQuestion];
     ctx.font = `12px ${this.retroFont}`;
     ctx.fillStyle = '#3D2914';
     
@@ -7406,17 +7408,67 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.textAlign = 'center';
     this.drawHighlightedText(ctx, line.trim(), w / 2, lineY, '#3D2914', 'center');
 
+    // Show reflection answer for the "What is Money?" question
+    let optionsStartY = cardY + 140;
+    if (reflectionAnswer) {
+      const reflectY = lineY + 30;
+      const reflectBoxW = cardW - 60;
+      const reflectBoxX = cardX + 30;
+
+      ctx.fillStyle = 'rgba(61, 41, 20, 0.12)';
+      ctx.beginPath();
+      ctx.roundRect(reflectBoxX, reflectY, reflectBoxW, 60, 8);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(139, 115, 85, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.font = `8px ${this.retroFont}`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#6B5344';
+      ctx.fillText('Your answer before playing:', reflectBoxX + 12, reflectY + 18);
+
+      ctx.font = `9px ${this.retroFont}`;
+      ctx.fillStyle = '#3D2914';
+      const answerMaxW = reflectBoxW - 24;
+      const answerWords = reflectionAnswer.split(' ');
+      let answerLine = '';
+      let answerLineY = reflectY + 36;
+      let answerLinesDrawn = 0;
+      for (const word of answerWords) {
+        const testLine = answerLine + word + ' ';
+        if (ctx.measureText(testLine).width > answerMaxW && answerLine !== '') {
+          if (answerLinesDrawn < 2) {
+            ctx.fillText(answerLine.trim(), reflectBoxX + 12, answerLineY);
+            answerLine = word + ' ';
+            answerLineY += 16;
+            answerLinesDrawn++;
+          } else {
+            answerLine = answerLine.trim() + '...';
+            break;
+          }
+        } else {
+          answerLine = testLine;
+        }
+      }
+      if (answerLine.trim()) {
+        ctx.fillText(answerLine.trim(), reflectBoxX + 12, answerLineY);
+      }
+
+      optionsStartY = reflectY + 70;
+    }
+
     // Options as buttons - smaller for multi-select to fit submit button
     this.quizButtonAreas = [];
     this.quizSubmitButton = null;
     const isMultiSelect = q.multiSelect === true;
     const btnW = cardW - 80;
     const btnH = isMultiSelect ? 40 : 60;
-    const btnSpacing = isMultiSelect ? 48 : 80; // Tighter spacing for multi-select
+    const btnSpacing = isMultiSelect ? 48 : 80;
     const btnX = cardX + 40;
 
     q.options.forEach((option, i) => {
-      const btnY = cardY + 140 + i * btnSpacing;
+      const btnY = optionsStartY + i * btnSpacing;
       
       // Check if this option is selected (for multi-select)
       const isSelected = isMultiSelect && this.multiSelectAnswers.includes(i);
@@ -7499,7 +7551,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const submitBtnH = 40;
       const submitBtnX = (w - submitBtnW) / 2;
       // Clamp submit button to stay within card bounds (cardY + cardH - submitBtnH - 10)
-      const rawSubmitY = cardY + 140 + q.options.length * btnSpacing + 5;
+      const rawSubmitY = optionsStartY + q.options.length * btnSpacing + 5;
       const maxSubmitY = cardY + cardH - submitBtnH - 10;
       const submitBtnY = Math.min(rawSubmitY, maxSubmitY);
       

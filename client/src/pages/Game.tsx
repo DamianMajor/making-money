@@ -26,20 +26,6 @@ function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
           MAKING MONEY
         </h1>
 
-        <p
-          style={{
-            fontFamily: '"Press Start 2P", monospace',
-            fontSize: 'clamp(7px, 1.5vw, 10px)',
-            color: '#8B7355',
-            textAlign: 'center',
-            lineHeight: 1.6,
-            letterSpacing: '0.5px'
-          }}
-          data-testid="text-tagline"
-        >
-          historical lessons of how money came to be
-        </p>
-
         <div className="flex flex-col items-center gap-8">
           <span
             style={{

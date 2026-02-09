@@ -234,6 +234,37 @@ function MoneyRainCanvas() {
 }
 
 function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audio = new Audio('/money_song_1.mp3');
+    audio.loop = true;
+    audio.volume = 0.5;
+    audioRef.current = audio;
+    audio.play().catch(() => {
+      const resumeOnInteraction = () => {
+        audio.play().catch(() => {});
+        document.removeEventListener('click', resumeOnInteraction);
+        document.removeEventListener('touchstart', resumeOnInteraction);
+      };
+      document.addEventListener('click', resumeOnInteraction);
+      document.addEventListener('touchstart', resumeOnInteraction);
+    });
+    return () => {
+      audio.pause();
+      audio.src = '';
+      audioRef.current = null;
+    };
+  }, []);
+
+  const handleStart = (answer: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    onStart(answer);
+  };
+
   return (
     <div
       className="fixed inset-0 w-full h-full flex items-center justify-center"
@@ -272,7 +303,7 @@ function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
             Lesson One — The Barter System
           </span>
           <button
-            onClick={() => onStart('')}
+            onClick={() => handleStart('')}
             className="cursor-pointer"
             style={{
               fontFamily: '"Press Start 2P", monospace',

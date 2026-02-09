@@ -119,8 +119,8 @@ function MoneyRainCanvas() {
     const STOCK_POINTS = 300;
     const STOCK_STEP = 8;
     const stockNorm: number[] = [];
-    let stockVal = 0;
-    let stockVel = 0;
+    let stockVal = 0.85;
+    let stockVel = -0.02;
     const minVel = 0.06;
     const upBias = -0.04;
     for (let i = 0; i < STOCK_POINTS; i++) {

@@ -30,7 +30,7 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - **Interaction Mechanics**: Player movement, tight interaction ranges for NPCs and objects.
 - **UI Elements**: "Stone Tablet" HUD for tracking debts, dialogue system with typewriter effect, "INTERACT" button with fade transitions, color-coded multiple-choice dialogue.
 - **World & NPCs**: A 3800px wide world with distinct locations and NPCs with defined movement patterns and central interaction points.
-- **Character Sprites**: Generated 2D pixel-art sprites for Player, Stone Worker, Fisherman, Village Elder, and Woodcutter. Sprites loaded with chroma key green background removal (samples corner pixel, Euclidean distance tolerance=80, 30-unit anti-alias band). Stored in `client/public/sprites/`. Character dimensions doubled from original (e.g., player 100x140). Walking animation uses squash/stretch cycle with directional mirroring (facingDirection property). Draw coordinates rounded to whole pixels to prevent sub-pixel flickering. No name labels above sprites.
+- **Character Sprites**: Generated 2D pixel-art sprites for Player, Stone Worker, Fisherman, Village Elder, and Woodcutter. Sprites loaded with chroma key green background removal (samples corner pixel, Euclidean distance tolerance=80, 30-unit anti-alias band). Stored in `client/public/sprites/`. All characters normalized to 100x140 dimensions. Walking animation uses squash/stretch cycle with directional mirroring (facingDirection property). Draw coordinates rounded to whole pixels to prevent sub-pixel flickering. No name labels above sprites. All character feet aligned to same height (feetY = groundY + 20).
 - **Game Progression (Two-Loop System)**:
     - **Loop 1 (Failure Path)**: Focuses on verbal promises and their failure, leading to disputes and consequences of unrecorded agreements.
     - **Loop 2 (Success Path)**: Introduces the Stone Tablet for recording debts, with choices between verbal promises and recording. Explores "NPC-First" and "Elder-First" settlement approaches and includes escort mechanics for debt recording.
@@ -42,7 +42,7 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
     - **Stone Tablet Direct Interaction**: Allows players to verify records independently.
     - **"Give-In" Failure Path**: Introduces mechanics where agreeing to inflated demands leads to complications.
     - **Mood System**: playerMood state tracks neutral/happy/angry. Face image rendering removed (placeholder for future face-capture feature). Mood logic preserved.
-    - **Environmental Transitions**: Night transitions, thunderstorms, and parallax backgrounds.
+    - **Environmental Transitions**: Night transitions, thunderstorms, parallax backgrounds, and night background crossfade (8-second transition triggered when debts settled in Loop 2).
     - **Double Coincidence of Wants**: Dialogue system demonstrates the economic problem of bartering challenges, rejecting player offers until credit is established.
     - **Badge System**: Awards celebratory popups with badges for learning key concepts like "Double Coincidence of Wants" and "Ledger Master."
     - **Audio System**: Utilizes Web Audio API with `AudioContext` for dynamic soundscapes, including pitch-varied footsteps, layered brawl audio, and dynamic background music transitions. Audio preloaded during intro screen via `preloadAudio()` for instant playback on game start. `resumeContext()` called on user gesture for iOS/Safari compatibility.
@@ -69,7 +69,7 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - Stone Tablet: graphic removed but interaction area preserved, popup shows on arrival or direct click.
 - Celebration timing: applauseDuration = fullDuration - 10 seconds (min 2s).
 - Game title displayed as "THE BARTER SYSTEM" in-game UI, series title "Making Money" on intro screen. Start button text is "Start".
-- Hut overlay drawn at 1.5x scale (hutScale=1.5), anchored relative to playerHomeX position on walking path layer.
+- Hut overlay drawn at 1.5x scale (hutScale=1.5), anchored relative to playerHomeX position on walking path layer, offset -50px left and +50px down. No "Home" label.
 
 ## External Dependencies
 

@@ -32,7 +32,8 @@ export type SoundName =
   | 'crowdBoo'
   | 'failure'
   | 'settle'
-  | 'badgeReward';
+  | 'badgeReward'
+  | 'stream';
 
 interface SoundConfig {
   src: string;
@@ -76,6 +77,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   failure: { src: '/sounds/failure.mp3', volume: 0.5, loop: false },
   settle: { src: '/sounds/settle.mp3', volume: 0.5, loop: false },
   badgeReward: { src: '/sounds/badge-reward.mp3', volume: 0.6, loop: false },
+  stream: { src: '/sounds/stream.aac', volume: 0.4, loop: true },
 };
 
 const FIGHT_LAYER_SOUNDS: SoundName[] = [
@@ -594,6 +596,22 @@ export class SoundManager {
     activeSound.source.start(0);
   }
 
+  // Set the volume of a currently playing sound (0-1 scale relative to config volume)
+  public setVolume(name: SoundName, volume: number): void {
+    const activeSound = this.activeSources.get(name);
+    if (!activeSound || !this.audioContext) return;
+    const config = SOUND_CONFIGS[name];
+    const targetVolume = config.volume * Math.max(0, Math.min(1, volume));
+    const currentTime = this.audioContext.currentTime;
+    activeSound.gainNode.gain.setValueAtTime(activeSound.gainNode.gain.value, currentTime);
+    activeSound.gainNode.gain.linearRampToValueAtTime(targetVolume, currentTime + 0.05);
+  }
+
+  // Check if a sound is currently playing
+  public isPlaying(name: SoundName): boolean {
+    return this.activeSources.has(name);
+  }
+
   // Start rain with cross-fade looping to eliminate loop point seam
   public startRainCrossfade(fadeInDuration: number = 2000): void {
     if (this.muted || !this.initialized || !this.audioContext) return;
@@ -730,10 +748,6 @@ export class SoundManager {
 
   public getMasterVolume(): number {
     return this.masterVolume;
-  }
-
-  public isPlaying(name: SoundName): boolean {
-    return this.activeSources.has(name);
   }
 
   public stopAll(): void {

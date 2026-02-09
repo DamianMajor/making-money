@@ -405,7 +405,7 @@ export class VillageLedgerGame {
     this.player = {
       id: 'player',
       name: 'PLAYER',
-      x: 150, // Player Home position (shifted right 50px)
+      x: 170, // Player Home position (+20px right)
       y: 0,
       width: 100,
       height: 140,
@@ -420,12 +420,12 @@ export class VillageLedgerGame {
     };
 
     // Initialize NPCs - NEW WORLD LAYOUT
-    // X: 100 (Home) -> 700 (Woodcutter) -> 1600 (Elder) -> 2000 (Berry Bush) -> 2500 (Stone-worker) -> 3200 (Fisherman)
+    // X: 100 (Home) -> 750 (Woodcutter) -> 1600 (Elder) -> 2550 (Berry Bush) -> 2150 (Stone-worker) -> 3100 (Fisherman)
     
     this.woodcutter = {
       id: 'woodcutter',
       name: 'WOODCUTTER',
-      x: 700,
+      x: 750,
       y: 0,
       width: 100,
       height: 140,
@@ -434,7 +434,7 @@ export class VillageLedgerGame {
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 700
+      originalX: 750
     };
 
     this.villageElder = {
@@ -483,7 +483,7 @@ export class VillageLedgerGame {
     this.fisherman = {
       id: 'fisherman',
       name: 'FISHERMAN',
-      x: 3175,
+      x: 3100,
       y: 0,
       width: 100,
       height: 140,
@@ -492,7 +492,7 @@ export class VillageLedgerGame {
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 3175
+      originalX: 3100
     };
 
     this.npcs = [this.woodcutter, this.villageElder, this.berryBush, this.stoneWorker, this.fisherman];
@@ -886,10 +886,12 @@ export class VillageLedgerGame {
           return;
         } else {
           // Set auto-walk target to NPC, clear manual movement
+          // Add slight offset so player stands next to NPC, not on top
           if (tappedTarget.id === 'berryBush') {
             this.autoWalkTarget = { x: tappedTarget.x - 60, type: 'berryBush', id: tappedTarget.id };
           } else {
-            this.autoWalkTarget = { x: tappedTarget.x, type: 'npc', id: tappedTarget.id };
+            const approachDir = this.player.x < tappedTarget.x ? -1 : 1;
+            this.autoWalkTarget = { x: tappedTarget.x + (approachDir * 40), type: 'npc', id: tappedTarget.id };
           }
           this.moveDirection = 0;
           this.touchActive = false;
@@ -3634,7 +3636,7 @@ export class VillageLedgerGame {
     // Calculate ground Y position
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     const feetY = groundY + 20;
-    this.player.y = feetY - this.player.height;
+    this.player.y = feetY - this.player.height + 15; // +15px down
 
     // All NPCs feet aligned to same height
     this.npcs.forEach(npc => {
@@ -3783,6 +3785,24 @@ export class VillageLedgerGame {
       soundManager.playFishingSequence();
     }
 
+    // Stream sound: fade in/out based on proximity to fisherman/water area
+    // Starts at berry bush position, full volume at fisherman, fades out past fisherman
+    const streamCenter = this.fisherman.x; // Center of stream sound
+    const streamRange = streamCenter - this.berryBush.x; // Fade distance (550px)
+    const distToStream = Math.abs(this.player.x - streamCenter);
+    if (distToStream <= streamRange && this.player.x >= this.berryBush.x) {
+      const volume = 1 - (distToStream / streamRange);
+      if (!soundManager.isPlaying('stream')) {
+        soundManager.playLoop('stream');
+        soundManager.setVolume('stream', 0);
+      }
+      soundManager.setVolume('stream', volume);
+    } else {
+      if (soundManager.isPlaying('stream')) {
+        soundManager.fadeOut('stream', 500);
+      }
+    }
+
     // Update NPC bobs and movement toward targets
     const npcSpeed = 80; // NPCs walk slower than player
     this.npcs.forEach((npc, i) => {
@@ -3830,6 +3850,12 @@ export class VillageLedgerGame {
         npc.bobOffset = Math.sin(this.bobTimer * 0.5 + i * 1.5) * 0.75;
         npc.isWalking = false;
         npc.walkFrame = 0;
+      }
+
+      // Village elder always faces the player
+      if (npc.id === 'villageElder' && !isWalking) {
+        const elderToPlayer = this.player.x - npc.x;
+        npc.facingDirection = elderToPlayer >= 0 ? 1 : -1;
       }
     });
     
@@ -4425,7 +4451,7 @@ export class VillageLedgerGame {
 
     // Special z-order handling: player passes BEHIND fisherman near fishing hole
     // Check if player is in fisherman's area (between fisherman position and pond)
-    const playerNearFisherman = this.player.x > 3100 && this.player.x < 3250;
+    const playerNearFisherman = this.player.x > 3025 && this.player.x < 3175;
     
     // Draw NPCs (in front of location markers)
     // But fisherman is drawn AFTER player if player is in fisherman's area
@@ -5552,70 +5578,12 @@ export class VillageLedgerGame {
   }
 
   private drawLocationMarkers(ctx: CanvasRenderingContext2D, groundY: number): void {
-
     // Village Center / Stone Tablet area (at x=1500) - graphic removed, interaction area preserved
-    
-    // Fishing Hole / Pond at Fisherman's location (x=3200)
-    // Shifted left by 60px and down by 25px so pond sits below ground horizon
-    const fishingHoleX = 3200;
-    const pondScreenX = fishingHoleX - this.cameraX - 60; // Shift left
-    const pondYOffset = 25; // Shift down
-    if (pondScreenX > -150 && pondScreenX < this.logicalWidth + 150) {
-      // Draw pond/water
-      ctx.fillStyle = '#4A90B8';
-      ctx.beginPath();
-      ctx.ellipse(pondScreenX - 40, groundY + 5 + pondYOffset, 70, 20, 0, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Pond edge/bank
-      ctx.strokeStyle = '#5D4E37';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.ellipse(pondScreenX - 40, groundY + 5 + pondYOffset, 72, 22, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      // Water ripples
-      ctx.strokeStyle = '#6BB5D8';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(pondScreenX - 50, groundY + pondYOffset, 20, 6, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.ellipse(pondScreenX - 25, groundY + 8 + pondYOffset, 15, 4, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      // Float/bobber
-      ctx.fillStyle = '#FF4444';
-      ctx.beginPath();
-      ctx.arc(pondScreenX - 45, groundY - 5 + pondYOffset, 4, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // Fishing Hole / Pond - hidden (old graphics removed)
   }
 
-  // Draw fishing pole in front of fisherman (called after NPCs are drawn)
+  // Draw fishing pole in front of fisherman - hidden (old graphics removed)
   private drawFishingPole(ctx: CanvasRenderingContext2D, groundY: number): void {
-    const fishingHoleX = 3200;
-    const pondScreenX = fishingHoleX - this.cameraX - 60; // Same offset as pond
-    const pondYOffset = 25;
-    const poleOffsetX = -10; // Adjusted pole position (moved right 40 from -50)
-    
-    if (pondScreenX > -150 && pondScreenX < this.logicalWidth + 150) {
-      // Fishing pole (held by Fisherman, angled over pond)
-      ctx.strokeStyle = '#8B6914';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(pondScreenX + 30 + poleOffsetX, groundY - 50 + pondYOffset); // Held at character level
-      ctx.lineTo(pondScreenX - 30 + poleOffsetX, groundY - 80 + pondYOffset); // Tip extends over water
-      ctx.stroke();
-      
-      // Fishing line
-      ctx.strokeStyle = '#AAA';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(pondScreenX - 30 + poleOffsetX, groundY - 80 + pondYOffset); // From pole tip
-      ctx.lineTo(pondScreenX - 35 + poleOffsetX, groundY - 5 + pondYOffset);  // Down to water
-      ctx.stroke();
-    }
   }
 
   private drawBackground(ctx: CanvasRenderingContext2D): void {
@@ -6161,11 +6129,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   
   const screenY = char.y + char.bobOffset + talkingBounce;
 
-  // 1. Draw original shadow
+  // 1. Draw shadow at original ground level (not affected by character offset)
+  const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
   const shadowYOffset = char.id === 'berryBush' ? -25 : 0;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
   ctx.beginPath();
-  ctx.ellipse(screenX, char.y + char.height + 5 + shadowYOffset, char.width * 0.4, char.height * 0.06 + 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(screenX, groundY + 5 + shadowYOffset, char.width * 0.4, char.height * 0.06 + 2, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const x = screenX - char.width / 2;
@@ -6209,11 +6178,47 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
     ctx.save();
 
-    const facing = char.facingDirection || 1;
+    let facing = char.facingDirection || 1;
     const walkT = char.walkFrame || 0;
     const walking = char.isWalking || false;
 
-    if (walking) {
+    // Woodcutter and stone worker sprites face opposite direction from player sprite
+    if (char.id === 'woodcutter' || char.id === 'stoneWorker') {
+      facing = -facing;
+    }
+
+    if (walking && char.id === 'player') {
+      const walkCycle = Math.sin(walkT * 2.5);
+      const lean = walkCycle * 0.03 * facing;
+      const stretchY = 1 + Math.abs(walkCycle) * 0.02;
+      const squashX = 1 - Math.abs(walkCycle) * 0.015;
+
+      // Split sprite into upper body (60%) and legs (40%) for stride animation
+      const splitRatio = 0.6;
+      const upperH = Math.round(processedSprite.height * splitRatio);
+      const lowerH = processedSprite.height - upperH;
+      const upperDrawH = Math.round(spriteH * splitRatio);
+      const lowerDrawH = spriteH - upperDrawH;
+
+      // Leg stride offset - alternating left/right
+      const strideOffset = walkCycle * 4 * facing;
+
+      ctx.translate(Math.round(screenX), Math.round(y + spriteH));
+      if (facing < 0) {
+        ctx.scale(-squashX, stretchY);
+      } else {
+        ctx.scale(squashX, stretchY);
+      }
+      ctx.rotate(lean);
+
+      // Draw upper body (no stride offset)
+      ctx.drawImage(processedSprite, 0, 0, processedSprite.width, upperH,
+        Math.round(-spriteW / 2), Math.round(-spriteH), Math.round(spriteW), upperDrawH);
+
+      // Draw legs with stride offset
+      ctx.drawImage(processedSprite, 0, upperH, processedSprite.width, lowerH,
+        Math.round(-spriteW / 2 + strideOffset), Math.round(-spriteH + upperDrawH), Math.round(spriteW), lowerDrawH);
+    } else if (walking) {
       const walkCycle = Math.sin(walkT * 2.5);
       const lean = walkCycle * 0.03 * facing;
       const stretchY = 1 + Math.abs(walkCycle) * 0.02;
@@ -8092,11 +8097,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.quizButtonAreas = [];
     
     // Reset NPC positions to original locations
-    this.woodcutter.x = this.woodcutter.originalX || 700;
+    this.woodcutter.x = this.woodcutter.originalX || 750;
     this.woodcutter.targetX = undefined;
     this.stoneWorker.x = this.stoneWorker.originalX || 2150;
     this.stoneWorker.targetX = undefined;
-    this.fisherman.x = this.fisherman.originalX || 3175;
+    this.fisherman.x = this.fisherman.originalX || 3100;
     this.fisherman.targetX = undefined;
     
     // Reset animation/sound flags
@@ -8202,11 +8207,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     };
     
     // Reset NPC positions to original locations
-    this.woodcutter.x = this.woodcutter.originalX || 700;
+    this.woodcutter.x = this.woodcutter.originalX || 750;
     this.woodcutter.targetX = undefined;
     this.stoneWorker.x = this.stoneWorker.originalX || 2150;
     this.stoneWorker.targetX = undefined;
-    this.fisherman.x = this.fisherman.originalX || 3175;
+    this.fisherman.x = this.fisherman.originalX || 3100;
     this.fisherman.targetX = undefined;
     
     // Reset animation/sound flags for loop 2

@@ -115,6 +115,21 @@ function MoneyRainCanvas() {
     }
     let matrixScrollOffset = 0;
 
+    const STOCK_POINTS = 300;
+    const STOCK_STEP = 8;
+    const stockNorm: number[] = [];
+    let stockVal = 0;
+    let stockVel = 0;
+    for (let i = 0; i < STOCK_POINTS; i++) {
+      stockVel += (Math.random() - 0.5) * 0.4;
+      stockVel *= 0.96;
+      stockVal += stockVel;
+      stockVal = Math.max(-1, Math.min(1, stockVal));
+      stockNorm.push(stockVal);
+    }
+    let stockScrollX = 0;
+    const STOCK_SPEED = 30;
+
     let lastTime = performance.now();
     function animate(now: number) {
       const dt = Math.min((now - lastTime) / 1000, 0.1);
@@ -123,6 +138,41 @@ function MoneyRainCanvas() {
       const w = canvas!.width;
       const h = canvas!.height;
       ctx!.clearRect(0, 0, w, h);
+
+      stockScrollX += STOCK_SPEED * dt;
+      if (stockScrollX >= STOCK_STEP) {
+        stockScrollX -= STOCK_STEP;
+        stockVel += (Math.random() - 0.5) * 0.4;
+        stockVel *= 0.96;
+        stockVal += stockVel;
+        stockVal = Math.max(-1, Math.min(1, stockVal));
+        stockNorm.push(stockVal);
+        if (stockNorm.length > STOCK_POINTS + 50) stockNorm.splice(0, 50);
+      }
+
+      const midY = h * 0.5;
+      const amp = h * 0.25;
+      ctx!.save();
+      ctx!.lineWidth = 1.5;
+      ctx!.globalAlpha = 0.25;
+      const startIdx = Math.max(0, stockNorm.length - STOCK_POINTS);
+      const offsetX = -stockScrollX;
+      for (let i = startIdx; i < stockNorm.length - 1; i++) {
+        const x1 = (i - startIdx) * STOCK_STEP + offsetX;
+        const x2 = (i - startIdx + 1) * STOCK_STEP + offsetX;
+        if (x2 < 0 || x1 > w) continue;
+        const y1 = midY + stockNorm[i] * amp;
+        const y2 = midY + stockNorm[i + 1] * amp;
+        const goingUp = y2 < y1;
+        ctx!.strokeStyle = goingUp ? '#00cc44' : '#cc2222';
+        ctx!.shadowColor = goingUp ? '#00ff55' : '#ff3333';
+        ctx!.shadowBlur = 4;
+        ctx!.beginPath();
+        ctx!.moveTo(x1, y1);
+        ctx!.lineTo(x2, y2);
+        ctx!.stroke();
+      }
+      ctx!.restore();
 
       matrixScrollOffset += dt * 60;
       if (matrixScrollOffset >= matrixCharSize) {

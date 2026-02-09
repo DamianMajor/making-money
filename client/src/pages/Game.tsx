@@ -4,7 +4,8 @@ import { VillageLedgerGame } from '@/lib/gameEngine';
 const MONEY_ICONS = [
   'money-shell', 'money-beads', 'money-goldbar', 'money-coin', 'money-raistone',
   'money-cattle', 'money-salt', 'money-teabrick', 'money-feather', 'money-cocoa',
-  'money-banknote', 'money-creditcard', 'money-moderncoins', 'money-binary1', 'money-binary2'
+  'money-banknote', 'money-creditcard', 'money-moderncoins', 'money-binary1', 'money-binary2',
+  'money-bitcoin'
 ];
 
 interface FallingItem {
@@ -65,7 +66,7 @@ function MoneyRainCanvas() {
     });
 
     function initItems(w: number, h: number) {
-      const count = Math.max(20, Math.floor((w * h) / 25000));
+      const count = Math.max(25, Math.floor((w * h) / 20000));
       const items: FallingItem[] = [];
       for (let i = 0; i < count; i++) {
         items.push(createItem(w, h, true));
@@ -74,7 +75,7 @@ function MoneyRainCanvas() {
     }
 
     function createItem(w: number, h: number, randomY: boolean): FallingItem {
-      const size = 24 + Math.random() * 20;
+      const size = 24 + Math.random() * 48;
       return {
         x: Math.random() * w,
         y: randomY ? Math.random() * h : -size - Math.random() * 100,

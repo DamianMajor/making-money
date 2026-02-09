@@ -30,7 +30,7 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - **Interaction Mechanics**: Player movement, tight interaction ranges for NPCs and objects.
 - **UI Elements**: "Stone Tablet" HUD for tracking debts, dialogue system with typewriter effect, "INTERACT" button with fade transitions, color-coded multiple-choice dialogue.
 - **World & NPCs**: A 3800px wide world with distinct locations and NPCs with defined movement patterns and central interaction points.
-- **Character Sprites**: Generated 2D pixel-art sprites for Player, Stone Worker, Fisherman, Village Elder, and Woodcutter. Sprites loaded with chroma key green background removal (samples corner pixel, Euclidean distance tolerance=80, 30-unit anti-alias band). Stored in `client/public/sprites/`. All characters normalized to 100x140 dimensions. Walking animation uses squash/stretch cycle with directional mirroring (facingDirection property). Draw coordinates rounded to whole pixels to prevent sub-pixel flickering. No name labels above sprites. All character feet aligned to same height (feetY = groundY + 20).
+- **Character Sprites**: Generated 2D pixel-art sprites for Player, Stone Worker, Fisherman, Village Elder, and Woodcutter. Sprites loaded with chroma key green background removal (samples corner pixel, Euclidean distance tolerance=80, 30-unit anti-alias band). Stored in `client/public/sprites/`. Most characters normalized to 100x140 dimensions; Stone Worker is 10% larger (110x154). Walking animation uses squash/stretch cycle with directional mirroring (facingDirection property). Draw coordinates rounded to whole pixels to prevent sub-pixel flickering. No name labels above sprites. Player feet at feetY = groundY + 20 + 15px down. NPC feet at feetY = groundY + 20 + 12px down.
 - **Game Progression (Two-Loop System)**:
     - **Loop 1 (Failure Path)**: Focuses on verbal promises and their failure, leading to disputes and consequences of unrecorded agreements.
     - **Loop 2 (Success Path)**: Introduces the Stone Tablet for recording debts, with choices between verbal promises and recording. Explores "NPC-First" and "Elder-First" settlement approaches and includes escort mechanics for debt recording.
@@ -64,12 +64,19 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 ## Key Technical Notes
 
 - Berry bush: player stops at bushX - 60px to stand beside it, not on top.
-- Boo sound: uses setTimeout(2000) with state guard to play during fail screen, not during fight.
+- Boo sound: uses setTimeout(500) with state guard to play during fail screen, not during fight.
 - Sound system: loads 34 sounds, mute/unmute via localStorage key `villageLedger_soundSettings`.
 - Stone Tablet: graphic removed but interaction area preserved, popup shows on arrival or direct click.
 - Celebration timing: applauseDuration = fullDuration - 10 seconds (min 2s).
 - Game title displayed as "THE BARTER SYSTEM" in-game UI, series title "Making Money" on intro screen. Start button text is "Start".
 - Hut overlay drawn at 1.5x scale (hutScale=1.5), anchored relative to playerHomeX position on walking path layer, offset -50px left and +50px down. No "Home" label.
+- Character positions: Player at x=170 (+20px right, +15px down from feet), woodcutter at x=800, fisherman at x=3025, stone worker at x=2150, berry bush at x=2550.
+- Character spacing: Auto-walk targets include 40px offset based on approach direction to prevent overlap during interactions.
+- Walking direction fix: Woodcutter and stone worker sprites naturally face opposite direction - fixed with sprite flip in rendering (facing = -facing for these IDs only).
+- NPC facing: All NPCs (except fisherman and berry bush) always face toward the player when idle. Fisherman faces AWAY from player by default (back turned); turns to face player only during active dialogue interaction when player is nearby.
+- Village elder behavior: During brawl, elder walks backwards (facing the fight/player) while moving away to targetX.
+- Hint pulse system: When player attempts premature interactions in Loop 2 (e.g., settling debts before recording on Stone Tablet), hint box text pulses with golden highlight for 1.5 seconds.
+- Stream sound trigger: Starts fading in at berryBush.x - 400, full volume at fisherman position, symmetric fade when moving away.
 
 ## External Dependencies
 

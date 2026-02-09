@@ -192,7 +192,7 @@ export class VillageLedgerGame {
   private berryBush: Character;
 
   // Location markers - NEW LAYOUT
-  // X: 100 (Home) -> 700 (Woodcutter) -> 1600 (Elder/Village Center) -> 2000 (Berry Bush) -> 2500 (Stone-worker) -> 3200 (Fisherman)
+  // X: 100 (Home) -> 800 (Woodcutter) -> 1600 (Elder/Village Center) -> 2550 (Berry Bush) -> 2150 (Stone-worker) -> 3025 (Fisherman)
   private playerHomeX: number = 100;
   private villageCenterX: number = 1600;
 
@@ -298,6 +298,7 @@ export class VillageLedgerGame {
   private bushShakeTimer: number = 0;
   private bushShakeDuration: number = 300;
   private booFailureTriggered: boolean = false;
+  private hintPulseTimer: number = 0; // Timer for hint box pulse animation
   private stormTriggered: boolean = false;
   private rainSoundStarted: boolean = false;
   private celebrationEndTime: number = 0;
@@ -420,12 +421,12 @@ export class VillageLedgerGame {
     };
 
     // Initialize NPCs - NEW WORLD LAYOUT
-    // X: 100 (Home) -> 750 (Woodcutter) -> 1600 (Elder) -> 2550 (Berry Bush) -> 2150 (Stone-worker) -> 3100 (Fisherman)
+    // X: 100 (Home) -> 800 (Woodcutter) -> 1600 (Elder) -> 2550 (Berry Bush) -> 2150 (Stone-worker) -> 3025 (Fisherman)
     
     this.woodcutter = {
       id: 'woodcutter',
       name: 'WOODCUTTER',
-      x: 750,
+      x: 800,
       y: 0,
       width: 100,
       height: 140,
@@ -434,7 +435,7 @@ export class VillageLedgerGame {
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 750
+      originalX: 800
     };
 
     this.villageElder = {
@@ -470,8 +471,8 @@ export class VillageLedgerGame {
       name: 'STONE-WORKER',
       x: 2150, // Swapped with Berry Bush
       y: 0,
-      width: 100,
-      height: 140,
+      width: 110,
+      height: 154,
       color: '#6B7280', // Gray for stone
       outlineColor: '#374151',
       visible: true,
@@ -483,7 +484,7 @@ export class VillageLedgerGame {
     this.fisherman = {
       id: 'fisherman',
       name: 'FISHERMAN',
-      x: 3100,
+      x: 3025,
       y: 0,
       width: 100,
       height: 140,
@@ -492,7 +493,7 @@ export class VillageLedgerGame {
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 3100
+      originalX: 3025
     };
 
     this.npcs = [this.woodcutter, this.villageElder, this.berryBush, this.stoneWorker, this.fisherman];
@@ -1661,6 +1662,7 @@ export class VillageLedgerGame {
           ]);
           return;
         }
+        this.triggerHintPulse();
         this.queueDialogue([
           {
             speaker: 'WOODCUTTER',
@@ -1793,6 +1795,7 @@ export class VillageLedgerGame {
       
       // NPC disputes - triggers verification need
       this.setMood('angry');
+      this.triggerHintPulse();
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
@@ -2409,6 +2412,7 @@ export class VillageLedgerGame {
           ]);
           return;
         }
+        this.triggerHintPulse();
         this.queueDialogue([
           {
             speaker: 'STONE-WORKER',
@@ -2447,6 +2451,7 @@ export class VillageLedgerGame {
       
       // NPC disputes - triggers verification need
       this.setMood('angry');
+      this.triggerHintPulse();
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
@@ -3548,6 +3553,10 @@ export class VillageLedgerGame {
     this.notifyStateChange();
   }
 
+  private triggerHintPulse(): void {
+    this.hintPulseTimer = 1.5; // 1.5 second pulse animation
+  }
+
   private showInventoryPopup(text: string, skipSound: boolean = false): void {
     if (!skipSound) {
       soundManager.play('itemPickup');
@@ -3638,9 +3647,9 @@ export class VillageLedgerGame {
     const feetY = groundY + 20;
     this.player.y = feetY - this.player.height + 15; // +15px down
 
-    // All NPCs feet aligned to same height
+    // All NPCs feet aligned to same height + 12px lower than player
     this.npcs.forEach(npc => {
-      npc.y = feetY - npc.height;
+      npc.y = feetY - npc.height + 12;
     });
   }
 
@@ -3695,6 +3704,11 @@ export class VillageLedgerGame {
     // Update bush shake timer
     if (this.bushShakeTimer > 0) {
       this.bushShakeTimer = Math.max(0, this.bushShakeTimer - dt * 1000);
+    }
+    
+    // Update hint pulse timer
+    if (this.hintPulseTimer > 0) {
+      this.hintPulseTimer = Math.max(0, this.hintPulseTimer - dt);
     }
     
     // Update player fade animation
@@ -3786,11 +3800,12 @@ export class VillageLedgerGame {
     }
 
     // Stream sound: fade in/out based on proximity to fisherman/water area
-    // Starts at berry bush position, full volume at fisherman, fades out past fisherman
+    // Trigger point moved 400px left of berry bush, full volume at fisherman
     const streamCenter = this.fisherman.x; // Center of stream sound
-    const streamRange = streamCenter - this.berryBush.x; // Fade distance (550px)
+    const streamFadeStart = this.berryBush.x - 400; // Start 400px left of berry bush
+    const streamRange = streamCenter - streamFadeStart; // Fade distance
     const distToStream = Math.abs(this.player.x - streamCenter);
-    if (distToStream <= streamRange && this.player.x >= this.berryBush.x) {
+    if (distToStream <= streamRange && this.player.x >= streamFadeStart) {
       const volume = 1 - (distToStream / streamRange);
       if (!soundManager.isPlaying('stream')) {
         soundManager.playLoop('stream');
@@ -3852,10 +3867,22 @@ export class VillageLedgerGame {
         npc.walkFrame = 0;
       }
 
-      // Village elder always faces the player
-      if (npc.id === 'villageElder' && !isWalking) {
-        const elderToPlayer = this.player.x - npc.x;
-        npc.facingDirection = elderToPlayer >= 0 ? 1 : -1;
+      // All NPCs face the player when idle (except fisherman - special behavior)
+      if (!isWalking && npc.id !== 'berryBush') {
+        const npcToPlayer = this.player.x - npc.x;
+        if (npc.id === 'fisherman') {
+          // Fisherman faces AWAY from player by default (back turned)
+          // Faces player during any active dialogue when player is nearby
+          const playerNearby = Math.abs(this.player.x - npc.x) < 80;
+          const inDialogue = this.state.currentDialogue !== null || this.state.dialogueQueue.length > 0;
+          if (playerNearby && inDialogue) {
+            npc.facingDirection = npcToPlayer >= 0 ? 1 : -1; // Face player during interaction
+          } else {
+            npc.facingDirection = npcToPlayer >= 0 ? -1 : 1; // Opposite direction (back turned)
+          }
+        } else {
+          npc.facingDirection = npcToPlayer >= 0 ? 1 : -1;
+        }
       }
     });
     
@@ -4040,11 +4067,14 @@ export class VillageLedgerGame {
           this.stoneWorker.x += Math.sign(dx) * brawlSpeed;
         }
       }
-      // Elder steps away more slowly
+      // Elder walks backwards (facing the fight) while moving away
       if (this.villageElder.targetX !== undefined) {
         const dx = this.villageElder.targetX - this.villageElder.x;
         if (Math.abs(dx) > 5) {
           this.villageElder.x += Math.sign(dx) * brawlSpeed * 0.5;
+          // Elder faces TOWARD the fight (player position) while backing away
+          const elderToPlayer = this.player.x - this.villageElder.x;
+          this.villageElder.facingDirection = elderToPlayer >= 0 ? 1 : -1;
         }
       }
       // End brawl at 4 seconds, show fail screen
@@ -4052,14 +4082,14 @@ export class VillageLedgerGame {
         this.state.showBrawl = false;
         this.state.showFail = true;
         this.state.phase = 'fail';
-        // Trigger boo sound 2 seconds after fail screen appears
+        // Trigger boo sound 0.5 seconds after fail screen appears
         if (!this.booFailureTriggered) {
           this.booFailureTriggered = true;
           setTimeout(() => {
             if (this.state.showFail && this.state.phase === 'fail') {
               soundManager.playBooThenFailure();
             }
-          }, 2000);
+          }, 500);
         }
       }
     }
@@ -4451,7 +4481,7 @@ export class VillageLedgerGame {
 
     // Special z-order handling: player passes BEHIND fisherman near fishing hole
     // Check if player is in fisherman's area (between fisherman position and pond)
-    const playerNearFisherman = this.player.x > 3025 && this.player.x < 3175;
+    const playerNearFisherman = this.player.x > 2950 && this.player.x < 3100;
     
     // Draw NPCs (in front of location markers)
     // But fisherman is drawn AFTER player if player is in fisherman's area
@@ -6989,7 +7019,18 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       // Hint text when no dialogue and no choice dialogue - using retro font at readable size
       ctx.font = `12px ${this.retroFont}`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = 'rgba(201, 184, 150, 0.5)';
+      
+      // Pulse effect when player attempts premature interaction
+      if (this.hintPulseTimer > 0) {
+        const pulsePhase = this.hintPulseTimer * 4; // Multiple pulses over duration
+        const pulseAlpha = 0.5 + Math.sin(pulsePhase * Math.PI) * 0.5;
+        const highlightR = 255;
+        const highlightG = 200;
+        const highlightB = 80;
+        ctx.fillStyle = `rgba(${highlightR}, ${highlightG}, ${highlightB}, ${0.5 + pulseAlpha * 0.5})`;
+      } else {
+        ctx.fillStyle = 'rgba(201, 184, 150, 0.5)';
+      }
 
       let hint = '';
       // CREDIT-FIRST HINTS
@@ -8097,11 +8138,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.quizButtonAreas = [];
     
     // Reset NPC positions to original locations
-    this.woodcutter.x = this.woodcutter.originalX || 750;
+    this.woodcutter.x = this.woodcutter.originalX || 800;
     this.woodcutter.targetX = undefined;
     this.stoneWorker.x = this.stoneWorker.originalX || 2150;
     this.stoneWorker.targetX = undefined;
-    this.fisherman.x = this.fisherman.originalX || 3100;
+    this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
     
     // Reset animation/sound flags
@@ -8207,11 +8248,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     };
     
     // Reset NPC positions to original locations
-    this.woodcutter.x = this.woodcutter.originalX || 750;
+    this.woodcutter.x = this.woodcutter.originalX || 800;
     this.woodcutter.targetX = undefined;
     this.stoneWorker.x = this.stoneWorker.originalX || 2150;
     this.stoneWorker.targetX = undefined;
-    this.fisherman.x = this.fisherman.originalX || 3100;
+    this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
     
     // Reset animation/sound flags for loop 2

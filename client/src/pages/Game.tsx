@@ -121,8 +121,11 @@ function MoneyRainCanvas() {
     let stockVal = 0;
     let stockVel = 0;
     for (let i = 0; i < STOCK_POINTS; i++) {
-      stockVel += (Math.random() - 0.5) * 0.4;
+      let nudge = (Math.random() - 0.5) * 0.4;
+      if (Math.abs(stockVel + nudge) < 0.02) nudge += (Math.random() < 0.5 ? 0.05 : -0.05);
+      stockVel += nudge;
       stockVel *= 0.96;
+      if (Math.abs(stockVel) < 0.01) stockVel = (Math.random() < 0.5 ? 0.03 : -0.03);
       stockVal += stockVel;
       stockVal = Math.max(-1, Math.min(1, stockVal));
       stockNorm.push(stockVal);
@@ -142,8 +145,11 @@ function MoneyRainCanvas() {
       stockScrollX += STOCK_SPEED * dt;
       if (stockScrollX >= STOCK_STEP) {
         stockScrollX -= STOCK_STEP;
-        stockVel += (Math.random() - 0.5) * 0.4;
+        let nudge = (Math.random() - 0.5) * 0.4;
+        if (Math.abs(stockVel + nudge) < 0.02) nudge += (Math.random() < 0.5 ? 0.05 : -0.05);
+        stockVel += nudge;
         stockVel *= 0.96;
+        if (Math.abs(stockVel) < 0.01) stockVel = (Math.random() < 0.5 ? 0.03 : -0.03);
         stockVal += stockVel;
         stockVal = Math.max(-1, Math.min(1, stockVal));
         stockNorm.push(stockVal);
@@ -157,6 +163,8 @@ function MoneyRainCanvas() {
       ctx!.globalAlpha = 0.25;
       const startIdx = Math.max(0, stockNorm.length - STOCK_POINTS);
       const offsetX = -stockScrollX;
+      const arrowTargetX = w * 0.75;
+      let arrowFound = false;
       for (let i = startIdx; i < stockNorm.length - 1; i++) {
         const x1 = (i - startIdx) * STOCK_STEP + offsetX;
         const x2 = (i - startIdx + 1) * STOCK_STEP + offsetX;
@@ -171,6 +179,22 @@ function MoneyRainCanvas() {
         ctx!.moveTo(x1, y1);
         ctx!.lineTo(x2, y2);
         ctx!.stroke();
+        if (!arrowFound && x1 <= arrowTargetX && x2 >= arrowTargetX) {
+          const t = (arrowTargetX - x1) / (x2 - x1);
+          const tipX = arrowTargetX;
+          const arrowTipY = y1 + t * (y2 - y1);
+          const angle = Math.atan2(y2 - y1, x2 - x1);
+          const arrowLen = 10;
+          const arrowColor = (y2 < y1) ? '#00cc44' : '#cc2222';
+          ctx!.fillStyle = arrowColor;
+          ctx!.beginPath();
+          ctx!.moveTo(tipX, arrowTipY);
+          ctx!.lineTo(tipX - arrowLen * Math.cos(angle - 0.4), arrowTipY - arrowLen * Math.sin(angle - 0.4));
+          ctx!.lineTo(tipX - arrowLen * Math.cos(angle + 0.4), arrowTipY - arrowLen * Math.sin(angle + 0.4));
+          ctx!.closePath();
+          ctx!.fill();
+          arrowFound = true;
+        }
       }
       ctx!.restore();
 
@@ -286,17 +310,39 @@ function MoneyRainCanvas() {
 
 function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: string) => void; audioRef: React.MutableRefObject<HTMLAudioElement | null> }) {
   const [answer, setAnswer] = useState('');
+  const [muted, setMuted] = useState(() => {
+    try {
+      const stored = localStorage.getItem('villageLedger_soundSettings');
+      if (stored) return JSON.parse(stored).muted ?? false;
+    } catch {}
+    return false;
+  });
 
   useEffect(() => {
     const audio = new Audio('/money_song_1.mp3');
     audio.loop = true;
     audio.volume = 0.5;
     audio.preload = 'auto';
+    audio.muted = muted;
     audioRef.current = audio;
   }, [audioRef]);
 
-  const handleContinue = () => {
+  const toggleMute = () => {
+    const newMuted = !muted;
+    setMuted(newMuted);
     if (audioRef.current) {
+      audioRef.current.muted = newMuted;
+    }
+    try {
+      const stored = localStorage.getItem('villageLedger_soundSettings');
+      const settings = stored ? JSON.parse(stored) : {};
+      settings.muted = newMuted;
+      localStorage.setItem('villageLedger_soundSettings', JSON.stringify(settings));
+    } catch {}
+  };
+
+  const handleContinue = () => {
+    if (audioRef.current && !muted) {
       audioRef.current.play().catch(() => {
         const resumeOnInteraction = () => {
           audioRef.current?.play().catch(() => {});
@@ -319,6 +365,40 @@ function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: strin
       }}
       data-testid="reflection-screen"
     >
+      <button
+        onClick={toggleMute}
+        className="cursor-pointer"
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          zIndex: 10,
+          background: 'none',
+          border: 'none',
+          padding: '8px',
+          opacity: 0.5,
+          transition: 'opacity 0.2s',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.8'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.5'; }}
+        data-testid="button-mute"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9B8A6A" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {muted ? (
+            <>
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#9B8A6A" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </>
+          ) : (
+            <>
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#9B8A6A" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            </>
+          )}
+        </svg>
+      </button>
       <div className="flex flex-col items-center max-w-lg w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
         <h2
           className="text-center mb-6"

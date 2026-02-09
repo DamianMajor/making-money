@@ -68,7 +68,7 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - Sound system: loads 35 sounds, mute/unmute via localStorage key `villageLedger_soundSettings`.
 - Stone Tablet: graphic removed but interaction area preserved, popup shows on arrival or direct click.
 - Celebration timing: applauseDuration = fullDuration - 12 seconds (min 2s).
-- Game title displayed as "THE BARTER SYSTEM" in-game UI, series title "WHAT IS MONEY?" on intro screen. Start button text is "Start".
+- Game title displayed as "THE BARTER SYSTEM" in-game UI, series title "MAKING MONEY" on intro screen with tagline "historical lessons of how money came to be". Start button text is "Start".
 - Hut overlay drawn at 1.5x scale (hutScale=1.5), anchored relative to playerHomeX position on walking path layer, offset -50px left and +50px down. No "Home" label.
 - Character positions: Player at x=170 (+20px right, +15px down from feet), woodcutter at x=835 (120x168, 20% larger), fisherman at x=3025, stone worker at x=2150, berry bush at x=2550.
 - Character spacing: Auto-walk targets include 40px offset based on approach direction to prevent overlap during interactions.

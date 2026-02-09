@@ -58,7 +58,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   ambientVillage: { src: '/sounds/ambient-village.mp3', volume: 0.2, loop: true },
   ambientNight: { src: '/sounds/ambient-night.mp3', volume: 0.3, loop: true },
   rain: { src: '/sounds/rain.mp3', volume: 0.4, loop: false },
-  thunder: { src: '/sounds/thunder.mp3', volume: 0.6, loop: false },
+  thunder: { src: '/sounds/thunder.mp3', volume: 0.6, loop: true },
   roofHammer: { src: '/sounds/roof-hammer.mp3', volume: 0.4, loop: false },
   backgroundMusicDay: { src: '/sounds/backgroundmusic-day.mp3', volume: 0.25, loop: false },
   backgroundMusicDay2: { src: '/sounds/backgroundmusic-day-2.mp3', volume: 0.25, loop: false },
@@ -80,8 +80,12 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   stream: { src: '/sounds/stream.aac', volume: 0.4, loop: true },
 };
 
-const FIGHT_LAYER_SOUNDS: SoundName[] = [
-  'fightCat', 'fightCrash', 'fightIntro', 'fightYell'
+const FIGHT_ALWAYS_SOUNDS: SoundName[] = [
+  'fightCrash', 'fightMartialArts', 'fightCat'
+];
+
+const FIGHT_RANDOM_SOUNDS: SoundName[] = [
+  'fightIntro', 'fightYell'
 ];
 
 interface ActiveSound {
@@ -338,30 +342,32 @@ export class SoundManager {
       mainBrawl.source.start(0);
     }
     
-    // Always play fightMartialArts as first layer
-    const martialArtsSound = this.createSource('fightMartialArts', false);
-    if (martialArtsSound) {
-      this.brawlSources.push(martialArtsSound);
-      martialArtsSound.source.start(0);
-    }
-    
-    // Pick 1-2 additional random fight layer sounds
-    const shuffled = [...FIGHT_LAYER_SOUNDS].sort(() => Math.random() - 0.5);
-    const layerCount = 1 + Math.floor(Math.random() * 2); // 1 or 2
-    const selectedLayers = shuffled.slice(0, layerCount);
-    
-    // Play each layer with slight delay for variation
-    selectedLayers.forEach((layerName, index) => {
+    // Always play car crash, martial arts, and cat sounds
+    FIGHT_ALWAYS_SOUNDS.forEach((soundName, index) => {
       const timeoutId = setTimeout(() => {
         if (this.muted || !this.brawlActive) return;
-        const layerSound = this.createSource(layerName, false);
-        if (layerSound) {
-          this.brawlSources.push(layerSound);
-          layerSound.source.start(0);
+        const sound = this.createSource(soundName, false);
+        if (sound) {
+          this.brawlSources.push(sound);
+          sound.source.start(0);
         }
-      }, index * 300); // Stagger by 300ms
+      }, index * 200);
       this.brawlTimeouts.push(timeoutId);
     });
+    
+    // Pick 0-1 additional random fight sounds (never cartoon)
+    if (Math.random() > 0.5) {
+      const randomSound = FIGHT_RANDOM_SOUNDS[Math.floor(Math.random() * FIGHT_RANDOM_SOUNDS.length)];
+      const timeoutId = setTimeout(() => {
+        if (this.muted || !this.brawlActive) return;
+        const sound = this.createSource(randomSound, false);
+        if (sound) {
+          this.brawlSources.push(sound);
+          sound.source.start(0);
+        }
+      }, 600);
+      this.brawlTimeouts.push(timeoutId);
+    }
     
     // Stop all brawl sounds after duration
     const stopTimeoutId = setTimeout(() => {
@@ -519,35 +525,23 @@ export class SoundManager {
     }, durationMs);
   }
 
-  public playBooThenFailure(): void {
+  public playFailureThenBoo(): void {
     if (this.muted) return;
     
-    // Use HTML5 Audio elements to guarantee no pitch shifting
-    const booAudio = new Audio('/sounds/crowd-boo.mp3');
-    booAudio.volume = this.masterVolume * 0.5;
-    booAudio.playbackRate = 1.0;
-    booAudio.play().catch(() => {});
+    // Play failure sound first
+    const failureAudio = new Audio('/sounds/failure.mp3');
+    failureAudio.volume = this.masterVolume * 0.5;
+    failureAudio.playbackRate = 1.0;
+    failureAudio.play().catch(() => {});
     
-    let failurePlayed = false;
-    
-    const playFailure = () => {
-      if (failurePlayed || this.muted) return;
-      failurePlayed = true;
-      const failureAudio = new Audio('/sounds/failure.mp3');
-      failureAudio.volume = this.masterVolume * 0.5;
-      failureAudio.playbackRate = 1.0;
-      failureAudio.play().catch(() => {});
-    };
-    
-    // Get duration and play failure with overlap
-    booAudio.addEventListener('loadedmetadata', () => {
-      const booDuration = booAudio.duration * 1000;
-      const delay = Math.max(0, booDuration - 1000); // Overlap by 1 second
-      setTimeout(playFailure, delay);
-    });
-    
-    // Fallback if metadata doesn't load quickly
-    setTimeout(playFailure, 1500);
+    // Boo plays 2 seconds after failure sound starts
+    setTimeout(() => {
+      if (this.muted) return;
+      const booAudio = new Audio('/sounds/crowd-boo.mp3');
+      booAudio.volume = this.masterVolume * 0.5;
+      booAudio.playbackRate = 1.0;
+      booAudio.play().catch(() => {});
+    }, 2000);
   }
 
   public getBufferDuration(name: SoundName): number {

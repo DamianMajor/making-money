@@ -404,6 +404,20 @@ export class VillageLedgerGame {
               }
             }
           }
+          // Remove blue shadow/puddle from bottom of sprite feet (scan bottom 10% for blue-ish residue)
+          const bottomBlueRows = Math.ceil(h * 0.10);
+          for (let row = h - bottomBlueRows; row < h; row++) {
+            for (let col = 0; col < w; col++) {
+              const idx = (row * w + col) * 4;
+              const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+              if (a > 0) {
+                // Detect blue-dominant pixels (shadow/puddle remnants from blue chroma key)
+                if (b > r + 30 && b > g + 30 && b > 60) {
+                  data[idx + 3] = 0;
+                }
+              }
+            }
+          }
           offCtx.putImageData(imageData, 0, 0);
           this.processedSprites[id] = offscreen;
         }
@@ -467,16 +481,16 @@ export class VillageLedgerGame {
     this.woodcutter = {
       id: 'woodcutter',
       name: 'WOODCUTTER',
-      x: 815,
+      x: 835,
       y: 0,
-      width: 100,
-      height: 140,
+      width: 120,
+      height: 168,
       color: '#8B4513', // Brown for wood theme
       outlineColor: '#5D2E0C',
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 815
+      originalX: 835
     };
 
     this.villageElder = {
@@ -1001,9 +1015,9 @@ export class VillageLedgerGame {
   private getTappedInteractable(x: number, y: number): Character | 'home' | 'stoneTablet' | null {
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     
-    // Check if tapping on home hut (at playerHomeX = 100)
+    // Check if tapping on home hut (at playerHomeX = 100) - enlarged hitbox (100% bigger)
     const homeScreenX = this.playerHomeX - this.cameraX;
-    const homeHitbox = { x: homeScreenX - 50, y: groundY - 120, width: 100, height: 120 };
+    const homeHitbox = { x: homeScreenX - 100, y: groundY - 240, width: 200, height: 240 };
     if (x >= homeHitbox.x && x <= homeHitbox.x + homeHitbox.width &&
         y >= homeHitbox.y && y <= homeHitbox.y + homeHitbox.height) {
       return 'home';
@@ -1109,6 +1123,7 @@ export class VillageLedgerGame {
               this.state.inventory.wood = 0;
               this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
               this.setMood('happy');
+              soundManager.stop('thunder');
               
               // After roof fix: play 3 footsteps, then player enters hut
               setTimeout(() => {
@@ -1196,6 +1211,7 @@ export class VillageLedgerGame {
           this.state.inventory.wood = 0;
           this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
           this.setMood('happy');
+          soundManager.stop('thunder');
         }
       }
     ]);
@@ -1693,7 +1709,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX + 200;
+                this.villageElder.targetX = this.villageCenterX + 100;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -1779,7 +1795,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX + 200;
+                this.villageElder.targetX = this.villageCenterX + 100;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -2414,7 +2430,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX + 200;
+                this.villageElder.targetX = this.villageCenterX + 100;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -2443,7 +2459,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX + 200;
+                this.villageElder.targetX = this.villageCenterX + 100;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -2993,7 +3009,7 @@ export class VillageLedgerGame {
               // Trigger the brawl - NPCs run to player, Elder steps aside
               this.woodcutter.targetX = this.player.x - 30;
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX + 200; // Elder steps away
+              this.villageElder.targetX = this.villageCenterX + 100; // Elder steps away
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3122,7 +3138,7 @@ export class VillageLedgerGame {
               // Trigger brawl
               this.woodcutter.targetX = this.player.x - 30;
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX + 200;
+              this.villageElder.targetX = this.villageCenterX + 100;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3151,7 +3167,7 @@ export class VillageLedgerGame {
             text: "Without a record, we cannot know the truth...",
             onComplete: () => {
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX + 200;
+              this.villageElder.targetX = this.villageCenterX + 100;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3180,7 +3196,7 @@ export class VillageLedgerGame {
             text: "Without a record, we cannot know the truth...",
             onComplete: () => {
               this.woodcutter.targetX = this.player.x - 30;
-              this.villageElder.targetX = this.villageCenterX + 200;
+              this.villageElder.targetX = this.villageCenterX + 100;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3365,7 +3381,7 @@ export class VillageLedgerGame {
                     // Trigger brawl
                     this.woodcutter.targetX = this.player.x - 30;
                     this.stoneWorker.targetX = this.player.x + 30;
-                    this.villageElder.targetX = this.villageCenterX + 200;
+                    this.villageElder.targetX = this.villageCenterX + 100;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
@@ -3523,7 +3539,7 @@ export class VillageLedgerGame {
                     // Trigger brawl
                     this.woodcutter.targetX = this.player.x - 30;
                     this.stoneWorker.targetX = this.player.x + 30;
-                    this.villageElder.targetX = this.villageCenterX + 200;
+                    this.villageElder.targetX = this.villageCenterX + 100;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
@@ -3887,17 +3903,17 @@ export class VillageLedgerGame {
       if (!isWalking && npc.id !== 'berryBush') {
         const npcToPlayer = this.player.x - npc.x;
         if (npc.id === 'fisherman') {
-          // Fisherman faces AWAY from player by default (back turned)
-          // Faces player during any active dialogue when player is nearby
+          // Fisherman faces TOWARD player by default
+          // Turns away only when NOT in dialogue and player is far
           const playerNearby = Math.abs(this.player.x - npc.x) < 80;
           const inDialogue = this.state.currentDialogue !== null || this.state.dialogueQueue.length > 0;
           if (playerNearby && inDialogue) {
-            npc.facingDirection = npcToPlayer >= 0 ? -1 : 1; // Face player during interaction
+            npc.facingDirection = npcToPlayer >= 0 ? 1 : -1; // Face player during interaction
           } else {
-            npc.facingDirection = npcToPlayer >= 0 ? 1 : -1; // Opposite direction (back turned)
+            npc.facingDirection = npcToPlayer >= 0 ? -1 : 1; // Face away when idle (back turned)
           }
         } else if (npc.id === 'villageElder') {
-          npc.facingDirection = npcToPlayer >= 0 ? -1 : 1; // Inverted orientation
+          npc.facingDirection = npcToPlayer >= 0 ? 1 : -1; // Normal orientation (faces player)
         } else {
           npc.facingDirection = npcToPlayer >= 0 ? 1 : -1;
         }
@@ -4090,25 +4106,21 @@ export class VillageLedgerGame {
         const dx = this.villageElder.targetX - this.villageElder.x;
         if (Math.abs(dx) > 5) {
           this.villageElder.x += Math.sign(dx) * brawlSpeed * 0.5;
-          // Elder faces TOWARD the fight (player position) while backing away (inverted)
+          // Elder faces TOWARD the fight (player position) while backing away
           const elderToPlayer = this.player.x - this.villageElder.x;
-          this.villageElder.facingDirection = elderToPlayer >= 0 ? -1 : 1;
+          this.villageElder.facingDirection = elderToPlayer >= 0 ? 1 : -1;
         }
+      }
+      // Trigger failure sound 0.25s before fail screen (at 3.75s)
+      if (this.state.brawlTimer > 3.75 && !this.booFailureTriggered) {
+        this.booFailureTriggered = true;
+        soundManager.playFailureThenBoo();
       }
       // End brawl at 4 seconds, show fail screen
       if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.1) {
         this.state.showBrawl = false;
         this.state.showFail = true;
         this.state.phase = 'fail';
-        // Trigger boo sound 0.5 seconds after fail screen appears
-        if (!this.booFailureTriggered) {
-          this.booFailureTriggered = true;
-          setTimeout(() => {
-            if (this.state.showFail && this.state.phase === 'fail') {
-              soundManager.playBooThenFailure();
-            }
-          }, 500);
-        }
       }
     }
     
@@ -4313,7 +4325,7 @@ export class VillageLedgerGame {
         // Trigger the brawl - NPCs run to player, Elder steps aside
         this.woodcutter.targetX = this.player.x - 30;
         this.stoneWorker.targetX = this.player.x + 30;
-        this.villageElder.targetX = this.villageCenterX + 200; // Elder steps away
+        this.villageElder.targetX = this.villageCenterX + 100; // Elder steps away
         this.state.phase = 'brawl';
         this.state.showBrawl = true;
         this.state.brawlTimer = 0;
@@ -4411,6 +4423,7 @@ export class VillageLedgerGame {
                 this.state.roofRepaired = true;
                 this.state.inventory.wood = 0;
                 this.showInventoryPopup('ROOF FIXED!');
+                soundManager.stop('thunder');
               }
               
               // Player fades into hut
@@ -5197,43 +5210,23 @@ export class VillageLedgerGame {
     this.state.cloudsAnimationTimer += 1/60;
     const t = this.state.cloudsAnimationTimer;
     
-    // Calculate cloud positions rolling in from left and right
-    const progress = Math.min(1, t / 2.5); // 0 to 1 over 2.5 seconds
-    const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease out
+    // Calculate progress
+    const progress = Math.min(1, t / 2.5);
+    const easeProgress = 1 - Math.pow(1 - progress, 3);
     
-    // Darken the sky gradually (reduced darkness)
+    // Darken the sky gradually (no cloud graphics, just darkening)
     const darkenAlpha = easeProgress * 0.4;
     ctx.fillStyle = `rgba(30, 30, 50, ${darkenAlpha})`;
     ctx.fillRect(0, 0, w, h);
     
-    // Draw large dark clouds rolling in from left
-    const leftCloudX = -w * 0.4 + (w * 0.6) * easeProgress;
-    this.drawCloud(ctx, leftCloudX, h * 0.15, 200, 0.8 * easeProgress, '#3a3a50');
-    this.drawCloud(ctx, leftCloudX - 100, h * 0.25, 180, 0.7 * easeProgress, '#404055');
-    this.drawCloud(ctx, leftCloudX + 50, h * 0.1, 150, 0.6 * easeProgress, '#454560');
-    
-    // Draw large dark clouds rolling in from right
-    const rightCloudX = w + w * 0.4 - (w * 0.6) * easeProgress;
-    this.drawCloud(ctx, rightCloudX, h * 0.12, 220, 0.8 * easeProgress, '#3a3a50');
-    this.drawCloud(ctx, rightCloudX + 100, h * 0.22, 170, 0.7 * easeProgress, '#404055');
-    this.drawCloud(ctx, rightCloudX - 80, h * 0.08, 160, 0.6 * easeProgress, '#454560');
-    
-    // Draw center cloud that slowly fades in from center top
-    const centerCloudAlpha = Math.min(1, t / 3.0) * 0.85; // Fade in slowly over 3 seconds
-    this.drawCloud(ctx, w * 0.5, h * 0.18, 250, centerCloudAlpha, '#2a2a40');
-    this.drawCloud(ctx, w * 0.4, h * 0.14, 180, centerCloudAlpha * 0.8, '#353550');
-    this.drawCloud(ctx, w * 0.6, h * 0.16, 190, centerCloudAlpha * 0.8, '#353550');
-    
-    // Text overlay at the end - fades in then fades out
-    // Skip text entirely once roof fix starts (roofRepaired becomes true)
+    // Text overlay - fades in then fades out (no cloud graphics)
     if (!this.state.roofRepaired && progress > 0.7) {
       const textAppearTime = 1.75;
       const textDuration = 5;
       const textFadeOutTime = 1;
       
-      let textAlpha = (progress - 0.7) / 0.3; // Fade in
+      let textAlpha = (progress - 0.7) / 0.3;
       
-      // Calculate fade out (after 5 seconds of visibility)
       const timeSinceAppear = t - textAppearTime;
       if (timeSinceAppear > textDuration) {
         const fadeOutProgress = (timeSinceAppear - textDuration) / textFadeOutTime;
@@ -5248,8 +5241,8 @@ export class VillageLedgerGame {
         ctx.fillStyle = '#FFFFFF';
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 3;
-        ctx.strokeText('A storm approaches...', w / 2, h / 2);
-        ctx.fillText('A storm approaches...', w / 2, h / 2);
+        ctx.strokeText('A storm approaches...', w / 2, h / 2 - 250);
+        ctx.fillText('A storm approaches...', w / 2, h / 2 - 250);
         ctx.restore();
       }
     }
@@ -5263,30 +5256,21 @@ export class VillageLedgerGame {
     this.state.rainfallTimer += 1/60;
     const t = this.state.rainfallTimer;
     
-    // Dark stormy sky background (reduced darkness)
+    // Dark stormy sky background (no cloud graphics)
     ctx.fillStyle = 'rgba(20, 20, 35, 0.65)';
     ctx.fillRect(0, 0, w, h);
-    
-    // Draw persistent clouds at top
-    this.drawCloud(ctx, w * 0.2, h * 0.12, 220, 0.9, '#2a2a40');
-    this.drawCloud(ctx, w * 0.5, h * 0.15, 280, 0.95, '#252538');
-    this.drawCloud(ctx, w * 0.8, h * 0.1, 200, 0.85, '#2a2a40');
-    this.drawCloud(ctx, w * 0.35, h * 0.08, 180, 0.8, '#303048');
-    this.drawCloud(ctx, w * 0.65, h * 0.12, 190, 0.8, '#303048');
     
     // Rain drops animation
     ctx.strokeStyle = 'rgba(180, 200, 255, 0.4)';
     ctx.lineWidth = 1.5;
     
-    const rainDensity = 150; // Number of rain drops
+    const rainDensity = 150;
     for (let i = 0; i < rainDensity; i++) {
-      // Seeded random positions that animate
       const seed = i * 1234.5678;
       const x = ((seed % w) + t * 80 * ((i % 3) + 1)) % w;
       const baseY = ((seed * 7) % h);
       const y = (baseY + t * 400 * (0.8 + (i % 5) * 0.1)) % (h + 50);
       
-      // Rain drop as a short line
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x - 2, y + 15);
@@ -5299,12 +5283,11 @@ export class VillageLedgerGame {
       ctx.fillRect(0, 0, w, h);
     }
     
-    // Show "A storm approaches" text with fade - but hide once roof fix starts
-    // Once roofRepaired is true, fade out the text quickly
+    // Show "A storm approaches" text with fade - hide once roof fix starts
     if (!this.state.roofRepaired) {
-      const textVisibleTime = t + 0.75; // Time since text first appeared
-      const textDuration = 5; // Total visibility before fade
-      const textFadeOutTime = 1; // Fade out duration
+      const textVisibleTime = t + 0.75;
+      const textDuration = 5;
+      const textFadeOutTime = 1;
       
       if (textVisibleTime < textDuration + textFadeOutTime) {
         let textAlpha = 1;
@@ -5320,8 +5303,8 @@ export class VillageLedgerGame {
           ctx.fillStyle = '#FFFFFF';
           ctx.strokeStyle = '#000';
           ctx.lineWidth = 3;
-          ctx.strokeText('A storm approaches...', w / 2, h / 2);
-          ctx.fillText('A storm approaches...', w / 2, h / 2);
+          ctx.strokeText('A storm approaches...', w / 2, h / 2 - 250);
+          ctx.fillText('A storm approaches...', w / 2, h / 2 - 250);
           ctx.restore();
         }
       }
@@ -5361,9 +5344,8 @@ export class VillageLedgerGame {
     
     // Continue rain effect during night transition (fading out more slowly)
     if (this.state.showRainfall) {
-      const rainFade = Math.max(0, 1 - t / 4); // Fade rain over first 4 seconds
+      const rainFade = Math.max(0, 1 - t / 4);
       
-      // Rain drops animation (continuing from rainfall)
       ctx.strokeStyle = `rgba(180, 200, 255, ${0.4 * rainFade})`;
       ctx.lineWidth = 1.5;
       
@@ -5382,85 +5364,25 @@ export class VillageLedgerGame {
       }
     }
     
-    // Fade from storm to night over 4 seconds (smooth gradual transition)
-    const fadeProgress = Math.min(1, t / 4);
-    // Use easing function for smoother fade: start slow, accelerate, then slow down
-    const easedProgress = fadeProgress < 0.5 
-      ? 2 * fadeProgress * fadeProgress 
-      : 1 - Math.pow(-2 * fadeProgress + 2, 2) / 2;
-    const nightAlpha = 0.3 + easedProgress * 0.6; // Start at 30%, smoothly fade to 90%
-    
-    // Draw dark overlay that increases as rain fades
-    ctx.fillStyle = `rgba(10, 20, 50, ${nightAlpha})`;
-    ctx.fillRect(0, 0, w, h);
-    
-    // Draw moon (fades in)
-    if (fadeProgress > 0.3) {
-      const moonAlpha = Math.min(1, (fadeProgress - 0.3) / 0.7);
-      const moonX = w * 0.8;
-      const moonY = 80;
-      const moonRadius = 40;
+    // No overlay after roof is fixed - the night background layers handle the visual
+    if (!this.state.roofRepaired) {
+      const fadeProgress = Math.min(1, t / 4);
+      const easedProgress = fadeProgress < 0.5 
+        ? 2 * fadeProgress * fadeProgress 
+        : 1 - Math.pow(-2 * fadeProgress + 2, 2) / 2;
+      const nightAlpha = 0.3 + easedProgress * 0.6;
       
-      ctx.save();
-      ctx.globalAlpha = moonAlpha;
-      
-      // Moon glow
-      const moonGlow = ctx.createRadialGradient(moonX, moonY, moonRadius * 0.5, moonX, moonY, moonRadius * 2);
-      moonGlow.addColorStop(0, 'rgba(255, 255, 200, 0.5)');
-      moonGlow.addColorStop(1, 'rgba(255, 255, 200, 0)');
-      ctx.fillStyle = moonGlow;
-      ctx.beginPath();
-      ctx.arc(moonX, moonY, moonRadius * 2, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Moon body
-      ctx.fillStyle = '#FFFACD';
-      ctx.beginPath();
-      ctx.arc(moonX, moonY, moonRadius, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Moon craters
-      ctx.fillStyle = 'rgba(200, 190, 150, 0.3)';
-      ctx.beginPath();
-      ctx.arc(moonX - 10, moonY - 5, 8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(moonX + 15, moonY + 10, 6, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.restore();
+      ctx.fillStyle = `rgba(10, 20, 50, ${nightAlpha})`;
+      ctx.fillRect(0, 0, w, h);
     }
     
-    // Draw stars (fade in after moon)
-    if (fadeProgress > 0.5) {
-      const starAlpha = Math.min(1, (fadeProgress - 0.5) / 0.5);
-      ctx.save();
-      ctx.globalAlpha = starAlpha;
-      
-      // Twinkling stars
-      for (let i = 0; i < 30; i++) {
-        const starX = (i * 73.7) % (w * 0.9) + w * 0.05;
-        const starY = (i * 41.3) % (h * 0.4) + 20;
-        const twinkle = Math.sin(t * 5 + i * 0.5) * 0.3 + 0.7;
-        const starSize = (1 + (i % 3)) * twinkle;
-        
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(starX, starY, starSize, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      
-      ctx.restore();
-    }
-    
-    // Draw "THE END OF A GOOD DAY" text after transition (fade out 3s earlier - at t=4 instead of t=7)
+    // Draw "THE END OF A GOOD DAY" text after transition
     if (t > 2 && t < 5) {
-      // Fade in from t=2 to t=3, then fade out from t=4 to t=5
       let textAlpha = 1;
       if (t < 3) {
-        textAlpha = (t - 2); // Fade in
+        textAlpha = (t - 2);
       } else if (t > 4) {
-        textAlpha = 1 - (t - 4); // Fade out
+        textAlpha = 1 - (t - 4);
       }
       ctx.save();
       ctx.globalAlpha = textAlpha;
@@ -5500,7 +5422,7 @@ export class VillageLedgerGame {
     ctx.font = `20px ${this.retroFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#DC2626';
-    ctx.fillText('SETTLEMENT IN CHAOS!', w / 2, cardY + 50);
+    ctx.fillText('COMMUNITY IN CHAOS!', w / 2, cardY + 50);
 
     // Message
     ctx.font = `10px ${this.retroFont}`;
@@ -5982,7 +5904,12 @@ export class VillageLedgerGame {
         
         ctx.beginPath();
         ctx.arc(screenX, screenY, particle.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 223, 150, ${finalAlpha})`;
+        // Transition dust color to blue/grey during night
+        const nf = this.state.nightBgCrossfade;
+        const dR = Math.round(255 * (1 - nf) + 140 * nf);
+        const dG = Math.round(223 * (1 - nf) + 160 * nf);
+        const dB = Math.round(150 * (1 - nf) + 200 * nf);
+        ctx.fillStyle = `rgba(${dR}, ${dG}, ${dB}, ${finalAlpha})`;
         ctx.fill();
       }
     }
@@ -6015,14 +5942,21 @@ export class VillageLedgerGame {
         
         ctx.beginPath();
         ctx.arc(screenX, screenY, particle.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 223, 150, ${finalAlpha})`;
+        const nf2 = this.state.nightBgCrossfade;
+        const mR = Math.round(255 * (1 - nf2) + 140 * nf2);
+        const mG = Math.round(223 * (1 - nf2) + 160 * nf2);
+        const mB = Math.round(150 * (1 - nf2) + 200 * nf2);
+        ctx.fillStyle = `rgba(${mR}, ${mG}, ${mB}, ${finalAlpha})`;
         ctx.fill();
         
         // Subtle glow for larger particles
         if (particle.size > 1) {
           ctx.beginPath();
           ctx.arc(screenX, screenY, particle.size * 2, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 200, 100, ${finalAlpha * 0.15})`;
+          const gR = Math.round(255 * (1 - nf2) + 120 * nf2);
+          const gG = Math.round(200 * (1 - nf2) + 140 * nf2);
+          const gB = Math.round(100 * (1 - nf2) + 180 * nf2);
+          ctx.fillStyle = `rgba(${gR}, ${gG}, ${gB}, ${finalAlpha * 0.15})`;
           ctx.fill();
         }
       }
@@ -6056,13 +5990,20 @@ export class VillageLedgerGame {
         
         ctx.beginPath();
         ctx.arc(screenX, screenY, particle.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 223, 150, ${finalAlpha})`;
+        const nf3 = this.state.nightBgCrossfade;
+        const fR = Math.round(255 * (1 - nf3) + 140 * nf3);
+        const fG = Math.round(223 * (1 - nf3) + 160 * nf3);
+        const fB = Math.round(150 * (1 - nf3) + 200 * nf3);
+        ctx.fillStyle = `rgba(${fR}, ${fG}, ${fB}, ${finalAlpha})`;
         ctx.fill();
         
         if (particle.size > 1.5) {
           ctx.beginPath();
           ctx.arc(screenX, screenY, particle.size * 2, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 200, 100, ${finalAlpha * 0.2})`;
+          const fg2R = Math.round(255 * (1 - nf3) + 120 * nf3);
+          const fg2G = Math.round(200 * (1 - nf3) + 140 * nf3);
+          const fg2B = Math.round(100 * (1 - nf3) + 180 * nf3);
+          ctx.fillStyle = `rgba(${fg2R}, ${fg2G}, ${fg2B}, ${finalAlpha * 0.2})`;
           ctx.fill();
         }
       }
@@ -7011,7 +6952,15 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const portraitY = y + (h - portraitSize) / 2;
       const textStartX = portraitX + portraitSize + 20; // Text starts after portrait
       
-      // Get speaker color based on who is speaking
+      // Map speaker names to processed sprite canvases
+      const speakerSpriteIdMap: Record<string, string> = {
+        'YOU': 'player',
+        'WOODCUTTER': 'woodcutter',
+        'STONE-WORKER': 'stone-worker',
+        'FISHERMAN': 'fisherman',
+        'VILLAGE ELDER': 'village-elder',
+      };
+      
       const speakerColors: Record<string, { bg: string; outline: string }> = {
         'WOODCUTTER': { bg: '#8B4513', outline: '#5D2E0C' },
         'STONE-WORKER': { bg: '#6B7280', outline: '#374151' },
@@ -7022,6 +6971,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       };
       
       const colors = speakerColors[this.state.currentDialogue.speaker] || { bg: '#6B7280', outline: '#374151' };
+      const spriteId = speakerSpriteIdMap[this.state.currentDialogue.speaker];
+      const spriteCanvas = spriteId ? this.processedSprites[spriteId] : null;
       
       // Draw portrait background (rounded square)
       ctx.fillStyle = colors.bg;
@@ -7032,13 +6983,24 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fill();
       ctx.stroke();
       
-      // Draw speaker-specific icon on portrait
-      if (this.state.currentDialogue.speaker === 'STONE TABLET') {
-        // Draw tablet icon instead of face
+      // Draw speaker sprite thumbnail or fallback icon
+      if (spriteCanvas) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(portraitX + 2, portraitY + 2, portraitSize - 4, portraitSize - 4, 6);
+        ctx.clip();
+        const sW = spriteCanvas.width;
+        const sH = spriteCanvas.height;
+        const scale = Math.max((portraitSize - 4) / sW, (portraitSize - 4) / sH) * 1.3;
+        const drawW = sW * scale;
+        const drawH = sH * scale;
+        const drawX = portraitX + 2 + (portraitSize - 4 - drawW) / 2;
+        const drawY = portraitY + 2 + (portraitSize - 4 - drawH) / 2 - drawH * 0.1;
+        ctx.drawImage(spriteCanvas, drawX, drawY, drawW, drawH);
+        ctx.restore();
+      } else if (this.state.currentDialogue.speaker === 'STONE TABLET') {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-        // Tablet shape
         ctx.fillRect(portraitX + 15, portraitY + 10, 30, 40);
-        // Lines on tablet representing text
         ctx.strokeStyle = colors.outline;
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -7049,11 +7011,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         ctx.moveTo(portraitX + 20, portraitY + 40);
         ctx.lineTo(portraitX + 35, portraitY + 40);
         ctx.stroke();
-      } else {
-        // Draw simple face on portrait for NPC speakers
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.fillRect(portraitX + 15, portraitY + 18, 10, 10); // Left eye
-        ctx.fillRect(portraitX + portraitSize - 25, portraitY + 18, 10, 10); // Right eye
       }
       
       // Speaker name - using retro font at proper size (16px per guidelines)

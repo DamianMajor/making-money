@@ -77,7 +77,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
 };
 
 const FIGHT_LAYER_SOUNDS: SoundName[] = [
-  'fightCartoon', 'fightCat', 'fightCrash', 'fightIntro', 'fightMartialArts', 'fightYell'
+  'fightCat', 'fightCrash', 'fightIntro', 'fightYell'
 ];
 
 interface ActiveSound {
@@ -334,9 +334,16 @@ export class SoundManager {
       mainBrawl.source.start(0);
     }
     
-    // Pick 2-3 random fight layer sounds
+    // Always play fightMartialArts as first layer
+    const martialArtsSound = this.createSource('fightMartialArts', false);
+    if (martialArtsSound) {
+      this.brawlSources.push(martialArtsSound);
+      martialArtsSound.source.start(0);
+    }
+    
+    // Pick 1-2 additional random fight layer sounds
     const shuffled = [...FIGHT_LAYER_SOUNDS].sort(() => Math.random() - 0.5);
-    const layerCount = 2 + Math.floor(Math.random() * 2); // 2 or 3
+    const layerCount = 1 + Math.floor(Math.random() * 2); // 1 or 2
     const selectedLayers = shuffled.slice(0, layerCount);
     
     // Play each layer with slight delay for variation

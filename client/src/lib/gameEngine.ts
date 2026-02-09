@@ -571,9 +571,6 @@ export class VillageLedgerGame {
       choiceOptions: []
     };
 
-    // Trigger intro dialogue immediately
-    setTimeout(() => this.triggerIntro(), 500);
-
     // Setup event listeners
     this.setupEventListeners();
     this.resize();
@@ -3638,11 +3635,19 @@ export class VillageLedgerGame {
     });
   }
 
-  public start(): void {
+  public start(withMusic: boolean = true): void {
     this.lastTime = performance.now();
     this.gameLoop();
+    if (withMusic) {
+      this.beginGameplay();
+    }
+  }
+
+  public beginGameplay(): void {
+    soundManager.init();
     soundManager.playLoop('ambientVillage');
     soundManager.startDaytimeMusic();
+    setTimeout(() => this.triggerIntro(), 500);
   }
 
   public stop(): void {

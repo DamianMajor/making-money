@@ -1,4 +1,4 @@
-// Village Ledger Educational Game Engine
+// The Barter System Educational Game Engine
 // Touch-only side-scroller optimized for iPad/Tablet
 
 import { soundManager } from './soundManager';
@@ -3964,17 +3964,20 @@ export class VillageLedgerGame {
           this.villageElder.x += Math.sign(dx) * brawlSpeed * 0.5;
         }
       }
-      // Trigger boo sound overlapping with fight end (at 2s to overlap ending by 2 seconds)
-      // Use exact timing check to prevent multiple triggers
-      if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.05 && !this.booFailureTriggered) {
-        this.booFailureTriggered = true;
-        soundManager.playBooThenFailure();
-      }
       // End brawl at 4 seconds, show fail screen
       if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.1) {
         this.state.showBrawl = false;
         this.state.showFail = true;
         this.state.phase = 'fail';
+        // Trigger boo sound 2 seconds after fail screen appears
+        if (!this.booFailureTriggered) {
+          this.booFailureTriggered = true;
+          setTimeout(() => {
+            if (this.state.showFail && this.state.phase === 'fail') {
+              soundManager.playBooThenFailure();
+            }
+          }, 2000);
+        }
       }
     }
     
@@ -5981,7 +5984,7 @@ export class VillageLedgerGame {
     ctx.fillStyle = '#D4A574';
     ctx.font = 'bold 32px "Courier New", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('VILLAGE LEDGER', w / 2, h / 2 - 40);
+    ctx.fillText('THE BARTER SYSTEM', w / 2, h / 2 - 40);
     
     // Loading text with animated dots
     const dots = '.'.repeat(Math.floor(Date.now() / 400) % 4);

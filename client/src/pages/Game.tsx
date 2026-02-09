@@ -61,7 +61,7 @@ export default function Game() {
           className="font-bold text-[#C9B896]"
           style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '10px' }}
         >
-          VILLAGE LEDGER
+          THE BARTER SYSTEM
         </span>
       </div>
     </div>

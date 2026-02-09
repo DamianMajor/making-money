@@ -9,7 +9,7 @@ const MONEY_ICONS = [
   'money-cattle', 'money-salt', 'money-teabrick', 'money-feather', 'money-cocoa',
   'money-banknote', 'money-creditcard', 'money-moderncoins', 'money-bitcoin',
   'money-yen', 'money-yuan', 'money-euro',
-  'money-chicken', 'money-fish', 'money-silvercoins'
+  'money-chicken', 'money-fish', 'money-silvercoins', 'money-wheat'
 ];
 
 function colorDistance(r1, g1, b1, r2, g2, b2) {

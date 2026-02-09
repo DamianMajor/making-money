@@ -534,7 +534,7 @@ export class VillageLedgerGame {
     this.villageElder = {
       id: 'villageElder',
       name: 'VILLAGE ELDER',
-      x: 1480, // Near Stone Tablet - original position
+      x: 1470, // Near Stone Tablet - original position (10px further from tablet)
       y: 0,
       width: 100,
       height: 140,
@@ -1031,8 +1031,8 @@ export class VillageLedgerGame {
   }
 
   private updateMoveDirection(x: number): void {
-    const halfWidth = this.logicalWidth / 2;
-    this.moveDirection = x < halfWidth ? -1 : 1;
+    const playerScreenX = this.player.x - this.cameraX;
+    this.moveDirection = x < playerScreenX ? -1 : 1;
   }
 
   private isInteractButtonTouched(x: number, y: number): boolean {
@@ -1094,7 +1094,7 @@ export class VillageLedgerGame {
     
     // Check if tapping on Stone Tablet (at villageCenterX = 1600) - AFTER NPCs
     const tabletScreenX = this.villageCenterX - this.cameraX;
-    const tabletHitbox = { x: tabletScreenX - 40, y: groundY - 100, width: 80, height: 100 };
+    const tabletHitbox = { x: tabletScreenX - 60, y: groundY - 130, width: 120, height: 130 };
     if (x >= tabletHitbox.x && x <= tabletHitbox.x + tabletHitbox.width &&
         y >= tabletHitbox.y && y <= tabletHitbox.y + tabletHitbox.height) {
       return 'stoneTablet';
@@ -1878,7 +1878,7 @@ export class VillageLedgerGame {
               soundManager.play('settle');
               if (this.state.woodcutterDebtRecorded) {
                 this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
-                  e.name === 'Woodcutter' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+                  e.debt.includes('WOODCUTTER') ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
                 );
               }
               this.hudGlow = 1;
@@ -2534,7 +2534,7 @@ export class VillageLedgerGame {
               soundManager.play('settle');
               if (this.state.stoneWorkerDebtRecorded) {
                 this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
-                  e.name === 'Stone-worker' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+                  e.debt.includes('STONE-WORKER') ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
                 );
               }
               this.hudGlow = 1;
@@ -3259,7 +3259,7 @@ export class VillageLedgerGame {
             text: "The Stone proves the truth... I was mistaken.",
             onComplete: () => {
               this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
-                e.name === 'Woodcutter' ? { ...e, debt: e.debt.replace('OWED', 'VERIFIED') } : e
+                e.debt.includes('WOODCUTTER') ? { ...e, debt: e.debt.replace('OWED', 'VERIFIED') } : e
               );
               this.hudGlow = 1;
             }
@@ -3269,7 +3269,7 @@ export class VillageLedgerGame {
             text: "The Tablet does not lie. I accept the truth.",
             onComplete: () => {
               this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
-                e.name === 'Stone-worker' ? { ...e, debt: e.debt.replace('OWED', 'VERIFIED') } : e
+                e.debt.includes('STONE-WORKER') ? { ...e, debt: e.debt.replace('OWED', 'VERIFIED') } : e
               );
               this.hudGlow = 1;
               this.state.phase = 'loop2_got_fish'; // Return to normal settlement phase
@@ -3306,7 +3306,10 @@ export class VillageLedgerGame {
           this.queueDialogue([
             {
               speaker: 'WOODCUTTER',
-              text: "Fine! The Tablet will prove I'm right! Let's go!"
+              text: "Fine! The Tablet will prove I'm right! Let's go!",
+              onComplete: () => {
+                this.woodcutter.targetX = this.villageCenterX + 80;
+              }
             },
             {
               speaker: 'WOODCUTTER',
@@ -3323,7 +3326,7 @@ export class VillageLedgerGame {
                   this.state.woodcutterSettled = true;
                   if (this.state.woodcutterDebtRecorded) {
                     this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
-                      e.name === 'Woodcutter' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+                      e.debt.includes('WOODCUTTER') ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
                     );
                   }
                   this.hudGlow = 1;
@@ -3461,7 +3464,10 @@ export class VillageLedgerGame {
           this.queueDialogue([
             {
               speaker: 'STONE-WORKER',
-              text: "Fine! The Tablet will prove I'm right! Let's go!"
+              text: "Fine! The Tablet will prove I'm right! Let's go!",
+              onComplete: () => {
+                this.stoneWorker.targetX = this.villageCenterX - 80;
+              }
             },
             {
               speaker: 'STONE-WORKER',
@@ -3478,7 +3484,7 @@ export class VillageLedgerGame {
                   this.state.stoneWorkerSettled = true;
                   if (this.state.stoneWorkerDebtRecorded) {
                     this.state.ledgerEntries = this.state.ledgerEntries.map(e => 
-                      e.name === 'Stone-Worker' ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
+                      e.debt.includes('STONE-WORKER') ? { ...e, debt: e.debt.replace('OWED', 'SETTLED') } : e
                     );
                   }
                   this.hudGlow = 1;
@@ -4067,8 +4073,12 @@ export class VillageLedgerGame {
       }
     }
     
-    // Move NPCs during settlement phase
-    if (this.state.phase === 'settlement') {
+    // Move NPCs during settlement or Loop 2 phases
+    const isSettlementPhase = this.state.phase === 'settlement' || 
+      this.state.phase === 'loop2_got_fish' || this.state.phase === 'loop2_verify_at_tablet' ||
+      this.state.phase === 'loop2_return' || this.state.phase === 'confrontation' ||
+      this.state.phase === 'complete_success';
+    if (isSettlementPhase) {
       // Woodcutter moves toward target
       if (this.woodcutter.targetX !== null && this.woodcutter.targetX !== undefined) {
         const dx = this.woodcutter.targetX - this.woodcutter.x;
@@ -4083,6 +4093,7 @@ export class VillageLedgerGame {
           this.stoneWorker.x += Math.sign(dx) * 80 * dt;
         }
       }
+      // Elder moves toward target (celebration walk, etc.) - handled by NPC movement loop above
     }
     
     // LOOP 2: Verbal promise path auto-trigger brawl (unchanged behavior for Loop 2)
@@ -4206,6 +4217,7 @@ export class VillageLedgerGame {
       // Thunderstorm lasts 3.5 seconds, then transition to night
       if (this.state.thunderstormTimer > 3.5) {
         this.state.showThunderstorm = false;
+        soundManager.stop('thunder');
         // Start night transition after thunderstorm
         this.state.showNightTransition = true;
         this.state.nightTransitionTimer = 0;
@@ -4260,10 +4272,8 @@ export class VillageLedgerGame {
         speaker: 'WOODCUTTER',
         text: "Enough! You're trying to cheat us all!",
         onComplete: () => {
-          // Position NPCs for brawl - Elder at Stone Tablet edge, others spaced out
-          // Stone Tablet is at x=1600, Elder overlaps its edge
-          this.villageElder.x = this.villageCenterX - 30; // Elder at tablet's left edge
-          this.villageElder.targetX = undefined; // Stop moving
+          // Position NPCs for brawl - Elder backs away, others rush in
+          this.villageElder.targetX = this.villageCenterX - 200; // Elder backs away from fight
           // Woodcutter to the left of Elder
           this.woodcutter.targetX = this.villageCenterX - 130;
           // Stone-worker to the right of tablet
@@ -5205,16 +5215,21 @@ export class VillageLedgerGame {
   
   private drawLightningFlash(ctx: CanvasRenderingContext2D, timer: number, interval: number): void {
     const w = this.logicalWidth;
-    const h = this.logicalHeight;
+    const bgH = this.logicalHeight - this.dialogueBoxHeight;
     const flashTime = timer % interval;
-    const frameDuration = 1 / 24;
+    const frameDuration = 1 / 12;
     if (flashTime < frameDuration * 2) {
       const frameIndex = flashTime < frameDuration ? 0 : 1;
       const lightningImg = this.lightningImages[frameIndex];
       if (lightningImg && lightningImg.complete) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, w, bgH);
+        ctx.clip();
         ctx.globalAlpha = 0.85;
-        ctx.drawImage(lightningImg, 0, 0, w, h);
+        ctx.drawImage(lightningImg, 0, 0, w, bgH);
         ctx.globalAlpha = 1;
+        ctx.restore();
       }
     }
   }
@@ -6926,26 +6941,26 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const normalColor = '#F5F5DC';
     const highlightColor = '#FFD700';
     
-    let highlightPhrase: string;
-    if (this.state.loop === 1) {
-      highlightPhrase = "Double Coincidence of Wants";
-    } else {
-      highlightPhrase = "Ledger";
+    const highlightPhrases: string[] = ["Double Coincidence of Wants"];
+    if (this.state.loop >= 2) {
+      highlightPhrases.push("Ledger");
     }
     
     const lowerText = text.toLowerCase();
-    const lowerPhrase = highlightPhrase.toLowerCase();
     
     // Build a per-character color map based on the FULL text
     const charColors: string[] = new Array(text.length).fill(normalColor);
-    let searchFrom = 0;
-    while (true) {
-      const idx = lowerText.indexOf(lowerPhrase, searchFrom);
-      if (idx === -1) break;
-      for (let i = idx; i < idx + highlightPhrase.length; i++) {
-        charColors[i] = highlightColor;
+    for (const highlightPhrase of highlightPhrases) {
+      const lowerPhrase = highlightPhrase.toLowerCase();
+      let searchFrom = 0;
+      while (true) {
+        const idx = lowerText.indexOf(lowerPhrase, searchFrom);
+        if (idx === -1) break;
+        for (let i = idx; i < idx + highlightPhrase.length; i++) {
+          charColors[i] = highlightColor;
+        }
+        searchFrom = idx + highlightPhrase.length;
       }
-      searchFrom = idx + highlightPhrase.length;
     }
     
     // Determine how many characters to actually render
@@ -6963,7 +6978,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const word = words[wi];
       const isLastWord = wi === words.length - 1;
       const wordWithSpace = word + (isLastWord ? '' : ' ');
-      const wordWidth = ctx.measureText(wordWithSpace).width;
+      const spaceW = ctx.measureText(' ').width;
+      const minSp = ctx.measureText('M').width * 0.5;
+      const effSp = Math.max(spaceW, minSp);
+      const wordWidth = ctx.measureText(word).width + (isLastWord ? 0 : effSp);
       
       if (currentLineWidth + wordWidth > maxWidth && currentLineWidth > 0) {
         lineY += lineHeight;
@@ -6977,7 +6995,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         const ch = wordWithSpace[ci];
         ctx.fillStyle = charColors[globalCharIdx] || normalColor;
         ctx.fillText(ch, charX, lineY);
-        charX += ctx.measureText(ch).width;
+        if (ch === ' ') {
+          charX += effSp;
+        } else {
+          charX += ctx.measureText(ch).width;
+        }
         globalCharIdx++;
       }
       currentLineWidth += wordWidth;
@@ -7058,8 +7080,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         const scale = Math.max((portraitSize - 4) / sW, (portraitSize - 4) / sH) * 1.69;
         const drawW = sW * scale;
         const drawH = sH * scale;
-        const drawX = portraitX + 2 + (portraitSize - 4 - drawW) / 2;
-        const drawY = portraitY + 2;
+        const headShift = portraitSize * 0.33;
+        let drawX = portraitX + 2 + (portraitSize - 4 - drawW) / 2;
+        const drawY = portraitY + 2 - headShift;
+        if (spriteId === 'fisherman') drawX += 10;
         ctx.drawImage(spriteCanvas, drawX, drawY, drawW, drawH);
         ctx.restore();
       } else if (this.state.currentDialogue.speaker === 'STONE TABLET') {
@@ -7382,6 +7406,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = '#3D2914';
     ctx.fillText('KNOWLEDGE SCROLL', w / 2, cardY + 40);
 
+    // Progress indicator - below title
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = '#6B5344';
+    ctx.fillText(`Question ${this.currentQuizQuestion + 1} of ${this.quizQuestions.length}`, w / 2, cardY + 65);
+
     // Question
     ctx.font = `12px ${this.retroFont}`;
     ctx.fillStyle = '#3D2914';
@@ -7389,7 +7418,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Wrap question text
     const words = q.question.split(' ');
     let line = '';
-    let lineY = cardY + 90;
+    let lineY = cardY + 110;
     const maxWidth = cardW - 60;
     
     for (const word of words) {
@@ -7409,7 +7438,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.drawHighlightedText(ctx, line.trim(), w / 2, lineY, '#3D2914', 'center');
 
     // Show reflection answer for the "What is Money?" question
-    let optionsStartY = cardY + 140;
+    let optionsStartY = cardY + 165;
     if (reflectionAnswer) {
       const reflectY = lineY + 30;
       const reflectBoxW = cardW - 60;
@@ -7574,11 +7603,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       this.quizSubmitButton = { x: submitBtnX, y: submitBtnY, w: submitBtnW, h: submitBtnH };
     }
 
-    // Progress indicator - position higher to avoid overlap with submit button
-    ctx.font = `10px ${this.retroFont}`;
-    ctx.fillStyle = '#6B5344';
-    const progressY = cardY + 65; // Fixed position near top, below title
-    ctx.fillText(`Question ${this.currentQuizQuestion + 1} of ${this.quizQuestions.length}`, w / 2, progressY);
   }
 
   private handleQuizTouch(x: number, y: number): void {
@@ -7881,7 +7905,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     normalColor: string,
     align: 'left' | 'center' = 'left'
   ): void {
-    const highlightColor = '#DAA520';
+    const highlightColor = '#FFB800';
     const keywords = ['double coincidence of wants', 'ledger'];
     const lowerText = text.toLowerCase();
     const charColors: string[] = new Array(text.length).fill(normalColor);

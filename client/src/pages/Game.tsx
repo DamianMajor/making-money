@@ -284,36 +284,141 @@ function MoneyRainCanvas() {
   );
 }
 
-function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: string) => void; audioRef: React.MutableRefObject<HTMLAudioElement | null> }) {
+  const [answer, setAnswer] = useState('');
 
   useEffect(() => {
     const audio = new Audio('/money_song_1.mp3');
     audio.loop = true;
     audio.volume = 0.5;
+    audio.preload = 'auto';
     audioRef.current = audio;
-    audio.play().catch(() => {
-      const resumeOnInteraction = () => {
-        audio.play().catch(() => {});
-        document.removeEventListener('click', resumeOnInteraction);
-        document.removeEventListener('touchstart', resumeOnInteraction);
-      };
-      document.addEventListener('click', resumeOnInteraction);
-      document.addEventListener('touchstart', resumeOnInteraction);
-    });
-    return () => {
-      audio.pause();
-      audio.src = '';
-      audioRef.current = null;
-    };
-  }, []);
+  }, [audioRef]);
 
-  const handleStart = (answer: string) => {
+  const handleContinue = () => {
+    if (audioRef.current) {
+      audioRef.current.play().catch(() => {
+        const resumeOnInteraction = () => {
+          audioRef.current?.play().catch(() => {});
+          document.removeEventListener('click', resumeOnInteraction);
+          document.removeEventListener('touchstart', resumeOnInteraction);
+        };
+        document.addEventListener('click', resumeOnInteraction);
+        document.addEventListener('touchstart', resumeOnInteraction);
+      });
+    }
+    onContinue(answer);
+  };
+
+  return (
+    <div
+      className="fixed inset-0 w-full h-full flex items-center justify-center"
+      style={{
+        background: 'linear-gradient(180deg, #1a1208 0%, #2d1f0e 30%, #3d2b14 60%, #2a1c0a 100%)',
+        zIndex: 50
+      }}
+      data-testid="reflection-screen"
+    >
+      <div className="flex flex-col items-center max-w-lg w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
+        <h2
+          className="text-center mb-6"
+          style={{
+            fontFamily: '"Press Start 2P", monospace',
+            fontSize: 'clamp(16px, 4vw, 28px)',
+            color: '#E8D5A8',
+            textShadow: '2px 2px 0px #5a4a32, 0 0 15px rgba(255,215,100,0.4)',
+            lineHeight: 1.4
+          }}
+          data-testid="text-reflection-title"
+        >
+          What is Money?
+        </h2>
+        <p
+          className="text-center mb-8"
+          style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 'clamp(12px, 2.5vw, 16px)',
+            color: '#B8A07A',
+            lineHeight: 1.7
+          }}
+          data-testid="text-reflection-description"
+        >
+          Money is everywhere. But what IS it? Travel back to where it all started — a world with no money at all — and discover how and why it came to exist.
+        </p>
+        <label
+          className="w-full mb-2"
+          style={{
+            fontFamily: '"Press Start 2P", monospace',
+            fontSize: 'clamp(8px, 1.5vw, 10px)',
+            color: '#9B8A6A',
+            display: 'block'
+          }}
+          data-testid="text-reflection-label"
+        >
+          What is money to you?
+        </label>
+        <textarea
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          placeholder="Type your answer here and we'll review it after you've played this lesson."
+          className="w-full mb-6"
+          style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 'clamp(12px, 2vw, 15px)',
+            color: '#E8D5A8',
+            background: 'rgba(30, 22, 12, 0.8)',
+            border: '2px solid #5a4a32',
+            borderRadius: '8px',
+            padding: '12px 14px',
+            minHeight: '80px',
+            resize: 'none',
+            outline: 'none',
+          }}
+          data-testid="input-reflection-answer"
+        />
+        <button
+          onClick={handleContinue}
+          className="cursor-pointer"
+          style={{
+            fontFamily: '"Press Start 2P", monospace',
+            fontSize: 'clamp(10px, 2.5vw, 14px)',
+            color: '#1a1208',
+            background: 'linear-gradient(180deg, #C9B896 0%, #a89478 100%)',
+            border: '2px solid #8B7355',
+            borderRadius: '8px',
+            padding: '14px 32px',
+            textShadow: '0 1px 0 rgba(255,255,255,0.2)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+            transition: 'transform 0.1s, box-shadow 0.1s',
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = 'scale(0.97)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
+          }}
+          data-testid="button-continue"
+        >
+          Continue
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function IntroScreen({ onStart, audioRef }: { onStart: () => void; audioRef: React.MutableRefObject<HTMLAudioElement | null> }) {
+  const handleStart = () => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.src = '';
     }
-    onStart(answer);
+    onStart();
   };
 
   return (
@@ -388,7 +493,7 @@ function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
             Lesson One — The Barter System
           </span>
           <button
-            onClick={() => handleStart('')}
+            onClick={handleStart}
             className="cursor-pointer"
             style={{
               fontFamily: '"Press Start 2P", monospace',
@@ -428,7 +533,8 @@ export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<VillageLedgerGame | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [showIntro, setShowIntro] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [screen, setScreen] = useState<'reflection' | 'intro' | 'game'>('reflection');
 
   const handleResize = useCallback(() => {
     if (gameRef.current) {
@@ -455,11 +561,15 @@ export default function Game() {
     };
   }, [handleResize]);
 
-  const handleStart = (answer: string) => {
+  const handleReflectionContinue = (answer: string) => {
     if (answer.trim()) {
       localStorage.setItem('makingMoney_moneyAnswer', answer.trim());
     }
-    setShowIntro(false);
+    setScreen('intro');
+  };
+
+  const handleGameStart = () => {
+    setScreen('game');
     if (gameRef.current) {
       gameRef.current.beginGameplay();
     }
@@ -482,7 +592,7 @@ export default function Game() {
           userSelect: 'none'
         }}
       />
-      {!showIntro && (
+      {screen === 'game' && (
         <div 
           className="absolute top-4 left-4 flex items-center gap-3 px-4 py-3 rounded-md"
           style={{ 
@@ -499,7 +609,8 @@ export default function Game() {
           </span>
         </div>
       )}
-      {showIntro && <IntroScreen onStart={handleStart} />}
+      {screen === 'reflection' && <ReflectionScreen onContinue={handleReflectionContinue} audioRef={audioRef} />}
+      {screen === 'intro' && <IntroScreen onStart={handleGameStart} audioRef={audioRef} />}
     </div>
   );
 }

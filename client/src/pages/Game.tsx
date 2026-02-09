@@ -122,8 +122,9 @@ function MoneyRainCanvas() {
     let stockVal = 0;
     let stockVel = 0;
     const minVel = 0.06;
+    const upBias = -0.04;
     for (let i = 0; i < STOCK_POINTS; i++) {
-      let nudge = (Math.random() - 0.5) * 0.5;
+      let nudge = (Math.random() - 0.5) * 0.5 + upBias;
       stockVel += nudge;
       stockVel *= 0.94;
       if (Math.abs(stockVel) < minVel) stockVel = stockVel >= 0 ? minVel : -minVel;
@@ -147,7 +148,7 @@ function MoneyRainCanvas() {
       stockScrollX += STOCK_SPEED * dt;
       if (stockScrollX >= STOCK_STEP) {
         stockScrollX -= STOCK_STEP;
-        let nudge = (Math.random() - 0.5) * 0.5;
+        let nudge = (Math.random() - 0.5) * 0.5 + upBias;
         stockVel += nudge;
         stockVel *= 0.94;
         if (Math.abs(stockVel) < minVel) stockVel = stockVel >= 0 ? minVel : -minVel;

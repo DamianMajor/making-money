@@ -158,21 +158,20 @@ function MoneyRainCanvas() {
         if (stockOsc.length > STOCK_POINTS + 50) stockOsc.splice(0, 50);
       }
 
-      const bottomY = h * 0.85;
+      const bottomY = h * 0.92;
       const topY = h * 0.15;
       const oscAmp = h * 0.06;
       ctx!.save();
       ctx!.lineWidth = 1.5;
       ctx!.globalAlpha = 0.25;
       const startIdx = Math.max(0, stockOsc.length - STOCK_POINTS);
-      const visibleCount = stockOsc.length - startIdx;
       const offsetX = -stockScrollX;
       const arrowStopX = w * 0.78;
+      const slopePerPoint = (topY - bottomY) / (STOCK_POINTS - 1);
 
       function getStockY(idx: number): number {
         const pos = idx - startIdx;
-        const t = visibleCount > 1 ? pos / (visibleCount - 1) : 0;
-        const baseline = bottomY + (topY - bottomY) * t;
+        const baseline = bottomY + slopePerPoint * pos;
         return baseline + stockOsc[idx] * oscAmp;
       }
 

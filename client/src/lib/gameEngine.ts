@@ -133,6 +133,7 @@ interface GameState {
   brawlTimer: number;
   showCelebration: boolean; // Dance animation when debts settled
   celebrationTimer: number;
+  nightBgCrossfade: number; // 0-1 crossfade progress to night background
   showNightTransition: boolean; // Nighttime transition before quiz
   nightTransitionTimer: number;
   showThunderstorm: boolean; // Thunderstorm after roof fix
@@ -261,6 +262,7 @@ export class VillageLedgerGame {
     tree3: HTMLImageElement;
     berryBush: HTMLImageElement;
     bushNoBerries: HTMLImageElement;
+    nightBg: HTMLImageElement;
   } = {
     sky: new Image(),
     backmid: new Image(),
@@ -274,7 +276,8 @@ export class VillageLedgerGame {
     tree2: new Image(),
     tree3: new Image(),
     berryBush: new Image(),
-    bushNoBerries: new Image()
+    bushNoBerries: new Image(),
+    nightBg: new Image()
   };
   private parallaxLoaded: boolean = false;
   
@@ -333,6 +336,7 @@ export class VillageLedgerGame {
     this.parallaxLayers.tree3.src = '/tree3.png';
     this.parallaxLayers.berryBush.src = '/berry-bush.png';
     this.parallaxLayers.bushNoBerries.src = '/bush-no-berries.png';
+    this.parallaxLayers.nightBg.src = '/night-background.jpg';
     
     // Load character sprites and remove green background via chroma key
     const spriteIds = ['player', 'stone-worker', 'fisherman', 'village-elder', 'woodcutter'];
@@ -423,8 +427,8 @@ export class VillageLedgerGame {
       name: 'WOODCUTTER',
       x: 700,
       y: 0,
-      width: 110,
-      height: 150,
+      width: 100,
+      height: 140,
       color: '#8B4513', // Brown for wood theme
       outlineColor: '#5D2E0C',
       visible: true,
@@ -438,8 +442,8 @@ export class VillageLedgerGame {
       name: 'VILLAGE ELDER',
       x: 1480, // Near Stone Tablet - original position
       y: 0,
-      width: 120,
-      height: 170,
+      width: 100,
+      height: 140,
       color: '#F8FAFC',
       outlineColor: '#64748B',
       visible: true,
@@ -556,6 +560,7 @@ export class VillageLedgerGame {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
+      nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
       showThunderstorm: false,
@@ -3628,11 +3633,12 @@ export class VillageLedgerGame {
 
     // Calculate ground Y position
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    this.player.y = groundY - this.player.height;
+    const feetY = groundY + 20;
+    this.player.y = feetY - this.player.height;
 
-    // All NPCs are now at ground level (including Elder who is always visible)
+    // All NPCs feet aligned to same height
     this.npcs.forEach(npc => {
-      npc.y = groundY - npc.height;
+      npc.y = feetY - npc.height;
     });
   }
 
@@ -3733,7 +3739,7 @@ export class VillageLedgerGame {
         const dir = Math.sign(dx);
         this.player.x += dir * this.playerSpeed * dt;
         this.player.x = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, this.player.x));
-        this.player.bobOffset = Math.sin(this.bobTimer) * 3;
+        this.player.bobOffset = Math.sin(this.bobTimer) * 1.5;
         this.player.facingDirection = dir;
         this.player.isWalking = true;
         this.player.walkFrame = (this.player.walkFrame || 0) + dt * 8;
@@ -3752,7 +3758,7 @@ export class VillageLedgerGame {
       this.player.x = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, this.player.x));
 
       // Update player bob
-      this.player.bobOffset = Math.sin(this.bobTimer) * 3;
+      this.player.bobOffset = Math.sin(this.bobTimer) * 1.5;
       this.player.facingDirection = this.moveDirection;
       this.player.isWalking = true;
       this.player.walkFrame = (this.player.walkFrame || 0) + dt * 8;
@@ -3765,7 +3771,7 @@ export class VillageLedgerGame {
       }
     } else {
       // Subtle idle animation
-      this.player.bobOffset = Math.sin(this.bobTimer * 0.5) * 1;
+      this.player.bobOffset = Math.sin(this.bobTimer * 0.5) * 0.5;
       this.player.isWalking = false;
       this.player.walkFrame = 0;
     }
@@ -3817,11 +3823,11 @@ export class VillageLedgerGame {
       }
       
       if (isWalking) {
-        npc.bobOffset = Math.sin(this.bobTimer * 2 + i) * 3;
+        npc.bobOffset = Math.sin(this.bobTimer * 2 + i) * 1.5;
         npc.isWalking = true;
         npc.walkFrame = (npc.walkFrame || 0) + dt * 8;
       } else if (npc.targetX === undefined) {
-        npc.bobOffset = Math.sin(this.bobTimer * 0.5 + i * 1.5) * 1.5;
+        npc.bobOffset = Math.sin(this.bobTimer * 0.5 + i * 1.5) * 0.75;
         npc.isWalking = false;
         npc.walkFrame = 0;
       }
@@ -4032,6 +4038,13 @@ export class VillageLedgerGame {
       }
     }
     
+    // Update night background crossfade (starts when celebration begins, 8 second transition)
+    if (this.state.showCelebration || this.state.phase === 'loop2_return' || this.state.phase === 'complete_success') {
+      if (this.state.nightBgCrossfade < 1) {
+        this.state.nightBgCrossfade = Math.min(1, this.state.nightBgCrossfade + dt / 8);
+      }
+    }
+
     // Update celebration animation timer - reduced applause duration (minus 10 seconds, earlier fade)
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
@@ -5539,14 +5552,6 @@ export class VillageLedgerGame {
   }
 
   private drawLocationMarkers(ctx: CanvasRenderingContext2D, groundY: number): void {
-    // Player Home label (hut graphic is now rendered as part of the foreground layer)
-    const homeScreenX = this.playerHomeX - this.cameraX;
-    if (homeScreenX > -100 && homeScreenX < this.logicalWidth + 100) {
-      ctx.font = `10px ${this.retroFont}`;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#FFF';
-      ctx.fillText('HOME', homeScreenX, groundY - 110);
-    }
 
     // Village Center / Stone Tablet area (at x=1500) - graphic removed, interaction area preserved
     
@@ -5648,6 +5653,30 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.sky, 0, 0, skyWidth, skyHeight,
         skyScreenX, skyYOffset, skyScaledWidth, skyHeight);
       
+      // Night background crossfade overlay
+      if (this.state.nightBgCrossfade > 0 && this.parallaxLayers.nightBg.naturalWidth > 0) {
+        ctx.save();
+        ctx.globalAlpha = this.state.nightBgCrossfade;
+        const nightW = this.parallaxLayers.nightBg.naturalWidth;
+        const nightH = this.parallaxLayers.nightBg.naturalHeight;
+        const nightAspect = nightW / nightH;
+        const canvasAspect = w / h;
+        let drawW: number, drawH: number, drawX: number, drawY: number;
+        if (canvasAspect > nightAspect) {
+          drawW = w;
+          drawH = w / nightAspect;
+          drawX = 0;
+          drawY = (h - drawH) / 2;
+        } else {
+          drawH = h;
+          drawW = h * nightAspect;
+          drawX = (w - drawW) / 2;
+          drawY = 0;
+        }
+        ctx.drawImage(this.parallaxLayers.nightBg, drawX, drawY, drawW, drawH);
+        ctx.restore();
+      }
+      
       // Draw back-layer dust particles
       this.drawBackDustParticles(ctx, w, h);
       
@@ -5711,8 +5740,8 @@ export class VillageLedgerGame {
         const hutScale = 1.5;
         const hutDrawWidth = pathDrawWidth * hutScale;
         const hutDrawHeight = walkingPathHeight * hutScale;
-        const hutX = walkingPathScreenX - (hutDrawWidth - pathDrawWidth) * (this.playerHomeX / this.worldWidth);
-        const hutY = walkingPathYOffset - (hutDrawHeight - walkingPathHeight);
+        const hutX = walkingPathScreenX - (hutDrawWidth - pathDrawWidth) * (this.playerHomeX / this.worldWidth) - 50;
+        const hutY = walkingPathYOffset - (hutDrawHeight - walkingPathHeight) + 50;
         ctx.drawImage(hutImg, 0, 0, hutImg.naturalWidth, hutImg.naturalHeight,
           hutX, hutY, hutDrawWidth, hutDrawHeight);
       }
@@ -8042,6 +8071,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
+      nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
       showThunderstorm: false,
@@ -8154,6 +8184,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
+      nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
       showThunderstorm: false,

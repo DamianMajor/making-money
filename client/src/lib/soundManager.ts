@@ -145,6 +145,12 @@ export class SoundManager {
     }
   }
 
+  public prefetch(): void {
+    Object.values(SOUND_CONFIGS).forEach(config => {
+      fetch(config.src).catch(() => {});
+    });
+  }
+
   public async init(): Promise<void> {
     if (this.initialized || this.initializing) return;
     this.initializing = true;

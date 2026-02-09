@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { VillageLedgerGame } from '@/lib/gameEngine';
+import { soundManager } from '@/lib/soundManager';
 
 const MONEY_ICONS = [
   'money-shell', 'money-beads', 'money-goldbar', 'money-coin', 'money-raistone',
@@ -355,7 +356,7 @@ function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: strin
       } catch {}
       return false;
     })();
-    const audio = new Audio('/money_song_1.mp3');
+    const audio = new Audio('/sounds/money_song_1.mp3');
     audio.loop = true;
     audio.volume = 0.5;
     audio.preload = 'auto';
@@ -512,8 +513,18 @@ function IntroScreen({ onStart, audioRef }: { onStart: () => void; audioRef: Rea
 
   const handleStart = () => {
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
+      const audio = audioRef.current;
+      const fadeStep = 0.05;
+      const fadeInterval = setInterval(() => {
+        if (audio.volume > fadeStep) {
+          audio.volume -= fadeStep;
+        } else {
+          audio.volume = 0;
+          audio.pause();
+          audio.src = '';
+          clearInterval(fadeInterval);
+        }
+      }, 25);
     }
     onStart();
   };
@@ -666,6 +677,10 @@ export default function Game() {
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [screen, setScreen] = useState<'reflection' | 'intro' | 'game'>('reflection');
+
+  useEffect(() => {
+    soundManager.prefetch();
+  }, []);
 
   const handleResize = useCallback(() => {
     if (gameRef.current) {

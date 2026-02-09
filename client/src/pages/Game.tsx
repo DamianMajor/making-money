@@ -121,27 +121,15 @@ function MoneyRainCanvas() {
     const stockNorm: number[] = [];
     let stockVal = 0;
     let stockVel = 0;
-    let flatRun = 0;
+    const minVel = 0.06;
     for (let i = 0; i < STOCK_POINTS; i++) {
-      let nudge = (Math.random() - 0.5) * 0.4;
-      if (Math.abs(stockVel + nudge) < 0.02) nudge += (Math.random() < 0.5 ? 0.05 : -0.05);
+      let nudge = (Math.random() - 0.5) * 0.5;
       stockVel += nudge;
-      stockVel *= 0.96;
-      if (Math.abs(stockVel) < 0.01) stockVel = (Math.random() < 0.5 ? 0.03 : -0.03);
-      const prevVal = stockVal;
+      stockVel *= 0.94;
+      if (Math.abs(stockVel) < minVel) stockVel = stockVel >= 0 ? minVel : -minVel;
       stockVal += stockVel;
       stockVal = Math.max(-1, Math.min(1, stockVal));
-      if (Math.abs(stockVal - prevVal) * STOCK_STEP * 30 < 1) {
-        flatRun += STOCK_STEP;
-        if (flatRun > 30) {
-          stockVel += (Math.random() < 0.5 ? 0.08 : -0.08);
-          stockVal += stockVel;
-          stockVal = Math.max(-1, Math.min(1, stockVal));
-          flatRun = 0;
-        }
-      } else {
-        flatRun = 0;
-      }
+      if (stockVal >= 1 || stockVal <= -1) stockVel *= -0.5;
       stockNorm.push(stockVal);
     }
     let stockScrollX = 0;
@@ -159,25 +147,13 @@ function MoneyRainCanvas() {
       stockScrollX += STOCK_SPEED * dt;
       if (stockScrollX >= STOCK_STEP) {
         stockScrollX -= STOCK_STEP;
-        let nudge = (Math.random() - 0.5) * 0.4;
-        if (Math.abs(stockVel + nudge) < 0.02) nudge += (Math.random() < 0.5 ? 0.05 : -0.05);
+        let nudge = (Math.random() - 0.5) * 0.5;
         stockVel += nudge;
-        stockVel *= 0.96;
-        if (Math.abs(stockVel) < 0.01) stockVel = (Math.random() < 0.5 ? 0.03 : -0.03);
-        const prevVal = stockVal;
+        stockVel *= 0.94;
+        if (Math.abs(stockVel) < minVel) stockVel = stockVel >= 0 ? minVel : -minVel;
         stockVal += stockVel;
         stockVal = Math.max(-1, Math.min(1, stockVal));
-        if (Math.abs(stockVal - prevVal) * STOCK_STEP * 30 < 1) {
-          flatRun += STOCK_STEP;
-          if (flatRun > 30) {
-            stockVel += (Math.random() < 0.5 ? 0.08 : -0.08);
-            stockVal += stockVel;
-            stockVal = Math.max(-1, Math.min(1, stockVal));
-            flatRun = 0;
-          }
-        } else {
-          flatRun = 0;
-        }
+        if (stockVal >= 1 || stockVal <= -1) stockVel *= -0.5;
         stockNorm.push(stockVal);
         if (stockNorm.length > STOCK_POINTS + 50) stockNorm.splice(0, 50);
       }
@@ -189,7 +165,7 @@ function MoneyRainCanvas() {
       ctx!.globalAlpha = 0.25;
       const startIdx = Math.max(0, stockNorm.length - STOCK_POINTS);
       const offsetX = -stockScrollX;
-      const arrowStopX = w - 30;
+      const arrowStopX = w * 0.78;
       const lastVisibleIdx = stockNorm.length - 1;
       const lastX = (lastVisibleIdx - startIdx) * STOCK_STEP + offsetX;
       const secondLastX = (lastVisibleIdx - 1 - startIdx) * STOCK_STEP + offsetX;

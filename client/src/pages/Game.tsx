@@ -1,6 +1,174 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { VillageLedgerGame } from '@/lib/gameEngine';
 
+const MONEY_ICONS = [
+  'money-shell', 'money-beads', 'money-goldbar', 'money-coin', 'money-raistone',
+  'money-cattle', 'money-salt', 'money-teabrick', 'money-feather', 'money-cocoa'
+];
+
+interface FallingItem {
+  x: number;
+  y: number;
+  speed: number;
+  sway: number;
+  swaySpeed: number;
+  swayOffset: number;
+  size: number;
+  iconIndex: number;
+  rotation: number;
+  rotationSpeed: number;
+  sparkleTimer: number;
+  sparkleInterval: number;
+  opacity: number;
+}
+
+function MoneyRainCanvas() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imagesRef = useRef<HTMLImageElement[]>([]);
+  const itemsRef = useRef<FallingItem[]>([]);
+  const animFrameRef = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    let loadedCount = 0;
+    let initStarted = false;
+    MONEY_ICONS.forEach((name, i) => {
+      const img = new Image();
+      img.onload = () => {
+        imagesRef.current[i] = img;
+        loadedCount++;
+        if (loadedCount >= 3 && !initStarted) {
+          initStarted = true;
+          initItems(canvas.width, canvas.height);
+        }
+      };
+      img.onerror = () => {
+        loadedCount++;
+        if (loadedCount >= 3 && !initStarted) {
+          initStarted = true;
+          initItems(canvas.width, canvas.height);
+        }
+      };
+      img.src = `/sprites/${name}.png`;
+    });
+
+    function initItems(w: number, h: number) {
+      const count = Math.max(20, Math.floor((w * h) / 25000));
+      const items: FallingItem[] = [];
+      for (let i = 0; i < count; i++) {
+        items.push(createItem(w, h, true));
+      }
+      itemsRef.current = items;
+    }
+
+    function createItem(w: number, h: number, randomY: boolean): FallingItem {
+      const size = 24 + Math.random() * 20;
+      return {
+        x: Math.random() * w,
+        y: randomY ? Math.random() * h : -size - Math.random() * 100,
+        speed: 15 + Math.random() * 25,
+        sway: 10 + Math.random() * 20,
+        swaySpeed: 0.3 + Math.random() * 0.6,
+        swayOffset: Math.random() * Math.PI * 2,
+        size,
+        iconIndex: Math.floor(Math.random() * MONEY_ICONS.length),
+        rotation: Math.random() * Math.PI * 2,
+        rotationSpeed: (Math.random() - 0.5) * 0.3,
+        sparkleTimer: Math.random() * 5,
+        sparkleInterval: 2 + Math.random() * 4,
+        opacity: 0.3 + Math.random() * 0.4,
+      };
+    }
+
+    let lastTime = performance.now();
+    function animate(now: number) {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      const w = canvas!.width;
+      const h = canvas!.height;
+      ctx!.clearRect(0, 0, w, h);
+
+      const items = itemsRef.current;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        item.y += item.speed * dt;
+        item.rotation += item.rotationSpeed * dt;
+        item.sparkleTimer += dt;
+
+        const swayX = item.x + Math.sin(now / 1000 * item.swaySpeed + item.swayOffset) * item.sway;
+
+        if (item.y > h + item.size) {
+          items[i] = createItem(w, h, false);
+          continue;
+        }
+
+        const img = imagesRef.current[item.iconIndex];
+        if (!img) continue;
+
+        ctx!.save();
+        ctx!.globalAlpha = item.opacity;
+        ctx!.translate(swayX + item.size / 2, item.y + item.size / 2);
+        ctx!.rotate(item.rotation);
+        ctx!.drawImage(img, -item.size / 2, -item.size / 2, item.size, item.size);
+
+        if (item.sparkleTimer % item.sparkleInterval < 0.4) {
+          const sparkleProgress = (item.sparkleTimer % item.sparkleInterval) / 0.4;
+          const sparkleAlpha = Math.sin(sparkleProgress * Math.PI) * 0.8;
+          ctx!.globalAlpha = sparkleAlpha;
+          const sparkleSize = item.size * 0.3;
+          const gradient = ctx!.createRadialGradient(0, -item.size * 0.3, 0, 0, -item.size * 0.3, sparkleSize);
+          gradient.addColorStop(0, 'rgba(255, 255, 220, 1)');
+          gradient.addColorStop(0.5, 'rgba(255, 223, 150, 0.6)');
+          gradient.addColorStop(1, 'rgba(255, 200, 100, 0)');
+          ctx!.fillStyle = gradient;
+          ctx!.beginPath();
+          ctx!.arc(0, -item.size * 0.3, sparkleSize, 0, Math.PI * 2);
+          ctx!.fill();
+
+          ctx!.strokeStyle = `rgba(255, 255, 220, ${sparkleAlpha})`;
+          ctx!.lineWidth = 1;
+          ctx!.beginPath();
+          ctx!.moveTo(-sparkleSize * 0.8, -item.size * 0.3);
+          ctx!.lineTo(sparkleSize * 0.8, -item.size * 0.3);
+          ctx!.moveTo(0, -item.size * 0.3 - sparkleSize * 0.8);
+          ctx!.lineTo(0, -item.size * 0.3 + sparkleSize * 0.8);
+          ctx!.stroke();
+        }
+
+        ctx!.restore();
+      }
+
+      animFrameRef.current = requestAnimationFrame(animate);
+    }
+
+    animFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      cancelAnimationFrame(animFrameRef.current);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+    />
+  );
+}
+
 function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
   return (
     <div
@@ -11,7 +179,8 @@ function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
       }}
       data-testid="intro-screen"
     >
-      <div className="flex flex-col items-center max-w-xl w-full px-6 py-8">
+      <MoneyRainCanvas />
+      <div className="flex flex-col items-center max-w-xl w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
         <h1
           className="text-center mb-8"
           style={{

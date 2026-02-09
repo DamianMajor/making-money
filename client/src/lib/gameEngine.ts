@@ -303,6 +303,13 @@ export class VillageLedgerGame {
   // Sound mute button
   private muteButtonArea: { x: number; y: number; w: number; h: number } | null = null;
   
+  // Item icons for inventory
+  private itemIcons: { [key: string]: HTMLImageElement } = {};
+  private itemIconsLoaded: boolean = false;
+
+  // Lightning flash images
+  private lightningImages: HTMLImageElement[] = [];
+
   // Inventory UI
   private inventoryButtonArea: { x: number; y: number; w: number; h: number } | null = null;
   private inventoryDetailPopupArea: { x: number; y: number; w: number; h: number } | null = null;
@@ -363,6 +370,26 @@ export class VillageLedgerGame {
     this.parallaxLayers.berryBushNight.src = '/berry-bush-night.png';
     this.parallaxLayers.bushNoBerriesNight.src = '/bush-no-berries-night.png';
     
+    // Load item icons for inventory
+    const itemNames = ['slingshot', 'wood', 'stone', 'fish', 'berries'];
+    itemNames.forEach(name => {
+      const img = new Image();
+      img.onload = () => {
+        this.itemIcons[name] = img;
+        if (Object.keys(this.itemIcons).length === itemNames.length) {
+          this.itemIconsLoaded = true;
+        }
+      };
+      img.src = `/sprites/item-${name}.png`;
+    });
+
+    // Load lightning flash images
+    for (let i = 1; i <= 2; i++) {
+      const img = new Image();
+      img.src = `/lightning-flash-${i}.jpg`;
+      this.lightningImages.push(img);
+    }
+
     // Load character sprites and remove background via chroma key (blue backgrounds)
     const spriteIds = ['player', 'stone-worker', 'fisherman', 'village-elder', 'woodcutter'];
     spriteIds.forEach(id => {
@@ -1525,7 +1552,7 @@ export class VillageLedgerGame {
         return;
       }
       
-      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 200;
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < this.logicalWidth / 3;
       const woodcutterAtCenter = Math.abs(this.woodcutter.x - this.villageCenterX) < 200;
       
       if (playerAtCenter && woodcutterAtCenter) {
@@ -1587,7 +1614,7 @@ export class VillageLedgerGame {
                         this.setMood('happy');
                         this.state.phase = 'loop2_got_wood';
                         this.state.escortingNPC = null;
-                        this.woodcutter.targetX = this.villageCenterX + 80;
+                        this.woodcutter.targetX = this.villageCenterX + 160;
                       }
                     }
                   ]);
@@ -1615,7 +1642,7 @@ export class VillageLedgerGame {
                 this.setMood('happy');
                 this.state.phase = 'loop2_got_wood';
                 this.state.escortingNPC = null;
-                this.woodcutter.targetX = this.villageCenterX + 80;
+                this.woodcutter.targetX = this.villageCenterX + 160;
               }
             }
           ]);
@@ -1658,8 +1685,8 @@ export class VillageLedgerGame {
     }
     // LOOP 1 SETTLEMENT: Player tries to settle - Woodcutter claims inflated debt
     else if (phase === 'settlement' && !this.state.woodcutterDisputed) {
-      // Woodcutter steps to position (right of Elder to avoid overlap)
-      this.woodcutter.targetX = this.villageCenterX + 80;
+      // Woodcutter steps to position (right, spread apart from Elder/Stone Worker)
+      this.woodcutter.targetX = this.villageCenterX + 160;
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
@@ -1709,7 +1736,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX + 100;
+                this.villageElder.targetX = this.villageCenterX - 60;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -1795,7 +1822,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX + 100;
+                this.villageElder.targetX = this.villageCenterX - 60;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -1940,7 +1967,7 @@ export class VillageLedgerGame {
             this.showInventoryPopup('+1 WOOD');
             this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
-            this.woodcutter.targetX = this.villageCenterX + 80;
+            this.woodcutter.targetX = this.villageCenterX + 160;
           }
         }
       ]);
@@ -1970,7 +1997,7 @@ export class VillageLedgerGame {
             this.showInventoryPopup('+1 WOOD');
             this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
-            this.woodcutter.targetX = this.villageCenterX + 80;
+            this.woodcutter.targetX = this.villageCenterX + 160;
           }
         }
       ]);
@@ -2000,7 +2027,7 @@ export class VillageLedgerGame {
             this.showInventoryPopup('+1 WOOD');
             this.setMood('happy');
             this.state.phase = 'got_wood_need_stone';
-            this.woodcutter.targetX = this.villageCenterX + 80;
+            this.woodcutter.targetX = this.villageCenterX + 160;
           }
         }
       ]);
@@ -2202,7 +2229,7 @@ export class VillageLedgerGame {
         return;
       }
       
-      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 200;
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < this.logicalWidth / 3;
       const stoneWorkerAtCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 200;
       
       if (playerAtCenter && stoneWorkerAtCenter) {
@@ -2262,7 +2289,7 @@ export class VillageLedgerGame {
                         this.setMood('happy');
                         this.state.phase = 'loop2_got_stone';
                         this.state.escortingNPC = null;
-                        this.stoneWorker.targetX = this.villageCenterX - 100;
+                        this.stoneWorker.targetX = this.villageCenterX - 160;
                       }
                     }
                   ]);
@@ -2289,7 +2316,7 @@ export class VillageLedgerGame {
                 this.setMood('happy');
                 this.state.phase = 'loop2_got_stone';
                 this.state.escortingNPC = null;
-                this.stoneWorker.targetX = this.villageCenterX - 100;
+                this.stoneWorker.targetX = this.villageCenterX - 160;
               }
             }
           ]);
@@ -2330,8 +2357,8 @@ export class VillageLedgerGame {
     }
     // LOOP 1 SETTLEMENT: Player tries to settle - Stone-worker claims inflated debt
     else if (phase === 'settlement' && !this.state.stoneworkerDisputed) {
-      // Stone-worker steps to the right to confront player
-      this.stoneWorker.targetX = this.villageCenterX - 100;
+      // Stone-worker steps to the left to confront player (spread apart from Elder)
+      this.stoneWorker.targetX = this.villageCenterX - 160;
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
@@ -2430,7 +2457,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX + 100;
+                this.villageElder.targetX = this.villageCenterX - 60;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -2459,7 +2486,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX + 100;
+                this.villageElder.targetX = this.villageCenterX - 60;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -2539,7 +2566,7 @@ export class VillageLedgerGame {
       this.showInventoryPopup('+1 SHARP STONE');
       this.setMood('happy');
       this.state.phase = 'got_stone_need_fish';
-      this.stoneWorker.targetX = this.villageCenterX - 100;
+      this.stoneWorker.targetX = this.villageCenterX - 160;
     };
 
     // Award badge after DCW line, then show credit offer
@@ -3009,7 +3036,7 @@ export class VillageLedgerGame {
               // Trigger the brawl - NPCs run to player, Elder steps aside
               this.woodcutter.targetX = this.player.x - 30;
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX + 100; // Elder steps away
+              this.villageElder.targetX = this.villageCenterX - 60; // Elder steps away
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3138,7 +3165,7 @@ export class VillageLedgerGame {
               // Trigger brawl
               this.woodcutter.targetX = this.player.x - 30;
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX + 100;
+              this.villageElder.targetX = this.villageCenterX - 60;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3167,7 +3194,7 @@ export class VillageLedgerGame {
             text: "Without a record, we cannot know the truth...",
             onComplete: () => {
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX + 100;
+              this.villageElder.targetX = this.villageCenterX - 60;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3196,7 +3223,7 @@ export class VillageLedgerGame {
             text: "Without a record, we cannot know the truth...",
             onComplete: () => {
               this.woodcutter.targetX = this.player.x - 30;
-              this.villageElder.targetX = this.villageCenterX + 100;
+              this.villageElder.targetX = this.villageCenterX - 60;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3273,7 +3300,7 @@ export class VillageLedgerGame {
               text: "...Wait. The Ledger says 1 Stone and 1 Fish. I was wrong... I apologize.",
               onComplete: () => {
                 this.state.elderVerified = true;
-                this.woodcutter.targetX = this.villageCenterX + 80;
+                this.woodcutter.targetX = this.villageCenterX + 160;
                 const hasStone = this.state.inventory.stone >= 1;
                 const hasFish = this.state.inventory.fish >= 1;
                 if (hasStone && hasFish) {
@@ -3381,7 +3408,7 @@ export class VillageLedgerGame {
                     // Trigger brawl
                     this.woodcutter.targetX = this.player.x - 30;
                     this.stoneWorker.targetX = this.player.x + 30;
-                    this.villageElder.targetX = this.villageCenterX + 100;
+                    this.villageElder.targetX = this.villageCenterX - 60;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
@@ -3428,7 +3455,7 @@ export class VillageLedgerGame {
               text: "...Wait. The Ledger says 1 Wood and 2 Fish. I was wrong... I apologize.",
               onComplete: () => {
                 this.state.elderVerified = true;
-                this.stoneWorker.targetX = this.villageCenterX - 100;
+                this.stoneWorker.targetX = this.villageCenterX - 160;
                 const hasWood = this.state.inventory.wood >= 1;
                 const hasFish = this.state.inventory.fish >= 2;
                 if (hasWood && hasFish) {
@@ -3539,7 +3566,7 @@ export class VillageLedgerGame {
                     // Trigger brawl
                     this.woodcutter.targetX = this.player.x - 30;
                     this.stoneWorker.targetX = this.player.x + 30;
-                    this.villageElder.targetX = this.villageCenterX + 100;
+                    this.villageElder.targetX = this.villageCenterX - 60;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
@@ -4021,9 +4048,9 @@ export class VillageLedgerGame {
       const hasRequirements = this.state.inventory.stone >= 1 && this.state.inventory.fish >= 3;
       if (nearVillageCenter && hasRequirements && !this.state.currentDialogue) {
         this.state.phase = 'settlement';
-        // Move NPCs to village center area for the confrontation (woodcutter right to avoid Elder overlap)
-        this.woodcutter.targetX = this.villageCenterX + 80;
-        this.stoneWorker.targetX = this.villageCenterX - 100;
+        // Move NPCs to village center area for the confrontation - spread apart to avoid overlap
+        this.woodcutter.targetX = this.villageCenterX + 160;
+        this.stoneWorker.targetX = this.villageCenterX - 160;
       }
     }
     
@@ -4227,7 +4254,7 @@ export class VillageLedgerGame {
           // Woodcutter to the left of Elder
           this.woodcutter.targetX = this.villageCenterX - 130;
           // Stone-worker to the right of tablet
-          this.stoneWorker.targetX = this.villageCenterX - 100;
+          this.stoneWorker.targetX = this.villageCenterX - 160;
           
           this.state.phase = 'brawl';
           this.state.showBrawl = true;
@@ -4325,7 +4352,7 @@ export class VillageLedgerGame {
         // Trigger the brawl - NPCs run to player, Elder steps aside
         this.woodcutter.targetX = this.player.x - 30;
         this.stoneWorker.targetX = this.player.x + 30;
-        this.villageElder.targetX = this.villageCenterX + 100; // Elder steps away
+        this.villageElder.targetX = this.villageCenterX - 60; // Elder steps away
         this.state.phase = 'brawl';
         this.state.showBrawl = true;
         this.state.brawlTimer = 0;
@@ -5163,12 +5190,21 @@ export class VillageLedgerGame {
     ctx.fillStyle = `rgba(30, 30, 50, ${stormAlpha})`;
     ctx.fillRect(0, 0, w, h);
     
-    // Lightning flashes at intervals
+    // Lightning flash images - flash each for 1/24s (~42ms) back-to-back every 0.8s
     const flashTime = t % 0.8;
-    if (flashTime < 0.1) {
-      const flashIntensity = (0.1 - flashTime) / 0.1;
-      ctx.fillStyle = `rgba(255, 255, 220, ${flashIntensity * 0.6})`;
-      ctx.fillRect(0, 0, w, h);
+    const frameDuration = 1 / 24; // ~42ms per frame
+    if (flashTime < frameDuration * 2) {
+      const frameIndex = flashTime < frameDuration ? 0 : 1;
+      const lightningImg = this.lightningImages[frameIndex];
+      if (lightningImg && lightningImg.complete) {
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(lightningImg, 0, 0, w, h);
+        ctx.globalAlpha = 1;
+      } else {
+        const flashIntensity = (frameDuration * 2 - flashTime) / (frameDuration * 2);
+        ctx.fillStyle = `rgba(255, 255, 220, ${flashIntensity * 0.6})`;
+        ctx.fillRect(0, 0, w, h);
+      }
     }
     
     // Draw rain
@@ -5277,10 +5313,17 @@ export class VillageLedgerGame {
       ctx.stroke();
     }
     
-    // Occasional lightning flash
-    if (Math.sin(t * 3) > 0.98) {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.fillRect(0, 0, w, h);
+    // Occasional lightning flash using lightning images
+    const rainFlashTime = t % 2.5;
+    const rainFrameDuration = 1 / 24;
+    if (rainFlashTime < rainFrameDuration * 2) {
+      const frameIndex = rainFlashTime < rainFrameDuration ? 0 : 1;
+      const lightningImg = this.lightningImages[frameIndex];
+      if (lightningImg && lightningImg.complete) {
+        ctx.globalAlpha = 0.7;
+        ctx.drawImage(lightningImg, 0, 0, w, h);
+        ctx.globalAlpha = 1;
+      }
     }
     
     // Show "A storm approaches" text with fade - hide once roof fix starts
@@ -6590,12 +6633,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const spacing = 8;
     
     // All items shown from start of each loop - no need to collect first
-    const items: { count: number; color: string; label: string }[] = [
-      { count: this.state.inventory.slingshot, color: '#D97706', label: 'Y' },
-      { count: this.state.inventory.wood, color: '#8B4513', label: 'W' },
-      { count: this.state.inventory.stone, color: '#6B7280', label: 'S' },
-      { count: this.state.inventory.fish, color: '#3B82F6', label: 'F' },
-      { count: this.state.inventory.berries, color: '#DC2626', label: 'B' }
+    const items: { count: number; color: string; label: string; iconKey: string }[] = [
+      { count: this.state.inventory.slingshot, color: '#D97706', label: 'Y', iconKey: 'slingshot' },
+      { count: this.state.inventory.wood, color: '#8B4513', label: 'W', iconKey: 'wood' },
+      { count: this.state.inventory.stone, color: '#6B7280', label: 'S', iconKey: 'stone' },
+      { count: this.state.inventory.fish, color: '#3B82F6', label: 'F', iconKey: 'fish' },
+      { count: this.state.inventory.berries, color: '#DC2626', label: 'B', iconKey: 'berries' }
     ];
     
     // Background panel - positioned to the left of the Stone Tablet HUD (top right area)
@@ -6621,14 +6664,17 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const iconOffsetX = 4; // Move icons slightly right
     const iconOffsetY = 4; // Move icons slightly down
     items.forEach((item) => {
-      // Draw simple colored circle as icon
-      ctx.fillStyle = item.color;
-      ctx.beginPath();
-      ctx.arc(xPos + iconSize / 2 + iconOffsetX, yPos + iconSize / 2 + iconOffsetY, iconSize / 2 - 2, 0, Math.PI * 2);
-      ctx.fill();
+      const iconImg = this.itemIcons[item.iconKey];
+      if (iconImg && iconImg.complete) {
+        ctx.drawImage(iconImg, xPos + iconOffsetX, yPos + iconOffsetY, iconSize, iconSize);
+      } else {
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(xPos + iconSize / 2 + iconOffsetX, yPos + iconSize / 2 + iconOffsetY, iconSize / 2 - 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.strokeStyle = '#5D4837';
       ctx.lineWidth = 2;
-      ctx.stroke();
       
       // Draw count
       ctx.font = `bold 14px ${this.uiFont}`;
@@ -6995,7 +7041,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         const drawW = sW * scale;
         const drawH = sH * scale;
         const drawX = portraitX + 2 + (portraitSize - 4 - drawW) / 2;
-        const drawY = portraitY + 2 + (portraitSize - 4 - drawH) / 2 - drawH * 0.1;
+        const drawY = portraitY + 2;
         ctx.drawImage(spriteCanvas, drawX, drawY, drawW, drawH);
         ctx.restore();
       } else if (this.state.currentDialogue.speaker === 'STONE TABLET') {
@@ -7128,8 +7174,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private drawInteractButton(ctx: CanvasRenderingContext2D): void {
-    // Use opacity for fade transition
-    if (this.interactButtonOpacity <= 0) return;
+    // Interact button is hidden
+    return;
 
     const size = this.interactButtonSize;
     const x = this.logicalWidth - size - 32;
@@ -8192,7 +8238,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     soundManager.fadeIn('ambientVillage', 1000);
     soundManager.startDaytimeMusic();
     
-    this.player.x = 150;
+    this.player.x = 175;
+    this.player.facingDirection = 1;
     this.state = {
       phase: 'loop2_intro',
       loop: 2,

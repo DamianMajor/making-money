@@ -346,7 +346,7 @@ function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: strin
           Money is everywhere. But what IS it? Travel back to where it all started — a world with no money at all — and discover how and why it came to exist.
         </p>
         <label
-          className="w-full mb-2"
+          className="w-full mb-2 text-center"
           style={{
             fontFamily: '"Press Start 2P", monospace',
             fontSize: 'clamp(8px, 1.5vw, 10px)',

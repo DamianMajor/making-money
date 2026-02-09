@@ -31,7 +31,8 @@ export type SoundName =
   | 'fishingPlop'
   | 'crowdBoo'
   | 'failure'
-  | 'settle';
+  | 'settle'
+  | 'badgeReward';
 
 interface SoundConfig {
   src: string;
@@ -74,6 +75,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   crowdBoo: { src: '/sounds/crowd-boo.mp3', volume: 0.5, loop: false },
   failure: { src: '/sounds/failure.mp3', volume: 0.5, loop: false },
   settle: { src: '/sounds/settle.mp3', volume: 0.5, loop: false },
+  badgeReward: { src: '/sounds/badge-reward.mp3', volume: 0.6, loop: false },
 };
 
 const FIGHT_LAYER_SOUNDS: SoundName[] = [

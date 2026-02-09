@@ -368,7 +368,7 @@ export class VillageLedgerGame {
     this.player = {
       id: 'player',
       name: 'PLAYER',
-      x: 100, // Player Home position
+      x: 150, // Player Home position (shifted right 50px)
       y: 0,
       width: 50,
       height: 70,
@@ -849,7 +849,7 @@ export class VillageLedgerGame {
         } else {
           // Set auto-walk target to NPC, clear manual movement
           if (tappedTarget.id === 'berryBush') {
-            this.autoWalkTarget = { x: tappedTarget.x, type: 'berryBush', id: tappedTarget.id };
+            this.autoWalkTarget = { x: tappedTarget.x - 60, type: 'berryBush', id: tappedTarget.id };
           } else {
             this.autoWalkTarget = { x: tappedTarget.x, type: 'npc', id: tappedTarget.id };
           }
@@ -3671,6 +3671,11 @@ export class VillageLedgerGame {
         if (targetType === 'home') {
           this.handleHomeInteraction();
         } else if (targetType === 'stoneTablet') {
+          if (!this.state.showStoneTabletPopup) {
+            this.state.showStoneTabletPopup = true;
+            const ledgerDuration = Math.max(500, soundManager.getBufferDuration('stoneLedger') - 1000);
+            soundManager.playForDuration('stoneLedger', ledgerDuration);
+          }
           this.handleStoneTabletInteraction();
         } else if (targetType === 'location') {
           // Just arrived at location, no interaction needed
@@ -3961,7 +3966,7 @@ export class VillageLedgerGame {
       }
       // Trigger boo sound overlapping with fight end (at 2s to overlap ending by 2 seconds)
       // Use exact timing check to prevent multiple triggers
-      if (this.state.brawlTimer > 2 && this.state.brawlTimer <= 2.05 && !this.booFailureTriggered) {
+      if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.05 && !this.booFailureTriggered) {
         this.booFailureTriggered = true;
         soundManager.playBooThenFailure();
       }
@@ -3973,11 +3978,11 @@ export class VillageLedgerGame {
       }
     }
     
-    // Update celebration animation timer - reduced applause duration (minus 8 seconds, earlier fade)
+    // Update celebration animation timer - reduced applause duration (minus 10 seconds, earlier fade)
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
       const fullApplauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
-      const applauseDuration = Math.max(2, fullApplauseDuration - 8); // Reduce by 8 seconds, min 2s
+      const applauseDuration = Math.max(2, fullApplauseDuration - 10); // Reduce by 10 seconds, min 2s
       const distToHome = Math.abs(this.player.x - this.playerHomeX);
       
       // End celebration when: reduced applause time OR player within 250 pixels of home
@@ -5472,7 +5477,7 @@ export class VillageLedgerGame {
       this.state.pendingBadge = { name, description };
       this.state.showBadgePopup = true;
       this.badgeDismissCallback = onDismiss || null;
-      soundManager.play('quizCorrect');
+      soundManager.play('badgeReward');
     } else if (onDismiss) {
       // Badge already earned, call callback immediately
       onDismiss();
@@ -7587,7 +7592,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     align: 'left' | 'center' = 'left'
   ): void {
     const highlightColor = '#DAA520';
-    const keywords = ['double coincidence of wants', 'ledger', 'debts', 'debt'];
+    const keywords = ['double coincidence of wants', 'ledger'];
     const lowerText = text.toLowerCase();
     const charColors: string[] = new Array(text.length).fill(normalColor);
     
@@ -7608,29 +7613,40 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       }
     }
     
-    if (align === 'center') {
-      const totalWidth = ctx.measureText(text).width;
-      x = x - totalWidth / 2;
-    }
-    
     const originalFont = ctx.font;
-    let curX = x;
+    
+    const segments: { text: string; color: string; font: string }[] = [];
     let i = 0;
     while (i < text.length) {
       let j = i;
       while (j < text.length && charColors[j] === charColors[i]) j++;
       const segment = text.substring(i, j);
-      ctx.fillStyle = charColors[i];
+      let segFont = originalFont;
       if (charColors[i] === highlightColor) {
         const sizeMatch = originalFont.match(/(\d+px)/);
         const size = sizeMatch ? sizeMatch[1] : '12px';
-        ctx.font = `bold ${size} ${this.retroFont}`;
-      } else {
-        ctx.font = originalFont;
+        segFont = `bold ${size} ${this.retroFont}`;
       }
-      ctx.fillText(segment, curX, y);
-      curX += ctx.measureText(segment).width;
+      segments.push({ text: segment, color: charColors[i], font: segFont });
       i = j;
+    }
+    
+    let totalWidth = 0;
+    for (const seg of segments) {
+      ctx.font = seg.font;
+      totalWidth += ctx.measureText(seg.text).width;
+    }
+    
+    if (align === 'center') {
+      x = x - totalWidth / 2;
+    }
+    
+    let curX = x;
+    for (const seg of segments) {
+      ctx.font = seg.font;
+      ctx.fillStyle = seg.color;
+      ctx.fillText(seg.text, curX, y);
+      curX += ctx.measureText(seg.text).width;
     }
     ctx.font = originalFont;
   }
@@ -7888,7 +7904,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   private resetGame(): void {
     // Reset all game state
-    this.player.x = 100;
+    this.player.x = 150;
     this.state = {
       phase: 'intro',
       loop: 1,
@@ -8000,7 +8016,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     soundManager.fadeIn('ambientVillage', 1000);
     soundManager.startDaytimeMusic();
     
-    this.player.x = 100;
+    this.player.x = 150;
     this.state = {
       phase: 'loop2_intro',
       loop: 2,

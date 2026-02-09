@@ -118,7 +118,7 @@ function MoneyRainCanvas() {
 
     const STOCK_POINTS = 300;
     const STOCK_STEP = 8;
-    const stockYValues: number[] = [];
+    const stockOsc: number[] = [];
     let osc = 0;
     let oscVel = 0;
     const minVel = 0.06;
@@ -130,13 +130,10 @@ function MoneyRainCanvas() {
       osc += oscVel;
       osc = Math.max(-1, Math.min(1, osc));
       if (osc >= 1 || osc <= -1) oscVel *= -0.5;
-      const progress = i / (STOCK_POINTS - 1);
-      const baseline = 0.85 - progress * 1.5;
-      stockYValues.push(baseline + osc * 0.2);
+      stockOsc.push(osc);
     }
     let stockScrollX = 0;
     const STOCK_SPEED = 30;
-    let stockProgress = 1;
 
     let lastTime = performance.now();
     function animate(now: number) {
@@ -157,33 +154,41 @@ function MoneyRainCanvas() {
         osc += oscVel;
         osc = Math.max(-1, Math.min(1, osc));
         if (osc >= 1 || osc <= -1) oscVel *= -0.5;
-        stockProgress += 1 / STOCK_POINTS;
-        const baseline = 0.85 - stockProgress * 1.5;
-        stockYValues.push(baseline + osc * 0.2);
-        if (stockYValues.length > STOCK_POINTS + 50) stockYValues.splice(0, 50);
+        stockOsc.push(osc);
+        if (stockOsc.length > STOCK_POINTS + 50) stockOsc.splice(0, 50);
       }
 
-      const midY = h * 0.5;
-      const amp = h * 0.4;
+      const bottomY = h * 0.85;
+      const topY = h * 0.15;
+      const oscAmp = h * 0.06;
       ctx!.save();
       ctx!.lineWidth = 1.5;
       ctx!.globalAlpha = 0.25;
-      const startIdx = Math.max(0, stockYValues.length - STOCK_POINTS);
+      const startIdx = Math.max(0, stockOsc.length - STOCK_POINTS);
+      const visibleCount = stockOsc.length - startIdx;
       const offsetX = -stockScrollX;
       const arrowStopX = w * 0.78;
-      const lastVisibleIdx = stockYValues.length - 1;
+
+      function getStockY(idx: number): number {
+        const pos = idx - startIdx;
+        const t = visibleCount > 1 ? pos / (visibleCount - 1) : 0;
+        const baseline = bottomY + (topY - bottomY) * t;
+        return baseline + stockOsc[idx] * oscAmp;
+      }
+
+      const lastVisibleIdx = stockOsc.length - 1;
       const lastX = (lastVisibleIdx - startIdx) * STOCK_STEP + offsetX;
+      const lastY = getStockY(lastVisibleIdx);
+      const secondLastY = getStockY(lastVisibleIdx - 1);
       const secondLastX = (lastVisibleIdx - 1 - startIdx) * STOCK_STEP + offsetX;
-      const lastY = midY + stockYValues[lastVisibleIdx] * amp;
-      const secondLastY = midY + stockYValues[lastVisibleIdx - 1] * amp;
       const lineEndX = Math.min(lastX, arrowStopX);
-      for (let i = startIdx; i < stockYValues.length - 1; i++) {
+      for (let i = startIdx; i < stockOsc.length - 1; i++) {
         const x1 = (i - startIdx) * STOCK_STEP + offsetX;
         const x2 = (i - startIdx + 1) * STOCK_STEP + offsetX;
         if (x2 < 0) continue;
         if (x1 > lineEndX) break;
-        const y1 = midY + stockYValues[i] * amp;
-        const y2 = midY + stockYValues[i + 1] * amp;
+        const y1 = getStockY(i);
+        const y2 = getStockY(i + 1);
         const goingUp = y2 < y1;
         ctx!.strokeStyle = goingUp ? '#00cc44' : '#cc2222';
         ctx!.shadowColor = goingUp ? '#00ff55' : '#ff3333';

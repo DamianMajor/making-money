@@ -192,7 +192,7 @@ export class VillageLedgerGame {
   private berryBush: Character;
 
   // Location markers - NEW LAYOUT
-  // X: 100 (Home) -> 800 (Woodcutter) -> 1600 (Elder/Village Center) -> 2550 (Berry Bush) -> 2150 (Stone-worker) -> 3025 (Fisherman)
+  // X: 100 (Home) -> 815 (Woodcutter) -> 1600 (Elder/Great Stone) -> 2550 (Berry Bush) -> 2150 (Stone-worker) -> 3025 (Fisherman)
   private playerHomeX: number = 100;
   private villageCenterX: number = 1600;
 
@@ -426,7 +426,7 @@ export class VillageLedgerGame {
     this.woodcutter = {
       id: 'woodcutter',
       name: 'WOODCUTTER',
-      x: 800,
+      x: 815,
       y: 0,
       width: 100,
       height: 140,
@@ -435,7 +435,7 @@ export class VillageLedgerGame {
       visible: true,
       bobOffset: 0,
       bobDirection: 1,
-      originalX: 800
+      originalX: 815
     };
 
     this.villageElder = {
@@ -889,7 +889,7 @@ export class VillageLedgerGame {
           // Set auto-walk target to NPC, clear manual movement
           // Add slight offset so player stands next to NPC, not on top
           if (tappedTarget.id === 'berryBush') {
-            this.autoWalkTarget = { x: tappedTarget.x - 60, type: 'berryBush', id: tappedTarget.id };
+            this.autoWalkTarget = { x: tappedTarget.x - 30, type: 'berryBush', id: tappedTarget.id };
           } else {
             const approachDir = this.player.x < tappedTarget.x ? -1 : 1;
             this.autoWalkTarget = { x: tappedTarget.x + (approachDir * 40), type: 'npc', id: tappedTarget.id };
@@ -1172,7 +1172,7 @@ export class VillageLedgerGame {
           this.queueDialogue([
             {
               speaker: 'YOU',
-              text: "Roof is fixed! But I still need to settle my debts with the villagers. I should head to the Village Center."
+              text: "Roof is fixed! But I still need to settle my debts. I should head to the Great Stone."
             }
           ]);
         }
@@ -1567,7 +1567,7 @@ export class VillageLedgerGame {
         this.queueDialogue([
           {
             speaker: 'WOODCUTTER',
-            text: "Let's keep walking to the Stone Tablet at the Village Center!"
+            text: "Let's keep walking to the Stone Tablet at the Great Stone!"
           }
         ]);
       }
@@ -1586,7 +1586,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
-          text: "You have my Stone! Now get my 1 Fish from the Fisherman, then meet me at the Town Center!"
+          text: "You have my Stone! Now get my 1 Fish from the Fisherman, then meet me at the Great Stone!"
         }
       ]);
     }
@@ -1595,7 +1595,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
-          text: "You have everything! Meet me at the Town Center to settle your debt!"
+          text: "You have everything! Meet me at the Great Stone to settle your debt!"
         }
       ]);
     }
@@ -1873,7 +1873,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
+          text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.state.obtainedWood = true;
@@ -1903,7 +1903,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
+          text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.state.obtainedWood = true;
@@ -1933,7 +1933,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Village Center.",
+          text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
           onComplete: () => {
             this.state.inventory.wood = 1;
             this.state.obtainedWood = true;
@@ -2026,7 +2026,7 @@ export class VillageLedgerGame {
           this.queueDialogue([
             {
               speaker: 'WOODCUTTER',
-              text: "Very well, let's walk to the Village Center together. I'll give you the wood there.",
+              text: "Very well, let's walk to the Great Stone together. I'll give you the wood there.",
               onComplete: () => {
                 this.state.phase = 'loop2_escorting_woodcutter';
                 this.state.escortingNPC = 'woodcutter';
@@ -2241,7 +2241,7 @@ export class VillageLedgerGame {
         this.queueDialogue([
           {
             speaker: 'STONE-WORKER',
-            text: "Let's keep walking to the Stone Tablet at the Village Center!"
+            text: "Let's keep walking to the Stone Tablet at the Great Stone!"
           }
         ]);
       }
@@ -2267,7 +2267,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
-          text: "You have the Fish! Head to the Town Center to settle your debt!"
+          text: "You have the Fish! Head to the Great Stone to settle your debt!"
         }
       ]);
     }
@@ -2496,7 +2496,7 @@ export class VillageLedgerGame {
             this.queueDialogue([
               {
                 speaker: 'STONE-WORKER',
-                text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
+                text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Great Stone.",
                 onComplete: finishGetStone
               }
             ]);
@@ -2507,7 +2507,7 @@ export class VillageLedgerGame {
         this.queueDialogue([
           {
             speaker: 'STONE-WORKER',
-            text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Village Center.",
+            text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Great Stone.",
             onComplete: finishGetStone
           }
         ]);
@@ -2597,7 +2597,7 @@ export class VillageLedgerGame {
             this.queueDialogue([
               {
                 speaker: 'STONE-WORKER',
-                text: "Very well, let's walk to the Village Center. I'll give you the stone there.",
+                text: "Very well, let's walk to the Great Stone. I'll give you the stone there.",
                 onComplete: () => {
                   this.state.phase = 'loop2_escorting_stoneworker';
                   this.state.escortingNPC = 'stoneworker';
@@ -2913,7 +2913,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'VILLAGE ELDER',
-          text: "I write my ideas on this Stone Tablet so I never forget. It is the only truth in this village."
+          text: "I write my ideas on this Stone Tablet so I never forget. It is the only truth in this settlement."
         }
       ]);
     }
@@ -3001,7 +3001,7 @@ export class VillageLedgerGame {
           this.queueDialogue([
             {
               speaker: 'VILLAGE ELDER',
-              text: "All debts are paid and recorded. Peace is restored to our village!",
+              text: "All debts are paid and recorded. Peace is restored to our settlement!",
               onComplete: () => {
                 this.state.phase = 'loop2_return';
                 this.state.showCelebration = true;
@@ -3876,10 +3876,12 @@ export class VillageLedgerGame {
           const playerNearby = Math.abs(this.player.x - npc.x) < 80;
           const inDialogue = this.state.currentDialogue !== null || this.state.dialogueQueue.length > 0;
           if (playerNearby && inDialogue) {
-            npc.facingDirection = npcToPlayer >= 0 ? 1 : -1; // Face player during interaction
+            npc.facingDirection = npcToPlayer >= 0 ? -1 : 1; // Face player during interaction
           } else {
-            npc.facingDirection = npcToPlayer >= 0 ? -1 : 1; // Opposite direction (back turned)
+            npc.facingDirection = npcToPlayer >= 0 ? 1 : -1; // Opposite direction (back turned)
           }
+        } else if (npc.id === 'villageElder') {
+          npc.facingDirection = npcToPlayer >= 0 ? -1 : 1; // Inverted orientation
         } else {
           npc.facingDirection = npcToPlayer >= 0 ? 1 : -1;
         }
@@ -4072,9 +4074,9 @@ export class VillageLedgerGame {
         const dx = this.villageElder.targetX - this.villageElder.x;
         if (Math.abs(dx) > 5) {
           this.villageElder.x += Math.sign(dx) * brawlSpeed * 0.5;
-          // Elder faces TOWARD the fight (player position) while backing away
+          // Elder faces TOWARD the fight (player position) while backing away (inverted)
           const elderToPlayer = this.player.x - this.villageElder.x;
-          this.villageElder.facingDirection = elderToPlayer >= 0 ? 1 : -1;
+          this.villageElder.facingDirection = elderToPlayer >= 0 ? -1 : 1;
         }
       }
       // End brawl at 4 seconds, show fail screen
@@ -4105,7 +4107,7 @@ export class VillageLedgerGame {
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
       const fullApplauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
-      const applauseDuration = Math.max(2, fullApplauseDuration - 10); // Reduce by 10 seconds, min 2s
+      const applauseDuration = Math.max(2, fullApplauseDuration - 12); // Reduce by 12 seconds, min 2s
       const distToHome = Math.abs(this.player.x - this.playerHomeX);
       
       // End celebration when: reduced applause time OR player within 250 pixels of home
@@ -4335,7 +4337,7 @@ export class VillageLedgerGame {
       },
       {
         speaker: 'VILLAGE ELDER',
-        text: "All debts are paid and recorded on the Stone Tablet. Peace is restored to our village!",
+        text: "All debts are paid and recorded on the Stone Tablet. Peace is restored to our settlement!",
         onComplete: () => {
           this.state.showCelebration = true;
           this.state.celebrationTimer = 0;
@@ -5464,11 +5466,7 @@ export class VillageLedgerGame {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
 
-    // Dark overlay
-    ctx.fillStyle = 'rgba(139, 0, 0, 0.9)';
-    ctx.fillRect(0, 0, w, h);
-
-    // Fail card
+    // Fail card (no full-screen overlay - just the bordered card)
     const cardW = Math.min(550, w - 60);
     const cardH = 380;
     const cardX = (w - cardW) / 2;
@@ -5486,7 +5484,7 @@ export class VillageLedgerGame {
     ctx.font = `20px ${this.retroFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#DC2626';
-    ctx.fillText('VILLAGE IN CHAOS!', w / 2, cardY + 50);
+    ctx.fillText('SETTLEMENT IN CHAOS!', w / 2, cardY + 50);
 
     // Message
     ctx.font = `10px ${this.retroFont}`;
@@ -5856,10 +5854,10 @@ export class VillageLedgerGame {
   }
   
   private initializeDustParticles(): void {
-    // Create 130 foreground floating dust particles
+    // Create 195 foreground floating dust particles (50% increase from 130)
     this.dustParticles = [];
     const viewHeight = this.logicalHeight - this.dialogueBoxHeight;
-    for (let i = 0; i < 130; i++) {
+    for (let i = 0; i < 195; i++) {
       this.dustParticles.push({
         x: Math.random() * this.worldWidth,
         y: Math.random() * viewHeight, // Full viewing area above dialogue box
@@ -5976,10 +5974,9 @@ export class VillageLedgerGame {
   
   private drawForegroundDustParticles(ctx: CanvasRenderingContext2D, w: number, h: number, foregroundY?: number): void {
     const t = this.atmosphereTimer;
-    // Allow particles to overlap the top 20% of the foreground (path/shrubs) layer
-    const foregroundTop = foregroundY !== undefined ? foregroundY : (h - this.dialogueBoxHeight);
-    const foregroundHeight = (h - this.dialogueBoxHeight) - foregroundTop;
-    const maxY = foregroundTop + foregroundHeight * 0.4;
+    // Allow particles to overlap up to 150px above the hint box
+    const hintBoxTop = h - this.dialogueBoxHeight;
+    const maxY = hintBoxTop - 150;
     
     // Foreground dust particles - drawn between thick trees and shrubs
     ctx.save();
@@ -6164,7 +6161,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   const shadowYOffset = char.id === 'berryBush' ? -25 : 0;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
   ctx.beginPath();
-  ctx.ellipse(screenX, groundY + 5 + shadowYOffset, char.width * 0.4, char.height * 0.06 + 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(screenX, groundY + 15 + shadowYOffset, char.width * 0.4, char.height * 0.06 + 2, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const x = screenX - char.width / 2;
@@ -7051,7 +7048,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           hint = 'Get fish from the Fisherman...';
           break;
         case 'got_fish_ready_settle':
-          hint = 'Return to Village Center to settle debts...';
+          hint = 'Return to the Great Stone to settle debts...';
           break;
         case 'settlement':
           if (!this.state.woodcutterDisputed) {
@@ -7792,6 +7789,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
     
     let curX = x;
+    ctx.textAlign = 'left';
     for (const seg of segments) {
       ctx.font = seg.font;
       ctx.fillStyle = seg.color;
@@ -8138,7 +8136,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.quizButtonAreas = [];
     
     // Reset NPC positions to original locations
-    this.woodcutter.x = this.woodcutter.originalX || 800;
+    this.woodcutter.x = this.woodcutter.originalX || 815;
     this.woodcutter.targetX = undefined;
     this.stoneWorker.x = this.stoneWorker.originalX || 2150;
     this.stoneWorker.targetX = undefined;
@@ -8248,7 +8246,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     };
     
     // Reset NPC positions to original locations
-    this.woodcutter.x = this.woodcutter.originalX || 800;
+    this.woodcutter.x = this.woodcutter.originalX || 815;
     this.woodcutter.targetX = undefined;
     this.stoneWorker.x = this.stoneWorker.originalX || 2150;
     this.stoneWorker.targetX = undefined;

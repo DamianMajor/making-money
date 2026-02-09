@@ -63,20 +63,25 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 
 ## Key Technical Notes
 
-- Berry bush: player stops at bushX - 60px to stand beside it, not on top.
+- Berry bush: player stops at bushX - 30px to stand beside it, not on top (reduced from 60px).
 - Boo sound: uses setTimeout(500) with state guard to play during fail screen, not during fight.
 - Sound system: loads 34 sounds, mute/unmute via localStorage key `villageLedger_soundSettings`.
 - Stone Tablet: graphic removed but interaction area preserved, popup shows on arrival or direct click.
-- Celebration timing: applauseDuration = fullDuration - 10 seconds (min 2s).
+- Celebration timing: applauseDuration = fullDuration - 12 seconds (min 2s).
 - Game title displayed as "THE BARTER SYSTEM" in-game UI, series title "Making Money" on intro screen. Start button text is "Start".
 - Hut overlay drawn at 1.5x scale (hutScale=1.5), anchored relative to playerHomeX position on walking path layer, offset -50px left and +50px down. No "Home" label.
-- Character positions: Player at x=170 (+20px right, +15px down from feet), woodcutter at x=800, fisherman at x=3025, stone worker at x=2150, berry bush at x=2550.
+- Character positions: Player at x=170 (+20px right, +15px down from feet), woodcutter at x=815, fisherman at x=3025, stone worker at x=2150, berry bush at x=2550.
 - Character spacing: Auto-walk targets include 40px offset based on approach direction to prevent overlap during interactions.
 - Walking direction fix: Woodcutter and stone worker sprites naturally face opposite direction - fixed with sprite flip in rendering (facing = -facing for these IDs only).
-- NPC facing: All NPCs (except fisherman and berry bush) always face toward the player when idle. Fisherman faces AWAY from player by default (back turned); turns to face player only during active dialogue interaction when player is nearby.
-- Village elder behavior: During brawl, elder walks backwards (facing the fight/player) while moving away to targetX.
+- NPC facing: All NPCs (except fisherman, berry bush, and village elder) face toward the player when idle. Village elder orientation is inverted. Fisherman faces AWAY from player by default (back turned); turns to face player only during active dialogue interaction when player is nearby.
+- Village elder behavior: During brawl, elder walks backwards (facing the fight/player, inverted orientation) while moving away to targetX.
 - Hint pulse system: When player attempts premature interactions in Loop 2 (e.g., settling debts before recording on Stone Tablet), hint box text pulses with golden highlight for 1.5 seconds.
 - Stream sound trigger: Starts fading in at berryBush.x - 400, full volume at fisherman position, symmetric fade when moving away.
+- Shadows: Positioned at groundY+15 (moved 10px down from original +5), not affected by character offset.
+- Sprite backgrounds: Blue (#0000FF) instead of green for chroma key — prevents earth-tone outfit colors from being removed.
+- Foreground dust particles: 195 particles (50% increase from 130), allowed to overlap up to 150px above hint box top.
+- Dialogue language: "Village Center" / "Town Center" replaced with "the Great Stone" throughout. "Village in chaos" failure message changed to "Settlement in chaos". All "village" references in dialogue changed to "settlement".
+- Fail screen: Red overlay removed, only bordered card box remains.
 
 ## External Dependencies
 

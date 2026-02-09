@@ -275,6 +275,9 @@ export class VillageLedgerGame {
   };
   private parallaxLoaded: boolean = false;
   
+  private characterSprites: { [key: string]: HTMLImageElement } = {};
+  private processedSprites: { [key: string]: HTMLCanvasElement } = {};
+  
   // Sound mute button
   private muteButtonArea: { x: number; y: number; w: number; h: number } | null = null;
   
@@ -333,6 +336,38 @@ export class VillageLedgerGame {
     this.parallaxLayers.berryBush.src = '/berry-bush.png';
     this.parallaxLayers.bushNoBerries.src = '/bush-no-berries.png';
     
+    // Load character sprites and remove green background via chroma key
+    const spriteIds = ['player', 'stone-worker', 'fisherman', 'village-elder', 'woodcutter'];
+    spriteIds.forEach(id => {
+      const img = new Image();
+      img.onload = () => {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = img.naturalWidth;
+        offscreen.height = img.naturalHeight;
+        const offCtx = offscreen.getContext('2d');
+        if (offCtx) {
+          offCtx.drawImage(img, 0, 0);
+          const imageData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+          const data = imageData.data;
+          const bgR = data[0], bgG = data[1], bgB = data[2];
+          const tolerance = 80;
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
+            if (dist < tolerance) {
+              data[i + 3] = 0;
+            } else if (dist < tolerance + 30) {
+              data[i + 3] = Math.round(255 * ((dist - tolerance) / 30));
+            }
+          }
+          offCtx.putImageData(imageData, 0, 0);
+          this.processedSprites[id] = offscreen;
+        }
+      };
+      img.src = `/sprites/${id}.png`;
+      this.characterSprites[id] = img;
+    });
+
     // Track when all layers are loaded (or failed - proceed anyway)
     let loadedCount = 0;
     const totalImages = 13;
@@ -6114,31 +6149,51 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     return;
   }
 
-  // Draw character body (Keep original blue/green/orange colors)
-  ctx.fillStyle = char.color;
-  ctx.strokeStyle = char.outlineColor;
-  ctx.lineWidth = 3;
-  const radius = 6;
-  ctx.beginPath();
-  ctx.roundRect(x, y, char.width, char.height, radius);
-  ctx.fill();
-  ctx.stroke();
+  // Map character id to sprite key
+  const spriteKeyMap: { [key: string]: string } = {
+    'player': 'player',
+    'stoneWorker': 'stone-worker',
+    'fisherman': 'fisherman',
+    'villageElder': 'village-elder',
+    'woodcutter': 'woodcutter'
+  };
+  const spriteKey = spriteKeyMap[char.id];
+  const processedSprite = spriteKey ? this.processedSprites[spriteKey] : null;
 
-  // 3. BRAIN SURGERY: Draw the JibJab face ONLY for the player
-  if (char.id === 'player') {
-    const faceImg = this.faceImages[this.state.playerMood];
-    // Check if image is loaded before drawing
-    if (faceImg && faceImg.complete) {
-      // Positioned slightly higher to look like a head on the body
-      ctx.drawImage(faceImg, x, y - 5, char.width, char.width);
+  if (processedSprite) {
+    const spriteScale = char.height / processedSprite.height;
+    const spriteW = processedSprite.width * spriteScale;
+    const spriteH = processedSprite.height * spriteScale;
+    const spriteX = screenX - spriteW / 2;
+    const spriteY = y;
+    ctx.drawImage(processedSprite, spriteX, spriteY, spriteW, spriteH);
+
+    if (char.id === 'player') {
+      const faceImg = this.faceImages[this.state.playerMood];
+      if (faceImg && faceImg.complete) {
+        const faceSize = char.width * 0.65;
+        ctx.drawImage(faceImg, screenX - faceSize / 2, spriteY + spriteH * 0.05, faceSize, faceSize);
+      }
     }
   } else {
-    // Original face indicator for NPCs
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.fillRect(x + 10, y + 12, 8, 8);
-    ctx.fillRect(x + char.width - 18, y + 12, 8, 8);
+    ctx.fillStyle = char.color;
+    ctx.strokeStyle = char.outlineColor;
+    ctx.lineWidth = 3;
+    const radius = 6;
+    ctx.beginPath();
+    ctx.roundRect(x, y, char.width, char.height, radius);
+    ctx.fill();
+    ctx.stroke();
 
-    // Original name label for NPCs
+    if (char.id === 'player') {
+      const faceImg = this.faceImages[this.state.playerMood];
+      if (faceImg && faceImg.complete) {
+        ctx.drawImage(faceImg, x, y - 5, char.width, char.width);
+      }
+    }
+  }
+
+  if (char.id !== 'player') {
     ctx.font = `7px ${this.retroFont}`;
     ctx.textAlign = 'center';
     const labelWidth = ctx.measureText(char.name).width + 16;

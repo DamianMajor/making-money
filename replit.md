@@ -82,6 +82,10 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - Foreground dust particles: 195 particles (50% increase from 130), allowed to overlap up to 150px above hint box top.
 - Dialogue language: "Village Center" / "Town Center" replaced with "the Great Stone" throughout. "Village in chaos" failure message changed to "Settlement in chaos". All "village" references in dialogue changed to "settlement".
 - Fail screen: Red overlay removed, only bordered card box remains.
+- Intro screen: Simplified to title "MAKING MONEY", lesson label, and Start button. Removed "Travel back..." text, "What is money to you?" question, and textarea input.
+- NPC overlap: Characters can now pass through each other smoothly without popping/flashing. Removed enforceNPCSpacing visual offset system (kept tablet exclusion only).
+- Sprite cleanup: Bottom 3% of sprite images scanned for white/light artifacts and removed during chroma key processing.
+- Night layer crossfade: Walking path, berry bush, hut (all 3 states), close trees, and far trees all crossfade to night versions alongside the background during the 8-second night transition. Night assets stored as *-night.png in client/public/.
 
 ## External Dependencies
 

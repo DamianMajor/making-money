@@ -2,8 +2,6 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { VillageLedgerGame } from '@/lib/gameEngine';
 
 function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
-  const [answer, setAnswer] = useState('');
-
   return (
     <div
       className="fixed inset-0 w-full h-full flex items-center justify-center"
@@ -28,60 +26,6 @@ function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
           MAKING MONEY
         </h1>
 
-        <p
-          className="text-center mb-8"
-          style={{
-            fontFamily: '"Press Start 2P", monospace',
-            fontSize: 'clamp(9px, 2vw, 13px)',
-            color: '#a89478',
-            lineHeight: 2.2,
-            maxWidth: '480px'
-          }}
-          data-testid="text-overview"
-        >
-          Money is everywhere. But what IS it? Travel back to where it all started — a world with no money at all — and discover how and why it came to exist.
-        </p>
-
-        <div className="w-full mb-8" style={{ maxWidth: '440px' }}>
-          <label
-            className="block text-center mb-4"
-            style={{
-              fontFamily: '"Press Start 2P", monospace',
-              fontSize: 'clamp(8px, 1.8vw, 11px)',
-              color: '#c9b896',
-              lineHeight: 2
-            }}
-            data-testid="text-question"
-          >
-            What is money to you? Type your answer here and we'll review it after you've played this lesson.
-          </label>
-          <textarea
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Type your answer..."
-            className="w-full resize-none"
-            rows={3}
-            style={{
-              fontFamily: '"Press Start 2P", monospace',
-              fontSize: '11px',
-              lineHeight: 1.8,
-              color: '#e8dcc8',
-              background: 'rgba(0, 0, 0, 0.4)',
-              border: '2px solid #5a4a32',
-              borderRadius: '6px',
-              padding: '12px 14px',
-              outline: 'none',
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = '#8B7355';
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = '#5a4a32';
-            }}
-            data-testid="input-answer"
-          />
-        </div>
-
         <div className="flex flex-col items-center gap-3">
           <span
             style={{
@@ -95,7 +39,7 @@ function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
             Lesson One — The Barter System
           </span>
           <button
-            onClick={() => onStart(answer)}
+            onClick={() => onStart('')}
             className="cursor-pointer"
             style={{
               fontFamily: '"Press Start 2P", monospace',

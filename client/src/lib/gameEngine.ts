@@ -263,6 +263,14 @@ export class VillageLedgerGame {
     berryBush: HTMLImageElement;
     bushNoBerries: HTMLImageElement;
     nightBg: HTMLImageElement;
+    walkingPathNight: HTMLImageElement;
+    treesFarNight: HTMLImageElement;
+    treesCloseNight: HTMLImageElement;
+    hutBrokenOpenNight: HTMLImageElement;
+    hutFixedOpenNight: HTMLImageElement;
+    hutFixedClosedNight: HTMLImageElement;
+    berryBushNight: HTMLImageElement;
+    bushNoBerriesNight: HTMLImageElement;
   } = {
     sky: new Image(),
     backmid: new Image(),
@@ -277,7 +285,15 @@ export class VillageLedgerGame {
     tree3: new Image(),
     berryBush: new Image(),
     bushNoBerries: new Image(),
-    nightBg: new Image()
+    nightBg: new Image(),
+    walkingPathNight: new Image(),
+    treesFarNight: new Image(),
+    treesCloseNight: new Image(),
+    hutBrokenOpenNight: new Image(),
+    hutFixedOpenNight: new Image(),
+    hutFixedClosedNight: new Image(),
+    berryBushNight: new Image(),
+    bushNoBerriesNight: new Image()
   };
   private parallaxLoaded: boolean = false;
   
@@ -338,8 +354,16 @@ export class VillageLedgerGame {
     this.parallaxLayers.berryBush.src = '/berry-bush.png';
     this.parallaxLayers.bushNoBerries.src = '/bush-no-berries.png';
     this.parallaxLayers.nightBg.src = '/night-background.jpg';
+    this.parallaxLayers.walkingPathNight.src = '/walking-path-night.png';
+    this.parallaxLayers.treesFarNight.src = '/trees-far-night.png';
+    this.parallaxLayers.treesCloseNight.src = '/trees-close-night.png';
+    this.parallaxLayers.hutBrokenOpenNight.src = '/hut-broken-open-night.png';
+    this.parallaxLayers.hutFixedOpenNight.src = '/hut-fixed-open-night.png';
+    this.parallaxLayers.hutFixedClosedNight.src = '/hut-fixed-closed-night.png';
+    this.parallaxLayers.berryBushNight.src = '/berry-bush-night.png';
+    this.parallaxLayers.bushNoBerriesNight.src = '/bush-no-berries-night.png';
     
-    // Load character sprites and remove green background via chroma key
+    // Load character sprites and remove background via chroma key (blue backgrounds)
     const spriteIds = ['player', 'stone-worker', 'fisherman', 'village-elder', 'woodcutter'];
     spriteIds.forEach(id => {
       const img = new Image();
@@ -354,13 +378,30 @@ export class VillageLedgerGame {
           const data = imageData.data;
           const bgR = data[0], bgG = data[1], bgB = data[2];
           const tolerance = 80;
+          const antialias = 30;
           for (let i = 0; i < data.length; i += 4) {
             const r = data[i], g = data[i + 1], b = data[i + 2];
             const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
             if (dist < tolerance) {
               data[i + 3] = 0;
-            } else if (dist < tolerance + 30) {
-              data[i + 3] = Math.round(255 * ((dist - tolerance) / 30));
+            } else if (dist < tolerance + antialias) {
+              data[i + 3] = Math.round(255 * ((dist - tolerance) / antialias));
+            }
+          }
+          // Trim white/light artifacts from bottom edge (scan bottom 3% of image)
+          const w = offscreen.width;
+          const h = offscreen.height;
+          const bottomScanRows = Math.ceil(h * 0.03);
+          for (let row = h - bottomScanRows; row < h; row++) {
+            for (let col = 0; col < w; col++) {
+              const idx = (row * w + col) * 4;
+              const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+              if (a > 0) {
+                const brightness = (r + g + b) / 3;
+                if (brightness > 200 && Math.abs(r - g) < 40 && Math.abs(g - b) < 40) {
+                  data[idx + 3] = 0;
+                }
+              }
             }
           }
           offCtx.putImageData(imageData, 0, 0);
@@ -3571,46 +3612,21 @@ export class VillageLedgerGame {
   // Enforce minimum spacing between NPCs to prevent overlap during village center gatherings
   // Soft collision: NPCs slow down when near each other and avoid Stone Tablet center
   private enforceNPCSpacing(): void {
-    const minVisualSpacing = 80; // Minimum pixels for visual overlap prevention (rendering offset only)
     const tabletExclusionRadius = 50; // Keep NPCs away from tablet center for clicking
     const npcs = [this.woodcutter, this.stoneWorker, this.fisherman, this.villageElder];
     
-    // Reset render offsets each tick to prevent accumulation drift
     npcs.forEach(npc => {
       npc.renderOffsetX = 0;
     });
     
-    // Sort by x position
-    const sortedNPCs = [...npcs].sort((a, b) => a.x - b.x);
-    
-    // Calculate render offsets to prevent visual overlap
-    for (let i = 0; i < sortedNPCs.length - 1; i++) {
-      const npc1 = sortedNPCs[i];
-      const npc2 = sortedNPCs[i + 1];
-      const distance = Math.abs(npc2.x - npc1.x);
-      
-      if (distance < minVisualSpacing) {
-        // Apply small render offset to spread them visually
-        const offsetNeeded = (minVisualSpacing - distance) / 2;
-        npc1.renderOffsetX = -offsetNeeded;
-        npc2.renderOffsetX = offsetNeeded;
-      } else {
-        // Reset offsets when not overlapping
-        npc1.renderOffsetX = Math.max(0, (npc1.renderOffsetX || 0) * 0.9);
-        npc2.renderOffsetX = Math.max(0, (npc2.renderOffsetX || 0) * 0.9);
-      }
-    }
-    
     // Keep NPCs away from Stone Tablet center so it remains clickable
-    // Use renderOffsetX only - don't change actual positions to avoid pushing
     npcs.forEach(npc => {
       const distToTablet = npc.x - this.villageCenterX;
       if (Math.abs(distToTablet) < tabletExclusionRadius) {
-        // Apply render offset to move NPC visually away from tablet (without changing x)
         if (distToTablet < 0) {
-          npc.renderOffsetX = (npc.renderOffsetX || 0) - 3; // Offset left
+          npc.renderOffsetX = (npc.renderOffsetX || 0) - 3;
         } else {
-          npc.renderOffsetX = (npc.renderOffsetX || 0) + 3; // Offset right
+          npc.renderOffsetX = (npc.renderOffsetX || 0) + 3;
         }
       }
     });
@@ -5690,6 +5706,13 @@ export class VillageLedgerGame {
         ctx.globalAlpha = 0.85;
         ctx.drawImage(this.parallaxLayers.treesFar, 0, 0, treesFarW, treesFarH,
           treesFarScreenX, treesFarYOffset, treesFarDrawWidth, treesFarH);
+        if (this.state.nightBgCrossfade > 0 && this.parallaxLayers.treesFarNight.naturalWidth > 0) {
+          ctx.globalAlpha = this.state.nightBgCrossfade * 0.85;
+          const nightW = this.parallaxLayers.treesFarNight.naturalWidth;
+          const nightH = this.parallaxLayers.treesFarNight.naturalHeight;
+          ctx.drawImage(this.parallaxLayers.treesFarNight, 0, 0, nightW, nightH,
+            treesFarScreenX, treesFarYOffset, treesFarDrawWidth, treesFarH);
+        }
         ctx.globalAlpha = 1.0;
         ctx.restore();
         this.drawLayerHaze(ctx, w, h, 0.45);
@@ -5706,6 +5729,13 @@ export class VillageLedgerGame {
         ctx.globalAlpha = 0.9;
         ctx.drawImage(this.parallaxLayers.treesClose, 0, 0, treesCloseW, treesCloseH,
           treesCloseScreenX, treesCloseYOffset, treesCloseDrawWidth, treesCloseH);
+        if (this.state.nightBgCrossfade > 0 && this.parallaxLayers.treesCloseNight.naturalWidth > 0) {
+          ctx.globalAlpha = this.state.nightBgCrossfade * 0.9;
+          const nightW = this.parallaxLayers.treesCloseNight.naturalWidth;
+          const nightH = this.parallaxLayers.treesCloseNight.naturalHeight;
+          ctx.drawImage(this.parallaxLayers.treesCloseNight, 0, 0, nightW, nightH,
+            treesCloseScreenX, treesCloseYOffset, treesCloseDrawWidth, treesCloseH);
+        }
         ctx.globalAlpha = 1.0;
         ctx.restore();
         this.drawLayerHaze(ctx, w, h, 0.3);
@@ -5722,6 +5752,16 @@ export class VillageLedgerGame {
       const walkingPathScreenX = -frontmidOffset;
       ctx.drawImage(this.parallaxLayers.walkingPath, 0, 0, walkingPathWidth, walkingPathHeight,
         walkingPathScreenX, walkingPathYOffset, pathDrawWidth, walkingPathHeight);
+      // Night crossfade for walking path
+      if (this.state.nightBgCrossfade > 0 && this.parallaxLayers.walkingPathNight.naturalWidth > 0) {
+        ctx.save();
+        ctx.globalAlpha = this.state.nightBgCrossfade;
+        const nightPathW = this.parallaxLayers.walkingPathNight.naturalWidth;
+        const nightPathH = this.parallaxLayers.walkingPathNight.naturalHeight;
+        ctx.drawImage(this.parallaxLayers.walkingPathNight, 0, 0, nightPathW, nightPathH,
+          walkingPathScreenX, walkingPathYOffset, pathDrawWidth, walkingPathHeight);
+        ctx.restore();
+      }
       
       // Draw hut overlay at 1.5x scale, anchored to walking path
       let hutImg: HTMLImageElement;
@@ -5740,6 +5780,24 @@ export class VillageLedgerGame {
         const hutY = walkingPathYOffset - (hutDrawHeight - walkingPathHeight) + 50;
         ctx.drawImage(hutImg, 0, 0, hutImg.naturalWidth, hutImg.naturalHeight,
           hutX, hutY, hutDrawWidth, hutDrawHeight);
+        // Night crossfade for hut
+        if (this.state.nightBgCrossfade > 0) {
+          let hutNightImg: HTMLImageElement;
+          if (this.state.playerEnteredHut) {
+            hutNightImg = this.parallaxLayers.hutFixedClosedNight;
+          } else if (this.state.roofRepaired) {
+            hutNightImg = this.parallaxLayers.hutFixedOpenNight;
+          } else {
+            hutNightImg = this.parallaxLayers.hutBrokenOpenNight;
+          }
+          if (hutNightImg.naturalWidth > 0) {
+            ctx.save();
+            ctx.globalAlpha = this.state.nightBgCrossfade;
+            ctx.drawImage(hutNightImg, 0, 0, hutNightImg.naturalWidth, hutNightImg.naturalHeight,
+              hutX, hutY, hutDrawWidth, hutDrawHeight);
+            ctx.restore();
+          }
+        }
       }
       
       // Apply subtle haze to foreground
@@ -6184,6 +6242,18 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       bushX += Math.sin(shakeProgress * Math.PI * 8) * 3 * shakeProgress;
     }
     ctx.drawImage(bushImg, Math.round(bushX), Math.round(bushY), Math.round(bushW), Math.round(bushH));
+    // Night crossfade for berry bush
+    if (this.state.nightBgCrossfade > 0) {
+      const nightBushImg = (bushIsEmpty && this.parallaxLayers.bushNoBerriesNight.naturalWidth > 0)
+        ? this.parallaxLayers.bushNoBerriesNight
+        : this.parallaxLayers.berryBushNight;
+      if (nightBushImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.globalAlpha = this.state.nightBgCrossfade;
+        ctx.drawImage(nightBushImg, Math.round(bushX), Math.round(bushY), Math.round(bushW), Math.round(bushH));
+        ctx.restore();
+      }
+    }
     return;
   }
 

@@ -446,7 +446,18 @@ export class VillageLedgerGame {
             }
           }
           offCtx.putImageData(imageData, 0, 0);
-          this.processedSprites[id] = offscreen;
+          if (id === 'woodcutter') {
+            const trimmed = document.createElement('canvas');
+            trimmed.width = offscreen.width;
+            trimmed.height = offscreen.height - 10;
+            const trimCtx = trimmed.getContext('2d');
+            if (trimCtx) {
+              trimCtx.drawImage(offscreen, 0, 0, offscreen.width, offscreen.height - 10, 0, 0, trimmed.width, trimmed.height);
+            }
+            this.processedSprites[id] = trimmed;
+          } else {
+            this.processedSprites[id] = offscreen;
+          }
         }
       };
       img.src = `/sprites/${id}.png`;
@@ -488,7 +499,7 @@ export class VillageLedgerGame {
     this.player = {
       id: 'player',
       name: 'PLAYER',
-      x: 170, // Player Home position (+20px right)
+      x: 185, // Player Home position (+35px right)
       y: 0,
       width: 100,
       height: 140,
@@ -568,8 +579,8 @@ export class VillageLedgerGame {
       name: 'FISHERMAN',
       x: 3025,
       y: 0,
-      width: 100,
-      height: 140,
+      width: 115,
+      height: 161,
       color: '#F97316',
       outlineColor: '#C2410C',
       visible: true,
@@ -1300,6 +1311,7 @@ export class VillageLedgerGame {
               try {
                 this.state.showRainfall = false; // Turn off rain
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
+                soundManager.stop('thunder');
                 // Keep night scene visible for 1 extra second, then show quiz with night background
                 setTimeout(() => {
                   this.state.showQuiz = true;
@@ -1364,6 +1376,7 @@ export class VillageLedgerGame {
                 this.state.showRainfall = false; // Now turn off rain
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
                 soundManager.fadeOut('ambientNight', 1000); // Fade out ambient night
+                soundManager.stop('thunder');
                 this.state.showNightTransition = false;
                 // Delay quiz appearance by 3 seconds
                 setTimeout(() => {
@@ -1552,7 +1565,7 @@ export class VillageLedgerGame {
         return;
       }
       
-      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < this.logicalWidth / 3;
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 350;
       const woodcutterAtCenter = Math.abs(this.woodcutter.x - this.villageCenterX) < 200;
       
       if (playerAtCenter && woodcutterAtCenter) {
@@ -1736,7 +1749,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 60;
+                this.villageElder.targetX = this.villageCenterX - 45;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -1822,7 +1835,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 60;
+                this.villageElder.targetX = this.villageCenterX - 45;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -2229,7 +2242,7 @@ export class VillageLedgerGame {
         return;
       }
       
-      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < this.logicalWidth / 3;
+      const playerAtCenter = Math.abs(this.player.x - this.villageCenterX) < 350;
       const stoneWorkerAtCenter = Math.abs(this.stoneWorker.x - this.villageCenterX) < 200;
       
       if (playerAtCenter && stoneWorkerAtCenter) {
@@ -2457,7 +2470,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 60;
+                this.villageElder.targetX = this.villageCenterX - 45;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -2486,7 +2499,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 60;
+                this.villageElder.targetX = this.villageCenterX - 45;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -3036,7 +3049,7 @@ export class VillageLedgerGame {
               // Trigger the brawl - NPCs run to player, Elder steps aside
               this.woodcutter.targetX = this.player.x - 30;
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX - 60; // Elder steps away
+              this.villageElder.targetX = this.villageCenterX - 45; // Elder steps away
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3165,7 +3178,7 @@ export class VillageLedgerGame {
               // Trigger brawl
               this.woodcutter.targetX = this.player.x - 30;
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX - 60;
+              this.villageElder.targetX = this.villageCenterX - 45;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3194,7 +3207,7 @@ export class VillageLedgerGame {
             text: "Without a record, we cannot know the truth...",
             onComplete: () => {
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX - 60;
+              this.villageElder.targetX = this.villageCenterX - 45;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3223,7 +3236,7 @@ export class VillageLedgerGame {
             text: "Without a record, we cannot know the truth...",
             onComplete: () => {
               this.woodcutter.targetX = this.player.x - 30;
-              this.villageElder.targetX = this.villageCenterX - 60;
+              this.villageElder.targetX = this.villageCenterX - 45;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3408,7 +3421,7 @@ export class VillageLedgerGame {
                     // Trigger brawl
                     this.woodcutter.targetX = this.player.x - 30;
                     this.stoneWorker.targetX = this.player.x + 30;
-                    this.villageElder.targetX = this.villageCenterX - 60;
+                    this.villageElder.targetX = this.villageCenterX - 45;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
@@ -3566,7 +3579,7 @@ export class VillageLedgerGame {
                     // Trigger brawl
                     this.woodcutter.targetX = this.player.x - 30;
                     this.stoneWorker.targetX = this.player.x + 30;
-                    this.villageElder.targetX = this.villageCenterX - 60;
+                    this.villageElder.targetX = this.villageCenterX - 45;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
@@ -4352,7 +4365,7 @@ export class VillageLedgerGame {
         // Trigger the brawl - NPCs run to player, Elder steps aside
         this.woodcutter.targetX = this.player.x - 30;
         this.stoneWorker.targetX = this.player.x + 30;
-        this.villageElder.targetX = this.villageCenterX - 60; // Elder steps away
+        this.villageElder.targetX = this.villageCenterX - 45; // Elder steps away
         this.state.phase = 'brawl';
         this.state.showBrawl = true;
         this.state.brawlTimer = 0;
@@ -4384,6 +4397,8 @@ export class VillageLedgerGame {
   // Triggered when Elder arrives at player after both debts are settled
   private triggerElderCelebration(): void {
     this.state.elderWalkingToCelebrate = false;
+    const elderDir = this.villageElder.x - this.player.x;
+    this.player.facingDirection = elderDir >= 0 ? 1 : -1;
     
     this.queueDialogue([
       {
@@ -4478,6 +4493,7 @@ export class VillageLedgerGame {
                     try {
                       this.state.showRainfall = false;
                       soundManager.fadeOut('rain', 6000); // 6 second fade out
+                      soundManager.stop('thunder');
                       this.state.showNightTransition = false;
                       // Delay quiz appearance by 3 seconds
                       setTimeout(() => {
@@ -4529,6 +4545,14 @@ export class VillageLedgerGame {
 
     // Draw parallax background elements
     this.drawBackground(ctx);
+
+    // Draw lightning flashes on top of background but behind all other layers
+    if (this.state.showThunderstorm) {
+      this.drawLightningFlash(ctx, this.state.thunderstormTimer, 0.8);
+    }
+    if (this.state.showRainfall && !this.state.showNightTransition) {
+      this.drawLightningFlash(ctx, this.state.rainfallTimer, 2.5);
+    }
 
     // Ground Y position for character placement
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
@@ -5179,6 +5203,22 @@ export class VillageLedgerGame {
     }
   }
   
+  private drawLightningFlash(ctx: CanvasRenderingContext2D, timer: number, interval: number): void {
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    const flashTime = timer % interval;
+    const frameDuration = 1 / 24;
+    if (flashTime < frameDuration * 2) {
+      const frameIndex = flashTime < frameDuration ? 0 : 1;
+      const lightningImg = this.lightningImages[frameIndex];
+      if (lightningImg && lightningImg.complete) {
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(lightningImg, 0, 0, w, h);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
   private drawThunderstorm(ctx: CanvasRenderingContext2D): void {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
@@ -5189,23 +5229,6 @@ export class VillageLedgerGame {
     const stormAlpha = stormProgress * 0.35;
     ctx.fillStyle = `rgba(30, 30, 50, ${stormAlpha})`;
     ctx.fillRect(0, 0, w, h);
-    
-    // Lightning flash images - flash each for 1/24s (~42ms) back-to-back every 0.8s
-    const flashTime = t % 0.8;
-    const frameDuration = 1 / 24; // ~42ms per frame
-    if (flashTime < frameDuration * 2) {
-      const frameIndex = flashTime < frameDuration ? 0 : 1;
-      const lightningImg = this.lightningImages[frameIndex];
-      if (lightningImg && lightningImg.complete) {
-        ctx.globalAlpha = 0.85;
-        ctx.drawImage(lightningImg, 0, 0, w, h);
-        ctx.globalAlpha = 1;
-      } else {
-        const flashIntensity = (frameDuration * 2 - flashTime) / (frameDuration * 2);
-        ctx.fillStyle = `rgba(255, 255, 220, ${flashIntensity * 0.6})`;
-        ctx.fillRect(0, 0, w, h);
-      }
-    }
     
     // Draw rain
     ctx.strokeStyle = 'rgba(150, 180, 220, 0.6)';
@@ -5311,19 +5334,6 @@ export class VillageLedgerGame {
       ctx.moveTo(x, y);
       ctx.lineTo(x - 2, y + 15);
       ctx.stroke();
-    }
-    
-    // Occasional lightning flash using lightning images
-    const rainFlashTime = t % 2.5;
-    const rainFrameDuration = 1 / 24;
-    if (rainFlashTime < rainFrameDuration * 2) {
-      const frameIndex = rainFlashTime < rainFrameDuration ? 0 : 1;
-      const lightningImg = this.lightningImages[frameIndex];
-      if (lightningImg && lightningImg.complete) {
-        ctx.globalAlpha = 0.7;
-        ctx.drawImage(lightningImg, 0, 0, w, h);
-        ctx.globalAlpha = 1;
-      }
     }
     
     // Show "A storm approaches" text with fade - hide once roof fix starts
@@ -6858,14 +6868,22 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.stroke();
     
     // Draw each item
+    const iconKeyMap: Record<string, string> = {
+      'Slingshot': 'slingshot', 'Wood': 'wood', 'Stone': 'stone', 'Fish': 'fish', 'Berries': 'berries'
+    };
     let itemY = y + 36;
     items.forEach((item) => {
-      // Icon
       const iconSize = 32;
-      ctx.fillStyle = item.color;
-      ctx.beginPath();
-      ctx.arc(popupX + padding + iconSize / 2, itemY + itemHeight / 2, iconSize / 2 - 2, 0, Math.PI * 2);
-      ctx.fill();
+      const iconKey = iconKeyMap[item.name];
+      const iconImg = iconKey ? this.itemIcons[iconKey] : null;
+      if (iconImg && iconImg.complete) {
+        ctx.drawImage(iconImg, popupX + padding, itemY + (itemHeight - iconSize) / 2, iconSize, iconSize);
+      } else {
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(popupX + padding + iconSize / 2, itemY + itemHeight / 2, iconSize / 2 - 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
       ctx.strokeStyle = '#5D4837';
       ctx.lineWidth = 2;
       ctx.stroke();
@@ -7037,7 +7055,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         ctx.clip();
         const sW = spriteCanvas.width;
         const sH = spriteCanvas.height;
-        const scale = Math.max((portraitSize - 4) / sW, (portraitSize - 4) / sH) * 1.3;
+        const scale = Math.max((portraitSize - 4) / sW, (portraitSize - 4) / sH) * 1.69;
         const drawW = sW * scale;
         const drawH = sH * scale;
         const drawX = portraitX + 2 + (portraitSize - 4 - drawW) / 2;
@@ -8238,7 +8256,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     soundManager.fadeIn('ambientVillage', 1000);
     soundManager.startDaytimeMusic();
     
-    this.player.x = 175;
+    this.player.x = 190;
     this.player.facingDirection = 1;
     this.state = {
       phase: 'loop2_intro',

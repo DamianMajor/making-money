@@ -83,20 +83,23 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - Dialogue language: "Village Center" / "Town Center" replaced with "the Great Stone" throughout. "Village in chaos" failure message changed to "Settlement in chaos". All "village" references in dialogue changed to "settlement".
 - Fail screen: Red overlay removed, only bordered card box remains.
 - Intro screen: Title "MAKING MONEY", lesson label, and Start button. Features falling "money rain" animation — pixel-art icons of historical money forms (shells, beads, gold bars, coins, rai stone, cattle, salt, tea bricks, feathers, cocoa beans) slowly drift down with gentle sway and periodic sparkle effects. Canvas-based animation behind the title UI.
-- Money rain icons: 15 transparent PNG icons covering money evolution — ancient (shells, beads, cattle, salt, tea bricks, feathers, cocoa beans, rai stone, gold bars, coins) and modern (banknotes, credit cards, modern coins, binary code strips x2). Blue backgrounds removed via scripts/process-money-icons.cjs. White edge artifacts trimmed before background removal.
+- Money rain icons: 16 transparent PNG icons covering money evolution — ancient (shells, beads, cattle, salt, tea bricks, feathers, cocoa beans, rai stone, gold bars, coins) and modern (banknotes, credit cards, modern coins, binary code strips x2, Bitcoin). Blue backgrounds removed via scripts/process-money-icons.cjs. White edge artifacts trimmed before background removal.
 - Interact button: Hidden (drawInteractButton returns early). Code preserved for future re-enabling.
 - Inventory icons: Pixel-art item icons loaded from /sprites/item-{name}.png (slingshot, wood, stone, fish, berries) replace colored circle placeholders in inventory HUD. Falls back to colored circles if images haven't loaded.
-- Lightning flash: Two lightning images (lightning-flash-1.jpg, lightning-flash-2.jpg) flashed back-to-back at 1/24s each (~42ms per frame) during thunderstorm and rainfall animations. Images drawn at 85% opacity over the scene.
-- Loop 2 player start: x=175, facingDirection=1 (faces right).
-- Settlement positioning: Woodcutter targetX = villageCenterX + 160, Stone Worker targetX = villageCenterX - 160, Village Elder targetX = villageCenterX - 60 (closer to Stone Ledger). Spread apart to prevent overlap during both first and second debt settlements.
-- Carving trigger distance: Player needs to be within logicalWidth / 3 of villageCenterX (about 1/3 screen width) for carving sequence to trigger, instead of the previous 200px.
+- Lightning flash: Two lightning images (lightning-flash-1.jpg, lightning-flash-2.jpg) flashed back-to-back at 1/24s each (~42ms per frame) during thunderstorm and rainfall animations. Images drawn at 85% opacity on top of background but behind all other layers (characters, trees, UI).
+- Loop 2 player start: x=190, facingDirection=1 (faces right). Loop 1 player start: x=185.
+- Settlement positioning: Woodcutter targetX = villageCenterX + 160, Stone Worker targetX = villageCenterX - 160, Village Elder targetX = villageCenterX - 45 (closer to Stone Ledger, +15px right from original -60). Spread apart to prevent overlap during both first and second debt settlements.
+- Carving trigger distance: Player needs to be within 350px of villageCenterX for carving sequence to trigger.
 - NPC overlap: Characters can now pass through each other smoothly without popping/flashing. Removed enforceNPCSpacing visual offset system (kept tablet exclusion only).
 - Sprite cleanup: Bottom 3% of sprite images scanned for white/light artifacts and removed during chroma key processing.
 - Night layer crossfade: Walking path, berry bush, hut (all 3 states), close trees, and far trees all crossfade to night versions alongside the background during the 8-second night transition. Night assets stored as *-night.png in client/public/. Moon/overlay removed after roof is fixed (only during pre-roof storm phase). Storm clouds removed from all animations (only darkening overlay and rain remain).
 - Fight audio: Always play fightCrash, fightMartialArts, fightCat; randomly play fightIntro or fightYell; never play fightCartoon.
-- Thunder: Loops continuously from debt settlement until roof is repaired, then stops.
-- Dialogue portraits: Character sprite thumbnails rendered in dialogue box instead of colored squares. Uses processedSprites (chroma-keyed) for player, woodcutter, stone-worker, fisherman, village-elder. Stone Tablet gets a drawn tablet icon. Portraits drawn from top of icon box (drawY = portraitY + 2) to show faces clearly without clipping.
-- Elder positioning: During brawl/confrontation, elder moves to villageCenterX-60 (closer to Stone Ledger).
+- Thunder: Loops continuously from debt settlement until rain graphics end, then stops.
+- Dialogue portraits: Character sprite thumbnails rendered in dialogue box instead of colored squares. Uses processedSprites (chroma-keyed) for player, woodcutter, stone-worker, fisherman, village-elder. Stone Tablet gets a drawn tablet icon. Portraits drawn from top of icon box (drawY = portraitY + 2) to show faces clearly without clipping. Character images enlarged 30% beyond icon box (scale multiplier 1.69x).
+- Elder positioning: During brawl/confrontation, elder moves to villageCenterX-45 (closer to Stone Ledger, +15px right).
+- Character positions: Player at x=185 (+35px right, +15px down from feet), woodcutter at x=835 (120x168, 20% larger, bottom 10px trimmed), fisherman at x=3025 (115x161, 15% larger), stone worker at x=2150, berry bush at x=2550.
+- Inventory detail popup: Uses item icons (item-{name}.png) instead of colored circles. Falls back to circles if icons not loaded.
+- Player facing: After final debt settlement, player automatically faces the village elder during celebration dialogue.
 
 ## External Dependencies
 

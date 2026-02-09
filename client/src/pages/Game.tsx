@@ -123,7 +123,7 @@ function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
             }}
             data-testid="button-start"
           >
-            Enter the Village
+            Start
           </button>
         </div>
       </div>
@@ -148,6 +148,7 @@ export default function Game() {
     if (!canvas) return;
 
     gameRef.current = new VillageLedgerGame(canvas);
+    gameRef.current.preloadAudio();
     gameRef.current.start(false);
 
     window.addEventListener('resize', handleResize);

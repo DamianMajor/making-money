@@ -24,6 +24,9 @@ interface Character {
   targetX?: number; // For NPC movement toward town center
   originalX?: number; // Store original position for reset
   renderOffsetX?: number; // Visual offset for soft collision display
+  facingDirection?: number; // -1 = left, 1 = right (default)
+  walkFrame?: number; // Walking animation frame timer
+  isWalking?: boolean; // Whether currently in walking motion
 }
 
 interface DialogueLine {
@@ -313,13 +316,8 @@ export class VillageLedgerGame {
     this.ctx = ctx;
     this.onStateChange = onStateChange;
 
-    // JibJab face assets storage
+    // Face images storage - placeholder for future face-capture feature
     this.faceImages = {};
-    ['neutral', 'happy', 'angry'].forEach(mood => {
-      const img = new Image();
-      img.src = `/assets/${mood}.PNG`;
-      this.faceImages[mood] = img;
-    });
 
     // Load parallax background layers
     this.parallaxLayers.sky.src = '/sky.png';
@@ -405,13 +403,16 @@ export class VillageLedgerGame {
       name: 'PLAYER',
       x: 150, // Player Home position (shifted right 50px)
       y: 0,
-      width: 50,
-      height: 70,
+      width: 100,
+      height: 140,
       color: '#3B82F6',
       outlineColor: '#FFFFFF',
       visible: true,
       bobOffset: 0,
-      bobDirection: 1
+      bobDirection: 1,
+      facingDirection: 1,
+      walkFrame: 0,
+      isWalking: false
     };
 
     // Initialize NPCs - NEW WORLD LAYOUT
@@ -422,8 +423,8 @@ export class VillageLedgerGame {
       name: 'WOODCUTTER',
       x: 700,
       y: 0,
-      width: 55,
-      height: 75,
+      width: 110,
+      height: 150,
       color: '#8B4513', // Brown for wood theme
       outlineColor: '#5D2E0C',
       visible: true,
@@ -437,8 +438,8 @@ export class VillageLedgerGame {
       name: 'VILLAGE ELDER',
       x: 1480, // Near Stone Tablet - original position
       y: 0,
-      width: 60,
-      height: 85,
+      width: 120,
+      height: 170,
       color: '#F8FAFC',
       outlineColor: '#64748B',
       visible: true,
@@ -465,8 +466,8 @@ export class VillageLedgerGame {
       name: 'STONE-WORKER',
       x: 2150, // Swapped with Berry Bush
       y: 0,
-      width: 50,
-      height: 70,
+      width: 100,
+      height: 140,
       color: '#6B7280', // Gray for stone
       outlineColor: '#374151',
       visible: true,
@@ -480,8 +481,8 @@ export class VillageLedgerGame {
       name: 'FISHERMAN',
       x: 3175,
       y: 0,
-      width: 50,
-      height: 70,
+      width: 100,
+      height: 140,
       color: '#F97316',
       outlineColor: '#C2410C',
       visible: true,
@@ -3643,8 +3644,13 @@ export class VillageLedgerGame {
     }
   }
 
+  public preloadAudio(): void {
+    soundManager.init();
+  }
+
   public beginGameplay(): void {
     soundManager.init();
+    soundManager.resumeContext();
     soundManager.playLoop('ambientVillage');
     soundManager.startDaytimeMusic();
     setTimeout(() => this.triggerIntro(), 500);
@@ -3724,9 +3730,13 @@ export class VillageLedgerGame {
         }
       } else {
         // Walk toward target
-        this.player.x += Math.sign(dx) * this.playerSpeed * dt;
+        const dir = Math.sign(dx);
+        this.player.x += dir * this.playerSpeed * dt;
         this.player.x = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, this.player.x));
         this.player.bobOffset = Math.sin(this.bobTimer) * 3;
+        this.player.facingDirection = dir;
+        this.player.isWalking = true;
+        this.player.walkFrame = (this.player.walkFrame || 0) + dt * 8;
         
         // Play footstep sounds (throttled)
         const now = performance.now();
@@ -3743,6 +3753,9 @@ export class VillageLedgerGame {
 
       // Update player bob
       this.player.bobOffset = Math.sin(this.bobTimer) * 3;
+      this.player.facingDirection = this.moveDirection;
+      this.player.isWalking = true;
+      this.player.walkFrame = (this.player.walkFrame || 0) + dt * 8;
       
       // Play footstep sounds (throttled)
       const now = performance.now();
@@ -3753,6 +3766,8 @@ export class VillageLedgerGame {
     } else {
       // Subtle idle animation
       this.player.bobOffset = Math.sin(this.bobTimer * 0.5) * 1;
+      this.player.isWalking = false;
+      this.player.walkFrame = 0;
     }
     
     // Check if player is approaching fisherman - play fishing cast + plop sounds once (tripled distance)
@@ -3772,47 +3787,43 @@ export class VillageLedgerGame {
       let isWalking = false; // Track if NPC is currently walking
       
       if (isEscortingWoodcutter || isEscortingStoneworker) {
-        // Simple escort: NPC always moves toward the Stone Tablet (directly in front of it for carving)
-        // Both NPCs stop at the Stone Tablet position during escort, not offset to sides
-        const npcTargetX = this.villageCenterX; // Stone Tablet is at villageCenterX
+        const npcTargetX = this.villageCenterX;
         const diff = npcTargetX - npc.x;
         
         if (Math.abs(diff) > 5) {
-          // Move toward center at a speed that matches player
-          const escortSpeed = 180; // Faster than player to ensure arrival
+          const escortSpeed = 180;
+          npc.facingDirection = Math.sign(diff);
           npc.x += Math.sign(diff) * escortSpeed * dt;
           isWalking = true;
         } else {
-          // Arrived during escort - reset bobOffset
           npc.bobOffset = 0;
         }
       }
-      // Move NPC toward target if set (non-escort movement)
       else if (npc.targetX !== undefined) {
         const diff = npc.targetX - npc.x;
         if (Math.abs(diff) > 5) {
+          npc.facingDirection = Math.sign(diff);
           npc.x += Math.sign(diff) * npcSpeed * dt;
           isWalking = true;
         } else {
-          // Arrived at target - clear it and reset bobOffset
           npc.x = npc.targetX;
           npc.targetX = undefined;
-          npc.bobOffset = 0; // Stop bouncing immediately
+          npc.bobOffset = 0;
           
-          // Check if Elder arrived to celebrate
           if (npc === this.villageElder && this.state.elderWalkingToCelebrate) {
             this.triggerElderCelebration();
           }
         }
       }
       
-      // Apply appropriate bob animation based on movement state
       if (isWalking) {
-        // Fast walking bob when actively moving
         npc.bobOffset = Math.sin(this.bobTimer * 2 + i) * 3;
+        npc.isWalking = true;
+        npc.walkFrame = (npc.walkFrame || 0) + dt * 8;
       } else if (npc.targetX === undefined) {
-        // Slow idle bob only when not moving
         npc.bobOffset = Math.sin(this.bobTimer * 0.5 + i * 1.5) * 1.5;
+        npc.isWalking = false;
+        npc.walkFrame = 0;
       }
     });
     
@@ -5687,7 +5698,7 @@ export class VillageLedgerGame {
       ctx.drawImage(this.parallaxLayers.walkingPath, 0, 0, walkingPathWidth, walkingPathHeight,
         walkingPathScreenX, walkingPathYOffset, pathDrawWidth, walkingPathHeight);
       
-      // Draw hut overlay (same dimensions as walking path, aligned on top)
+      // Draw hut overlay at 1.5x scale, anchored to walking path
       let hutImg: HTMLImageElement;
       if (this.state.playerEnteredHut) {
         hutImg = this.parallaxLayers.hutFixedClosed;
@@ -5697,8 +5708,13 @@ export class VillageLedgerGame {
         hutImg = this.parallaxLayers.hutBrokenOpen;
       }
       if (hutImg.naturalWidth > 0) {
+        const hutScale = 1.5;
+        const hutDrawWidth = pathDrawWidth * hutScale;
+        const hutDrawHeight = walkingPathHeight * hutScale;
+        const hutX = walkingPathScreenX - (hutDrawWidth - pathDrawWidth) * (this.playerHomeX / this.worldWidth);
+        const hutY = walkingPathYOffset - (hutDrawHeight - walkingPathHeight);
         ctx.drawImage(hutImg, 0, 0, hutImg.naturalWidth, hutImg.naturalHeight,
-          walkingPathScreenX, walkingPathYOffset, pathDrawWidth, walkingPathHeight);
+          hutX, hutY, hutDrawWidth, hutDrawHeight);
       }
       
       // Apply subtle haze to foreground
@@ -6120,7 +6136,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   const shadowYOffset = char.id === 'berryBush' ? -25 : 0;
   ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
   ctx.beginPath();
-  ctx.ellipse(screenX, char.y + char.height + 5 + shadowYOffset, char.width * 0.4, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(screenX, char.y + char.height + 5 + shadowYOffset, char.width * 0.4, char.height * 0.06 + 2, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const x = screenX - char.width / 2;
@@ -6142,15 +6158,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const shakeProgress = this.bushShakeTimer / this.bushShakeDuration;
       bushX += Math.sin(shakeProgress * Math.PI * 8) * 3 * shakeProgress;
     }
-    ctx.drawImage(bushImg, bushX, bushY, bushW, bushH);
-    
-    ctx.font = `7px ${this.retroFont}`;
-    ctx.textAlign = 'center';
-    const labelWidth = ctx.measureText(char.name).width + 16;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(screenX - labelWidth / 2, bushY - 10, labelWidth, 18);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(char.name, screenX, bushY + 4);
+    ctx.drawImage(bushImg, Math.round(bushX), Math.round(bushY), Math.round(bushW), Math.round(bushH));
     return;
   }
 
@@ -6169,17 +6177,36 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const spriteScale = char.height / processedSprite.height;
     const spriteW = processedSprite.width * spriteScale;
     const spriteH = processedSprite.height * spriteScale;
-    const spriteX = screenX - spriteW / 2;
-    const spriteY = y;
-    ctx.drawImage(processedSprite, spriteX, spriteY, spriteW, spriteH);
 
-    if (char.id === 'player') {
-      const faceImg = this.faceImages[this.state.playerMood];
-      if (faceImg && faceImg.complete) {
-        const faceSize = char.width * 0.65;
-        ctx.drawImage(faceImg, screenX - faceSize / 2, spriteY + spriteH * 0.05, faceSize, faceSize);
+    ctx.save();
+
+    const facing = char.facingDirection || 1;
+    const walkT = char.walkFrame || 0;
+    const walking = char.isWalking || false;
+
+    if (walking) {
+      const walkCycle = Math.sin(walkT * 2.5);
+      const lean = walkCycle * 0.03 * facing;
+      const stretchY = 1 + Math.abs(walkCycle) * 0.02;
+      const squashX = 1 - Math.abs(walkCycle) * 0.015;
+
+      ctx.translate(Math.round(screenX), Math.round(y + spriteH));
+      if (facing < 0) {
+        ctx.scale(-squashX, stretchY);
+      } else {
+        ctx.scale(squashX, stretchY);
       }
+      ctx.rotate(lean);
+      ctx.drawImage(processedSprite, Math.round(-spriteW / 2), Math.round(-spriteH), Math.round(spriteW), Math.round(spriteH));
+    } else {
+      ctx.translate(Math.round(screenX), Math.round(y + spriteH));
+      if (facing < 0) {
+        ctx.scale(-1, 1);
+      }
+      ctx.drawImage(processedSprite, Math.round(-spriteW / 2), Math.round(-spriteH), Math.round(spriteW), Math.round(spriteH));
     }
+
+    ctx.restore();
   } else {
     ctx.fillStyle = char.color;
     ctx.strokeStyle = char.outlineColor;
@@ -6189,25 +6216,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.roundRect(x, y, char.width, char.height, radius);
     ctx.fill();
     ctx.stroke();
-
-    if (char.id === 'player') {
-      const faceImg = this.faceImages[this.state.playerMood];
-      if (faceImg && faceImg.complete) {
-        ctx.drawImage(faceImg, x, y - 5, char.width, char.width);
-      }
-    }
   }
 
-  if (char.id !== 'player') {
-    ctx.font = `7px ${this.retroFont}`;
-    ctx.textAlign = 'center';
-    const labelWidth = ctx.measureText(char.name).width + 16;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(screenX - labelWidth / 2, screenY - 24, labelWidth, 18);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(char.name, screenX, screenY - 10);
-  }
 }
+
 
   private drawInventoryPopup(ctx: CanvasRenderingContext2D): void {
     if (!this.inventoryPopup) return;

@@ -746,6 +746,12 @@ export class SoundManager {
     this.stopBrawl();
   }
 
+  public resumeContext(): void {
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume();
+    }
+  }
+
   public resume(name: SoundName): void {
     // For Web Audio API, we need to restart the sound
     // This is mainly used for looping sounds

@@ -281,8 +281,8 @@ function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
           style={{
             fontFamily: '"Press Start 2P", monospace',
             fontSize: 'clamp(20px, 5vw, 36px)',
-            color: '#C9B896',
-            textShadow: '2px 2px 0px #5a4a32, 0 0 20px rgba(201, 184, 150, 0.3)',
+            color: '#E8D5A8',
+            textShadow: '2px 2px 0px #5a4a32, 0 0 10px rgba(255, 215, 100, 0.6), 0 0 30px rgba(255, 200, 80, 0.4), 0 0 60px rgba(255, 180, 50, 0.25), 0 0 100px rgba(255, 170, 40, 0.15)',
             lineHeight: 1.4
           }}
           data-testid="text-title"

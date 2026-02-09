@@ -276,19 +276,53 @@ function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
     >
       <MoneyRainCanvas />
       <div className="flex flex-col items-center max-w-xl w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
-        <h1
-          className="text-center mb-8"
-          style={{
-            fontFamily: '"Press Start 2P", monospace',
-            fontSize: 'clamp(20px, 5vw, 36px)',
-            color: '#E8D5A8',
-            textShadow: '2px 2px 0px #5a4a32, 0 0 10px rgba(255, 215, 100, 0.6), 0 0 30px rgba(255, 200, 80, 0.4), 0 0 60px rgba(255, 180, 50, 0.25), 0 0 100px rgba(255, 170, 40, 0.15)',
-            lineHeight: 1.4
-          }}
-          data-testid="text-title"
-        >
-          MAKING MONEY
-        </h1>
+        <div className="relative text-center mb-8" data-testid="text-title">
+          <style>{`
+            @keyframes glowPulse {
+              0%, 100% { text-shadow: 2px 2px 0px #5a4a32, 0 0 10px rgba(255,215,100,0.6), 0 0 30px rgba(255,200,80,0.4), 0 0 60px rgba(255,180,50,0.25), 0 0 100px rgba(255,170,40,0.15); }
+              50% { text-shadow: 2px 2px 0px #5a4a32, 0 0 15px rgba(255,215,100,0.9), 0 0 40px rgba(255,200,80,0.6), 0 0 80px rgba(255,180,50,0.4), 0 0 120px rgba(255,170,40,0.25); }
+            }
+            @keyframes sparkle1 { 0%,100% { opacity:0; transform:scale(0.5) rotate(0deg); } 50% { opacity:1; transform:scale(1) rotate(180deg); } }
+            @keyframes sparkle2 { 0%,100% { opacity:0; transform:scale(0.6) rotate(0deg); } 40% { opacity:1; transform:scale(1.1) rotate(160deg); } }
+            @keyframes sparkle3 { 0%,100% { opacity:0; transform:scale(0.4) rotate(0deg); } 60% { opacity:1; transform:scale(1) rotate(200deg); } }
+            @keyframes sparkle4 { 0%,100% { opacity:0; transform:scale(0.5) rotate(0deg); } 45% { opacity:0.9; transform:scale(1.05) rotate(170deg); } }
+            @keyframes sparkle5 { 0%,100% { opacity:0; transform:scale(0.3) rotate(0deg); } 55% { opacity:1; transform:scale(0.95) rotate(190deg); } }
+          `}</style>
+          <h1
+            style={{
+              fontFamily: '"Press Start 2P", monospace',
+              fontSize: 'clamp(20px, 5vw, 36px)',
+              color: '#E8D5A8',
+              animation: 'glowPulse 3s ease-in-out infinite',
+              lineHeight: 1.4
+            }}
+          >
+            MAKING MONEY
+          </h1>
+          {[
+            { top: '-6px', left: '-4px', anim: 'sparkle1 2.4s ease-in-out infinite', size: 10 },
+            { top: '-4px', right: '2px', anim: 'sparkle2 3.1s ease-in-out infinite 0.5s', size: 8 },
+            { bottom: '2px', left: '10%', anim: 'sparkle3 2.8s ease-in-out infinite 1.2s', size: 7 },
+            { bottom: '-2px', right: '8%', anim: 'sparkle4 2.6s ease-in-out infinite 0.8s', size: 9 },
+            { top: '45%', left: '-8px', anim: 'sparkle5 3.4s ease-in-out infinite 1.6s', size: 6 },
+          ].map((s, i) => (
+            <span
+              key={i}
+              style={{
+                position: 'absolute',
+                ...Object.fromEntries(Object.entries(s).filter(([k]) => ['top','bottom','left','right'].includes(k))),
+                width: s.size,
+                height: s.size,
+                animation: s.anim,
+                pointerEvents: 'none' as const,
+              }}
+            >
+              <svg width={s.size} height={s.size} viewBox="0 0 20 20">
+                <path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8 Z" fill="#FFE4A0" />
+              </svg>
+            </span>
+          ))}
+        </div>
 
         <div className="flex flex-col items-center gap-8">
           <span

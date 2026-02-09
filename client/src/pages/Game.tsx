@@ -23,10 +23,10 @@ function IntroScreen({ onStart }: { onStart: (answer: string) => void }) {
           }}
           data-testid="text-title"
         >
-          MAKING MONEY
+          WHAT IS MONEY?
         </h1>
 
-        <div className="flex flex-col items-center gap-3">
+        <div className="flex flex-col items-center gap-8">
           <span
             style={{
               fontFamily: '"Press Start 2P", monospace',

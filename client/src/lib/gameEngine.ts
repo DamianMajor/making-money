@@ -1295,7 +1295,7 @@ export class VillageLedgerGame {
         if (!this.rainSoundStarted) {
           this.rainSoundStarted = true;
           soundManager.fadeIn('rain', 2000); // 2 second fade in, plays once
-          soundManager.play('thunder'); // Thunder plays directly when rain begins
+          soundManager.stop('thunder'); // Stop thunder when rain starts
         }
         
         // Sequence: rainfall 16s → night transition 6s → quiz (3s delay)
@@ -1311,7 +1311,6 @@ export class VillageLedgerGame {
               try {
                 this.state.showRainfall = false; // Turn off rain
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
-                soundManager.stop('thunder');
                 // Keep night scene visible for 1 extra second, then show quiz with night background
                 setTimeout(() => {
                   this.state.showQuiz = true;
@@ -1360,6 +1359,7 @@ export class VillageLedgerGame {
           this.rainSoundStarted = true;
           soundManager.fadeIn('rain', 500); // Plays once
           soundManager.fadeIn('ambientNight', 500); // Start ambient night sounds with storm
+          soundManager.stop('thunder'); // Stop thunder when rain starts
         }
         
         setTimeout(() => {
@@ -1376,7 +1376,6 @@ export class VillageLedgerGame {
                 this.state.showRainfall = false; // Now turn off rain
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
                 soundManager.fadeOut('ambientNight', 1000); // Fade out ambient night
-                soundManager.stop('thunder');
                 this.state.showNightTransition = false;
                 // Delay quiz appearance by 3 seconds
                 setTimeout(() => {
@@ -4475,7 +4474,6 @@ export class VillageLedgerGame {
                 this.state.roofRepaired = true;
                 this.state.inventory.wood = 0;
                 this.showInventoryPopup('ROOF FIXED!');
-                soundManager.stop('thunder');
               }
               
               // Player fades into hut
@@ -4489,6 +4487,7 @@ export class VillageLedgerGame {
                 this.rainSoundStarted = true;
                 soundManager.fadeIn('rain', 500);
                 soundManager.fadeIn('ambientNight', 500);
+                soundManager.stop('thunder'); // Stop thunder when rain starts
               }
               
               // Rain for 17 seconds, then night transition
@@ -4503,7 +4502,6 @@ export class VillageLedgerGame {
                     try {
                       this.state.showRainfall = false;
                       soundManager.fadeOut('rain', 6000); // 6 second fade out
-                      soundManager.stop('thunder');
                       this.state.showNightTransition = false;
                       // Delay quiz appearance by 3 seconds
                       setTimeout(() => {

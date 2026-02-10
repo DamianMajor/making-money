@@ -94,7 +94,7 @@ A custom JavaScript game engine provides a 60fps experience with a click-to-walk
 - Sprite cleanup: Bottom 3% of sprite images scanned for white/light artifacts and removed during chroma key processing.
 - Night layer crossfade: Walking path, berry bush, hut (all 3 states), close trees, and far trees all crossfade to night versions alongside the background during the 8-second night transition. Night assets stored as *-night.png in client/public/. Moon/overlay removed after roof is fixed (only during pre-roof storm phase). Storm clouds removed from all animations (only darkening overlay and rain remain).
 - Fight audio: Always play fightCrash, fightMartialArts, fightCat; randomly play fightIntro or fightYell; never play fightCartoon.
-- Thunder: Loops continuously from debt settlement until rain graphics end, then stops.
+- Thunder: Loops continuously from debt settlement until rain graphics start, then stops.
 - Dialogue portraits: Character sprite thumbnails rendered in dialogue box instead of colored squares. Uses processedSprites (chroma-keyed) for player, woodcutter, stone-worker, fisherman, village-elder. Stone Tablet gets a drawn tablet icon. Portraits drawn from top of icon box (drawY = portraitY + 2) to show faces clearly without clipping. Character images enlarged 30% beyond icon box (scale multiplier 1.69x).
 - Elder positioning: Starting position x=1470 (10px further from tablet than original 1480). During brawl, elder backs away to villageCenterX-200. During confrontation, elder moves to villageCenterX-45.
 - NPC settlement behavior: When player chooses "Let's check the Stone Tablet together!", NPCs walk toward the tablet (woodcutter to villageCenterX+80, stone worker to villageCenterX-80) then spread out after reading.

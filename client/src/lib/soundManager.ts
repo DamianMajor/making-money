@@ -811,11 +811,11 @@ export class SoundManager {
       osc.type = profile.type;
       osc.frequency.setValueAtTime(freq, this.audioContext.currentTime);
       gain.gain.setValueAtTime(profile.vol, this.audioContext.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.10);
       osc.connect(gain);
       gain.connect(this.masterGain);
       osc.start();
-      osc.stop(this.audioContext.currentTime + 0.06);
+      osc.stop(this.audioContext.currentTime + 0.10);
       this.voiceBlipOsc = osc;
       osc.onended = () => {
         osc.disconnect();

@@ -2471,7 +2471,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 45;
+                this.villageElder.targetX = this.villageCenterX - 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -2500,7 +2500,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 45;
+                this.villageElder.targetX = this.villageCenterX - 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -3179,7 +3179,7 @@ export class VillageLedgerGame {
               // Trigger brawl
               this.woodcutter.targetX = this.player.x - 30;
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX - 45;
+              this.villageElder.targetX = this.villageCenterX - 200;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3208,7 +3208,7 @@ export class VillageLedgerGame {
             text: "Without a record, we cannot know the truth...",
             onComplete: () => {
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX - 45;
+              this.villageElder.targetX = this.villageCenterX - 200;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3237,7 +3237,7 @@ export class VillageLedgerGame {
             text: "Without a record, we cannot know the truth...",
             onComplete: () => {
               this.woodcutter.targetX = this.player.x - 30;
-              this.villageElder.targetX = this.villageCenterX - 45;
+              this.villageElder.targetX = this.villageCenterX - 200;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3425,7 +3425,7 @@ export class VillageLedgerGame {
                     // Trigger brawl
                     this.woodcutter.targetX = this.player.x - 30;
                     this.stoneWorker.targetX = this.player.x + 30;
-                    this.villageElder.targetX = this.villageCenterX - 45;
+                    this.villageElder.targetX = this.villageCenterX - 200;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
@@ -3586,7 +3586,7 @@ export class VillageLedgerGame {
                     // Trigger brawl
                     this.woodcutter.targetX = this.player.x - 30;
                     this.stoneWorker.targetX = this.player.x + 30;
-                    this.villageElder.targetX = this.villageCenterX - 45;
+                    this.villageElder.targetX = this.villageCenterX - 200;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
@@ -4015,7 +4015,7 @@ export class VillageLedgerGame {
     // Update dialogue typing
     if (this.state.currentDialogue && !this.state.dialogueComplete) {
       this.dialogueTimer += dt;
-      if (this.dialogueTimer > 0.03) {
+      if (this.dialogueTimer > 0.055) {
         this.dialogueTimer = 0;
         const prevIdx = this.dialogueCharIndex;
         this.dialogueCharIndex++;

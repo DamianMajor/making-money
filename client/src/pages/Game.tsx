@@ -515,6 +515,7 @@ function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue:
           style={{
             fontFamily: 'Georgia, serif',
             fontSize: 'clamp(12px, 2vw, 15px)',
+            textAlign: 'center',
             color: '#E8D5A8',
             background: 'rgba(30, 22, 12, 0.8)',
             border: '2px solid #5a4a32',

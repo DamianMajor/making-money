@@ -33,7 +33,8 @@ export type SoundName =
   | 'failure'
   | 'settle'
   | 'badgeReward'
-  | 'stream';
+  | 'stream'
+  | 'moneySong';
 
 interface SoundConfig {
   src: string;
@@ -78,6 +79,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   settle: { src: '/sounds/settle.mp3', volume: 0.5, loop: false },
   badgeReward: { src: '/sounds/badge-reward.mp3', volume: 0.6, loop: false },
   stream: { src: '/sounds/stream.aac', volume: 0.4, loop: true },
+  moneySong: { src: '/sounds/money_song_1.mp3', volume: 0.5, loop: true },
 };
 
 const FIGHT_ALWAYS_SOUNDS: SoundName[] = [

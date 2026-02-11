@@ -473,7 +473,7 @@ function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: strin
   );
 }
 
-function IntroScreen({ onStart, audioRef }: { onStart: () => void; audioRef: React.MutableRefObject<HTMLAudioElement | null> }) {
+function IntroScreen({ onStart, audioRef, onMount }: { onStart: () => void; audioRef: React.MutableRefObject<HTMLAudioElement | null>; onMount?: () => void }) {
   const [muted, setMuted] = useState(() => {
     try {
       const stored = localStorage.getItem('villageLedger_soundSettings');
@@ -481,6 +481,10 @@ function IntroScreen({ onStart, audioRef }: { onStart: () => void; audioRef: Rea
     } catch {}
     return false;
   });
+
+  useEffect(() => {
+    if (onMount) onMount();
+  }, [onMount]);
 
   const toggleMute = () => {
     const newMuted = !muted;
@@ -656,15 +660,122 @@ function IntroScreen({ onStart, audioRef }: { onStart: () => void; audioRef: Rea
   );
 }
 
+function LoadingScreen({ onLoaded }: { onLoaded: () => void }) {
+  const [progress, setProgress] = useState(0);
+  const [fadeOut, setFadeOut] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const totalAssets = MONEY_ICONS.length + 1;
+    let loaded = 0;
+
+    function tick() {
+      if (cancelled) return;
+      loaded++;
+      setProgress(Math.min(loaded / totalAssets, 1));
+      if (loaded >= totalAssets) {
+        setTimeout(() => {
+          if (!cancelled) {
+            setFadeOut(true);
+            setTimeout(() => { if (!cancelled) onLoaded(); }, 500);
+          }
+        }, 300);
+      }
+    }
+
+    MONEY_ICONS.forEach(name => {
+      const img = new Image();
+      img.onload = tick;
+      img.onerror = tick;
+      img.src = `/sprites/${name}.png`;
+    });
+
+    const songCheck = new Audio();
+    songCheck.preload = 'auto';
+    const songLoaded = () => { tick(); songCheck.removeEventListener('canplaythrough', songLoaded); };
+    songCheck.addEventListener('canplaythrough', songLoaded);
+    songCheck.src = '/sounds/money_song_1.mp3';
+    const songTimeout = setTimeout(() => { songCheck.removeEventListener('canplaythrough', songLoaded); tick(); }, 8000);
+
+    return () => { cancelled = true; clearTimeout(songTimeout); };
+  }, [onLoaded]);
+
+  return (
+    <div
+      className="fixed inset-0 w-full h-full flex flex-col items-center justify-center"
+      style={{
+        background: 'linear-gradient(180deg, #1a1208 0%, #2d1f0e 30%, #3d2b14 60%, #2a1c0a 100%)',
+        zIndex: 60,
+        opacity: fadeOut ? 0 : 1,
+        transition: 'opacity 0.5s ease-out',
+      }}
+      data-testid="loading-screen"
+    >
+      <h1
+        style={{
+          fontFamily: '"Press Start 2P", monospace',
+          fontSize: 'clamp(18px, 4.5vw, 32px)',
+          color: '#E8D5A8',
+          textShadow: '2px 2px 0px #5a4a32, 0 0 15px rgba(255,215,100,0.4)',
+          lineHeight: 1.4,
+          marginBottom: '40px',
+        }}
+        data-testid="text-loading-title"
+      >
+        MAKING MONEY
+      </h1>
+      <div
+        style={{
+          width: 'min(280px, 70vw)',
+          height: '8px',
+          background: 'rgba(60, 45, 25, 0.6)',
+          borderRadius: '4px',
+          border: '1px solid #5a4a32',
+          overflow: 'hidden',
+        }}
+        data-testid="loading-bar-container"
+      >
+        <div
+          style={{
+            width: `${progress * 100}%`,
+            height: '100%',
+            background: 'linear-gradient(90deg, #8B7355, #C9B896)',
+            borderRadius: '4px',
+            transition: 'width 0.3s ease-out',
+          }}
+          data-testid="loading-bar-fill"
+        />
+      </div>
+      <span
+        style={{
+          fontFamily: '"Press Start 2P", monospace',
+          fontSize: 'clamp(7px, 1.5vw, 9px)',
+          color: '#7A6A50',
+          marginTop: '16px',
+        }}
+        data-testid="text-loading-label"
+      >
+        Loading...
+      </span>
+    </div>
+  );
+}
+
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<VillageLedgerGame | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [screen, setScreen] = useState<'reflection' | 'intro' | 'game'>('reflection');
+  const [screen, setScreen] = useState<'loading' | 'reflection' | 'intro' | 'game'>('loading');
+  const gameInitialized = useRef(false);
 
-  useEffect(() => {
-    soundManager.prefetch();
+  const initGameEngine = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || gameInitialized.current) return;
+    gameInitialized.current = true;
+    gameRef.current = new VillageLedgerGame(canvas);
+    gameRef.current.preloadAudio();
+    gameRef.current.start(false);
   }, []);
 
   const handleResize = useCallback(() => {
@@ -674,37 +785,44 @@ export default function Game() {
   }, []);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    gameRef.current = new VillageLedgerGame(canvas);
-    gameRef.current.preloadAudio();
-    gameRef.current.start(false);
-
     window.addEventListener('resize', handleResize);
-    handleResize();
+    return () => window.removeEventListener('resize', handleResize);
+  }, [handleResize]);
 
+  useEffect(() => {
     return () => {
       if (gameRef.current) {
         gameRef.current.destroy();
       }
-      window.removeEventListener('resize', handleResize);
     };
-  }, [handleResize]);
+  }, []);
 
-  const handleReflectionContinue = (answer: string) => {
+  const handleLoadingComplete = useCallback(() => {
+    setScreen('reflection');
+  }, []);
+
+  const handleReflectionContinue = useCallback((answer: string) => {
     if (answer.trim()) {
       localStorage.setItem('makingMoney_moneyAnswer', answer.trim());
     }
     setScreen('intro');
-  };
+  }, []);
 
-  const handleGameStart = () => {
+  const handleIntroMount = useCallback(() => {
+    initGameEngine();
+    soundManager.prefetch();
+  }, [initGameEngine]);
+
+  const handleGameStart = useCallback(() => {
+    if (!gameInitialized.current) {
+      initGameEngine();
+    }
     setScreen('game');
+    handleResize();
     if (gameRef.current) {
       gameRef.current.beginGameplay();
     }
-  };
+  }, [initGameEngine, handleResize]);
 
   return (
     <div 
@@ -740,8 +858,9 @@ export default function Game() {
           </span>
         </div>
       )}
+      {screen === 'loading' && <LoadingScreen onLoaded={handleLoadingComplete} />}
       {screen === 'reflection' && <ReflectionScreen onContinue={handleReflectionContinue} audioRef={audioRef} />}
-      {screen === 'intro' && <IntroScreen onStart={handleGameStart} audioRef={audioRef} />}
+      {screen === 'intro' && <IntroScreen onStart={handleGameStart} audioRef={audioRef} onMount={handleIntroMount} />}
     </div>
   );
 }

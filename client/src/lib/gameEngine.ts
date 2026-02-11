@@ -3105,16 +3105,12 @@ export class VillageLedgerGame {
         
         // Check if player has already delivered to both NPCs
         if (this.state.woodcutterSettled && this.state.stoneWorkerSettled) {
-          // Already delivered - trigger celebration!
           this.queueDialogue([
             {
               speaker: 'VILLAGE ELDER',
               text: "All debts are paid and recorded. Peace is restored to our settlement!",
               onComplete: () => {
-                this.state.phase = 'loop2_return';
-                this.state.showCelebration = true;
-                this.state.celebrationTimer = 0;
-                soundManager.play('celebration');
+                this.startDiscoParty();
               }
             }
           ]);
@@ -4204,37 +4200,38 @@ export class VillageLedgerGame {
       }
     }
     
-    // Update night background crossfade (starts when celebration begins, 8 second transition)
-    if (this.state.showCelebration || this.state.phase === 'loop2_return' || this.state.phase === 'complete_success') {
+    if ((!this.state.showCelebration && this.state.phase === 'loop2_return') || this.state.phase === 'complete_success') {
       if (this.state.nightBgCrossfade < 1) {
         this.state.nightBgCrossfade = Math.min(1, this.state.nightBgCrossfade + dt / 8);
       }
     }
 
-    // Update celebration animation timer - reduced applause duration (minus 10 seconds, earlier fade)
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
-      const fullApplauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
-      const applauseDuration = Math.max(2, fullApplauseDuration - 12); // Reduce by 12 seconds, min 2s
-      const distToHome = Math.abs(this.player.x - this.playerHomeX);
       
-      // End celebration when: reduced applause time OR player within 250 pixels of home
-      if (this.state.celebrationTimer > applauseDuration || distToHome <= 250) {
+      this.updateDancingNPCs(dt);
+      
+      const halfwayToHome = (this.villageCenterX + this.playerHomeX) / 2;
+      if (this.player.x <= halfwayToHome) {
         this.state.showCelebration = false;
         this.celebrationEndTime = Date.now();
-        // Fade out both celebration and applause sounds (5 seconds for smoother fade)
-        soundManager.fadeOut('crowdApplause', 5000);
-        soundManager.fadeOut('celebration', 5000);
+        soundManager.fadeOut('moneySong', 3000);
+        soundManager.fadeOut('crowdApplause', 3000);
+        soundManager.fadeOut('celebration', 3000);
+        this.woodcutter.isWalking = false;
+        this.stoneWorker.isWalking = false;
+        this.fisherman.isWalking = false;
+        this.woodcutter.targetX = this.woodcutter.originalX || 815;
+        this.stoneWorker.targetX = this.stoneWorker.originalX || 2150;
+        this.fisherman.targetX = this.fisherman.originalX || 3025;
       }
     }
     
-    // Trigger storm 3 seconds after celebration ends OR when player within 400 pixels of home
     if (this.state.phase === 'loop2_return' && !this.state.showCelebration && !this.stormTriggered && 
         !this.state.showCloudsAnimation && !this.state.showRainfall && !this.state.showQuiz) {
-      const distToHome = Math.abs(this.player.x - this.playerHomeX);
       const timeSinceCelebrationEnd = this.celebrationEndTime > 0 ? (Date.now() - this.celebrationEndTime) / 1000 : 0;
       
-      if (distToHome <= 400 || timeSinceCelebrationEnd >= 3) {
+      if (timeSinceCelebrationEnd >= 1) {
         this.stormTriggered = true;
         this.triggerStormClouds();
       }
@@ -4448,15 +4445,7 @@ export class VillageLedgerGame {
         speaker: 'VILLAGE ELDER',
         text: "All debts are paid and recorded on the Stone Tablet. Peace is restored to our settlement!",
         onComplete: () => {
-          this.state.showCelebration = true;
-          this.state.celebrationTimer = 0;
-          this.state.phase = 'loop2_return';
-          this.stormTriggered = false; // Reset storm trigger
-          this.celebrationEndTime = 0;
-          soundManager.play('celebration');
-          // Play applause with reduced duration (full duration minus 8 seconds, earlier stop)
-          const fullDuration = soundManager.getBufferDuration('crowdApplause');
-          soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 8000));
+          this.startDiscoParty();
         }
       }
     ]);
@@ -4476,6 +4465,44 @@ export class VillageLedgerGame {
     // Player must now interact with hut to proceed
   }
   
+  private startDiscoParty(): void {
+    this.state.phase = 'loop2_return';
+    this.state.showCelebration = true;
+    this.state.celebrationTimer = 0;
+    this.stormTriggered = false;
+    this.celebrationEndTime = 0;
+    
+    soundManager.play('moneySong');
+    soundManager.play('celebration');
+    const fullDuration = soundManager.getBufferDuration('crowdApplause');
+    soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 8000));
+    
+    this.woodcutter.targetX = this.villageCenterX - 120;
+    this.stoneWorker.targetX = this.villageCenterX + 120;
+    this.fisherman.targetX = this.villageCenterX + 200;
+  }
+  
+  private updateDancingNPCs(dt: number): void {
+    const t = this.state.celebrationTimer;
+    const cx = this.villageCenterX;
+    
+    const danceSway = 40;
+    this.woodcutter.x = (cx - 120) + Math.sin(t * 3.0) * danceSway;
+    this.stoneWorker.x = (cx + 120) + Math.sin(t * 2.5 + 2) * danceSway;
+    this.fisherman.x = (cx + 200) + Math.sin(t * 2.8 + 4) * danceSway;
+    
+    this.woodcutter.targetX = undefined;
+    this.stoneWorker.targetX = undefined;
+    this.fisherman.targetX = undefined;
+    
+    this.woodcutter.isWalking = true;
+    this.stoneWorker.isWalking = true;
+    this.fisherman.isWalking = true;
+    this.woodcutter.walkFrame = (this.woodcutter.walkFrame || 0) + dt * 12;
+    this.stoneWorker.walkFrame = (this.stoneWorker.walkFrame || 0) + dt * 10;
+    this.fisherman.walkFrame = (this.fisherman.walkFrame || 0) + dt * 11;
+  }
+
   // Storm approaching after celebration - player goes home, fixes roof, enters hut, then rain (legacy)
   private triggerStormApproaching(): void {
     this.queueDialogue([
@@ -5164,84 +5191,228 @@ export class VillageLedgerGame {
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
     
-    // Calculate fade out - start fading 5 seconds before end (longer fade)
-    const applauseDuration = soundManager.getBufferDuration('crowdApplause') / 1000;
-    const fadeStartTime = Math.max(0, applauseDuration - 5);
-    const distToHome = Math.abs(this.player.x - this.playerHomeX);
+    const halfwayToHome = (this.villageCenterX + this.playerHomeX) / 2;
+    const distToHalfway = Math.abs(this.player.x - halfwayToHome);
+    const fadeRange = 200;
+    let fadeAlpha = Math.min(1, distToHalfway / fadeRange);
+    const introFade = Math.min(1, t / 1.5);
+    fadeAlpha = Math.min(fadeAlpha, introFade);
     
-    // Also start fading when approaching home (within 400 pixels, full fade at 250)
-    let fadeAlpha = 1.0;
-    if (distToHome <= 400) {
-      fadeAlpha = Math.max(0, (distToHome - 250) / 150);
-    }
-    if (t > fadeStartTime) {
-      const timeFade = 1 - ((t - fadeStartTime) / 1.5);
-      fadeAlpha = Math.min(fadeAlpha, timeFade);
-    }
-    fadeAlpha = Math.max(0, Math.min(1, fadeAlpha));
-    
-    // Draw confetti particles with fade - diagonal falling pattern
-    const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#9B59B6', '#2ECC71'];
     ctx.save();
     ctx.globalAlpha = fadeAlpha;
-    for (let i = 0; i < 30; i++) {
+    
+    const elderScreenX = this.villageElder.x - this.cameraX;
+    
+    const djBoothW = 80;
+    const djBoothH = 50;
+    const djBoothX = elderScreenX - djBoothW / 2;
+    const djBoothY = groundY - djBoothH + 5;
+    
+    ctx.fillStyle = '#2D1B0E';
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(djBoothX, djBoothY, djBoothW, djBoothH, 4);
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.fillStyle = '#1A1A2E';
+    ctx.fillRect(djBoothX + 5, djBoothY + 5, djBoothW - 10, djBoothH - 15);
+    
+    const knobColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00'];
+    for (let i = 0; i < 4; i++) {
+      const kx = djBoothX + 12 + i * 16;
+      const ky = djBoothY + djBoothH - 8;
+      ctx.fillStyle = knobColors[i];
+      ctx.globalAlpha = fadeAlpha * (0.5 + 0.5 * Math.sin(t * 6 + i * 1.5));
+      ctx.beginPath();
+      ctx.arc(kx, ky, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = fadeAlpha;
+    
+    const eqBars = 8;
+    for (let i = 0; i < eqBars; i++) {
+      const barH = 5 + Math.abs(Math.sin(t * 8 + i * 0.8)) * 15;
+      const bx = djBoothX + 8 + i * 8;
+      ctx.fillStyle = `hsl(${(t * 60 + i * 40) % 360}, 100%, 60%)`;
+      ctx.fillRect(bx, djBoothY + 25 - barH, 5, barH);
+    }
+    
+    const discoBallX = elderScreenX;
+    const discoBallDropY = Math.min(35, t * 25);
+    const discoBallY = discoBallDropY;
+    const discoBallR = 18;
+    
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(discoBallX, 0);
+    ctx.lineTo(discoBallX, discoBallY);
+    ctx.stroke();
+    
+    const grad = ctx.createRadialGradient(discoBallX - 4, discoBallY - 4, 2, discoBallX, discoBallY, discoBallR);
+    grad.addColorStop(0, '#FFFFFF');
+    grad.addColorStop(0.3, '#C0C0C0');
+    grad.addColorStop(1, '#606060');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(discoBallX, discoBallY, discoBallR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    
+    for (let row = -2; row <= 2; row++) {
+      for (let col = -3; col <= 3; col++) {
+        const tileAngle = t * 2 + row * 0.5 + col * 0.7;
+        const tileX = discoBallX + col * 5 * Math.cos(row * 0.6);
+        const tileY = discoBallY + row * 5;
+        const dist = Math.sqrt((tileX - discoBallX) ** 2 + (tileY - discoBallY) ** 2);
+        if (dist < discoBallR - 2) {
+          ctx.fillStyle = `hsl(${(tileAngle * 60) % 360}, 80%, ${60 + Math.sin(tileAngle) * 20}%)`;
+          ctx.fillRect(tileX - 2, tileY - 2, 4, 4);
+        }
+      }
+    }
+    
+    const numBeams = 12;
+    for (let i = 0; i < numBeams; i++) {
+      const angle = (t * 1.5 + i * (Math.PI * 2 / numBeams));
+      const beamLen = 250 + Math.sin(t * 3 + i) * 80;
+      const endX = discoBallX + Math.cos(angle) * beamLen;
+      const endY = discoBallY + Math.sin(angle) * beamLen;
+      
+      if (endY > 0) {
+        const beamGrad = ctx.createLinearGradient(discoBallX, discoBallY, endX, endY);
+        const hue = (t * 40 + i * 30) % 360;
+        beamGrad.addColorStop(0, `hsla(${hue}, 100%, 80%, 0.4)`);
+        beamGrad.addColorStop(1, `hsla(${hue}, 100%, 60%, 0)`);
+        ctx.strokeStyle = beamGrad;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(discoBallX, discoBallY);
+        ctx.lineTo(endX, Math.min(endY, groundY));
+        ctx.stroke();
+      }
+    }
+    
+    const lightColors = ['#FF0066', '#00FF66', '#0066FF', '#FF6600', '#CC00FF', '#FFFF00'];
+    const numLights = 8;
+    for (let i = 0; i < numLights; i++) {
+      const lx = (w / (numLights + 1)) * (i + 1);
+      const sweepAngle = Math.sin(t * 2.5 + i * 0.8) * 0.6 - Math.PI / 2;
+      const beamLen = groundY + 20;
+      const endX = lx + Math.cos(sweepAngle) * beamLen * 0.4;
+      
+      const lightGrad = ctx.createLinearGradient(lx, groundY, endX, 0);
+      const color = lightColors[i % lightColors.length];
+      lightGrad.addColorStop(0, color + 'AA');
+      lightGrad.addColorStop(0.5, color + '33');
+      lightGrad.addColorStop(1, color + '00');
+      
+      ctx.fillStyle = lightGrad;
+      ctx.beginPath();
+      ctx.moveTo(lx - 8, groundY);
+      ctx.lineTo(endX - 30, 10);
+      ctx.lineTo(endX + 30, 10);
+      ctx.lineTo(lx + 8, groundY);
+      ctx.closePath();
+      ctx.fill();
+    }
+    
+    for (let i = 0; i < 4; i++) {
+      const cornerX = (i % 2 === 0) ? 0 : w;
+      const cornerY = (i < 2) ? 0 : groundY;
+      const sweepAngle = Math.sin(t * 1.8 + i * 1.2) * 0.5;
+      const baseAngle = (i % 2 === 0) ? 0 : Math.PI;
+      const angle = baseAngle + sweepAngle + (i < 2 ? 0.3 : -0.3);
+      const beamLen = 350;
+      const endX = cornerX + Math.cos(angle) * beamLen;
+      const endY = cornerY + Math.sin(angle) * beamLen;
+      
+      const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
+      const hue = (t * 50 + i * 90) % 360;
+      cornerGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.5)`);
+      cornerGrad.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
+      ctx.strokeStyle = cornerGrad;
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(cornerX, cornerY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+    }
+    
+    const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#9B59B6', '#2ECC71', '#FF69B4'];
+    for (let i = 0; i < 40; i++) {
       const seed = i * 137.5;
-      // Diagonal movement: X moves right as Y moves down
       const baseX = seed * 7.3;
       const baseY = seed * 3.7;
-      const fallSpeed = 120 + (i % 5) * 30; // Varied fall speeds
-      const driftSpeed = 80 + (i % 3) * 20; // Horizontal drift for diagonal effect
+      const fallSpeed = 100 + (i % 5) * 25;
+      const driftSpeed = 60 + (i % 3) * 20;
       const x = (baseX + t * driftSpeed) % w;
-      const y = ((baseY + t * fallSpeed) % (groundY - 100)) + 50;
-      const size = 4 + (i % 3) * 2;
-      const colorIndex = i % confettiColors.length;
-      const rotation = t * (5 + i % 3);
+      const y = ((baseY + t * fallSpeed) % (groundY - 60)) + 30;
+      const size = 3 + (i % 3) * 2;
+      const rotation = t * (4 + i % 3);
       
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(rotation);
-      ctx.fillStyle = confettiColors[colorIndex];
-      ctx.fillRect(-size / 2, -size / 2, size, size);
+      ctx.fillStyle = confettiColors[i % confettiColors.length];
+      if (i % 3 === 0) {
+        ctx.beginPath();
+        ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.fillRect(-size / 2, -size / 2, size, size);
+      }
       ctx.restore();
     }
-    ctx.restore();
     
-    // Draw dancing NPCs indicator - bouncing motion for NPCs at village center
-    // Get the screen positions for NPCs at center
-    const woodcutterScreenX = this.woodcutter.x - this.cameraX;
-    const stoneWorkerScreenX = this.stoneWorker.x - this.cameraX;
-    const elderScreenX = this.villageElder.x - this.cameraX;
-    
-    // Draw musical notes above dancing characters
-    ctx.font = '20px Arial';
-    ctx.fillStyle = '#FFD700';
-    const noteY = groundY - 120;
-    
-    // Animate notes
-    const bounce = Math.sin(t * 10) * 10;
-    
-    if (Math.abs(this.woodcutter.x - this.villageCenterX) < 100) {
-      ctx.fillText('♪', woodcutterScreenX + Math.sin(t * 8) * 15, noteY + bounce);
+    const characters = [this.woodcutter, this.stoneWorker, this.fisherman];
+    for (let i = 0; i < characters.length; i++) {
+      const npc = characters[i];
+      const sx = npc.x - this.cameraX;
+      const noteY = npc.y - 20 + Math.sin(t * 8 + i * 2) * 10;
+      const noteX = sx + Math.sin(t * 5 + i * 3) * 12;
+      ctx.fillStyle = `hsl(${(t * 80 + i * 120) % 360}, 100%, 70%)`;
+      ctx.strokeStyle = ctx.fillStyle;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(noteX, noteY, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(noteX + 4, noteY);
+      ctx.lineTo(noteX + 4, noteY - 14);
+      ctx.stroke();
+      if (i % 2 === 0) {
+        ctx.beginPath();
+        ctx.arc(noteX + 10, noteY - 2, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(noteX + 14, noteY - 2);
+        ctx.lineTo(noteX + 14, noteY - 14);
+        ctx.moveTo(noteX + 4, noteY - 14);
+        ctx.lineTo(noteX + 14, noteY - 14);
+        ctx.stroke();
+      }
     }
-    if (Math.abs(this.stoneWorker.x - this.villageCenterX) < 100) {
-      ctx.fillText('♫', stoneWorkerScreenX + Math.sin(t * 9 + 1) * 15, noteY - bounce);
-    }
-    ctx.fillText('♪', elderScreenX + Math.sin(t * 7 + 2) * 15, noteY + bounce * 0.5);
     
-    // Center "CELEBRATION!" text
-    ctx.font = `24px ${this.retroFont}`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#22C55E';
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 3;
-    // Center vertically in the playable area (above ground and dialogue box)
-    const playableHeight = groundY;
-    const celebY = (playableHeight / 2) + Math.sin(t * 5) * 10;
-    // Only show "DEBTS SETTLED!" text for first 4 seconds
-    if (t <= 4) {
+    if (t <= 5) {
+      const textAlpha = t <= 3 ? Math.min(1, t / 0.5) : Math.max(0, 1 - (t - 3) / 2);
+      ctx.globalAlpha = fadeAlpha * textAlpha;
+      ctx.font = `24px ${this.retroFont}`;
+      ctx.textAlign = 'center';
+      const celebY = groundY * 0.35 + Math.sin(t * 5) * 8;
+      const textHue = (t * 60) % 360;
+      ctx.fillStyle = `hsl(${textHue}, 100%, 70%)`;
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 3;
       ctx.strokeText('DEBTS SETTLED!', w / 2, celebY);
       ctx.fillText('DEBTS SETTLED!', w / 2, celebY);
     }
+    
+    ctx.restore();
   }
   
   private drawLightningFlash(ctx: CanvasRenderingContext2D, timer: number, interval: number): void {

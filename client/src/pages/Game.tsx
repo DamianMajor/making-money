@@ -95,7 +95,7 @@ function MoneyRainCanvas() {
         rotationSpeed: (Math.random() - 0.5) * 0.3,
         sparkleTimer: Math.random() * 5,
         sparkleInterval: 2 + Math.random() * 4,
-        opacity: 0.3 + Math.random() * 0.4,
+        opacity: 0.45 + Math.random() * 0.4,
       };
     }
 

@@ -520,7 +520,7 @@ function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue:
             background: 'rgba(30, 22, 12, 0.8)',
             border: '2px solid #5a4a32',
             borderRadius: '8px',
-            padding: '12px 14px',
+            padding: 'calc((80px - 1.5em) / 2) 14px',
             minHeight: '80px',
             resize: 'none',
             outline: 'none',

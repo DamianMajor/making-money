@@ -536,7 +536,7 @@ export class VillageLedgerGame {
     this.villageElder = {
       id: 'villageElder',
       name: 'VILLAGE ELDER',
-      x: 1470, // Near Stone Tablet - original position (10px further from tablet)
+      x: 1490, // Near Stone Tablet - original position
       y: 0,
       width: 100,
       height: 140,
@@ -1312,6 +1312,7 @@ export class VillageLedgerGame {
             setTimeout(() => {
               try {
                 this.state.showRainfall = false; // Turn off rain
+                soundManager.stop('thunder');
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
                 // Keep night scene visible for 1 extra second, then show quiz with night background
                 setTimeout(() => {
@@ -1376,6 +1377,7 @@ export class VillageLedgerGame {
             setTimeout(() => {
               try {
                 this.state.showRainfall = false; // Now turn off rain
+                soundManager.stop('thunder');
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
                 soundManager.fadeOut('ambientNight', 1000); // Fade out ambient night
                 this.state.showNightTransition = false;
@@ -1690,12 +1692,10 @@ export class VillageLedgerGame {
     }
     // Player has everything, ready to settle (Loop 1)
     else if (phase === 'got_fish_ready_settle') {
-      this.queueDialogue([
-        {
-          speaker: 'WOODCUTTER',
-          text: "You have everything! Meet me at the Great Stone to settle your debt!"
-        }
-      ]);
+      this.state.phase = 'settlement';
+      this.woodcutter.targetX = this.villageCenterX + 160;
+      this.stoneWorker.targetX = this.villageCenterX - 160;
+      this.handleWoodcutterInteraction();
     }
     // LOOP 1 SETTLEMENT: Player tries to settle - Woodcutter claims inflated debt
     else if (phase === 'settlement' && !this.state.woodcutterDisputed) {
@@ -1750,7 +1750,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 45;
+                this.villageElder.targetX = this.villageCenterX - 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -1836,7 +1836,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 45;
+                this.villageElder.targetX = this.villageCenterX - 200;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -3050,7 +3050,7 @@ export class VillageLedgerGame {
               // Trigger the brawl - NPCs run to player, Elder steps aside
               this.woodcutter.targetX = this.player.x - 30;
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX - 45; // Elder steps away
+              this.villageElder.targetX = this.villageCenterX - 200; // Elder backs away from fight
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3840,7 +3840,7 @@ export class VillageLedgerGame {
         // Walk toward target
         const dir = Math.sign(dx);
         this.player.x += dir * this.playerSpeed * dt;
-        this.player.x = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, this.player.x));
+        this.player.x = Math.max(this.player.width / 2, Math.min(this.fisherman.x - 20, this.player.x));
         this.player.bobOffset = Math.sin(this.bobTimer) * 1.5;
         this.player.facingDirection = dir;
         this.player.isWalking = true;
@@ -3857,7 +3857,7 @@ export class VillageLedgerGame {
     // Regular player movement (manual touch controls)
     else if (this.moveDirection !== 0 && !this.state.currentDialogue) {
       this.player.x += this.moveDirection * this.playerSpeed * dt;
-      this.player.x = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, this.player.x));
+      this.player.x = Math.max(this.player.width / 2, Math.min(this.fisherman.x - 20, this.player.x));
 
       // Update player bob
       this.player.bobOffset = Math.sin(this.bobTimer) * 1.5;
@@ -4383,7 +4383,7 @@ export class VillageLedgerGame {
         // Trigger the brawl - NPCs run to player, Elder steps aside
         this.woodcutter.targetX = this.player.x - 30;
         this.stoneWorker.targetX = this.player.x + 30;
-        this.villageElder.targetX = this.villageCenterX - 45; // Elder steps away
+        this.villageElder.targetX = this.villageCenterX - 200; // Elder backs away from fight
         this.state.phase = 'brawl';
         this.state.showBrawl = true;
         this.state.brawlTimer = 0;
@@ -4510,6 +4510,7 @@ export class VillageLedgerGame {
                   setTimeout(() => {
                     try {
                       this.state.showRainfall = false;
+                      soundManager.stop('thunder');
                       soundManager.fadeOut('rain', 6000); // 6 second fade out
                       this.state.showNightTransition = false;
                       // Delay quiz appearance by 3 seconds
@@ -4563,13 +4564,7 @@ export class VillageLedgerGame {
     // Draw parallax background elements
     this.drawBackground(ctx);
 
-    // Draw lightning flashes on top of background but behind all other layers
-    if (this.state.showThunderstorm) {
-      this.drawLightningFlash(ctx, this.state.thunderstormTimer, 0.8);
-    }
-    if (this.state.showRainfall && !this.state.showNightTransition) {
-      this.drawLightningFlash(ctx, this.state.rainfallTimer, 2.5);
-    }
+    // Lightning flash calls removed - keeping drawLightningFlash method for potential future use
 
     // Ground Y position for character placement
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
@@ -7913,7 +7908,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     normalColor: string,
     align: 'left' | 'center' = 'left'
   ): void {
-    const highlightColor = '#FFB800';
+    const highlightColor = '#FFD700';
     const keywords = ['double coincidence of wants', 'ledger'];
     const lowerText = text.toLowerCase();
     const charColors: string[] = new Array(text.length).fill(normalColor);
@@ -8326,6 +8321,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     // Resume ambient music and day background
     soundManager.stopLoop('backgroundMusicNight');
+    soundManager.stop('thunder');
+    soundManager.stop('rain');
     soundManager.fadeIn('ambientVillage', 1000);
     soundManager.startDaytimeMusic();
     
@@ -8337,6 +8334,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private startLoop2(): void {
     // Resume ambient music and day background if it was stopped
     soundManager.stopLoop('backgroundMusicNight');
+    soundManager.stop('thunder');
+    soundManager.stop('rain');
     soundManager.fadeIn('ambientVillage', 1000);
     soundManager.startDaytimeMusic();
     

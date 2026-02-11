@@ -209,6 +209,7 @@ export class VillageLedgerGame {
   private bobTimer: number = 0;
   private talkingTimer: number = 0; // Timer for talking bounce animation
   private dialogueCharIndex: number = 0;
+  private dialogueWordCount: number = 0;
   private dialogueTimer: number = 0;
   private continueArrowBlink: number = 0;
   private inventoryPopup: { text: string; timer: number; y: number } | null = null;
@@ -1750,7 +1751,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 200;
+                this.villageElder.targetX = this.villageCenterX + 160;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -1836,7 +1837,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 200;
+                this.villageElder.targetX = this.villageCenterX + 160;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -2471,7 +2472,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 200;
+                this.villageElder.targetX = this.villageCenterX + 160;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -2500,7 +2501,7 @@ export class VillageLedgerGame {
                 // Trigger brawl
                 this.woodcutter.targetX = this.player.x - 30;
                 this.stoneWorker.targetX = this.player.x + 30;
-                this.villageElder.targetX = this.villageCenterX - 200;
+                this.villageElder.targetX = this.villageCenterX + 160;
                 this.state.showBrawl = true;
                 this.state.brawlTimer = 0;
                 soundManager.stopDaytimeMusic();
@@ -3050,7 +3051,7 @@ export class VillageLedgerGame {
               // Trigger the brawl - NPCs run to player, Elder steps aside
               this.woodcutter.targetX = this.player.x - 30;
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX - 200; // Elder backs away from fight
+              this.villageElder.targetX = this.villageCenterX + 160; // Elder backs away from fight
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3179,7 +3180,7 @@ export class VillageLedgerGame {
               // Trigger brawl
               this.woodcutter.targetX = this.player.x - 30;
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX - 200;
+              this.villageElder.targetX = this.villageCenterX + 160;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3208,7 +3209,7 @@ export class VillageLedgerGame {
             text: "Without a record, we cannot know the truth...",
             onComplete: () => {
               this.stoneWorker.targetX = this.player.x + 30;
-              this.villageElder.targetX = this.villageCenterX - 200;
+              this.villageElder.targetX = this.villageCenterX + 160;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3237,7 +3238,7 @@ export class VillageLedgerGame {
             text: "Without a record, we cannot know the truth...",
             onComplete: () => {
               this.woodcutter.targetX = this.player.x - 30;
-              this.villageElder.targetX = this.villageCenterX - 200;
+              this.villageElder.targetX = this.villageCenterX + 160;
               this.state.phase = 'confrontation';
               this.state.showBrawl = true;
               this.state.brawlTimer = 0;
@@ -3425,7 +3426,7 @@ export class VillageLedgerGame {
                     // Trigger brawl
                     this.woodcutter.targetX = this.player.x - 30;
                     this.stoneWorker.targetX = this.player.x + 30;
-                    this.villageElder.targetX = this.villageCenterX - 200;
+                    this.villageElder.targetX = this.villageCenterX + 160;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
@@ -3586,7 +3587,7 @@ export class VillageLedgerGame {
                     // Trigger brawl
                     this.woodcutter.targetX = this.player.x - 30;
                     this.stoneWorker.targetX = this.player.x + 30;
-                    this.villageElder.targetX = this.villageCenterX - 200;
+                    this.villageElder.targetX = this.villageCenterX + 160;
                     this.state.showBrawl = true;
                     this.state.brawlTimer = 0;
                     soundManager.stopDaytimeMusic();
@@ -3636,6 +3637,7 @@ export class VillageLedgerGame {
     if (this.state.dialogueQueue.length > 0) {
       this.state.currentDialogue = this.state.dialogueQueue.shift()!;
       this.dialogueCharIndex = 0;
+      this.dialogueWordCount = 0;
       this.state.dialogueComplete = false;
       this.dialogueTimer = 0;
     } else {
@@ -4022,9 +4024,14 @@ export class VillageLedgerGame {
         if (this.dialogueCharIndex >= this.state.currentDialogue.text.length) {
           this.state.dialogueComplete = true;
         }
-        if (prevIdx < this.state.currentDialogue.text.length && this.dialogueCharIndex % 2 === 0) {
+        if (prevIdx < this.state.currentDialogue.text.length) {
           const ch = this.state.currentDialogue.text[prevIdx];
-          soundManager.playVoiceBlip(this.state.currentDialogue.speaker, ch);
+          if (ch === ' ') {
+            this.dialogueWordCount = (this.dialogueWordCount || 0) + 1;
+            if (this.dialogueWordCount % 2 === 0) {
+              soundManager.playVoiceBlip(this.state.currentDialogue.speaker, ch);
+            }
+          }
         }
       }
     }
@@ -4286,7 +4293,7 @@ export class VillageLedgerGame {
         text: "Enough! You're trying to cheat us all!",
         onComplete: () => {
           // Position NPCs for brawl - Elder backs away, others rush in
-          this.villageElder.targetX = this.villageCenterX - 200; // Elder backs away from fight
+          this.villageElder.targetX = this.villageCenterX + 160; // Elder backs away from fight
           // Woodcutter to the left of Elder
           this.woodcutter.targetX = this.villageCenterX - 130;
           // Stone-worker to the right of tablet
@@ -4388,7 +4395,7 @@ export class VillageLedgerGame {
         // Trigger the brawl - NPCs run to player, Elder steps aside
         this.woodcutter.targetX = this.player.x - 30;
         this.stoneWorker.targetX = this.player.x + 30;
-        this.villageElder.targetX = this.villageCenterX - 200; // Elder backs away from fight
+        this.villageElder.targetX = this.villageCenterX + 160; // Elder backs away from fight
         this.state.phase = 'brawl';
         this.state.showBrawl = true;
         this.state.brawlTimer = 0;
@@ -4636,6 +4643,9 @@ export class VillageLedgerGame {
       // Draw atmospheric haze overlay (in front of everything except UI)
       this.drawAtmosphericHaze(ctx, w, h);
     }
+
+    // Draw mute button in upper-right corner (always visible)
+    this.drawMuteButton(ctx);
 
     // Draw inventory HUD at top of screen (on top of trees)
     this.drawInventoryHUD(ctx);
@@ -6422,7 +6432,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   private drawStoneTabletHUD(ctx: CanvasRenderingContext2D): void {
     const x = this.logicalWidth - this.hudWidth - 24;
-    const y = 24;
+    const y = 58;
     const w = this.hudWidth;
     const h = this.hudHeight;
 
@@ -6685,9 +6695,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     // Position to the left of Stone Tablet HUD (which is at canvas.width - hudWidth - 24)
     const stoneTabletHudX = this.logicalWidth - this.hudWidth - 24;
-    const stoneTabletHudY = 24; // Stone Tablet HUD is at y=24
-    const panelX = stoneTabletHudX - panelWidth - 12; // 12px gap from Stone Tablet HUD
-    const yPos = stoneTabletHudY; // Align top edge with Stone Tablet HUD
+    const stoneTabletHudY = 58;
+    const panelX = stoneTabletHudX - panelWidth - 12;
+    const yPos = stoneTabletHudY;
     let xPos = panelX + padding / 2;
     
     ctx.fillStyle = 'rgba(139, 115, 85, 0.85)';
@@ -6726,14 +6736,19 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Store inventory area for click detection
     this.inventoryButtonArea = { x: panelX, y: yPos - 4, w: panelWidth, h: panelHeight };
     
-    // Draw mute/sound button to the left of inventory (match inventory height, square)
-    const muteButtonSize = Math.round(panelHeight);
-    const muteX = panelX - muteButtonSize - 12;
-    const muteY = yPos - 4;
+    // Draw inventory detail popup if open
+    if (this.showInventoryDetailPopup) {
+      this.drawInventoryDetailPopup(ctx, panelX, yPos + panelHeight + 8);
+    }
+  }
+  
+  private drawMuteButton(ctx: CanvasRenderingContext2D): void {
+    const muteButtonSize = 36;
+    const muteX = this.logicalWidth - muteButtonSize - 12;
+    const muteY = 12;
     
     this.muteButtonArea = { x: muteX, y: muteY, w: muteButtonSize, h: muteButtonSize };
     
-    // Button background
     ctx.fillStyle = soundManager.isMuted() ? 'rgba(220, 38, 38, 0.85)' : 'rgba(34, 197, 94, 0.85)';
     ctx.beginPath();
     ctx.roundRect(muteX, muteY, muteButtonSize, muteButtonSize, 8);
@@ -6742,7 +6757,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.lineWidth = 2;
     ctx.stroke();
     
-    // Draw speaker icon (centered in larger button)
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 2;
@@ -6750,7 +6764,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const iconX = muteX + muteButtonSize / 2 - 10;
     const iconY = muteY + muteButtonSize / 2 - 6;
     
-    // Speaker body
     ctx.beginPath();
     ctx.moveTo(iconX, iconY + 4);
     ctx.lineTo(iconX + 6, iconY + 4);
@@ -6762,7 +6775,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fill();
     
     if (soundManager.isMuted()) {
-      // Draw X for muted
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -6772,7 +6784,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.lineTo(iconX + 14, iconY + 10);
       ctx.stroke();
     } else {
-      // Draw sound waves
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -6782,13 +6793,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.arc(iconX + 14, iconY + 6, 8, -0.5, 0.5);
       ctx.stroke();
     }
-    
-    // Draw inventory detail popup if open
-    if (this.showInventoryDetailPopup) {
-      this.drawInventoryDetailPopup(ctx, panelX, yPos + panelHeight + 8);
-    }
   }
-  
+
   // Draw inventory hint popup with arrow pointing to inventory box
   private drawInventoryHint(ctx: CanvasRenderingContext2D): void {
     if (!this.inventoryButtonArea) return;
@@ -6987,13 +6993,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     let currentLineWidth = 0;
     let globalCharIdx = 0;
     
+    const spaceW = ctx.measureText(' ').width;
+    const minSp = ctx.measureText('M').width * 0.5;
+    const effSp = Math.max(spaceW, minSp);
+
     for (let wi = 0; wi < words.length; wi++) {
       const word = words[wi];
       const isLastWord = wi === words.length - 1;
       const wordWithSpace = word + (isLastWord ? '' : ' ');
-      const spaceW = ctx.measureText(' ').width;
-      const minSp = ctx.measureText('M').width * 0.5;
-      const effSp = Math.max(spaceW, minSp);
       const wordWidth = ctx.measureText(word).width + (isLastWord ? 0 : effSp);
       
       if (currentLineWidth + wordWidth > maxWidth && currentLineWidth > 0) {
@@ -7002,20 +7009,18 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         currentLineWidth = 0;
       }
       
-      // Render each character of the word with its correct color
       let charX = lineX + currentLineWidth;
+      let renderedWidth = 0;
       for (let ci = 0; ci < wordWithSpace.length; ci++) {
         const ch = wordWithSpace[ci];
         ctx.fillStyle = charColors[globalCharIdx] || normalColor;
         ctx.fillText(ch, charX, lineY);
-        if (ch === ' ') {
-          charX += effSp;
-        } else {
-          charX += ctx.measureText(ch).width;
-        }
+        const advance = ch === ' ' ? effSp : ctx.measureText(ch).width;
+        charX += advance;
+        renderedWidth += advance;
         globalCharIdx++;
       }
-      currentLineWidth += wordWidth;
+      currentLineWidth += renderedWidth;
     }
   }
 

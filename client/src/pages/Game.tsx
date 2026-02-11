@@ -330,7 +330,14 @@ function MoneyRainCanvas() {
   );
 }
 
-function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: string) => void; audioRef: React.MutableRefObject<HTMLAudioElement | null> }) {
+interface AudioGraph {
+  ctx: AudioContext;
+  dry: GainNode;
+  wetGain: GainNode;
+  feedback: GainNode;
+}
+
+function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue: (answer: string) => void; audioRef: React.MutableRefObject<HTMLAudioElement | null>; audioGraphRef: React.MutableRefObject<AudioGraph | null> }) {
   const [answer, setAnswer] = useState('');
   const [muted, setMuted] = useState(() => {
     try {
@@ -369,6 +376,41 @@ function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: strin
     audio.preload = 'auto';
     audio.muted = muted;
     audioRef.current = audio;
+
+    try {
+      const ctx = new AudioContext();
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+      const source = ctx.createMediaElementSource(audio);
+      (audio as any)._mediaSourceAttached = true;
+
+      const dry = ctx.createGain();
+      dry.gain.value = 1.0;
+
+      const delayNode = ctx.createDelay(2.0);
+      delayNode.delayTime.value = 0.5;
+
+      const feedback = ctx.createGain();
+      feedback.gain.value = 0;
+
+      const wetGain = ctx.createGain();
+      wetGain.gain.value = 0;
+
+      source.connect(dry);
+      dry.connect(ctx.destination);
+
+      source.connect(delayNode);
+      delayNode.connect(feedback);
+      feedback.connect(delayNode);
+      delayNode.connect(wetGain);
+      wetGain.connect(ctx.destination);
+
+      audioGraphRef.current = { ctx, dry, wetGain, feedback };
+    } catch (e) {
+      console.warn('[ReflectionScreen] AudioContext setup failed:', e);
+    }
+
     if (!muted) {
       audio.play().catch(() => {
         const resumeOnInteraction = () => {
@@ -380,7 +422,7 @@ function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: strin
         document.addEventListener('touchstart', resumeOnInteraction);
       });
     }
-  }, [audioRef]);
+  }, [audioRef, audioGraphRef]);
 
   const handleContinue = () => {
     onContinue(answer);
@@ -522,7 +564,7 @@ function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: strin
   );
 }
 
-function IntroScreen({ onStart, audioRef, onMount }: { onStart: () => void; audioRef: React.MutableRefObject<HTMLAudioElement | null>; onMount?: () => void }) {
+function IntroScreen({ onStart, audioRef, audioGraphRef, onMount }: { onStart: () => void; audioRef: React.MutableRefObject<HTMLAudioElement | null>; audioGraphRef: React.MutableRefObject<AudioGraph | null>; onMount?: () => void }) {
   const [muted, setMuted] = useState(() => {
     try {
       const stored = localStorage.getItem('villageLedger_soundSettings');
@@ -531,52 +573,8 @@ function IntroScreen({ onStart, audioRef, onMount }: { onStart: () => void; audi
     return false;
   });
 
-  const audioGraphRef = useRef<{
-    ctx: AudioContext;
-    dry: GainNode;
-    wetGain: GainNode;
-    feedback: GainNode;
-  } | null>(null);
-
   useEffect(() => {
     if (onMount) onMount();
-
-    const audio = audioRef.current;
-    if (audio && !(audio as any)._mediaSourceAttached) {
-      try {
-        const ctx = new AudioContext();
-        if (ctx.state === 'suspended') {
-          ctx.resume().catch(() => {});
-        }
-        const source = ctx.createMediaElementSource(audio);
-        (audio as any)._mediaSourceAttached = true;
-
-        const dry = ctx.createGain();
-        dry.gain.value = 1.0;
-
-        const delayNode = ctx.createDelay(2.0);
-        delayNode.delayTime.value = 0.5;
-
-        const feedback = ctx.createGain();
-        feedback.gain.value = 0;
-
-        const wetGain = ctx.createGain();
-        wetGain.gain.value = 0;
-
-        source.connect(dry);
-        dry.connect(ctx.destination);
-
-        source.connect(delayNode);
-        delayNode.connect(feedback);
-        feedback.connect(delayNode);
-        delayNode.connect(wetGain);
-        wetGain.connect(ctx.destination);
-
-        audioGraphRef.current = { ctx, dry, wetGain, feedback };
-      } catch (e) {
-        console.warn('[IntroScreen] AudioContext setup failed:', e);
-      }
-    }
 
     return () => {
       if (audioGraphRef.current) {
@@ -587,7 +585,7 @@ function IntroScreen({ onStart, audioRef, onMount }: { onStart: () => void; audi
         (audioRef.current as any)._mediaSourceAttached = false;
       }
     };
-  }, [onMount, audioRef]);
+  }, [onMount, audioRef, audioGraphRef]);
 
   const toggleMute = () => {
     const newMuted = !muted;
@@ -900,6 +898,7 @@ export default function Game() {
   const gameRef = useRef<VillageLedgerGame | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioGraphRef = useRef<AudioGraph | null>(null);
   const [screen, setScreen] = useState<'loading' | 'reflection' | 'intro' | 'game'>('loading');
   const gameInitialized = useRef(false);
 
@@ -993,8 +992,8 @@ export default function Game() {
         </div>
       )}
       {screen === 'loading' && <LoadingScreen onLoaded={handleLoadingComplete} />}
-      {screen === 'reflection' && <ReflectionScreen onContinue={handleReflectionContinue} audioRef={audioRef} />}
-      {screen === 'intro' && <IntroScreen onStart={handleGameStart} audioRef={audioRef} onMount={handleIntroMount} />}
+      {screen === 'reflection' && <ReflectionScreen onContinue={handleReflectionContinue} audioRef={audioRef} audioGraphRef={audioGraphRef} />}
+      {screen === 'intro' && <IntroScreen onStart={handleGameStart} audioRef={audioRef} audioGraphRef={audioGraphRef} onMount={handleIntroMount} />}
     </div>
   );
 }

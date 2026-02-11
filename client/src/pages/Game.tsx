@@ -495,7 +495,6 @@ function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue:
           }}
           data-testid="text-reflection-description"
         >
-          Money is everywhere. But what IS it? Travel back to where it all started — a world with no money at all — and discover how and why it came to exist.
         </p>
         <label
           className="w-full mb-2 text-center"
@@ -512,7 +511,7 @@ function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue:
         <textarea
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Type your answer here and we'll review it after you've played this lesson."
+          placeholder="Type your answer here and we'll review it after you've played"
           className="w-full mb-6"
           style={{
             fontFamily: 'Georgia, serif',

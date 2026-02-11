@@ -506,12 +506,11 @@ function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue:
           }}
           data-testid="text-reflection-label"
         >
-          What is money to you?
         </label>
         <textarea
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Type your answer here and we'll review it after you've played"
+          placeholder="Type your answer here."
           className="w-full mb-6"
           style={{
             fontFamily: 'Georgia, serif',

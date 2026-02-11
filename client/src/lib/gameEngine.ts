@@ -537,7 +537,7 @@ export class VillageLedgerGame {
     this.villageElder = {
       id: 'villageElder',
       name: 'VILLAGE ELDER',
-      x: 1490, // Near Stone Tablet - original position
+      x: 1600, // At Stone Tablet area - matches debt settlement position in Loop 2
       y: 0,
       width: 100,
       height: 140,
@@ -4237,7 +4237,7 @@ export class VillageLedgerGame {
       // Thunderstorm lasts 3.5 seconds, then transition to night
       if (this.state.thunderstormTimer > 3.5) {
         this.state.showThunderstorm = false;
-        soundManager.stop('thunder');
+        // Thunder keeps looping until roof fix is initiated
         // Start night transition after thunderstorm
         this.state.showNightTransition = true;
         this.state.nightTransitionTimer = 0;
@@ -6431,8 +6431,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private drawStoneTabletHUD(ctx: CanvasRenderingContext2D): void {
-    const x = this.logicalWidth - this.hudWidth - 24;
-    const y = 58;
+    const muteButtonSize = 36;
+    const muteRightEdge = this.logicalWidth - 12;
+    const x = muteRightEdge - muteButtonSize - 12 - this.hudWidth;
+    const y = 24;
     const w = this.hudWidth;
     const h = this.hudHeight;
 
@@ -6693,9 +6695,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const panelWidth = items.length * (iconSize + spacing + 20) + padding;
     const panelHeight = iconSize + padding * 1.5;
     
-    // Position to the left of Stone Tablet HUD (which is at canvas.width - hudWidth - 24)
-    const stoneTabletHudX = this.logicalWidth - this.hudWidth - 24;
-    const stoneTabletHudY = 58;
+    // Position to the left of Stone Tablet HUD
+    const muteButtonSize = 36;
+    const muteRightEdge = this.logicalWidth - 12;
+    const stoneTabletHudX = muteRightEdge - muteButtonSize - 12 - this.hudWidth;
+    const stoneTabletHudY = 24;
     const panelX = stoneTabletHudX - panelWidth - 12;
     const yPos = stoneTabletHudY;
     let xPos = panelX + padding / 2;
@@ -7731,7 +7735,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       } else {
         // All correct - show quiz review before success
         soundManager.play('quizCorrect');
-        soundManager.play('crowdApplause');
+        const applauseDuration = soundManager.getBufferDuration('crowdApplause');
+        soundManager.playForDuration('crowdApplause', Math.max(1000, applauseDuration * 0.25));
         this.state.showQuiz = false;
         this.state.showQuizReview = true;
         this.quizReviewScrollOffset = 0;
@@ -8327,6 +8332,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
+    this.villageElder.x = 1600;
+    this.villageElder.targetX = undefined;
     
     // Reset animation/sound flags
     this.booFailureTriggered = false;
@@ -8442,6 +8449,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
+    this.villageElder.x = 1600;
+    this.villageElder.targetX = undefined;
     
     // Reset animation/sound flags for loop 2
     this.booFailureTriggered = false;

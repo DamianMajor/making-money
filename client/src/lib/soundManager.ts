@@ -777,6 +777,53 @@ export class SoundManager {
   public pause(name: SoundName): void {
     this.stop(name);
   }
+
+  private voiceBlipOsc: OscillatorNode | null = null;
+  private voiceBlipGain: GainNode | null = null;
+
+  public playVoiceBlip(speaker: string, char: string): void {
+    if (this.muted) return;
+    if (!this.audioContext || !this.masterGain) return;
+    if (char === ' ' || char === '\n' || char === '\t') return;
+
+    const profiles: Record<string, { freq: number; type: OscillatorType; vol: number }> = {
+      'YOU':            { freq: 320, type: 'square',   vol: 0.06 },
+      'WOODCUTTER':     { freq: 180, type: 'sawtooth', vol: 0.05 },
+      'STONE-WORKER':   { freq: 240, type: 'triangle', vol: 0.06 },
+      'FISHERMAN':      { freq: 360, type: 'sine',     vol: 0.07 },
+      'VILLAGE ELDER':  { freq: 200, type: 'triangle', vol: 0.06 },
+      'STONE TABLET':   { freq: 440, type: 'sine',     vol: 0.04 },
+    };
+    const profile = profiles[speaker] || { freq: 280, type: 'square' as OscillatorType, vol: 0.05 };
+
+    const jitter = (Math.random() - 0.5) * 40;
+    const freq = profile.freq + jitter;
+
+    try {
+      if (this.voiceBlipOsc) {
+        this.voiceBlipOsc.stop();
+        this.voiceBlipOsc.disconnect();
+        this.voiceBlipOsc = null;
+      }
+
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+      osc.type = profile.type;
+      osc.frequency.setValueAtTime(freq, this.audioContext.currentTime);
+      gain.gain.setValueAtTime(profile.vol, this.audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.06);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      osc.start();
+      osc.stop(this.audioContext.currentTime + 0.06);
+      this.voiceBlipOsc = osc;
+      osc.onended = () => {
+        osc.disconnect();
+        gain.disconnect();
+        if (this.voiceBlipOsc === osc) this.voiceBlipOsc = null;
+      };
+    } catch {}
+  }
 }
 
 export const soundManager = new SoundManager();

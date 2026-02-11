@@ -4017,9 +4017,14 @@ export class VillageLedgerGame {
       this.dialogueTimer += dt;
       if (this.dialogueTimer > 0.03) {
         this.dialogueTimer = 0;
+        const prevIdx = this.dialogueCharIndex;
         this.dialogueCharIndex++;
         if (this.dialogueCharIndex >= this.state.currentDialogue.text.length) {
           this.state.dialogueComplete = true;
+        }
+        if (prevIdx < this.state.currentDialogue.text.length && this.dialogueCharIndex % 2 === 0) {
+          const ch = this.state.currentDialogue.text[prevIdx];
+          soundManager.playVoiceBlip(this.state.currentDialogue.speaker, ch);
         }
       }
     }
@@ -4883,12 +4888,17 @@ export class VillageLedgerGame {
       ctx.lineWidth = 2;
       ctx.stroke();
       
-      // Item icon (circle)
       const iconRadius = 16;
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
-      ctx.beginPath();
-      ctx.arc(btnX + padding + iconRadius, itemY + itemBtnHeight / 2, iconRadius, 0, Math.PI * 2);
-      ctx.fill();
+      const iconKey = item.name.toLowerCase();
+      const iconImg = this.itemIcons[iconKey];
+      if (iconImg && iconImg.complete) {
+        ctx.drawImage(iconImg, btnX + padding, itemY + itemBtnHeight / 2 - iconRadius, iconRadius * 2, iconRadius * 2);
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.arc(btnX + padding + iconRadius, itemY + itemBtnHeight / 2, iconRadius, 0, Math.PI * 2);
+        ctx.fill();
+      }
       
       // Item name and count
       ctx.font = `bold 16px ${this.uiFont}`;

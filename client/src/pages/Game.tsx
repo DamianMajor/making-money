@@ -332,6 +332,28 @@ function MoneyRainCanvas() {
 
 function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: string) => void; audioRef: React.MutableRefObject<HTMLAudioElement | null> }) {
   const [answer, setAnswer] = useState('');
+  const [muted, setMuted] = useState(() => {
+    try {
+      const stored = localStorage.getItem('villageLedger_soundSettings');
+      if (stored) return JSON.parse(stored).muted ?? false;
+    } catch {}
+    return false;
+  });
+
+  const toggleMute = () => {
+    const newMuted = !muted;
+    setMuted(newMuted);
+    if (audioRef.current) {
+      audioRef.current.muted = newMuted;
+    }
+    soundManager.setMuted(newMuted);
+    try {
+      const stored = localStorage.getItem('villageLedger_soundSettings');
+      const settings = stored ? JSON.parse(stored) : {};
+      settings.muted = newMuted;
+      localStorage.setItem('villageLedger_soundSettings', JSON.stringify(settings));
+    } catch {}
+  };
 
   useEffect(() => {
     const muted = (() => {
@@ -373,6 +395,40 @@ function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: strin
       }}
       data-testid="reflection-screen"
     >
+      <button
+        onClick={toggleMute}
+        className="cursor-pointer"
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          zIndex: 10,
+          background: 'none',
+          border: 'none',
+          padding: '8px',
+          opacity: 0.4,
+          transition: 'opacity 0.2s',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4'; }}
+        data-testid="button-mute-reflection"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {muted ? (
+            <>
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#888888" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </>
+          ) : (
+            <>
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#888888" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            </>
+          )}
+        </svg>
+      </button>
       <div className="flex flex-col items-center max-w-lg w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
         <h2
           className="text-center mb-6"
@@ -485,10 +541,15 @@ function IntroScreen({ onStart, audioRef, onMount }: { onStart: () => void; audi
   useEffect(() => {
     if (onMount) onMount();
 
-    if (audioRef.current) {
+    const audio = audioRef.current;
+    if (audio && !(audio as any)._mediaSourceAttached) {
       try {
         const ctx = new AudioContext();
-        const source = ctx.createMediaElementSource(audioRef.current);
+        if (ctx.state === 'suspended') {
+          ctx.resume().catch(() => {});
+        }
+        const source = ctx.createMediaElementSource(audio);
+        (audio as any)._mediaSourceAttached = true;
 
         const dry = ctx.createGain();
         dry.gain.value = 1.0;
@@ -512,13 +573,18 @@ function IntroScreen({ onStart, audioRef, onMount }: { onStart: () => void; audi
         wetGain.connect(ctx.destination);
 
         audioGraphRef.current = { ctx, dry, wetGain, feedback };
-      } catch {}
+      } catch (e) {
+        console.warn('[IntroScreen] AudioContext setup failed:', e);
+      }
     }
 
     return () => {
       if (audioGraphRef.current) {
         audioGraphRef.current.ctx.close().catch(() => {});
         audioGraphRef.current = null;
+      }
+      if (audioRef.current) {
+        (audioRef.current as any)._mediaSourceAttached = false;
       }
     };
   }, [onMount, audioRef]);

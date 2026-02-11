@@ -482,9 +482,53 @@ function IntroScreen({ onStart, audioRef, onMount }: { onStart: () => void; audi
     return false;
   });
 
+  const audioGraphRef = useRef<{
+    ctx: AudioContext;
+    dry: GainNode;
+    wetGain: GainNode;
+    feedback: GainNode;
+  } | null>(null);
+
   useEffect(() => {
     if (onMount) onMount();
-  }, [onMount]);
+
+    if (audioRef.current) {
+      try {
+        const ctx = new AudioContext();
+        const source = ctx.createMediaElementSource(audioRef.current);
+
+        const dry = ctx.createGain();
+        dry.gain.value = 1.0;
+
+        const delayNode = ctx.createDelay(2.0);
+        delayNode.delayTime.value = 0.5;
+
+        const feedback = ctx.createGain();
+        feedback.gain.value = 0;
+
+        const wetGain = ctx.createGain();
+        wetGain.gain.value = 0;
+
+        source.connect(dry);
+        dry.connect(ctx.destination);
+
+        source.connect(delayNode);
+        delayNode.connect(feedback);
+        feedback.connect(delayNode);
+        delayNode.connect(wetGain);
+        wetGain.connect(ctx.destination);
+
+        audioGraphRef.current = { ctx, dry, wetGain, feedback };
+      } catch {}
+    }
+
+    return () => {
+      if (audioGraphRef.current) {
+        audioGraphRef.current.ctx.close().catch(() => {});
+        audioGraphRef.current = null;
+      }
+    };
+  }, [onMount, audioRef]);
 
   const toggleMute = () => {
     const newMuted = !muted;
@@ -500,8 +544,39 @@ function IntroScreen({ onStart, audioRef, onMount }: { onStart: () => void; audi
     } catch {}
   };
 
+  const startedRef = useRef(false);
+
   const handleStart = () => {
-    if (audioRef.current) {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    if (audioRef.current && audioGraphRef.current) {
+      const audio = audioRef.current;
+      const { ctx, dry, wetGain, feedback } = audioGraphRef.current;
+
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+
+      const now = ctx.currentTime;
+      const fadeDuration = 2.0;
+
+      feedback.gain.setValueAtTime(0.45, now);
+      feedback.gain.linearRampToValueAtTime(0.15, now + fadeDuration);
+
+      wetGain.gain.setValueAtTime(0.6, now);
+      wetGain.gain.linearRampToValueAtTime(0, now + fadeDuration);
+
+      dry.gain.setValueAtTime(1.0, now);
+      dry.gain.linearRampToValueAtTime(0, now + fadeDuration * 0.6);
+
+      setTimeout(() => {
+        audio.pause();
+        audio.src = '';
+        audioGraphRef.current?.ctx.close().catch(() => {});
+        audioGraphRef.current = null;
+      }, (fadeDuration + 1.5) * 1000);
+    } else if (audioRef.current) {
       const audio = audioRef.current;
       const fadeStep = 0.05;
       const fadeInterval = setInterval(() => {

@@ -299,6 +299,8 @@ export class VillageLedgerGame {
   
   private characterSprites: { [key: string]: HTMLImageElement } = {};
   private processedSprites: { [key: string]: HTMLCanvasElement } = {};
+  private spriteFallbackTimer: number = 0;
+  private showSpriteFallbacks: boolean = false;
   
   // Sound mute button
   private muteButtonArea: { x: number; y: number; w: number; h: number } | null = null;
@@ -3773,6 +3775,13 @@ export class VillageLedgerGame {
   }
 
   private update(dt: number): void {
+    if (!this.showSpriteFallbacks) {
+      this.spriteFallbackTimer += dt;
+      if (this.spriteFallbackTimer > 3) {
+        this.showSpriteFallbacks = true;
+      }
+    }
+
     // Update bob animation
     this.bobTimer += dt * 8;
     this.talkingTimer += dt * 18; // Faster timer for talking bounce (~3 cycles/sec)
@@ -6346,6 +6355,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
     ctx.restore();
   } else {
+    if (!this.showSpriteFallbacks) return;
     ctx.fillStyle = char.color;
     ctx.strokeStyle = char.outlineColor;
     ctx.lineWidth = 3;

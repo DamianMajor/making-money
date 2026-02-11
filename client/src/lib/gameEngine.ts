@@ -6325,38 +6325,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       facing = -facing;
     }
 
-    if (walking && char.id === 'player') {
-      const walkCycle = Math.sin(walkT * 2.5);
-      const lean = walkCycle * 0.03 * facing;
-      const stretchY = 1 + Math.abs(walkCycle) * 0.02;
-      const squashX = 1 - Math.abs(walkCycle) * 0.015;
-
-      // Split sprite into upper body (60%) and legs (40%) for stride animation
-      const splitRatio = 0.6;
-      const upperH = Math.round(processedSprite.height * splitRatio);
-      const lowerH = processedSprite.height - upperH;
-      const upperDrawH = Math.round(spriteH * splitRatio);
-      const lowerDrawH = spriteH - upperDrawH;
-
-      // Leg stride offset - alternating left/right
-      const strideOffset = walkCycle * 4 * facing;
-
-      ctx.translate(Math.round(screenX), Math.round(y + spriteH));
-      if (facing < 0) {
-        ctx.scale(-squashX, stretchY);
-      } else {
-        ctx.scale(squashX, stretchY);
-      }
-      ctx.rotate(lean);
-
-      // Draw upper body (no stride offset)
-      ctx.drawImage(processedSprite, 0, 0, processedSprite.width, upperH,
-        Math.round(-spriteW / 2), Math.round(-spriteH), Math.round(spriteW), upperDrawH);
-
-      // Draw legs with stride offset
-      ctx.drawImage(processedSprite, 0, upperH, processedSprite.width, lowerH,
-        Math.round(-spriteW / 2 + strideOffset), Math.round(-spriteH + upperDrawH), Math.round(spriteW), lowerDrawH);
-    } else if (walking) {
+    if (walking) {
       const walkCycle = Math.sin(walkT * 2.5);
       const lean = walkCycle * 0.03 * facing;
       const stretchY = 1 + Math.abs(walkCycle) * 0.02;

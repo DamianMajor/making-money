@@ -347,18 +347,8 @@ function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: strin
     audio.preload = 'auto';
     audio.muted = muted;
     audioRef.current = audio;
-  }, [audioRef]);
-
-  const handleContinue = () => {
-    const muted = (() => {
-      try {
-        const stored = localStorage.getItem('villageLedger_soundSettings');
-        if (stored) return JSON.parse(stored).muted ?? false;
-      } catch {}
-      return false;
-    })();
-    if (audioRef.current && !muted) {
-      audioRef.current.play().catch(() => {
+    if (!muted) {
+      audio.play().catch(() => {
         const resumeOnInteraction = () => {
           audioRef.current?.play().catch(() => {});
           document.removeEventListener('click', resumeOnInteraction);
@@ -368,6 +358,9 @@ function ReflectionScreen({ onContinue, audioRef }: { onContinue: (answer: strin
         document.addEventListener('touchstart', resumeOnInteraction);
       });
     }
+  }, [audioRef]);
+
+  const handleContinue = () => {
     onContinue(answer);
   };
 

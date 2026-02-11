@@ -302,6 +302,9 @@ export class VillageLedgerGame {
   private processedSprites: { [key: string]: HTMLCanvasElement } = {};
   private spriteFallbackTimer: number = 0;
   private showSpriteFallbacks: boolean = false;
+  private spritesReady: boolean = false;
+  private spriteLoadCount: number = 0;
+  private spriteTotal: number = 5;
   
   // Sound mute button
   private muteButtonArea: { x: number; y: number; w: number; h: number } | null = null;
@@ -461,11 +464,17 @@ export class VillageLedgerGame {
           } else {
             this.processedSprites[id] = offscreen;
           }
+          this.spriteLoadCount++;
+          if (this.spriteLoadCount >= this.spriteTotal) {
+            this.spritesReady = true;
+          }
         }
       };
       img.src = `/sprites/${id}.png`;
       this.characterSprites[id] = img;
     });
+    this.spriteLoadCount = 0;
+    this.spriteTotal = spriteIds.length;
 
     // Track when all layers are loaded (or failed - proceed anyway)
     let loadedCount = 0;
@@ -6219,7 +6228,8 @@ export class VillageLedgerGame {
   }
 
 private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
-  // Apply render offset for soft collision visual separation (NPCs only)
+  if (!this.spritesReady && char.id !== 'berryBush') return;
+  
   const renderOffset = char.renderOffsetX || 0;
   const screenX = char.x - this.cameraX + renderOffset;
   

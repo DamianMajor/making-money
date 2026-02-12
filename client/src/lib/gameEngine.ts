@@ -62,6 +62,7 @@ interface GameState {
   pendingBadge: { name: string; description: string } | null;
   showBadgeTray: boolean;
   badgeTrayAnimTimer: number;
+  selectedBadgeIndex: number | null;
   lastBadgeEarnedTime: number;
   // Inventory hint for first trade
   showInventoryHint: boolean;
@@ -362,6 +363,42 @@ export class VillageLedgerGame {
 
   private badgeTrayButtonArea: { x: number; y: number; w: number; h: number } | null = null;
   private badgeTrayCloseButton: { x: number; y: number; w: number; h: number } | null = null;
+  private badgeItemAreas: { x: number; y: number; w: number; h: number; idx: number }[] = [];
+  private badgeDetailBackButton: { x: number; y: number; w: number; h: number } | null = null;
+  private badgeTrayPanelBounds: { x: number; y: number; w: number; h: number } | null = null;
+
+  private readonly BADGE_EDUCATIONAL_INFO: Record<string, { title: string; lesson: string; realWorld: string }> = {
+    'Double Coincidence of Wants': {
+      title: 'Double Coincidence of Wants',
+      lesson: 'For barter to work, both people must want exactly what the other person has, at the same time. This is really hard to achieve!',
+      realWorld: 'Imagine you have apples but want shoes. The shoemaker must also want apples right now. If they want oranges instead, the trade fails. This is why barter systems are so limited.'
+    },
+    'Debt': {
+      title: 'Debt',
+      lesson: 'A debt is a promise to pay someone back later. It lets people trade even when they don\'t have what the other person wants right now.',
+      realWorld: 'When you borrow a book from a friend, you owe them — that\'s a debt. The problem is: what if you forget, or disagree about what was promised?'
+    },
+    'No Trust, No Trade': {
+      title: 'No Trust, No Trade',
+      lesson: 'Without a way to prove what was promised, people can argue about debts. Trust alone isn\'t enough when memory fails or people disagree.',
+      realWorld: 'Think about lending a toy to someone who says they never borrowed it. Without proof, there\'s no way to settle the argument fairly.'
+    },
+    'The Ledger': {
+      title: 'The Ledger',
+      lesson: 'A ledger is a written record of all debts. When everyone can see what was promised, there\'s no room for arguments.',
+      realWorld: 'Banks use ledgers every day to track money. Your bank account is really just a number in a giant ledger showing how much the bank owes you!'
+    },
+    'Debt Settled': {
+      title: 'Debt Settled',
+      lesson: 'When a debt is paid off and recorded as settled, both sides are happy. The ledger proves the deal is done.',
+      realWorld: 'When you pay off a loan, the bank updates their records. The debt is settled and you\'re free — just like crossing it off the Stone Tablet!'
+    },
+    'Money Scholar': {
+      title: 'Money Scholar',
+      lesson: 'Money is really just a system for keeping track of who owes what to whom. It evolved from the need for better record-keeping!',
+      realWorld: 'Every dollar bill, bank balance, and digital payment is part of a massive record-keeping system — a modern version of the Stone Tablet!'
+    }
+  };
   
   private characterSprites: { [key: string]: HTMLImageElement } = {};
   private processedSprites: { [key: string]: HTMLCanvasElement } = {};
@@ -686,6 +723,7 @@ export class VillageLedgerGame {
       pendingBadge: null,
       showBadgeTray: false,
       badgeTrayAnimTimer: 0,
+      selectedBadgeIndex: null,
       lastBadgeEarnedTime: 0,
       showInventoryHint: false,
       inventoryHintShown: false,
@@ -5978,6 +6016,10 @@ export class VillageLedgerGame {
     // Draw success screen if complete
     if (this.state.showSuccess) {
       this.drawSuccessScreen(ctx);
+      this.drawBadgeTrayIcon(ctx);
+      if (this.state.showBadgeTray) {
+        this.drawBadgeTrayPanel(ctx);
+      }
     }
   }
 
@@ -7556,8 +7598,7 @@ export class VillageLedgerGame {
   }
 
   private drawBadgeTrayIcon(ctx: CanvasRenderingContext2D): void {
-    if (this.state.showQuiz || this.state.showSuccess || this.state.showFail || this.state.showBrawl || this.state.showQuizReview) return;
-    if (this.state.badges.length === 0) return;
+    if (this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview) return;
 
     const x = this.inventoryPanelLeftX - 44;
     const y = 16;
@@ -7626,6 +7667,13 @@ export class VillageLedgerGame {
     ctx.lineWidth = 3;
     ctx.stroke();
 
+    this.badgeTrayPanelBounds = { x: panelX, y: panelY, w: panelW, h: panelH };
+
+    if (this.state.selectedBadgeIndex !== null) {
+      this.drawBadgeDetail(ctx, panelX, panelY, panelW, panelH);
+      return;
+    }
+
     ctx.font = `bold 20px ${this.uiFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFD700';
@@ -7642,6 +7690,7 @@ export class VillageLedgerGame {
     const gridW = cols * badgeSize + (cols - 1) * gapX;
     const startX = (w - gridW) / 2;
     const startY = panelY + 75;
+    this.badgeItemAreas = [];
 
     this.ALL_BADGES.forEach((badge, i) => {
       const col = i % cols;
@@ -7708,12 +7757,11 @@ export class VillageLedgerGame {
         ctx.fillText(nameLine.trim(), bx + badgeSize / 2, nameY);
       }
 
-      if (earned) {
-        ctx.font = `8px ${this.uiFont}`;
-        ctx.fillStyle = '#A89070';
-        const shortDesc = badge.description.length > 45 ? badge.description.substring(0, 42) + '...' : badge.description;
-        ctx.fillText(shortDesc, bx + badgeSize / 2, nameY + 14);
-      }
+      ctx.font = `8px ${this.uiFont}`;
+      ctx.fillStyle = earned ? '#A89070' : '#555';
+      ctx.fillText(earned ? 'Tap for details' : 'Not yet earned', bx + badgeSize / 2, nameY + 14);
+
+      this.badgeItemAreas.push({ x: bx, y: by, w: badgeSize, h: badgeSize + 30, idx: i });
     });
 
     const closeBtnW = 120;
@@ -7735,19 +7783,170 @@ export class VillageLedgerGame {
     ctx.fillText('Close', w / 2, closeBtnY + 24);
 
     this.badgeTrayCloseButton = { x: closeBtnX, y: closeBtnY, w: closeBtnW, h: closeBtnH };
+    this.badgeDetailBackButton = null;
+  }
+
+  private drawBadgeDetail(ctx: CanvasRenderingContext2D, panelX: number, panelY: number, panelW: number, panelH: number): void {
+    const w = this.logicalWidth;
+    const badge = this.ALL_BADGES[this.state.selectedBadgeIndex!];
+    const earned = this.state.badges.includes(badge.name);
+    const info = this.BADGE_EDUCATIONAL_INFO[badge.name];
+
+    ctx.font = `bold 18px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = earned ? '#FFD700' : '#888';
+    ctx.fillText(badge.name, w / 2, panelY + 40);
+
+    const badgeCX = w / 2;
+    const badgeCY = panelY + 90;
+    const badgeR = 32;
+
+    ctx.fillStyle = earned ? '#4A3728' : '#2A1A0E';
+    ctx.strokeStyle = earned ? '#FFD700' : '#555';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(badgeCX, badgeCY, badgeR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    if (earned) {
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath();
+      for (let j = 0; j < 5; j++) {
+        const angle = (j * 4 * Math.PI / 5) - Math.PI / 2;
+        const px = badgeCX + Math.cos(angle) * 20;
+        const py = badgeCY + Math.sin(angle) * 20;
+        if (j === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#555';
+      ctx.font = `bold 28px ${this.uiFont}`;
+      ctx.fillText('?', badgeCX, badgeCY + 10);
+    }
+
+    let textY = panelY + 140;
+    const maxTextW = panelW - 50;
+
+    if (earned && info) {
+      ctx.font = `bold 11px ${this.uiFont}`;
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText('What You Learned', w / 2, textY);
+      textY += 20;
+
+      ctx.font = `11px ${this.uiFont}`;
+      ctx.fillStyle = '#E8D5A8';
+      textY = this.wrapText(ctx, info.lesson, w / 2, textY, maxTextW, 16);
+      textY += 20;
+
+      ctx.font = `bold 11px ${this.uiFont}`;
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText('Real World Connection', w / 2, textY);
+      textY += 20;
+
+      ctx.font = `11px ${this.uiFont}`;
+      ctx.fillStyle = '#C4A77D';
+      textY = this.wrapText(ctx, info.realWorld, w / 2, textY, maxTextW, 16);
+    } else {
+      ctx.font = `12px ${this.uiFont}`;
+      ctx.fillStyle = '#888';
+      ctx.fillText('Keep playing to earn this badge!', w / 2, textY + 10);
+      textY += 30;
+      ctx.font = `10px ${this.uiFont}`;
+      ctx.fillStyle = '#666';
+      ctx.fillText(badge.description, w / 2, textY + 10);
+    }
+
+    const backBtnW = 120;
+    const backBtnH = 36;
+    const backBtnX = (w - backBtnW) / 2;
+    const backBtnY = panelY + panelH - 50;
+
+    ctx.fillStyle = '#5D4837';
+    ctx.beginPath();
+    ctx.roundRect(backBtnX, backBtnY, backBtnW, backBtnH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = '#F5DEB3';
+    ctx.textAlign = 'center';
+    ctx.fillText('Back', w / 2, backBtnY + 24);
+
+    this.badgeDetailBackButton = { x: backBtnX, y: backBtnY, w: backBtnW, h: backBtnH };
+    this.badgeTrayCloseButton = null;
+  }
+
+  private wrapText(ctx: CanvasRenderingContext2D, text: string, centerX: number, startY: number, maxWidth: number, lineHeight: number): number {
+    const words = text.split(' ');
+    let line = '';
+    let y = startY;
+    for (const word of words) {
+      const test = line + word + ' ';
+      if (ctx.measureText(test).width > maxWidth && line !== '') {
+        ctx.fillText(line.trim(), centerX, y);
+        line = word + ' ';
+        y += lineHeight;
+      } else {
+        line = test;
+      }
+    }
+    if (line.trim()) {
+      ctx.fillText(line.trim(), centerX, y);
+      y += lineHeight;
+    }
+    return y;
+  }
+
+  private isInsidePanel(x: number, y: number): boolean {
+    if (!this.badgeTrayPanelBounds) return false;
+    const p = this.badgeTrayPanelBounds;
+    return x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h;
   }
 
   private handleBadgeTrayTouch(x: number, y: number): void {
     if (this.state.showBadgeTray) {
+      if (!this.isInsidePanel(x, y)) {
+        this.state.showBadgeTray = false;
+        this.state.selectedBadgeIndex = null;
+        soundManager.play('dialogueAdvance');
+        return;
+      }
+
+      if (this.state.selectedBadgeIndex !== null) {
+        if (this.badgeDetailBackButton) {
+          const btn = this.badgeDetailBackButton;
+          if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+            this.state.selectedBadgeIndex = null;
+            soundManager.play('dialogueAdvance');
+            return;
+          }
+        }
+        return;
+      }
+
       if (this.badgeTrayCloseButton) {
         const btn = this.badgeTrayCloseButton;
         if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
           this.state.showBadgeTray = false;
+          this.state.selectedBadgeIndex = null;
           soundManager.play('dialogueAdvance');
           return;
         }
       }
-      this.state.showBadgeTray = false;
+
+      for (const area of this.badgeItemAreas) {
+        if (x >= area.x && x <= area.x + area.w && y >= area.y && y <= area.y + area.h) {
+          this.state.selectedBadgeIndex = area.idx;
+          soundManager.play('choiceSelect');
+          return;
+        }
+      }
+
       return;
     }
 
@@ -7755,6 +7954,7 @@ export class VillageLedgerGame {
       const btn = this.badgeTrayButtonArea;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.state.showBadgeTray = true;
+        this.state.selectedBadgeIndex = null;
         soundManager.play('dialogueAdvance');
       }
     }
@@ -10549,6 +10749,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillText('Play again to discover more concepts!', w / 2, msgY + 18);
     }
     
+    // Learn More hint
+    const hintY = startY + 2 * (badgeSize + gapY + 30) + 42;
+    ctx.font = `9px ${this.uiFont}`;
+    ctx.fillStyle = '#A89070';
+    ctx.textAlign = 'center';
+    ctx.fillText('Tap the badge icon to learn more about each concept', w / 2, hintY);
+
     // Play Again button
     const btnW = 180;
     const btnH = 42;
@@ -10576,6 +10783,19 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private slingshotExitButton: { x: number; y: number; w: number; h: number } | null = null;
 
   private handleSuccessTouch(x: number, y: number): void {
+    if (this.state.showBadgeTray) {
+      this.handleBadgeTrayTouch(x, y);
+      return;
+    }
+
+    if (this.badgeTrayButtonArea) {
+      const btn = this.badgeTrayButtonArea;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.handleBadgeTrayTouch(x, y);
+        return;
+      }
+    }
+
     if (this.playAgainButton) {
       const btn = this.playAgainButton;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
@@ -10596,6 +10816,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       pendingBadge: null,
       showBadgeTray: false,
       badgeTrayAnimTimer: 0,
+      selectedBadgeIndex: null,
       lastBadgeEarnedTime: 0,
       showInventoryHint: false,
       inventoryHintShown: false,
@@ -10748,6 +10969,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       pendingBadge: null,
       showBadgeTray: false,
       badgeTrayAnimTimer: 0,
+      selectedBadgeIndex: null,
       lastBadgeEarnedTime: 0,
       showInventoryHint: false,
       inventoryHintShown: false,

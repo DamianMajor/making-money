@@ -394,6 +394,7 @@ export class VillageLedgerGame {
   private stormTriggered: boolean = false;
   private rainSoundStarted: boolean = false;
   private celebrationEndTime: number = 0;
+  private frozenCelebrationTimer: number = 0;
   private partySongEndTime: number = 0;
   private slingshotPlatformActive: boolean = false;
   private inventoryPanelLeftX: number = 0;
@@ -4900,6 +4901,7 @@ export class VillageLedgerGame {
     this.state.slingshotGameActive = false;
     this.state.slingshotLocked = false;
     this.state.playerBlockedForCarving = false;
+    this.frozenCelebrationTimer = this.state.celebrationTimer;
     this.state.partyEnded = true;
     this.state.showCelebration = false;
     this.celebrationEndTime = Date.now();
@@ -6272,9 +6274,9 @@ export class VillageLedgerGame {
   private drawSpeakers(ctx: CanvasRenderingContext2D): void {
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
-    const t = this.state.celebrationTimer;
-    const introFade = Math.min(1, t / 1.5);
     const isAnimated = this.state.showCelebration;
+    const t = isAnimated ? this.state.celebrationTimer : this.frozenCelebrationTimer;
+    const introFade = Math.min(1, t / 1.5);
 
     ctx.save();
     ctx.globalAlpha = isAnimated ? introFade : 1;
@@ -6283,7 +6285,8 @@ export class VillageLedgerGame {
     const conePump = isAnimated ? Math.sin(t * 8) * 9 : 0;
     const speakerShake = isAnimated ? Math.sin(t * 15) * 3 : 0;
 
-    const speakerWorldPositions = [this.villageCenterX - 300, this.villageCenterX + 350];
+    const djCenterX = this.villageElder.x;
+    const speakerWorldPositions = [djCenterX - 350, djCenterX + 350];
     for (let side = 0; side < 2; side++) {
       const speakerWorldX = speakerWorldPositions[side];
       const speakerScreenX = speakerWorldX - this.cameraX;
@@ -6531,39 +6534,180 @@ export class VillageLedgerGame {
     const introFade = Math.min(1, t / 1.5);
 
     if (this.state.partyEnded && !this.state.showCelebration) {
+      const ft = this.frozenCelebrationTimer;
       ctx.save();
       
       const elderScreenX = this.villageElder.x - this.cameraX;
+
+      const discoBallR = 36;
+      const targetFrozenY = groundY * 0.45;
+      const discoBallDropY = Math.min(targetFrozenY, ft * 30);
+      const discoBallWorldX = this.villageElder.x;
+      const discoBallX = discoBallWorldX - this.cameraX;
+      const discoBallFrozenY = discoBallDropY;
+
+      const numBeams = 16;
+      for (let i = 0; i < numBeams; i++) {
+        const angle = (ft * 1.5 + i * (Math.PI * 2 / numBeams));
+        const beamLen = 300 + Math.sin(ft * 3 + i) * 100;
+        const endX = discoBallX + Math.cos(angle) * beamLen;
+        const endY = discoBallFrozenY + Math.sin(angle) * beamLen;
+        if (endY > discoBallFrozenY) {
+          const beamGrad = ctx.createLinearGradient(discoBallX, discoBallFrozenY, endX, endY);
+          const hue = (ft * 40 + i * 22) % 360;
+          beamGrad.addColorStop(0, `hsla(${hue}, 100%, 80%, 0.25)`);
+          beamGrad.addColorStop(1, `hsla(${hue}, 100%, 60%, 0)`);
+          ctx.strokeStyle = beamGrad;
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(discoBallX, discoBallFrozenY);
+          ctx.lineTo(endX, Math.min(endY, groundY));
+          ctx.stroke();
+        }
+      }
+
+      const lightColors = ['#FF0066', '#00FF66', '#0066FF', '#FF6600', '#CC00FF', '#FFFF00'];
+      const stoneCenter = this.villageCenterX;
+      const clearance = 250;
+      const spacing = 200;
+      const lightPositions = [
+        stoneCenter - clearance - spacing * 2,
+        stoneCenter - clearance - spacing,
+        stoneCenter - clearance,
+        stoneCenter + clearance,
+        stoneCenter + clearance + spacing,
+        stoneCenter + clearance + spacing * 2,
+      ];
+      const casingH = 14;
+      const casingW = 18;
+      const casingFrozenY = dialogueTop - casingH;
+
+      for (let i = 0; i < lightPositions.length; i++) {
+        const worldX = lightPositions[i];
+        const lx = worldX - this.cameraX;
+        if (lx < -100 || lx > w + 100) continue;
+        const sweepAngle = Math.sin(ft * 2.5 + i * 1.2) * 0.6 - Math.PI / 2;
+        const beamLen = groundY + 20;
+        const endX = lx + Math.cos(sweepAngle) * beamLen * 0.4;
+        const lightGrad = ctx.createLinearGradient(lx, dialogueTop, endX, 0);
+        const color = lightColors[i % lightColors.length];
+        lightGrad.addColorStop(0, color + 'AA');
+        lightGrad.addColorStop(0.5, color + '33');
+        lightGrad.addColorStop(1, color + '00');
+        ctx.fillStyle = lightGrad;
+        ctx.beginPath();
+        ctx.moveTo(lx - 6, dialogueTop);
+        ctx.lineTo(endX - 35, 10);
+        ctx.lineTo(endX + 35, 10);
+        ctx.lineTo(lx + 6, dialogueTop);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#1A1A1A';
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(lx - casingW / 2, casingFrozenY, casingW, casingH, [3, 3, 0, 0]);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = color + '88';
+        ctx.beginPath();
+        ctx.arc(lx, casingFrozenY + 2, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const partyLeftWorld = this.villageCenterX - 400;
+      const partyRightWorld = this.villageCenterX + 400;
+      for (let i = 0; i < 4; i++) {
+        const worldCornerX = (i % 2 === 0) ? partyLeftWorld : partyRightWorld;
+        const cornerX = worldCornerX - this.cameraX;
+        const cornerY = (i < 2) ? 0 : groundY;
+        if (cornerX < -200 || cornerX > w + 200) continue;
+        const sweepAngle = Math.sin(ft * 1.8 + i * 1.2) * 0.5;
+        const baseAngle = (i % 2 === 0) ? 0 : Math.PI;
+        const angle = baseAngle + sweepAngle + (i < 2 ? 0.3 : -0.3);
+        const beamLen = 350;
+        const endX = cornerX + Math.cos(angle) * beamLen;
+        const endY = cornerY + Math.sin(angle) * beamLen;
+        const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
+        const hue = (ft * 50 + i * 90) % 360;
+        cornerGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.35)`);
+        cornerGrad.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
+        ctx.strokeStyle = cornerGrad;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+      }
+
       const boothW = 120;
       const boothH = 75;
       const boothX = elderScreenX - boothW / 2;
       const boothY = groundY - boothH + 27;
       ctx.fillStyle = '#2D1B0E';
-      ctx.strokeStyle = '#1A0F06';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.roundRect(boothX, boothY, boothW, boothH, 6);
-      ctx.fill();
-      ctx.stroke();
-      ctx.fillStyle = '#1A0F06';
-      ctx.beginPath();
-      ctx.roundRect(boothX + 8, boothY + 8, boothW - 16, boothH - 20, 4);
-      ctx.fill();
-      
-      const discoBallR = 36;
-      const discoBallY = groundY * 0.45;
-      const discoBallWorldX = this.villageElder.x;
-      const discoBallScreenX = discoBallWorldX - this.cameraX;
-      ctx.fillStyle = '#555';
-      ctx.beginPath();
-      ctx.arc(discoBallScreenX, discoBallY, discoBallR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = '#444';
+      ctx.strokeStyle = '#8B6914';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(discoBallScreenX, discoBallY - discoBallR);
-      ctx.lineTo(discoBallScreenX, 0);
+      ctx.roundRect(boothX, boothY, boothW, boothH, 4);
+      ctx.fill();
       ctx.stroke();
+      ctx.fillStyle = '#1A1A2E';
+      ctx.fillRect(boothX + 6, boothY + 6, boothW - 12, boothH - 22);
+      const eqBars = 12;
+      for (let i = 0; i < eqBars; i++) {
+        const barH = 6 + Math.abs(Math.sin(ft * 8 + i * 0.8)) * 22;
+        const bx = boothX + 10 + i * 10;
+        ctx.fillStyle = `hsl(${(ft * 60 + i * 40) % 360}, 100%, 60%)`;
+        ctx.fillRect(bx, boothY + 38 - barH, 6, barH);
+      }
+      const knobColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
+      for (let i = 0; i < 5; i++) {
+        const kx = boothX + 12 + i * 22;
+        const ky = boothY + boothH - 10;
+        ctx.fillStyle = knobColors[i];
+        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(ft * 6 + i * 1.5);
+        ctx.beginPath();
+        ctx.arc(kx, ky, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(discoBallX, 0);
+      ctx.lineTo(discoBallX, discoBallFrozenY - discoBallR);
+      ctx.stroke();
+      const grad = ctx.createRadialGradient(discoBallX - 8, discoBallFrozenY - 8, 4, discoBallX, discoBallFrozenY, discoBallR);
+      grad.addColorStop(0, '#FFFFFF');
+      grad.addColorStop(0.3, '#C0C0C0');
+      grad.addColorStop(1, '#505050');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(discoBallX, discoBallFrozenY, discoBallR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      const tileSpacing = 4.5;
+      const tileSize = 4;
+      const maxRows = Math.ceil(discoBallR / tileSpacing);
+      for (let row = -maxRows; row <= maxRows; row++) {
+        const rowY = row * tileSpacing;
+        const rowRadius = Math.sqrt(Math.max(0, discoBallR * discoBallR - rowY * rowY));
+        const numCols = Math.ceil(rowRadius / tileSpacing);
+        for (let col = -numCols; col <= numCols; col++) {
+          const tileAngle = ft * 2 + row * 0.5 + col * 0.7;
+          const perspectiveScale = Math.cos(row * 0.15);
+          const tileX = discoBallX + col * tileSpacing * perspectiveScale;
+          const tileY = discoBallFrozenY + rowY;
+          const dist = Math.sqrt((tileX - discoBallX) ** 2 + (tileY - discoBallFrozenY) ** 2);
+          if (dist < discoBallR - 1.5) {
+            ctx.fillStyle = `hsl(${(tileAngle * 60) % 360}, 85%, ${55 + Math.sin(tileAngle) * 25}%)`;
+            ctx.fillRect(tileX - tileSize / 2, tileY - tileSize / 2, tileSize, tileSize);
+          }
+        }
+      }
       
       ctx.restore();
       return;

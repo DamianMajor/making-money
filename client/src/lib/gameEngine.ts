@@ -1176,8 +1176,9 @@ export class VillageLedgerGame {
           return;
         }
       } else {
-        // Check if player is within range of the NPC
-        const inRange = Math.abs(this.player.x - tappedTarget.x) < interactionRange;
+        // Check if player is within range of the NPC (stone worker gets extra range)
+        const npcRange = tappedTarget.id === 'stoneWorker' ? interactionRange + 50 : interactionRange;
+        const inRange = Math.abs(this.player.x - tappedTarget.x) < npcRange;
         if (inRange) {
           this.triggerNPCInteraction(tappedTarget.id);
           this.autoWalkTarget = null;
@@ -3464,7 +3465,7 @@ export class VillageLedgerGame {
     this.state.slingshotBalloons = [];
     const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 25; i++) {
       this.state.slingshotBalloons.push({
         x: 80 + Math.random() * (this.worldWidth - 160),
         y: 30 + Math.random() * (groundY * 0.55),
@@ -3479,7 +3480,6 @@ export class VillageLedgerGame {
     }
     soundManager.stopDaytimeMusic();
     soundManager.play('remixSong');
-    soundManager.play('crowdApplause');
     const remixDuration = soundManager.getBufferDuration('remixSong');
     if (remixDuration > 0) {
       this.partySongEndTime = Date.now() + remixDuration;
@@ -4381,8 +4381,9 @@ export class VillageLedgerGame {
       const targetX = this.autoWalkTarget.x;
       const dx = targetX - this.player.x;
       const interactionRange = 25; // Small range for proximity-based interactions
+      const effectiveRange = (this.autoWalkTarget.id === 'stoneWorker') ? interactionRange + 50 : interactionRange;
       
-      if (Math.abs(dx) <= interactionRange) {
+      if (Math.abs(dx) <= effectiveRange) {
         // Arrived at target - trigger interaction and clear movement state
         const targetType = this.autoWalkTarget.type;
         const targetId = this.autoWalkTarget.id;
@@ -4713,7 +4714,7 @@ export class VillageLedgerGame {
       this.state.playerFading = true;
       this.state.playerBlockedForCarving = true;
       this.autoWalkTarget = null;
-      soundManager.stop('thunder');
+      soundManager.play('thunder');
     }
 
     // Update brawl animation timer and NPC movement during brawl
@@ -5106,7 +5107,7 @@ export class VillageLedgerGame {
     this.state.slingshotBalloons = [];
     const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 25; i++) {
       this.state.slingshotBalloons.push({
         x: 80 + Math.random() * (this.worldWidth - 160),
         y: 30 + Math.random() * (groundY * 0.55),
@@ -5149,7 +5150,7 @@ export class VillageLedgerGame {
     const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
     
     const activeBalloons = this.state.slingshotBalloons.filter(b => !b.popped);
-    if (t - this.state.slingshotLastSpawnTime > 2.5 && activeBalloons.length < 15) {
+    if (t - this.state.slingshotLastSpawnTime > 1.5 && activeBalloons.length < 25) {
       this.state.slingshotLastSpawnTime = t;
       const fromLeft = Math.random() > 0.5;
       this.state.slingshotBalloons.push({
@@ -5347,9 +5348,9 @@ export class VillageLedgerGame {
     const platformW = 120;
     const platformH = 16;
     const platformScreenX = platformWorldX - this.cameraX;
-    const slingshotWorldX = platformWorldX;
+    const slingshotWorldX = platformWorldX - platformW / 2 + 15;
     const slingshotScreenX = slingshotWorldX - this.cameraX;
-    const slingshotY = groundY - 20;
+    const slingshotY = groundY;
     
     this.slingshotPlatformActive = this.state.showCelebration && this.state.slingshotLocked;
     
@@ -5365,7 +5366,7 @@ export class VillageLedgerGame {
       ctx.fillStyle = '#6B3A1F';
       ctx.fillRect(platformScreenX - platformW / 2 + 4, groundY - platformH - 2, platformW - 8, 3);
       
-      const signPostX = platformScreenX + platformW / 2 + 20;
+      const signPostX = platformScreenX + platformW / 2 + 35;
       ctx.strokeStyle = '#6B3A1F';
       ctx.lineWidth = 4;
       ctx.beginPath();
@@ -5552,12 +5553,12 @@ export class VillageLedgerGame {
       ctx.textAlign = 'center';
       ctx.font = `bold 14px ${this.uiFont}`;
       ctx.fillStyle = '#FFD700';
-      ctx.fillText(`SCORE: ${this.state.slingshotScore}`, platformScreenX, groundY - platformH - 65);
+      ctx.fillText(`SCORE: ${this.state.slingshotScore}`, platformScreenX, groundY + 28);
       
       if (this.state.slingshotCombo >= 2) {
         ctx.font = `bold 12px ${this.uiFont}`;
         ctx.fillStyle = '#FF6600';
-        ctx.fillText(`x${this.state.slingshotCombo}`, platformScreenX, groundY - platformH - 50);
+        ctx.fillText(`x${this.state.slingshotCombo}`, platformScreenX, groundY + 43);
       }
     }
     
@@ -5594,8 +5595,10 @@ export class VillageLedgerGame {
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const platformWorldX = this.villageCenterX + 400;
-    const slingshotScreenX = platformWorldX - this.cameraX;
-    const slingshotY = groundY - 20;
+    const platformW = 120;
+    const slingshotWorldX = platformWorldX - platformW / 2 + 15;
+    const slingshotScreenX = slingshotWorldX - this.cameraX;
+    const slingshotY = groundY;
     
     const dx = x - slingshotScreenX;
     const dy = y - (slingshotY - 30);
@@ -5615,7 +5618,9 @@ export class VillageLedgerGame {
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const platformWorldX = this.villageCenterX + 400;
-    const slingshotScreenX = platformWorldX - this.cameraX;
+    const platformW = 120;
+    const slingshotWorldX = platformWorldX - platformW / 2 + 15;
+    const slingshotScreenX = slingshotWorldX - this.cameraX;
     const slingshotY = groundY - 30;
     
     const dx = x - slingshotScreenX;
@@ -5640,7 +5645,9 @@ export class VillageLedgerGame {
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const platformWorldX = this.villageCenterX + 400;
-    const slingshotScreenX = platformWorldX - this.cameraX;
+    const platformW = 120;
+    const slingshotWorldX = platformWorldX - platformW / 2 + 15;
+    const slingshotScreenX = slingshotWorldX - this.cameraX;
     const slingshotY = groundY - 30;
     
     if (this.state.slingshotAimCurrent) {
@@ -6233,6 +6240,13 @@ export class VillageLedgerGame {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
     
+    // Animation: scale up from 0.5 and fade in over 0.4 seconds
+    const animElapsed = (Date.now() - this.badgePopupStartTime) / 1000;
+    const animProgress = Math.min(1, animElapsed / 0.4);
+    const eased = 1 - Math.pow(1 - animProgress, 3);
+    const scale = 0.5 + 0.5 * eased;
+    const popupAlpha = eased;
+    
     // Popup dimensions - increased height for text and button spacing
     const popupWidth = 420;
     const popupHeight = 360;
@@ -6240,8 +6254,15 @@ export class VillageLedgerGame {
     const popupY = (h - popupHeight) / 2;
     
     // Dark overlay with celebration effect
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.8 * popupAlpha})`;
     ctx.fillRect(0, 0, w, h);
+    
+    // Apply scale transform centered on popup
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.scale(scale, scale);
+    ctx.translate(-w / 2, -h / 2);
+    ctx.globalAlpha = popupAlpha;
     
     // Add sparkle particles
     const now = Date.now() / 1000;
@@ -6366,6 +6387,8 @@ export class VillageLedgerGame {
     ctx.fillText('Continue', btnX + btnWidth / 2, btnY + 26);
     
     this.badgePopupButtonArea = { x: btnX, y: btnY, w: btnWidth, h: btnHeight };
+    
+    ctx.restore();
   }
 
   private drawBrawlAnimation(ctx: CanvasRenderingContext2D): void {
@@ -6505,7 +6528,7 @@ export class VillageLedgerGame {
         ctx.roundRect(9, cabY - cabH + 9, cabW - 18, cabH - 18, 4);
         ctx.fill();
         const coneX = cabW / 2;
-        const coneY = cabY - cabH / 2 - 15;
+        const coneY = cabY - cabH / 2 - 5;
         const coneR = 48 + conePump;
         ctx.fillStyle = '#111';
         ctx.beginPath();
@@ -6527,7 +6550,7 @@ export class VillageLedgerGame {
         ctx.beginPath();
         ctx.arc(coneX, coneY, 15, 0, Math.PI * 2);
         ctx.fill();
-        const tweeterY = cabY - cabH + 42;
+        const tweeterY = cabY - cabH + 50;
         ctx.fillStyle = '#111';
         ctx.beginPath();
         ctx.arc(coneX, tweeterY, 18, 0, Math.PI * 2);
@@ -6930,7 +6953,7 @@ export class VillageLedgerGame {
     const glassW = 20;
     const glassH = 7;
     const bridgeY = elderHeadY;
-    const sideOffset = 7;
+    const sideOffset = 10;
 
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#333';
@@ -7302,12 +7325,15 @@ export class VillageLedgerGame {
     this.state.rainfallTimer += 1/60;
     const t = this.state.rainfallTimer;
     
+    // Fade in over 2 seconds
+    const fadeIn = Math.min(1, t / 2);
+    
     // Dark stormy sky background (no cloud graphics)
-    ctx.fillStyle = 'rgba(20, 20, 35, 0.65)';
+    ctx.fillStyle = `rgba(20, 20, 35, ${0.65 * fadeIn})`;
     ctx.fillRect(0, 0, w, h);
     
     // Rain drops animation
-    ctx.strokeStyle = 'rgba(180, 200, 255, 0.4)';
+    ctx.strokeStyle = `rgba(180, 200, 255, ${0.4 * fadeIn})`;
     ctx.lineWidth = 1.5;
     
     const rainDensity = 150;
@@ -7559,12 +7585,15 @@ export class VillageLedgerGame {
   
   private badgeAutoTimer: ReturnType<typeof setTimeout> | null = null;
 
+  private badgePopupStartTime: number = 0;
+
   private awardBadge(name: string, description: string, onDismiss?: () => void): void {
     // Don't award duplicates
     if (!this.state.badges.includes(name)) {
       this.state.pendingBadge = { name, description };
       this.state.showBadgePopup = true;
       this.state.lastBadgeEarnedTime = Date.now();
+      this.badgePopupStartTime = Date.now();
       this.badgeDismissCallback = onDismiss || null;
       soundManager.play('badgeReward');
       if (this.badgeAutoTimer) clearTimeout(this.badgeAutoTimer);
@@ -7622,7 +7651,7 @@ export class VillageLedgerGame {
     ctx.stroke();
 
     const starX = x + size / 2;
-    const starY = y + size / 2 + 1;
+    const starY = y + size / 2;
     const starSize = 10;
     ctx.fillStyle = '#FFD700';
     ctx.beginPath();
@@ -8644,7 +8673,24 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       facing = -facing;
     }
 
-    if (walking) {
+    const isDancing = (this.state.showCelebration || this.state.partyEnded) && !this.state.slingshotLocked && char.id === 'player';
+    
+    if (isDancing) {
+      const danceT = this.state.celebrationTimer * 4;
+      const bounce = Math.abs(Math.sin(danceT)) * 8;
+      const sway = Math.sin(danceT * 0.5) * 0.06;
+      const squash = 1 + Math.abs(Math.sin(danceT)) * 0.04;
+      const stretch = 1 - Math.abs(Math.sin(danceT)) * 0.03;
+      
+      ctx.translate(Math.round(screenX), Math.round(y + spriteH - bounce));
+      if (facing < 0) {
+        ctx.scale(-stretch, squash);
+      } else {
+        ctx.scale(stretch, squash);
+      }
+      ctx.rotate(sway);
+      ctx.drawImage(processedSprite, Math.round(-spriteW / 2), Math.round(-spriteH), Math.round(spriteW), Math.round(spriteH));
+    } else if (walking) {
       const walkCycle = Math.sin(walkT * 2.5);
       const lean = walkCycle * 0.03 * facing;
       const stretchY = 1 + Math.abs(walkCycle) * 0.02;
@@ -10510,9 +10556,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.fillRect(0, 0, w, h);
     
-    // Card dimensions - tall enough to fit all content
-    const cardW = Math.min(700, w - 40);
-    const cardH = Math.min(560, h - 20);
+    // Card dimensions - compact for brief congrats
+    const cardW = Math.min(500, w - 40);
+    const cardH = Math.min(380, h - 40);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
     
@@ -10525,72 +10571,49 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.lineWidth = 4;
     ctx.stroke();
     
+    // Gold star icon
+    const starCx = w / 2;
+    const starCy = cardY + 60;
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const angle = (i * 4 * Math.PI / 5) - Math.PI / 2;
+      const px = starCx + Math.cos(angle) * 28;
+      const py = starCy + Math.sin(angle) * 28;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    
     // Title
     ctx.font = `bold 20px ${this.retroFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#166534';
-    ctx.fillText('LESSON COMPLETE!', w / 2, cardY + 45);
+    ctx.fillText('CONGRATULATIONS!', w / 2, cardY + 115);
     
     // Score line
-    ctx.font = `12px ${this.retroFont}`;
+    ctx.font = `14px ${this.retroFont}`;
     ctx.fillStyle = '#5D4837';
-    ctx.fillText(`You answered all ${this.quizQuestions.length} questions correctly!`, w / 2, cardY + 75);
+    ctx.fillText(`You aced all ${this.quizQuestions.length} questions!`, w / 2, cardY + 145);
     
-    const maxWidth = cardW - 60;
-    let yOffset = cardY + 110;
-    
-    // Main educational summary
-    ctx.font = `bold 14px ${this.retroFont}`;
-    ctx.fillStyle = '#3D2914';
-    ctx.fillText('What You Learned:', w / 2, yOffset);
-    yOffset += 30;
-    
-    // Key lessons
+    // Brief summary
     ctx.font = `12px ${this.retroFont}`;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#5D4837';
-    
-    const lessons = [
-      "1. The Double Coincidence of Wants makes direct trading difficult - both parties must want exactly what the other has, at the same time.",
-      "2. Debt allows trade even when you don't have what someone wants right now - you can promise to pay later.",
-      "3. A Ledger creates a permanent, shared record that everyone can verify - no more disputes about who owes what.",
-      "4. Money evolved as a social tool to solve these problems - it tracks debts so anyone can trade with anyone, anytime."
-    ];
-    
-    lessons.forEach(lesson => {
-      const lines = this.wrapText(ctx, lesson, maxWidth);
-      lines.forEach(line => {
-        ctx.font = `12px ${this.retroFont}`;
-        ctx.textAlign = 'left';
-        this.drawHighlightedText(ctx, line, cardX + 30, yOffset, '#5D4837');
-        yOffset += 18;
-      });
-      yOffset += 6;
-    });
-    
-    yOffset += 5;
-    
-    ctx.font = `bold 11px ${this.retroFont}`;
     ctx.fillStyle = '#6B4423';
-    ctx.textAlign = 'center';
-    ctx.fillText('The Big Idea:', w / 2, yOffset);
-    yOffset += 16;
+    ctx.fillText('You learned how the barter system works,', w / 2, cardY + 185);
+    ctx.fillText('why money was invented, and how a', w / 2, cardY + 203);
+    ctx.fillText('ledger keeps trade fair for everyone.', w / 2, cardY + 221);
     
+    // Learn More hint
     ctx.font = `10px ${this.retroFont}`;
-    ctx.textAlign = 'center';
-    const bigIdea = "Money is not just coins or paper - it's a system for tracking debts. When you get paid, you earn the right to collect value later. The Stone Tablet was an early ledger - today we use banks and computers, but the idea is the same!";
-    const bigIdeaLines = this.wrapText(ctx, bigIdea, maxWidth);
-    bigIdeaLines.forEach(line => {
-      this.drawHighlightedText(ctx, line, w / 2, yOffset, '#3D2914', 'center');
-      yOffset += 14;
-    });
+    ctx.fillStyle = '#8B7355';
+    ctx.fillText('Tap the badge tray to explore what you learned!', w / 2, cardY + 260);
     
-    // Continue button - positioned below the text content, clamped to card bounds
+    // Continue button
     const btnW = 200;
     const btnH = 45;
     const btnX = (w - btnW) / 2;
-    const maxBtnY = cardY + cardH - btnH - 15;
-    const btnY = Math.min(yOffset + 20, maxBtnY);
+    const btnY = cardY + 290;
     
     ctx.fillStyle = '#166534';
     ctx.beginPath();

@@ -4148,30 +4148,33 @@ export class VillageLedgerGame {
     soundManager.init();
     soundManager.resumeContext();
 
-    setTimeout(() => {
+    if (this.externalAudio) {
+      const audio = this.externalAudio;
+      const extCtx = this.externalAudioContext;
+      this.externalAudio = null;
+      this.externalAudioContext = null;
+      const fadeStep = 0.02;
+      const fadeInterval = setInterval(() => {
+        if (audio.volume > fadeStep) {
+          audio.volume -= fadeStep;
+        } else {
+          audio.volume = 0;
+          audio.pause();
+          clearInterval(fadeInterval);
+          if (extCtx) {
+            extCtx.close().catch(() => {});
+          }
+        }
+      }, 50);
+
+      setTimeout(() => {
+        soundManager.playLoop('ambientVillage');
+        soundManager.startDaytimeMusic();
+      }, 2000);
+    } else {
       soundManager.playLoop('ambientVillage');
       soundManager.startDaytimeMusic();
-
-      if (this.externalAudio) {
-        const audio = this.externalAudio;
-        const extCtx = this.externalAudioContext;
-        const fadeStep = 0.02;
-        const fadeInterval = setInterval(() => {
-          if (audio.volume > fadeStep) {
-            audio.volume -= fadeStep;
-          } else {
-            audio.volume = 0;
-            audio.pause();
-            clearInterval(fadeInterval);
-            if (extCtx) {
-              extCtx.close().catch(() => {});
-            }
-          }
-        }, 50);
-        this.externalAudio = null;
-        this.externalAudioContext = null;
-      }
-    }, 1500);
+    }
 
     setTimeout(() => this.triggerIntro(), 500);
   }
@@ -8612,9 +8615,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const panelWidth = items.length * (iconSize + spacing + 20) + padding;
     const panelHeight = iconSize + padding * 1.5;
     
-    // Position to the left of Stone Tablet HUD icon
-    const stoneTabletHudX = this.stoneTabletHudArea.x;
-    const stoneTabletHudY = this.stoneTabletHudArea.y;
+    // Calculate Stone Tablet HUD position directly (same formula as drawStoneTabletHUD)
+    const muteButtonSize = 36;
+    const muteRightEdge = this.logicalWidth - 12;
+    const tabletIconW = 44;
+    const stoneTabletHudX = this.state.showHUD ? this.stoneTabletHudArea.x : (muteRightEdge - muteButtonSize - 12 - tabletIconW);
+    const stoneTabletHudY = this.state.showHUD ? this.stoneTabletHudArea.y : 16;
     const panelX = stoneTabletHudX - panelWidth - 12;
     const yPos = stoneTabletHudY;
     let xPos = panelX + padding / 2;

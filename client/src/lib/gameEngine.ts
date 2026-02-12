@@ -5901,6 +5901,83 @@ export class VillageLedgerGame {
     ctx.save();
     ctx.globalAlpha = introFade;
     
+    // ── GIANT SPEAKER STACKS (screen-fixed, left and right) ──
+    const speakerPulse = Math.sin(t * 12) * 0.02;
+    const conePump = Math.sin(t * 8) * 3;
+    const speakerShake = Math.sin(t * 15) * 1.5;
+    
+    for (let side = 0; side < 2; side++) {
+      const sx = side === 0 ? 10 : w - 70;
+      const baseY = groundY - 10;
+      
+      ctx.save();
+      ctx.translate(sx + 30, baseY);
+      ctx.translate(speakerShake * (side === 0 ? 1 : -1), speakerShake * 0.5);
+      ctx.scale(1 + speakerPulse, 1 + speakerPulse);
+      ctx.translate(-30, 0);
+      
+      for (let cab = 0; cab < 2; cab++) {
+        const cabY = -cab * 55;
+        const cabW = 60;
+        const cabH = 52;
+        
+        ctx.fillStyle = '#1A1A1A';
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(0, cabY - cabH, cabW, cabH, 3);
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.fillStyle = '#222';
+        ctx.beginPath();
+        ctx.roundRect(3, cabY - cabH + 3, cabW - 6, cabH - 6, 2);
+        ctx.fill();
+        
+        const coneX = cabW / 2;
+        const coneY = cabY - cabH / 2 - 5;
+        const coneR = 16 + conePump;
+        
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(coneX, coneY, coneR + 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        const coneGrad = ctx.createRadialGradient(coneX, coneY, 2, coneX, coneY, coneR);
+        coneGrad.addColorStop(0, '#444');
+        coneGrad.addColorStop(0.5, '#2A2A2A');
+        coneGrad.addColorStop(1, '#111');
+        ctx.fillStyle = coneGrad;
+        ctx.beginPath();
+        ctx.arc(coneX, coneY, coneR, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(coneX, coneY, 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        const tweeterY = cabY - cabH + 14;
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(coneX, tweeterY, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#383838';
+        ctx.beginPath();
+        ctx.arc(coneX, tweeterY, 4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(1, cabY - cabH + 3);
+        ctx.lineTo(1, cabY - 3);
+        ctx.stroke();
+      }
+      
+      ctx.restore();
+    }
+    
     const elderScreenX = this.villageElder.x - this.cameraX;
 
     // Draw sunglasses on the Village Elder (adjusted for 3/4 side-facing view)
@@ -6058,32 +6135,53 @@ export class VillageLedgerGame {
       ctx.stroke();
     }
     
-    // ── CONFETTI (full screen width) ──
-    const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#9B59B6', '#2ECC71', '#FF69B4'];
-    for (let i = 0; i < 40; i++) {
+    // ── CONFETTI (screen-fixed, full width, does NOT track camera) ──
+    ctx.save();
+    const currentTransform = ctx.getTransform();
+    ctx.setTransform(currentTransform.a, 0, 0, currentTransform.d, 0, 0);
+    
+    const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#9B59B6', '#2ECC71', '#FF69B4', '#FF4444', '#44AAFF'];
+    const confettiCount = 100;
+    for (let i = 0; i < confettiCount; i++) {
       const seed = i * 137.5;
-      const screenXPos = (seed * 7.3) % w;
-      const baseY = seed * 3.7;
-      const fallSpeed = 100 + (i % 5) * 25;
-      const driftSpeed = 30 + (i % 3) * 10;
-      const x = screenXPos + Math.sin(t * 0.5 + i) * driftSpeed;
-      const y = ((baseY + t * fallSpeed) % (groundY - 60)) + 30;
-      const size = 3 + (i % 3) * 2;
-      const rotation = t * (4 + i % 3);
+      const screenXPos = (seed * 7.3 + i * 31.7) % w;
+      const baseY = (seed * 3.7 + i * 17.3) % (groundY * 2);
+      const fallSpeed = 60 + (i % 7) * 20;
+      const driftAmplitude = 15 + (i % 5) * 8;
+      const driftFreq = 0.8 + (i % 4) * 0.3;
+      const cx = screenXPos + Math.sin(t * driftFreq + seed * 0.01) * driftAmplitude;
+      const cy = ((baseY + t * fallSpeed) % (groundY + 20)) - 10;
+      const size = 2 + (i % 4) * 1.5;
+      const rotation = t * (3 + i % 4) + seed;
       
       ctx.save();
-      ctx.translate(x, y);
+      ctx.translate(cx, cy);
       ctx.rotate(rotation);
+      ctx.globalAlpha = introFade * (0.7 + 0.3 * Math.sin(t * 2 + i));
       ctx.fillStyle = confettiColors[i % confettiColors.length];
-      if (i % 3 === 0) {
+      
+      const shape = i % 4;
+      if (shape === 0) {
         ctx.beginPath();
         ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
         ctx.fill();
-      } else {
+      } else if (shape === 1) {
         ctx.fillRect(-size / 2, -size / 2, size, size);
+      } else if (shape === 2) {
+        ctx.fillRect(-size / 2, -size, size, size * 2);
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(0, -size);
+        ctx.lineTo(size / 2, 0);
+        ctx.lineTo(0, size);
+        ctx.lineTo(-size / 2, 0);
+        ctx.closePath();
+        ctx.fill();
       }
       ctx.restore();
     }
+    
+    ctx.restore();
     
     // ── MUSICAL NOTES above dancing NPCs ──
     const characters = [this.woodcutter, this.stoneWorker, this.fisherman];

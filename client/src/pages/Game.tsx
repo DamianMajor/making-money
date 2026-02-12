@@ -886,9 +886,12 @@ export default function Game() {
     soundManager.prefetch();
   }, [initGameEngine]);
 
-  const handleGameStart = useCallback(() => {
+  const handleGameStart = useCallback(async () => {
     if (!gameInitialized.current) {
       initGameEngine();
+    }
+    if (gameRef.current) {
+      await gameRef.current.waitForSprites();
     }
     setScreen('game');
     handleResize();

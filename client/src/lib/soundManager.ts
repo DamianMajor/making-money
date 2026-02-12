@@ -54,7 +54,8 @@ export type SoundName =
   | 'npcHit'
   | 'basicHit1'
   | 'basicHit2'
-  | 'partySong';
+  | 'partySong'
+  | 'remixSong';
 
 interface SoundConfig {
   src: string;
@@ -120,6 +121,7 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   basicHit1: { src: '/sounds/basic-hit-1.mp3', volume: 0.5, loop: false },
   basicHit2: { src: '/sounds/basic-hit-2.mp3', volume: 0.5, loop: false },
   partySong: { src: '/sounds/money-yell-open.mp3', volume: 0.5, loop: false },
+  remixSong: { src: '/sounds/money-remix.mp3', volume: 0.5, loop: false },
 };
 
 const FIGHT_ALWAYS_SOUNDS: SoundName[] = [

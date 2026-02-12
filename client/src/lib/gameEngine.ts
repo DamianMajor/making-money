@@ -199,6 +199,7 @@ interface GameState {
   stormCountdownTimer: number;
   forceHutEntry: boolean;
   partyEnded: boolean;
+  remixPlayed: boolean;
 }
 
 // Game Engine Class
@@ -409,6 +410,7 @@ export class VillageLedgerGame {
 
   // Smart Path input handler
   private smartPathInputHandler: ((prompt: string, callback: (answer: string) => void) => void) | null = null;
+  private smartPathElderIntroShown: boolean = false;
 
   // Callbacks
   private onStateChange?: (state: GameState) => void;
@@ -779,7 +781,8 @@ export class VillageLedgerGame {
       stormCountdownActive: false,
       stormCountdownTimer: 0,
       forceHutEntry: false,
-      partyEnded: false
+      partyEnded: false,
+      remixPlayed: false
     };
 
     // Setup event listeners
@@ -1690,6 +1693,14 @@ export class VillageLedgerGame {
   private handleWoodcutterInteraction(): void {
     const phase = this.state.phase;
     
+    if (this.state.partyEnded) {
+      this.queueDialogue([{
+        speaker: 'WOODCUTTER',
+        text: "That storm looks nasty! You better get home before it hits!"
+      }]);
+      return;
+    }
+    
     // LOOP 1: Double coincidence of wants dialogue - verbal promise
     if (phase === 'need_wood') {
       this.queueDialogue([
@@ -1772,17 +1783,15 @@ export class VillageLedgerGame {
         if (recorded) {
           const dialogues: any[] = [];
           
-          if (this.state.smartPathTaken) {
+          if (this.state.smartPathTaken && !this.smartPathElderIntroShown) {
+            this.smartPathElderIntroShown = true;
             dialogues.push({
               speaker: 'VILLAGE ELDER',
               text: "Welcome! I see you've brought a clever idea. This is the Great Stone - a ledger that everyone in the village can see."
             });
             dialogues.push({
               speaker: 'VILLAGE ELDER',
-              text: "When someone gives you something on credit, we carve the agreement into this stone. That way, no one can deny or forget what was promised.",
-              onComplete: () => {
-                this.state.smartPathTaken = false;
-              }
+              text: "When someone gives you something on credit, we carve the agreement into this stone. That way, no one can deny or forget what was promised."
             });
           }
           
@@ -2535,6 +2544,14 @@ export class VillageLedgerGame {
   private handleStoneWorkerInteraction(): void {
     const phase = this.state.phase;
     
+    if (this.state.partyEnded) {
+      this.queueDialogue([{
+        speaker: 'STONE-WORKER',
+        text: "Go home! That thunder sounds close... you don't want to be caught outside!"
+      }]);
+      return;
+    }
+    
     // LOOP 1: Double coincidence of wants - player offers to trade
     if (phase === 'got_wood_need_stone') {
       this.queueDialogue([
@@ -3161,6 +3178,14 @@ export class VillageLedgerGame {
   private handleFishermanInteraction(): void {
     const phase = this.state.phase;
     
+    if (this.state.partyEnded) {
+      this.queueDialogue([{
+        speaker: 'FISHERMAN',
+        text: "Better head home quick! The storm's coming in fast!"
+      }]);
+      return;
+    }
+    
     // Check if resources are depleted (after paying first inflated demand)
     if (this.state.resourcesDepleted) {
       this.queueDialogue([
@@ -3382,8 +3407,97 @@ export class VillageLedgerGame {
     }
   }
 
+  private startRemixParty(): void {
+    this.state.stormCountdownActive = false;
+    this.state.showCelebration = true;
+    this.state.remixPlayed = true;
+    this.state.slingshotGameActive = true;
+    this.state.slingshotScore = 0;
+    this.state.slingshotCombo = 0;
+    this.state.slingshotMaxCombo = 0;
+    this.state.slingshotProjectile = null;
+    this.state.slingshotAiming = false;
+    this.state.slingshotAimStart = null;
+    this.state.slingshotAimCurrent = null;
+    this.state.slingshotLastSpawnTime = 0;
+    this.state.slingshotFloatingTexts = [];
+    this.state.slingshotBalloons = [];
+    const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
+    const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
+    for (let i = 0; i < 9; i++) {
+      this.state.slingshotBalloons.push({
+        x: 80 + Math.random() * (this.worldWidth - 160),
+        y: 30 + Math.random() * (groundY * 0.55),
+        vx: (Math.random() - 0.5) * 30,
+        vy: (Math.random() - 0.5) * 16,
+        color: balloonColors[Math.floor(Math.random() * balloonColors.length)],
+        radius: 16 + Math.random() * 6,
+        popped: false,
+        popAnim: 0,
+        bobPhase: Math.random() * Math.PI * 2,
+      });
+    }
+    soundManager.stopDaytimeMusic();
+    soundManager.play('remixSong');
+    soundManager.play('crowdApplause');
+    const remixDuration = soundManager.getBufferDuration('remixSong');
+    if (remixDuration > 0) {
+      this.partySongEndTime = Date.now() + remixDuration;
+    } else {
+      this.partySongEndTime = Date.now() + 264000;
+    }
+    this.woodcutter.isWalking = true;
+    this.stoneWorker.isWalking = true;
+    this.fisherman.isWalking = true;
+  }
+
   private handleElderInteraction(): void {
     const phase = this.state.phase;
+    
+    if (this.state.partyEnded) {
+      if (this.state.remixPlayed) {
+        this.queueDialogue([{
+          speaker: 'VILLAGE ELDER',
+          text: "Ha! That was quite the encore! Now hurry home before the storm arrives!"
+        }]);
+      } else {
+        this.queueDialogue([
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "What a celebration! But the storm approaches... unless you want one more song?"
+          }
+        ]);
+        this.state.showChoice = true;
+        this.state.choiceOptions = [
+          {
+            text: "Drop the beat!",
+            action: () => {
+              this.state.showChoice = false;
+              this.state.choiceOptions = [];
+              this.queueDialogue([{
+                speaker: 'VILLAGE ELDER',
+                text: "Ha ha! You asked for it! REMIX TIME!",
+                onComplete: () => {
+                  this.startRemixParty();
+                }
+              }]);
+            }
+          },
+          {
+            text: "I should head home",
+            action: () => {
+              this.state.showChoice = false;
+              this.state.choiceOptions = [];
+              this.queueDialogue([{
+                speaker: 'VILLAGE ELDER',
+                text: "Wise choice! Get home before the storm hits. Safe travels!"
+              }]);
+            }
+          }
+        ];
+      }
+      return;
+    }
     
     // Loop 1: Generic hint about the tablet (credit-first phases)
     if (this.state.loop === 1 && (phase === 'need_wood' || phase === 'got_wood_need_stone' || phase === 'got_stone_need_fish' || phase === 'got_fish_ready_settle')) {
@@ -4125,6 +4239,24 @@ export class VillageLedgerGame {
     soundManager.init();
   }
 
+  public areSpritesReady(): boolean {
+    return this.spritesReady;
+  }
+
+  public waitForSprites(): Promise<void> {
+    if (this.spritesReady) return Promise.resolve();
+    return new Promise((resolve) => {
+      const check = () => {
+        if (this.spritesReady) {
+          resolve();
+        } else {
+          setTimeout(check, 50);
+        }
+      };
+      check();
+    });
+  }
+
   public setSmartPathHandler(handler: (prompt: string, callback: (answer: string) => void) => void): void {
     this.smartPathInputHandler = handler;
   }
@@ -4625,6 +4757,10 @@ export class VillageLedgerGame {
       this.handleHomeInteraction();
     }
 
+    if (this.state.partyEnded && !this.state.showCelebration) {
+      this.state.celebrationTimer += dt;
+    }
+
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
       if (this.partySongEndTime > 0 && Date.now() >= this.partySongEndTime && this.state.showCelebration) {
@@ -4901,6 +5037,7 @@ export class VillageLedgerGame {
     this.state.showCelebration = false;
     this.celebrationEndTime = Date.now();
     soundManager.stop('partySong');
+    soundManager.stop('remixSong');
     soundManager.fadeOut('crowdApplause', 1500);
     soundManager.fadeOut('celebration', 1500);
     this.woodcutter.isWalking = false;
@@ -5009,7 +5146,7 @@ export class VillageLedgerGame {
     
     const proj = this.state.slingshotProjectile;
     if (proj && proj.active) {
-      proj.vy += 400 * dt;
+      proj.vy += 280 * dt;
       proj.x += proj.vx * dt;
       proj.y += proj.vy * dt;
       
@@ -5472,7 +5609,7 @@ export class VillageLedgerGame {
         soundManager.play('stretchRelease');
         const wooshSounds = ['projectileWoosh1', 'projectileWoosh2', 'projectileWoosh3', 'projectileWoosh4'] as const;
         soundManager.play(wooshSounds[Math.floor(Math.random() * wooshSounds.length)]);
-        const launchPower = 4.5;
+        const launchPower = 5.5;
         this.state.slingshotProjectile = {
           x: slingshotScreenX,
           y: slingshotY,
@@ -6539,6 +6676,7 @@ export class VillageLedgerGame {
     const introFade = Math.min(1, t / 1.5);
 
     if (this.state.partyEnded && !this.state.showCelebration) {
+      const at = t;
       const ft = this.frozenCelebrationTimer;
       ctx.save();
       
@@ -6546,20 +6684,20 @@ export class VillageLedgerGame {
 
       const discoBallR = 36;
       const targetFrozenY = groundY * 0.45;
-      const discoBallDropY = Math.min(targetFrozenY, ft * 30);
+      const discoBallDropY = targetFrozenY;
       const discoBallWorldX = this.villageElder.x;
       const discoBallX = discoBallWorldX - this.cameraX;
       const discoBallFrozenY = discoBallDropY;
 
       const numBeams = 16;
       for (let i = 0; i < numBeams; i++) {
-        const angle = (ft * 1.5 + i * (Math.PI * 2 / numBeams));
-        const beamLen = 300 + Math.sin(ft * 3 + i) * 100;
+        const angle = (at * 1.5 + i * (Math.PI * 2 / numBeams));
+        const beamLen = 300 + Math.sin(at * 3 + i) * 100;
         const endX = discoBallX + Math.cos(angle) * beamLen;
         const endY = discoBallFrozenY + Math.sin(angle) * beamLen;
         if (endY > discoBallFrozenY) {
           const beamGrad = ctx.createLinearGradient(discoBallX, discoBallFrozenY, endX, endY);
-          const hue = (ft * 40 + i * 22) % 360;
+          const hue = (at * 40 + i * 22) % 360;
           beamGrad.addColorStop(0, `hsla(${hue}, 100%, 80%, 0.25)`);
           beamGrad.addColorStop(1, `hsla(${hue}, 100%, 60%, 0)`);
           ctx.strokeStyle = beamGrad;
@@ -6591,7 +6729,7 @@ export class VillageLedgerGame {
         const worldX = lightPositions[i];
         const lx = worldX - this.cameraX;
         if (lx < -100 || lx > w + 100) continue;
-        const sweepAngle = Math.sin(ft * 2.5 + i * 1.2) * 0.6 - Math.PI / 2;
+        const sweepAngle = Math.sin(at * 2.5 + i * 1.2) * 0.6 - Math.PI / 2;
         const beamLen = groundY + 20;
         const endX = lx + Math.cos(sweepAngle) * beamLen * 0.4;
         const lightGrad = ctx.createLinearGradient(lx, dialogueTop, endX, 0);
@@ -6667,9 +6805,9 @@ export class VillageLedgerGame {
       ctx.fillRect(boothX + 6, boothY + 6, boothW - 12, boothH - 22);
       const eqBars = 12;
       for (let i = 0; i < eqBars; i++) {
-        const barH = 6 + Math.abs(Math.sin(ft * 8 + i * 0.8)) * 22;
+        const barH = 6 + Math.abs(Math.sin(at * 8 + i * 0.8)) * 22;
         const bx = boothX + 10 + i * 10;
-        ctx.fillStyle = `hsl(${(ft * 60 + i * 40) % 360}, 100%, 60%)`;
+        ctx.fillStyle = `hsl(${(at * 60 + i * 40) % 360}, 100%, 60%)`;
         ctx.fillRect(bx, boothY + 38 - barH, 6, barH);
       }
       const knobColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
@@ -6677,7 +6815,7 @@ export class VillageLedgerGame {
         const kx = boothX + 12 + i * 22;
         const ky = boothY + boothH - 10;
         ctx.fillStyle = knobColors[i];
-        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(ft * 6 + i * 1.5);
+        ctx.globalAlpha = 0.5 + 0.5 * Math.sin(at * 6 + i * 1.5);
         ctx.beginPath();
         ctx.arc(kx, ky, 4, 0, Math.PI * 2);
         ctx.fill();
@@ -6709,7 +6847,7 @@ export class VillageLedgerGame {
         const rowRadius = Math.sqrt(Math.max(0, discoBallR * discoBallR - rowY * rowY));
         const numCols = Math.ceil(rowRadius / tileSpacing);
         for (let col = -numCols; col <= numCols; col++) {
-          const tileAngle = ft * 2 + row * 0.5 + col * 0.7;
+          const tileAngle = at * 2 + row * 0.5 + col * 0.7;
           const perspectiveScale = Math.cos(row * 0.15);
           const tileX = discoBallX + col * tileSpacing * perspectiveScale;
           const tileY = discoBallFrozenY + rowY;
@@ -6736,7 +6874,7 @@ export class VillageLedgerGame {
     const glassW = 20;
     const glassH = 7;
     const bridgeY = elderHeadY;
-    const sideOffset = 5;
+    const sideOffset = 7;
 
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#333';
@@ -10526,7 +10664,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stormCountdownActive: false,
       stormCountdownTimer: 0,
       forceHutEntry: false,
-      partyEnded: false
+      partyEnded: false,
+      remixPlayed: false
     };
     this.currentQuizQuestion = 0;
     this.playAgainButton = null;
@@ -10547,6 +10686,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.stormTriggered = false;
     this.rainSoundStarted = false;
     this.celebrationEndTime = 0;
+    this.smartPathElderIntroShown = false;
     
     // Resume ambient music and day background
     soundManager.stopLoop('backgroundMusicNight');
@@ -10676,7 +10816,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stormCountdownActive: false,
       stormCountdownTimer: 0,
       forceHutEntry: false,
-      partyEnded: false
+      partyEnded: false,
+      remixPlayed: false
     };
     this.state.badges = savedBadges;
     this.state.lastBadgeEarnedTime = savedLastBadgeTime;
@@ -10696,6 +10837,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.stormTriggered = false;
     this.rainSoundStarted = false;
     this.celebrationEndTime = 0;
+    this.smartPathElderIntroShown = false;
     
     setTimeout(() => this.triggerIntro(), 500);
   }

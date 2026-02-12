@@ -5097,30 +5097,6 @@ export class VillageLedgerGame {
         }
 
         if (this.state.slingshotProjectile) {
-          const speakerWorldXs = [this.villageCenterX - 300, this.villageCenterX + 350];
-          const speakerW = 180;
-          const speakerH = 156 * 2;
-          for (const spkWorldX of speakerWorldXs) {
-            if (!this.state.slingshotProjectile) break;
-            const spkScreenX = spkWorldX - this.cameraX;
-            const spkLeft = spkScreenX - speakerW / 2;
-            const spkTop = groundY - speakerH;
-            if (this.state.slingshotProjectile.x >= spkLeft && this.state.slingshotProjectile.x <= spkLeft + speakerW &&
-                this.state.slingshotProjectile.y >= spkTop && this.state.slingshotProjectile.y <= groundY) {
-              const spkHitSounds = ['basicHit1', 'basicHit2'] as const;
-              soundManager.play(spkHitSounds[Math.floor(Math.random() * spkHitSounds.length)]);
-              this.state.slingshotScore += 10;
-              this.state.slingshotFloatingTexts.push({
-                x: spkWorldX, y: spkTop + speakerH / 2,
-                text: '+10',
-                timer: 0,
-              });
-              this.state.slingshotProjectile = null;
-            }
-          }
-        }
-
-        if (this.state.slingshotProjectile) {
           const elderScreenX = this.villageElder.x - this.cameraX;
           const boothLeft = elderScreenX - 60;
           const boothTop = groundY - 75 + 27;
@@ -5659,12 +5635,16 @@ export class VillageLedgerGame {
     // Draw location markers FIRST (behind characters) - Stone Tablet and Home
     this.drawLocationMarkers(ctx, groundY);
 
-    if (this.state.showCelebration) {
-      // Draw elder BEFORE DJ booth so he appears behind it (DJing)
-      if (this.villageElder.visible) {
-        this.drawCharacter(ctx, this.villageElder);
+    if (this.state.showCelebration || this.state.partyEnded) {
+      // Draw speakers BEFORE characters so they appear in the background
+      this.drawSpeakers(ctx);
+      if (this.state.showCelebration) {
+        // Draw elder BEFORE DJ booth so he appears behind it (DJing)
+        if (this.villageElder.visible) {
+          this.drawCharacter(ctx, this.villageElder);
+        }
+        this.drawCelebrationBackground(ctx);
       }
-      this.drawCelebrationBackground(ctx);
     }
 
     // Special z-order handling: player passes BEHIND fisherman near fishing hole
@@ -6289,6 +6269,94 @@ export class VillageLedgerGame {
     ctx.fillText(effects[effectIndex], centerX + Math.sin(t * 5) * 50, centerY - 100);
   }
 
+  private drawSpeakers(ctx: CanvasRenderingContext2D): void {
+    const h = this.logicalHeight;
+    const groundY = h - this.groundHeight - this.dialogueBoxHeight;
+    const t = this.state.celebrationTimer;
+    const introFade = Math.min(1, t / 1.5);
+    const isAnimated = this.state.showCelebration;
+
+    ctx.save();
+    ctx.globalAlpha = isAnimated ? introFade : 1;
+
+    const speakerPulse = isAnimated ? Math.sin(t * 12) * 0.02 : 0;
+    const conePump = isAnimated ? Math.sin(t * 8) * 9 : 0;
+    const speakerShake = isAnimated ? Math.sin(t * 15) * 3 : 0;
+
+    const speakerWorldPositions = [this.villageCenterX - 300, this.villageCenterX + 350];
+    for (let side = 0; side < 2; side++) {
+      const speakerWorldX = speakerWorldPositions[side];
+      const speakerScreenX = speakerWorldX - this.cameraX;
+      if (speakerScreenX < -200 || speakerScreenX > this.logicalWidth + 200) continue;
+      const baseY = groundY - 10;
+      ctx.save();
+      ctx.translate(speakerScreenX, baseY);
+      if (isAnimated) {
+        ctx.translate(speakerShake * (side === 0 ? 1 : -1), speakerShake * 0.5);
+        ctx.scale(1 + speakerPulse, 1 + speakerPulse);
+      }
+      ctx.translate(-90, 0);
+      for (let cab = 0; cab < 2; cab++) {
+        const cabY = -cab * 165;
+        const cabW = 180;
+        const cabH = 156;
+        ctx.fillStyle = '#1A1A1A';
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(0, cabY - cabH, cabW, cabH, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#222';
+        ctx.beginPath();
+        ctx.roundRect(9, cabY - cabH + 9, cabW - 18, cabH - 18, 4);
+        ctx.fill();
+        const coneX = cabW / 2;
+        const coneY = cabY - cabH / 2 - 15;
+        const coneR = 48 + conePump;
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(coneX, coneY, coneR + 6, 0, Math.PI * 2);
+        ctx.fill();
+        if (isAnimated) {
+          const coneGrad = ctx.createRadialGradient(coneX, coneY, 4, coneX, coneY, coneR);
+          coneGrad.addColorStop(0, '#444');
+          coneGrad.addColorStop(0.5, '#2A2A2A');
+          coneGrad.addColorStop(1, '#111');
+          ctx.fillStyle = coneGrad;
+        } else {
+          ctx.fillStyle = '#2A2A2A';
+        }
+        ctx.beginPath();
+        ctx.arc(coneX, coneY, coneR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.arc(coneX, coneY, 15, 0, Math.PI * 2);
+        ctx.fill();
+        const tweeterY = cabY - cabH + 42;
+        ctx.fillStyle = '#111';
+        ctx.beginPath();
+        ctx.arc(coneX, tweeterY, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = isAnimated ? '#383838' : '#383838';
+        ctx.beginPath();
+        ctx.arc(coneX, tweeterY, isAnimated ? 12 : 8, 0, Math.PI * 2);
+        ctx.fill();
+        if (isAnimated) {
+          ctx.strokeStyle = '#444';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(3, cabY - cabH + 9);
+          ctx.lineTo(3, cabY - 9);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   private drawCelebrationBackground(ctx: CanvasRenderingContext2D): void {
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
@@ -6465,58 +6533,6 @@ export class VillageLedgerGame {
     if (this.state.partyEnded && !this.state.showCelebration) {
       ctx.save();
       
-      const staticSpeakerPositions = [this.villageCenterX - 300, this.villageCenterX + 350];
-      for (let side = 0; side < 2; side++) {
-        const speakerWorldX = staticSpeakerPositions[side];
-        const speakerScreenX = speakerWorldX - this.cameraX;
-        if (speakerScreenX < -200 || speakerScreenX > w + 200) continue;
-        const baseY = groundY - 10;
-        ctx.save();
-        ctx.translate(speakerScreenX, baseY);
-        ctx.translate(-90, 0);
-        for (let cab = 0; cab < 2; cab++) {
-          const cabY = -cab * 165;
-          const cabW = 180;
-          const cabH = 156;
-          ctx.fillStyle = '#1A1A1A';
-          ctx.strokeStyle = '#333';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.roundRect(0, cabY - cabH, cabW, cabH, 6);
-          ctx.fill();
-          ctx.stroke();
-          ctx.fillStyle = '#222';
-          ctx.beginPath();
-          ctx.roundRect(9, cabY - cabH + 9, cabW - 18, cabH - 18, 4);
-          ctx.fill();
-          const coneX = cabW / 2;
-          const coneY = cabY - cabH / 2 - 15;
-          const coneR = 48;
-          ctx.fillStyle = '#111';
-          ctx.beginPath();
-          ctx.arc(coneX, coneY, coneR + 6, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#2A2A2A';
-          ctx.beginPath();
-          ctx.arc(coneX, coneY, coneR, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#333';
-          ctx.beginPath();
-          ctx.arc(coneX, coneY, 15, 0, Math.PI * 2);
-          ctx.fill();
-          const tweeterY = cabY - cabH + 42;
-          ctx.fillStyle = '#111';
-          ctx.beginPath();
-          ctx.arc(coneX, tweeterY, 18, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = '#383838';
-          ctx.beginPath();
-          ctx.arc(coneX, tweeterY, 8, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.restore();
-      }
-      
       const elderScreenX = this.villageElder.x - this.cameraX;
       const boothW = 120;
       const boothH = 75;
@@ -6555,88 +6571,6 @@ export class VillageLedgerGame {
     
     ctx.save();
     ctx.globalAlpha = introFade;
-    
-    // ── GIANT SPEAKER STACKS (world-space, left and right) ──
-    const speakerPulse = Math.sin(t * 12) * 0.02;
-    const conePump = Math.sin(t * 8) * 9;
-    const speakerShake = Math.sin(t * 15) * 3;
-    
-    const speakerWorldPositions = [this.villageCenterX - 300, this.villageCenterX + 350];
-    for (let side = 0; side < 2; side++) {
-      const speakerWorldX = speakerWorldPositions[side];
-      const speakerScreenX = speakerWorldX - this.cameraX;
-      
-      if (speakerScreenX < -200 || speakerScreenX > w + 200) continue;
-      
-      const baseY = groundY - 10;
-      
-      ctx.save();
-      ctx.translate(speakerScreenX, baseY);
-      ctx.translate(speakerShake * (side === 0 ? 1 : -1), speakerShake * 0.5);
-      ctx.scale(1 + speakerPulse, 1 + speakerPulse);
-      ctx.translate(-90, 0);
-      
-      for (let cab = 0; cab < 2; cab++) {
-        const cabY = -cab * 165;
-        const cabW = 180;
-        const cabH = 156;
-        
-        ctx.fillStyle = '#1A1A1A';
-        ctx.strokeStyle = '#333';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.roundRect(0, cabY - cabH, cabW, cabH, 6);
-        ctx.fill();
-        ctx.stroke();
-        
-        ctx.fillStyle = '#222';
-        ctx.beginPath();
-        ctx.roundRect(9, cabY - cabH + 9, cabW - 18, cabH - 18, 4);
-        ctx.fill();
-        
-        const coneX = cabW / 2;
-        const coneY = cabY - cabH / 2 - 15;
-        const coneR = 48 + conePump;
-        
-        ctx.fillStyle = '#111';
-        ctx.beginPath();
-        ctx.arc(coneX, coneY, coneR + 6, 0, Math.PI * 2);
-        ctx.fill();
-        
-        const coneGrad = ctx.createRadialGradient(coneX, coneY, 4, coneX, coneY, coneR);
-        coneGrad.addColorStop(0, '#444');
-        coneGrad.addColorStop(0.5, '#2A2A2A');
-        coneGrad.addColorStop(1, '#111');
-        ctx.fillStyle = coneGrad;
-        ctx.beginPath();
-        ctx.arc(coneX, coneY, coneR, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = '#333';
-        ctx.beginPath();
-        ctx.arc(coneX, coneY, 15, 0, Math.PI * 2);
-        ctx.fill();
-        
-        const tweeterY = cabY - cabH + 42;
-        ctx.fillStyle = '#111';
-        ctx.beginPath();
-        ctx.arc(coneX, tweeterY, 18, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#383838';
-        ctx.beginPath();
-        ctx.arc(coneX, tweeterY, 12, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.strokeStyle = '#444';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(3, cabY - cabH + 9);
-        ctx.lineTo(3, cabY - 9);
-        ctx.stroke();
-      }
-      
-      ctx.restore();
-    }
     
     const elderScreenX = this.villageElder.x - this.cameraX;
 

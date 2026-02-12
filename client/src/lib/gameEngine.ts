@@ -6870,7 +6870,7 @@ export class VillageLedgerGame {
 
     // Draw sunglasses on the Village Elder (adjusted for 3/4 side-facing view)
     const elderBob = this.villageElder.bobOffset || 0;
-    const elderHeadY = this.villageElder.y + 28 + elderBob;
+    const elderHeadY = this.villageElder.y + 29 + elderBob;
     const glassW = 20;
     const glassH = 7;
     const bridgeY = elderHeadY;
@@ -7533,7 +7533,7 @@ export class VillageLedgerGame {
     if (this.state.badges.length === 0) return;
 
     const x = this.inventoryPanelLeftX - 44;
-    const y = 24;
+    const y = 16;
     const size = 32;
 
     const timeSinceLastBadge = (Date.now() - this.state.lastBadgeEarnedTime) / 1000;
@@ -8773,7 +8773,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private drawMuteButton(ctx: CanvasRenderingContext2D): void {
     const muteButtonSize = 36;
     const muteX = this.logicalWidth - muteButtonSize - 12;
-    const muteY = 20;
+    const muteY = 16;
     
     this.muteButtonArea = { x: muteX, y: muteY, w: muteButtonSize, h: muteButtonSize };
     

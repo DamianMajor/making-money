@@ -28,7 +28,7 @@ interface FallingItem {
   opacity: number;
 }
 
-function MoneyRainCanvas() {
+function MoneyRainCanvas({ preloadedImages }: { preloadedImages: HTMLImageElement[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imagesRef = useRef<HTMLImageElement[]>([]);
   const itemsRef = useRef<FallingItem[]>([]);
@@ -47,28 +47,8 @@ function MoneyRainCanvas() {
     resize();
     window.addEventListener('resize', resize);
 
-    let loadedCount = 0;
-    let initStarted = false;
-    const totalIcons = MONEY_ICONS.length;
-    MONEY_ICONS.forEach((name, i) => {
-      const img = new Image();
-      img.onload = () => {
-        imagesRef.current[i] = img;
-        loadedCount++;
-        if (loadedCount >= totalIcons && !initStarted) {
-          initStarted = true;
-          initItems(canvas.width, canvas.height);
-        }
-      };
-      img.onerror = () => {
-        loadedCount++;
-        if (loadedCount >= totalIcons && !initStarted) {
-          initStarted = true;
-          initItems(canvas.width, canvas.height);
-        }
-      };
-      img.src = `/sprites/${name}.png`;
-    });
+    imagesRef.current = preloadedImages;
+    initItems(canvas.width, canvas.height);
 
     function initItems(w: number, h: number) {
       const count = Math.max(25, Math.floor((w * h) / 20000));
@@ -564,7 +544,7 @@ function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue:
   );
 }
 
-function IntroScreen({ onStart, audioRef, audioGraphRef, onMount }: { onStart: () => void; audioRef: React.MutableRefObject<HTMLAudioElement | null>; audioGraphRef: React.MutableRefObject<AudioGraph | null>; onMount?: () => void }) {
+function IntroScreen({ onStart, audioRef, audioGraphRef, onMount, preloadedImages }: { onStart: () => void; audioRef: React.MutableRefObject<HTMLAudioElement | null>; audioGraphRef: React.MutableRefObject<AudioGraph | null>; onMount?: () => void; preloadedImages: HTMLImageElement[] }) {
   const [muted, setMuted] = useState(() => {
     try {
       const stored = localStorage.getItem('villageLedger_soundSettings');
@@ -577,6 +557,9 @@ function IntroScreen({ onStart, audioRef, audioGraphRef, onMount }: { onStart: (
     if (onMount) onMount();
 
     return () => {
+      if (startedRef.current) {
+        return;
+      }
       if (audioGraphRef.current) {
         audioGraphRef.current.ctx.close().catch(() => {});
         audioGraphRef.current = null;
@@ -607,8 +590,7 @@ function IntroScreen({ onStart, audioRef, audioGraphRef, onMount }: { onStart: (
     if (startedRef.current) return;
     startedRef.current = true;
 
-    if (audioRef.current && audioGraphRef.current) {
-      const audio = audioRef.current;
+    if (audioGraphRef.current) {
       const { ctx, dry, wetGain, feedback } = audioGraphRef.current;
 
       if (ctx.state === 'suspended') {
@@ -616,36 +598,9 @@ function IntroScreen({ onStart, audioRef, audioGraphRef, onMount }: { onStart: (
       }
 
       const now = ctx.currentTime;
-      const fadeDuration = 2.0;
-
-      feedback.gain.setValueAtTime(0.45, now);
-      feedback.gain.linearRampToValueAtTime(0.15, now + fadeDuration);
-
-      wetGain.gain.setValueAtTime(0.6, now);
-      wetGain.gain.linearRampToValueAtTime(0, now + fadeDuration);
-
+      wetGain.gain.setValueAtTime(0, now);
+      feedback.gain.setValueAtTime(0, now);
       dry.gain.setValueAtTime(1.0, now);
-      dry.gain.linearRampToValueAtTime(0, now + fadeDuration * 0.6);
-
-      setTimeout(() => {
-        audio.pause();
-        audio.src = '';
-        audioGraphRef.current?.ctx.close().catch(() => {});
-        audioGraphRef.current = null;
-      }, (fadeDuration + 1.5) * 1000);
-    } else if (audioRef.current) {
-      const audio = audioRef.current;
-      const fadeStep = 0.05;
-      const fadeInterval = setInterval(() => {
-        if (audio.volume > fadeStep) {
-          audio.volume -= fadeStep;
-        } else {
-          audio.volume = 0;
-          audio.pause();
-          audio.src = '';
-          clearInterval(fadeInterval);
-        }
-      }, 25);
     }
     onStart();
   };
@@ -693,7 +648,7 @@ function IntroScreen({ onStart, audioRef, audioGraphRef, onMount }: { onStart: (
           )}
         </svg>
       </button>
-      <MoneyRainCanvas />
+      <MoneyRainCanvas preloadedImages={preloadedImages} />
       <div className="flex flex-col items-center max-w-xl w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
         <div className="relative text-center mb-8" data-testid="text-title">
           <style>{`
@@ -893,28 +848,30 @@ function LoadingScreen({ onLoaded }: { onLoaded: () => void }) {
   );
 }
 
-const preloadMoneyIcons = (): Promise<void> => {
+const preloadMoneyIcons = (): Promise<HTMLImageElement[]> => {
   return new Promise((resolve) => {
     let loadedCount = 0;
     const totalIcons = MONEY_ICONS.length;
+    const images: HTMLImageElement[] = new Array(totalIcons);
     
     if (totalIcons === 0) {
-      resolve();
+      resolve([]);
       return;
     }
     
-    MONEY_ICONS.forEach((name) => {
+    MONEY_ICONS.forEach((name, i) => {
       const img = new Image();
       img.onload = () => {
+        images[i] = img;
         loadedCount++;
         if (loadedCount >= totalIcons) {
-          resolve();
+          resolve(images);
         }
       };
       img.onerror = () => {
         loadedCount++;
         if (loadedCount >= totalIcons) {
-          resolve();
+          resolve(images);
         }
       };
       img.src = `/sprites/${name}.png`;
@@ -928,6 +885,7 @@ export default function Game() {
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioGraphRef = useRef<AudioGraph | null>(null);
+  const preloadedImagesRef = useRef<HTMLImageElement[]>([]);
   const [screen, setScreen] = useState<'loading' | 'reflection' | 'intro' | 'game'>('loading');
   const [iconsPreloaded, setIconsPreloaded] = useState(false);
   const gameInitialized = useRef(false);
@@ -936,7 +894,8 @@ export default function Game() {
   const [smartPathAnswer, setSmartPathAnswer] = useState('');
 
   useEffect(() => {
-    preloadMoneyIcons().then(() => {
+    preloadMoneyIcons().then((images) => {
+      preloadedImagesRef.current = images;
       setIconsPreloaded(true);
     });
   }, []);
@@ -961,6 +920,7 @@ export default function Game() {
       smartPathCallbackRef.current = callback;
       setSmartPathAnswer('');
     });
+    gameRef.current.setExternalAudio(audioRef.current, audioGraphRef.current?.ctx);
     gameRef.current.preloadAudio();
     gameRef.current.start(false);
   }, []);
@@ -1137,7 +1097,7 @@ export default function Game() {
       )}
       {screen === 'loading' && <LoadingScreen onLoaded={handleLoadingComplete} />}
       {screen === 'reflection' && <ReflectionScreen onContinue={handleReflectionContinue} audioRef={audioRef} audioGraphRef={audioGraphRef} />}
-      {screen === 'intro' && <IntroScreen onStart={handleGameStart} audioRef={audioRef} audioGraphRef={audioGraphRef} onMount={handleIntroMount} />}
+      {screen === 'intro' && <IntroScreen onStart={handleGameStart} audioRef={audioRef} audioGraphRef={audioGraphRef} onMount={handleIntroMount} preloadedImages={preloadedImagesRef.current} />}
     </div>
   );
 }

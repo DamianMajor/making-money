@@ -254,6 +254,7 @@ export class VillageLedgerGame {
   private dialogueBoxHeight: number = 0;
   private hudWidth: number = 260;
   private hudHeight: number = 185;
+  private stoneTabletHudArea: { x: number; y: number; w: number; h: number } = { x: 0, y: 0, w: 44, h: 52 };
   private interactButtonSize: number = 90; // 10% smaller than original 100
 
   // Animation timers
@@ -408,6 +409,10 @@ export class VillageLedgerGame {
 
   // Smart Path input handler
   private smartPathInputHandler: ((prompt: string, callback: (answer: string) => void) => void) | null = null;
+
+  // External audio element from intro/reflection screens for seamless crossfade
+  private externalAudio: HTMLAudioElement | null = null;
+  private externalAudioContext: AudioContext | null = null;
 
   // Callbacks
   private onStateChange?: (state: GameState) => void;
@@ -958,11 +963,10 @@ export class VillageLedgerGame {
         }
       }
       
-      // Check if clicking on Stone Tablet HUD to open popup
+      // Check if clicking on Stone Tablet HUD icon to open popup
       if (this.state.showHUD) {
-        const hudX = this.logicalWidth - this.hudWidth - 24;
-        const hudY = 24;
-        if (x >= hudX && x <= hudX + this.hudWidth && y >= hudY && y <= hudY + this.hudHeight) {
+        const ta = this.stoneTabletHudArea;
+        if (x >= ta.x && x <= ta.x + ta.w && y >= ta.y && y <= ta.y + ta.h) {
           this.state.showStoneTabletPopup = true;
           // Play stone ledger sound reduced by 1 second (getBufferDuration returns ms)
           const ledgerDuration = Math.max(500, soundManager.getBufferDuration('stoneLedger') - 1000);
@@ -2460,11 +2464,11 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "I still don't have fish..."
+          text: this.state.smartPathTaken ? "I don't have anything you'd want right now..." : "I still don't have fish..."
         },
         {
           speaker: 'WOODCUTTER',
-          text: "Ah, that 'Double Coincidence of Wants' problem again! Last time we each kept our own mental Ledger... and we know how that ended.",
+          text: this.state.smartPathTaken ? "The 'Double Coincidence of Wants'! You don't have what I need. But we can use the shared Ledger to record a debt." : "Ah, that 'Double Coincidence of Wants' problem again! Last time we each kept our own mental Ledger... and we know how that ended.",
           onComplete: () => {
             this.showRecordOrRememberChoice();
           }
@@ -3108,11 +3112,11 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "I still don't have fish..."
+          text: this.state.smartPathTaken ? "I don't have anything you'd want right now..." : "I still don't have fish..."
         },
         {
           speaker: 'STONE-WORKER',
-          text: "The 'Double Coincidence of Wants'! We don't have what each other wants. But we can use the shared Ledger to record a debt.",
+          text: this.state.smartPathTaken ? "The 'Double Coincidence of Wants'! You don't have what I need. But we can use the shared Ledger to record a debt." : "The 'Double Coincidence of Wants'! We don't have what each other wants. But we can use the shared Ledger to record a debt.",
           onComplete: showRecordChoice
         }
       ]);
@@ -3461,7 +3465,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'VILLAGE ELDER',
-          text: "Wise one, you've learned from the past. Use the Stone Tablet to record your debts as you make them!"
+          text: this.state.smartPathTaken ? "Wise one, you've discovered the power of the ledger. Use the Stone Tablet to record your debts as you make them!" : "Wise one, you've learned from the past. Use the Stone Tablet to record your debts as you make them!"
         }
       ]);
     }
@@ -4130,6 +4134,11 @@ export class VillageLedgerGame {
     this.smartPathInputHandler = handler;
   }
 
+  public setExternalAudio(audio: HTMLAudioElement | null, audioContext?: AudioContext | null): void {
+    this.externalAudio = audio;
+    this.externalAudioContext = audioContext ?? null;
+  }
+
   private requestSmartPathInput(prompt: string, callback: (answer: string) => void): void {
     if (this.smartPathInputHandler) {
       this.smartPathInputHandler(prompt, callback);
@@ -4141,6 +4150,27 @@ export class VillageLedgerGame {
     soundManager.resumeContext();
     soundManager.playLoop('ambientVillage');
     soundManager.startDaytimeMusic();
+
+    if (this.externalAudio) {
+      const audio = this.externalAudio;
+      const extCtx = this.externalAudioContext;
+      const fadeStep = 0.02;
+      const fadeInterval = setInterval(() => {
+        if (audio.volume > fadeStep) {
+          audio.volume -= fadeStep;
+        } else {
+          audio.volume = 0;
+          audio.pause();
+          clearInterval(fadeInterval);
+          if (extCtx) {
+            extCtx.close().catch(() => {});
+          }
+        }
+      }, 50);
+      this.externalAudio = null;
+      this.externalAudioContext = null;
+    }
+
     setTimeout(() => this.triggerIntro(), 500);
   }
 
@@ -4527,18 +4557,18 @@ export class VillageLedgerGame {
     // Skip if rain sequence already started or player is fading into hut
     if (this.state.phase === 'complete_success' && this.player.x <= this.playerHomeX + 50 && 
         !this.state.showThunderstorm && !this.state.showNightTransition && 
-        !this.rainSoundStarted && !this.state.playerFading) {
-      // Auto-fix roof if not already repaired
+        !this.rainSoundStarted && !this.state.playerFading && !this.state.playerEnteredHut) {
       if (!this.state.roofRepaired) {
         this.state.roofRepaired = true;
       }
-      // Keep happy mood active for the rest of loop 2
       this.setMood('happy');
-      this.state.moodTimer = 999; // Large value to keep happy mood
-      // Start thunderstorm animation (before night transition)
+      this.state.moodTimer = 999;
       this.state.showThunderstorm = true;
       this.state.thunderstormTimer = 0;
-      // Show thunderstorm dialogue
+      this.state.playerFading = true;
+      this.state.playerBlockedForCarving = true;
+      this.autoWalkTarget = null;
+      soundManager.stop('thunder');
       this.queueDialogue([
         {
           speaker: 'YOU',
@@ -4658,16 +4688,12 @@ export class VillageLedgerGame {
       }
     }
     
-    // Update thunderstorm animation timer
     if (this.state.showThunderstorm) {
       this.state.thunderstormTimer += dt;
-      // Thunderstorm lasts 3.5 seconds, then transition to night
       if (this.state.thunderstormTimer > 3.5) {
         this.state.showThunderstorm = false;
-        // Thunder keeps looping until roof fix is initiated
-        // Start night transition after thunderstorm
-        this.state.showNightTransition = true;
-        this.state.nightTransitionTimer = 0;
+        this.state.stormCountdownActive = false;
+        this.triggerEnterHutSequence();
       }
     }
     
@@ -4914,6 +4940,9 @@ export class VillageLedgerGame {
     this.state.phase = 'complete_success';
     this.state.stormCountdownActive = true;
     this.state.stormCountdownTimer = 35;
+    setTimeout(() => {
+      soundManager.play('thunder');
+    }, 1000);
   }
   
   private startDiscoParty(): void {
@@ -6286,12 +6315,18 @@ export class VillageLedgerGame {
     const speakerShake = isAnimated ? Math.sin(t * 15) * 3 : 0;
 
     const djCenterX = this.villageElder.x;
-    const speakerWorldPositions = [djCenterX - 350, djCenterX + 350];
-    for (let side = 0; side < 2; side++) {
-      const speakerWorldX = speakerWorldPositions[side];
-      const speakerScreenX = speakerWorldX - this.cameraX;
+    const speakerPositions = [
+      { worldX: djCenterX - 350, stacked: false },
+      { worldX: djCenterX + 350, stacked: false },
+      { worldX: djCenterX - 550, stacked: true },
+      { worldX: djCenterX + 550, stacked: true },
+    ];
+    for (let si = 0; si < speakerPositions.length; si++) {
+      const sp = speakerPositions[si];
+      const speakerScreenX = sp.worldX - this.cameraX;
       if (speakerScreenX < -200 || speakerScreenX > this.logicalWidth + 200) continue;
       const baseY = groundY - 10;
+      const side = si % 2;
       ctx.save();
       ctx.translate(speakerScreenX, baseY);
       if (isAnimated) {
@@ -6299,7 +6334,8 @@ export class VillageLedgerGame {
         ctx.scale(1 + speakerPulse, 1 + speakerPulse);
       }
       ctx.translate(-90, 0);
-      for (let cab = 0; cab < 2; cab++) {
+      const cabCount = sp.stacked ? 2 : 1;
+      for (let cab = 0; cab < cabCount; cab++) {
         const cabY = -cab * 165;
         const cabW = 180;
         const cabH = 156;
@@ -6617,17 +6653,24 @@ export class VillageLedgerGame {
 
       const partyLeftWorld = this.villageCenterX - 400;
       const partyRightWorld = this.villageCenterX + 400;
+      const frozenLeftScreen = partyLeftWorld - this.cameraX;
+      const frozenRightScreen = partyRightWorld - this.cameraX;
       for (let i = 0; i < 4; i++) {
-        const worldCornerX = (i % 2 === 0) ? partyLeftWorld : partyRightWorld;
+        const isRight = (i % 2 === 1);
+        const isTop = (i < 2);
+        const worldCornerX = isRight ? partyRightWorld : partyLeftWorld;
         const cornerX = worldCornerX - this.cameraX;
-        const cornerY = (i < 2) ? 0 : groundY;
+        const cornerY = isTop ? 0 : groundY;
         if (cornerX < -200 || cornerX > w + 200) continue;
-        const sweepAngle = Math.sin(ft * 1.8 + i * 1.2) * 0.5;
-        const baseAngle = (i % 2 === 0) ? 0 : Math.PI;
-        const angle = baseAngle + sweepAngle + (i < 2 ? 0.3 : -0.3);
+        const sweepAngle = Math.sin(ft * 1.8 + i * 1.2) * 0.4;
+        const baseAngle = isRight ? (Math.PI + 0.5) : -0.5;
+        const verticalBias = isTop ? 0.4 : -0.4;
+        const angle = baseAngle + sweepAngle + verticalBias;
         const beamLen = 350;
-        const endX = cornerX + Math.cos(angle) * beamLen;
-        const endY = cornerY + Math.sin(angle) * beamLen;
+        let endX = cornerX + Math.cos(angle) * beamLen;
+        let endY = cornerY + Math.sin(angle) * beamLen;
+        endX = Math.max(frozenLeftScreen, Math.min(frozenRightScreen, endX));
+        endY = Math.max(0, Math.min(groundY, endY));
         const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
         const hue = (ft * 50 + i * 90) % 360;
         cornerGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.35)`);
@@ -6719,12 +6762,12 @@ export class VillageLedgerGame {
     const elderScreenX = this.villageElder.x - this.cameraX;
 
     // Draw sunglasses on the Village Elder (adjusted for 3/4 side-facing view)
-    const elderBob = Math.sin(this.state.celebrationTimer * 4) * 2;
-    const elderHeadY = this.villageElder.y + 20 + elderBob;
+    const elderBob = this.villageElder.bobOffset || 0;
+    const elderHeadY = this.villageElder.y + 28 + elderBob;
     const glassW = 20;
     const glassH = 7;
     const bridgeY = elderHeadY;
-    const sideOffset = 3;
+    const sideOffset = 5;
 
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#333';
@@ -6845,22 +6888,30 @@ export class VillageLedgerGame {
       ctx.fill();
     }
     
-    // Corner spotlights (world-fixed to party zone edges)
+    // Corner spotlights (world-fixed to party zone edges, contained within play area)
     const partyLeftWorld = this.villageCenterX - 400;
     const partyRightWorld = this.villageCenterX + 400;
+    const partyLeftScreen = partyLeftWorld - this.cameraX;
+    const partyRightScreen = partyRightWorld - this.cameraX;
     for (let i = 0; i < 4; i++) {
-      const worldCornerX = (i % 2 === 0) ? partyLeftWorld : partyRightWorld;
+      const isRight = (i % 2 === 1);
+      const isTop = (i < 2);
+      const worldCornerX = isRight ? partyRightWorld : partyLeftWorld;
       const cornerX = worldCornerX - this.cameraX;
-      const cornerY = (i < 2) ? 0 : groundY;
+      const cornerY = isTop ? 0 : groundY;
       
       if (cornerX < -200 || cornerX > w + 200) continue;
       
-      const sweepAngle = Math.sin(t * 1.8 + i * 1.2) * 0.5;
-      const baseAngle = (i % 2 === 0) ? 0 : Math.PI;
-      const angle = baseAngle + sweepAngle + (i < 2 ? 0.3 : -0.3);
+      const sweepAngle = Math.sin(t * 1.8 + i * 1.2) * 0.4;
+      const baseAngle = isRight ? (Math.PI + 0.5) : -0.5;
+      const verticalBias = isTop ? 0.4 : -0.4;
+      const angle = baseAngle + sweepAngle + verticalBias;
       const beamLen = 350;
-      const endX = cornerX + Math.cos(angle) * beamLen;
-      const endY = cornerY + Math.sin(angle) * beamLen;
+      let endX = cornerX + Math.cos(angle) * beamLen;
+      let endY = cornerY + Math.sin(angle) * beamLen;
+      
+      endX = Math.max(partyLeftScreen, Math.min(partyRightScreen, endX));
+      endY = Math.max(0, Math.min(groundY, endY));
       
       const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
       const hue = (t * 50 + i * 90) % 360;
@@ -7396,7 +7447,7 @@ export class VillageLedgerGame {
     ctx.stroke();
 
     const starX = x + size / 2;
-    const starY = y + size / 2 - 2;
+    const starY = y + size / 2 + 1;
     const starSize = 10;
     ctx.fillStyle = '#FFD700';
     ctx.beginPath();
@@ -7413,9 +7464,9 @@ export class VillageLedgerGame {
     ctx.font = `bold 9px ${this.uiFont}`;
     ctx.fillStyle = '#FFF';
     ctx.textAlign = 'center';
-    ctx.fillText(`${this.state.badges.length}/6`, x + size / 2, y + size + 6);
+    ctx.fillText(`${this.state.badges.length}/6`, x + size / 2, y + size + 14);
 
-    this.badgeTrayButtonArea = { x, y, w: size, h: size + 8 };
+    this.badgeTrayButtonArea = { x, y, w: size, h: size + 16 };
   }
 
   private drawBadgeTrayPanel(ctx: CanvasRenderingContext2D): void {
@@ -8346,136 +8397,73 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private drawStoneTabletHUD(ctx: CanvasRenderingContext2D): void {
     const muteButtonSize = 36;
     const muteRightEdge = this.logicalWidth - 12;
-    const x = muteRightEdge - muteButtonSize - 12 - this.hudWidth;
-    const y = 20;
-    const w = this.hudWidth;
-    const h = this.hudHeight;
+    const iconW = 44;
+    const iconH = 52;
+    const x = muteRightEdge - muteButtonSize - 12 - iconW;
+    const y = 16;
 
-    // Glow effect
     if (this.hudGlow > 0) {
       ctx.shadowColor = '#FFD700';
-      ctx.shadowBlur = 30 * this.hudGlow;
+      ctx.shadowBlur = 20 * this.hudGlow;
     }
 
-    // Stone texture background
-    const stoneGradient = ctx.createLinearGradient(x, y, x + w, y + h);
-    stoneGradient.addColorStop(0, '#D4C4A8');
-    stoneGradient.addColorStop(0.5, '#C9B896');
-    stoneGradient.addColorStop(1, '#B8A888');
-    ctx.fillStyle = stoneGradient;
-
-    // Draw beveled edge
+    const stoneGrad = ctx.createLinearGradient(x, y, x + iconW, y + iconH);
+    stoneGrad.addColorStop(0, '#D4C4A8');
+    stoneGrad.addColorStop(0.5, '#C9B896');
+    stoneGrad.addColorStop(1, '#B8A888');
+    ctx.fillStyle = stoneGrad;
     ctx.beginPath();
-    ctx.roundRect(x, y, w, h, 12);
+    ctx.moveTo(x + 4, y);
+    ctx.lineTo(x + iconW - 4, y);
+    ctx.lineTo(x + iconW, y + 4);
+    ctx.lineTo(x + iconW, y + iconH);
+    ctx.lineTo(x, y + iconH);
+    ctx.lineTo(x, y + 4);
+    ctx.closePath();
     ctx.fill();
 
-    // Stone texture details - subtle cracks
-    ctx.strokeStyle = 'rgba(139, 115, 85, 0.3)';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x + 15, y + 5);
-    ctx.lineTo(x + 25, y + h - 10);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(x + w - 30, y + 8);
-    ctx.lineTo(x + w - 15, y + h - 5);
-    ctx.stroke();
-
-    // Inner shadow for depth
-    ctx.beginPath();
-    ctx.roundRect(x, y, w, h, 12);
     ctx.strokeStyle = '#8B7355';
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 2;
     ctx.stroke();
 
     ctx.shadowBlur = 0;
 
-    // Title - using bold sans-serif per guidelines
-    ctx.font = `bold 14px ${this.uiFont}`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#5D4837';
-    ctx.fillText('STONE TABLET', x + w / 2, y + 26);
-
-    // Divider
-    ctx.strokeStyle = '#8B7355';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(139, 115, 85, 0.3)';
+    ctx.lineWidth = 0.5;
     ctx.beginPath();
-    ctx.moveTo(x + 16, y + 38);
-    ctx.lineTo(x + w - 16, y + 38);
+    ctx.moveTo(x + 8, y + 4);
+    ctx.lineTo(x + 12, y + iconH - 4);
     ctx.stroke();
 
-    // In Loop 1, show elder wisdom instead of NAME/DEBT columns
-    const isLoop1 = this.state.loop === 1;
-    
-    if (isLoop1) {
-      // Display elder wisdom about trustless verification
-      ctx.font = `italic 11px ${this.uiFont}`;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#5D4837';
-      
-      // Word-wrap the wisdom text
-      const wisdomLines = [
-        '"A promise remembered',
-        'only by one is easily',
-        'forgotten by another."',
-        '',
-        '"When debts are carved',
-        'in stone, no one can',
-        'deny what was agreed."'
-      ];
-      
-      wisdomLines.forEach((line, i) => {
-        ctx.fillText(line, x + w / 2, y + 55 + i * 18);
-      });
-    } else {
-      // Loop 2+: Show NAME/DEBT columns
-      // Column headers - bold sans-serif at 14px per guidelines
-      ctx.font = `bold 14px ${this.uiFont}`;
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#6B5344';
-      ctx.fillText('NAME', x + 20, y + 60);
-      ctx.fillText('DEBT', x + w * 0.55, y + 60);
-
-      // Column divider
+    const lineCount = this.state.ledgerEntries.length;
+    const lineLengths = [22, 18, 26, 20];
+    ctx.strokeStyle = '#6B5344';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < Math.min(lineCount, 4); i++) {
+      const ly = y + 12 + i * 9;
       ctx.beginPath();
-      ctx.moveTo(x + w * 0.5, y + 44);
-      ctx.lineTo(x + w * 0.5, y + h - 16);
+      ctx.moveTo(x + 10, ly);
+      ctx.lineTo(x + 10 + lineLengths[i], ly);
       ctx.stroke();
-
-      // Ledger entries - 12px sans-serif per guidelines
-      // Add safe zone margins and text truncation
-      ctx.font = `12px ${this.uiFont}`;
-      const nameMaxWidth = w * 0.45 - 30; // Safe zone for name column
-      const debtMaxWidth = w * 0.45 - 20; // Safe zone for debt column
-      
-      this.state.ledgerEntries.forEach((entry, i) => {
-        const entryY = y + 86 + i * 32;
-        ctx.fillStyle = '#5D4837';
-        ctx.textAlign = 'left';
-        
-        // Truncate name if too long
-        let displayName = entry.name;
-        while (ctx.measureText(displayName).width > nameMaxWidth && displayName.length > 3) {
-          displayName = displayName.slice(0, -4) + '...';
-        }
-        ctx.fillText(displayName, x + 20, entryY);
-        
-        // Truncate debt if too long
-        let displayDebt = entry.debt;
-        while (ctx.measureText(displayDebt).width > debtMaxWidth && displayDebt.length > 3) {
-          displayDebt = displayDebt.slice(0, -4) + '...';
-        }
-        ctx.fillText(displayDebt, x + w * 0.55, entryY);
-      });
-
-      // Empty state message
-      if (this.state.ledgerEntries.length === 0) {
-        ctx.font = `italic 12px ${this.uiFont}`;
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#8B7355';
-        ctx.fillText('(Empty)', x + w / 2, y + 100);
+    }
+    if (lineCount === 0) {
+      ctx.strokeStyle = 'rgba(139, 115, 85, 0.4)';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 3; i++) {
+        const ly = y + 14 + i * 10;
+        ctx.beginPath();
+        ctx.moveTo(x + 10, ly);
+        ctx.lineTo(x + 10 + 20, ly);
+        ctx.stroke();
       }
     }
+
+    ctx.font = `bold 8px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#5D4837';
+    ctx.fillText('TABLET', x + iconW / 2, y + iconH - 4);
+
+    this.stoneTabletHudArea = { x, y, w: iconW, h: iconH };
   }
 
   // Large popup view of Stone Tablet - shown when clicking the HUD or in-world tablet
@@ -8622,11 +8610,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const panelWidth = items.length * (iconSize + spacing + 20) + padding;
     const panelHeight = iconSize + padding * 1.5;
     
-    // Position to the left of Stone Tablet HUD
-    const muteButtonSize = 36;
-    const muteRightEdge = this.logicalWidth - 12;
-    const stoneTabletHudX = muteRightEdge - muteButtonSize - 12 - this.hudWidth;
-    const stoneTabletHudY = 20;
+    // Position to the left of Stone Tablet HUD icon
+    const stoneTabletHudX = this.stoneTabletHudArea.x;
+    const stoneTabletHudY = this.stoneTabletHudArea.y;
     const panelX = stoneTabletHudX - panelWidth - 12;
     const yPos = stoneTabletHudY;
     let xPos = panelX + padding / 2;
@@ -8677,7 +8663,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private drawMuteButton(ctx: CanvasRenderingContext2D): void {
     const muteButtonSize = 36;
     const muteX = this.logicalWidth - muteButtonSize - 12;
-    const muteY = 12;
+    const muteY = 20;
     
     this.muteButtonArea = { x: muteX, y: muteY, w: muteButtonSize, h: muteButtonSize };
     
@@ -10581,7 +10567,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
-    this.villageElder.x = 1588;
+    this.villageElder.x = 1568;
     this.villageElder.targetX = undefined;
     
     // Reset animation/sound flags
@@ -10730,7 +10716,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
-    this.villageElder.x = 1588;
+    this.villageElder.x = 1568;
     this.villageElder.targetX = undefined;
     
     // Reset animation/sound flags for loop 2

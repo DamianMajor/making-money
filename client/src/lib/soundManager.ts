@@ -38,7 +38,10 @@ export type SoundName =
   | 'silverScreenVillain1'
   | 'silverScreenVillain2'
   | 'silverScreenVillain3'
-  | 'sixtesCinemaTrillsA';
+  | 'sixtesCinemaTrillsA'
+  | 'balloonPop1'
+  | 'balloonPop2'
+  | 'balloonBop';
 
 interface SoundConfig {
   src: string;
@@ -88,6 +91,9 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   silverScreenVillain2: { src: '/sounds/silver-screen-villain-2.mp3', volume: 0.5, loop: false },
   silverScreenVillain3: { src: '/sounds/silver-screen-villain-3.mp3', volume: 0.5, loop: false },
   sixtesCinemaTrillsA: { src: '/sounds/sixties-cinema-trills-1.mp3', volume: 0.5, loop: false },
+  balloonPop1: { src: '/sounds/balloon-pop-1.mp3', volume: 0.6, loop: false },
+  balloonPop2: { src: '/sounds/balloon-pop-2.mp3', volume: 0.6, loop: false },
+  balloonBop: { src: '/sounds/balloon-bop.mp3', volume: 0.5, loop: false },
 };
 
 const FIGHT_ALWAYS_SOUNDS: SoundName[] = [

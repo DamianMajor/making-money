@@ -162,12 +162,12 @@ interface GameState {
     popAnim: number;
     bobPhase: number;
   }>;
-  slingshotProjectile: {
+  slingshotProjectiles: Array<{
     x: number; y: number;
     vx: number; vy: number;
     active: boolean;
     radius: number;
-  } | null;
+  }>;
   slingshotAiming: boolean;
   slingshotLocked: boolean;
   slingshotAimStart: { x: number; y: number } | null;
@@ -754,7 +754,7 @@ export class VillageLedgerGame {
       slingshotCombo: 0,
       slingshotMaxCombo: 0,
       slingshotBalloons: [],
-      slingshotProjectile: null,
+      slingshotProjectiles: [],
       slingshotAiming: false,
       slingshotLocked: false,
       slingshotAimStart: null,
@@ -3409,13 +3409,15 @@ export class VillageLedgerGame {
 
   private startRemixParty(): void {
     this.state.stormCountdownActive = false;
+    this.state.partyEnded = false;
     this.state.showCelebration = true;
     this.state.remixPlayed = true;
+    this.state.celebrationTimer = 0;
     this.state.slingshotGameActive = true;
     this.state.slingshotScore = 0;
     this.state.slingshotCombo = 0;
     this.state.slingshotMaxCombo = 0;
-    this.state.slingshotProjectile = null;
+    this.state.slingshotProjectiles = [];
     this.state.slingshotAiming = false;
     this.state.slingshotAimStart = null;
     this.state.slingshotAimCurrent = null;
@@ -3424,7 +3426,7 @@ export class VillageLedgerGame {
     this.state.slingshotBalloons = [];
     const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 15; i++) {
       this.state.slingshotBalloons.push({
         x: 80 + Math.random() * (this.worldWidth - 160),
         y: 30 + Math.random() * (groundY * 0.55),
@@ -4280,6 +4282,10 @@ export class VillageLedgerGame {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
     }
+    if (this.badgeAutoTimer) {
+      clearTimeout(this.badgeAutoTimer);
+      this.badgeAutoTimer = null;
+    }
     soundManager.stopAll();
   }
 
@@ -4670,12 +4676,6 @@ export class VillageLedgerGame {
       this.state.playerBlockedForCarving = true;
       this.autoWalkTarget = null;
       soundManager.stop('thunder');
-      this.queueDialogue([
-        {
-          speaker: 'YOU',
-          text: "Just in time! The storm is here... but my roof is fixed!"
-        }
-      ]);
     }
 
     // Update brawl animation timer and NPC movement during brawl
@@ -5059,7 +5059,7 @@ export class VillageLedgerGame {
     this.state.slingshotScore = 0;
     this.state.slingshotCombo = 0;
     this.state.slingshotMaxCombo = 0;
-    this.state.slingshotProjectile = null;
+    this.state.slingshotProjectiles = [];
     this.state.slingshotAiming = false;
     this.state.slingshotAimStart = null;
     this.state.slingshotAimCurrent = null;
@@ -5068,7 +5068,7 @@ export class VillageLedgerGame {
     this.state.slingshotBalloons = [];
     const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 15; i++) {
       this.state.slingshotBalloons.push({
         x: 80 + Math.random() * (this.worldWidth - 160),
         y: 30 + Math.random() * (groundY * 0.55),
@@ -5096,7 +5096,7 @@ export class VillageLedgerGame {
     const fullDuration = soundManager.getBufferDuration('crowdApplause');
     soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 8000));
     
-    this.woodcutter.targetX = this.villageCenterX - 120;
+    this.woodcutter.targetX = this.villageCenterX - 160;
     this.stoneWorker.targetX = this.villageCenterX + 120;
     this.fisherman.targetX = this.villageCenterX + 200;
   }
@@ -5144,116 +5144,122 @@ export class VillageLedgerGame {
       return true;
     });
     
-    const proj = this.state.slingshotProjectile;
-    if (proj && proj.active) {
+    for (const proj of this.state.slingshotProjectiles) {
+      if (!proj.active) continue;
       proj.vy += 280 * dt;
       proj.x += proj.vx * dt;
       proj.y += proj.vy * dt;
       
       if (proj.y > h || proj.x < -50 || proj.x > w + 50) {
-        this.state.slingshotProjectile = null;
-      } else {
-        for (const b of this.state.slingshotBalloons) {
-          if (b.popped) continue;
-          const screenBX = b.x - this.cameraX;
-          const dx = proj.x - screenBX;
-          const dy = proj.y - b.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < b.radius + proj.radius) {
-            const speed = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
-            if (speed < 150) {
-              soundManager.play('balloonBop');
-              const nx = dx / dist;
-              const ny = dy / dist;
-              proj.vx = -proj.vx * 0.4;
-              proj.vy = -proj.vy * 0.4;
-              proj.x = screenBX + nx * (b.radius + proj.radius + 2);
-              proj.y = b.y + ny * (b.radius + proj.radius + 2);
-            } else {
-              const chainPopped = this.chainPopBalloons(b);
-              const points = chainPopped * 10 + chainPopped * chainPopped * 5;
-              this.state.slingshotScore += points;
-              this.state.slingshotCombo++;
-              if (this.state.slingshotCombo > this.state.slingshotMaxCombo) {
-                this.state.slingshotMaxCombo = this.state.slingshotCombo;
-              }
-              this.state.slingshotFloatingTexts.push({
-                x: b.x, y: b.y,
-                text: `+${points}`,
-                timer: 0,
-              });
-              const popSound = Math.random() > 0.5 ? 'balloonPop1' : 'balloonPop2';
-              soundManager.play(popSound);
-              this.state.slingshotProjectile = null;
+        proj.active = false;
+        continue;
+      }
+
+      let hit = false;
+      for (const b of this.state.slingshotBalloons) {
+        if (b.popped) continue;
+        const screenBX = b.x - this.cameraX;
+        const dx = proj.x - screenBX;
+        const dy = proj.y - b.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < b.radius + proj.radius) {
+          const speed = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
+          if (speed < 150) {
+            soundManager.play('balloonBop');
+            const nx = dx / dist;
+            const ny = dy / dist;
+            proj.vx = -proj.vx * 0.4;
+            proj.vy = -proj.vy * 0.4;
+            proj.x = screenBX + nx * (b.radius + proj.radius + 2);
+            proj.y = b.y + ny * (b.radius + proj.radius + 2);
+          } else {
+            const chainPopped = this.chainPopBalloons(b);
+            const points = chainPopped * 10 + chainPopped * chainPopped * 5;
+            this.state.slingshotScore += points;
+            this.state.slingshotCombo++;
+            if (this.state.slingshotCombo > this.state.slingshotMaxCombo) {
+              this.state.slingshotMaxCombo = this.state.slingshotCombo;
             }
+            this.state.slingshotFloatingTexts.push({
+              x: b.x, y: b.y,
+              text: `+${points}`,
+              timer: 0,
+            });
+            const popSound = Math.random() > 0.5 ? 'balloonPop1' : 'balloonPop2';
+            soundManager.play(popSound);
+            proj.active = false;
+            hit = true;
+          }
+          break;
+        }
+      }
+
+      if (!hit && proj.active) {
+        const discoBallWorldX = this.villageElder.x;
+        const discoBallScreenX = discoBallWorldX - this.cameraX;
+        const discoBallR = 45;
+        const discoBallY = Math.min(groundY * 0.45, this.state.celebrationTimer * 30);
+        const dbDx = proj.x - discoBallScreenX;
+        const dbDy = proj.y - discoBallY;
+        const dbDist = Math.sqrt(dbDx * dbDx + dbDy * dbDy);
+        if (dbDist < discoBallR + proj.radius) {
+          const hitSounds = ['discoBallHit1', 'discoBallHit2', 'discoBallHit3'] as const;
+          soundManager.play(hitSounds[Math.floor(Math.random() * hitSounds.length)]);
+          this.state.slingshotScore += 25;
+          this.state.slingshotFloatingTexts.push({
+            x: discoBallWorldX, y: discoBallY,
+            text: '+25',
+            timer: 0,
+          });
+          proj.active = false;
+          hit = true;
+        }
+      }
+
+      if (!hit && proj.active) {
+        const npcsToCheck = [this.woodcutter, this.stoneWorker, this.fisherman, this.villageElder];
+        for (const npc of npcsToCheck) {
+          const npcScreenX = npc.x - this.cameraX;
+          const npcCenterY = npc.y + 20;
+          const nDx = proj.x - npcScreenX;
+          const nDy = proj.y - npcCenterY;
+          const nDist = Math.sqrt(nDx * nDx + nDy * nDy);
+          if (nDist < 25 + proj.radius) {
+            soundManager.play('npcHit');
+            this.state.slingshotScore += 5;
+            this.state.slingshotFloatingTexts.push({
+              x: npc.x, y: npcCenterY,
+              text: 'Oops!',
+              timer: 0,
+            });
+            proj.active = false;
+            hit = true;
             break;
           }
         }
+      }
 
-        if (this.state.slingshotProjectile) {
-          const discoBallWorldX = this.villageElder.x;
-          const discoBallScreenX = discoBallWorldX - this.cameraX;
-          const discoBallR = 45;
-          const discoBallY = Math.min(groundY * 0.45, this.state.celebrationTimer * 30);
-          const dbDx = this.state.slingshotProjectile.x - discoBallScreenX;
-          const dbDy = this.state.slingshotProjectile.y - discoBallY;
-          const dbDist = Math.sqrt(dbDx * dbDx + dbDy * dbDy);
-          if (dbDist < discoBallR + this.state.slingshotProjectile.radius) {
-            const hitSounds = ['discoBallHit1', 'discoBallHit2', 'discoBallHit3'] as const;
-            soundManager.play(hitSounds[Math.floor(Math.random() * hitSounds.length)]);
-            this.state.slingshotScore += 25;
-            this.state.slingshotFloatingTexts.push({
-              x: discoBallWorldX, y: discoBallY,
-              text: '+25',
-              timer: 0,
-            });
-            this.state.slingshotProjectile = null;
-          }
-        }
-
-        if (this.state.slingshotProjectile) {
-          const npcsToCheck = [this.woodcutter, this.stoneWorker, this.fisherman, this.villageElder];
-          for (const npc of npcsToCheck) {
-            if (!this.state.slingshotProjectile) break;
-            const npcScreenX = npc.x - this.cameraX;
-            const npcCenterY = npc.y + 20;
-            const nDx = this.state.slingshotProjectile.x - npcScreenX;
-            const nDy = this.state.slingshotProjectile.y - npcCenterY;
-            const nDist = Math.sqrt(nDx * nDx + nDy * nDy);
-            if (nDist < 25 + this.state.slingshotProjectile.radius) {
-              soundManager.play('npcHit');
-              this.state.slingshotScore += 5;
-              this.state.slingshotFloatingTexts.push({
-                x: npc.x, y: npcCenterY,
-                text: 'Oops!',
-                timer: 0,
-              });
-              this.state.slingshotProjectile = null;
-            }
-          }
-        }
-
-        if (this.state.slingshotProjectile) {
-          const elderScreenX = this.villageElder.x - this.cameraX;
-          const boothLeft = elderScreenX - 60;
-          const boothTop = groundY - 75 + 27;
-          const boothW = 120;
-          const boothH = 75;
-          if (this.state.slingshotProjectile.x >= boothLeft && this.state.slingshotProjectile.x <= boothLeft + boothW &&
-              this.state.slingshotProjectile.y >= boothTop && this.state.slingshotProjectile.y <= boothTop + boothH) {
-            const boothHitSounds = ['basicHit1', 'basicHit2'] as const;
-            soundManager.play(boothHitSounds[Math.floor(Math.random() * boothHitSounds.length)]);
-            this.state.slingshotScore += 10;
-            this.state.slingshotFloatingTexts.push({
-              x: this.villageElder.x, y: boothTop + boothH / 2,
-              text: '+10',
-              timer: 0,
-            });
-            this.state.slingshotProjectile = null;
-          }
+      if (!hit && proj.active) {
+        const elderScreenX = this.villageElder.x - this.cameraX;
+        const boothLeft = elderScreenX - 60;
+        const boothTop = groundY - 75 + 27;
+        const boothW = 120;
+        const boothH = 75;
+        if (proj.x >= boothLeft && proj.x <= boothLeft + boothW &&
+            proj.y >= boothTop && proj.y <= boothTop + boothH) {
+          const boothHitSounds = ['basicHit1', 'basicHit2'] as const;
+          soundManager.play(boothHitSounds[Math.floor(Math.random() * boothHitSounds.length)]);
+          this.state.slingshotScore += 10;
+          this.state.slingshotFloatingTexts.push({
+            x: this.villageElder.x, y: boothTop + boothH / 2,
+            text: '+10',
+            timer: 0,
+          });
+          proj.active = false;
         }
       }
     }
+    this.state.slingshotProjectiles = this.state.slingshotProjectiles.filter(p => p.active);
     
     this.state.slingshotFloatingTexts = this.state.slingshotFloatingTexts.filter(ft => {
       ft.timer += dt;
@@ -5479,8 +5485,8 @@ export class VillageLedgerGame {
       ctx.stroke();
     }
     
-    const proj = this.state.slingshotProjectile;
-    if (proj && proj.active) {
+    for (const proj of this.state.slingshotProjectiles) {
+      if (!proj.active) continue;
       const speed = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
       const normVx = speed > 0 ? proj.vx / speed : 0;
       const normVy = speed > 0 ? proj.vy / speed : 0;
@@ -5610,14 +5616,14 @@ export class VillageLedgerGame {
         const wooshSounds = ['projectileWoosh1', 'projectileWoosh2', 'projectileWoosh3', 'projectileWoosh4'] as const;
         soundManager.play(wooshSounds[Math.floor(Math.random() * wooshSounds.length)]);
         const launchPower = 5.5;
-        this.state.slingshotProjectile = {
+        this.state.slingshotProjectiles.push({
           x: slingshotScreenX,
           y: slingshotY,
           vx: -pullX * launchPower,
           vy: -pullY * launchPower,
           active: true,
           radius: 6,
-        };
+        });
         this.state.slingshotCombo = 0;
       } else {
         soundManager.stop('rubberBandStretch');
@@ -5635,7 +5641,7 @@ export class VillageLedgerGame {
     this.villageElder.facingDirection = 1;
     
     const danceSway = 40;
-    this.woodcutter.x = (cx - 120) + Math.sin(t * 3.0) * danceSway;
+    this.woodcutter.x = (cx - 160) + Math.sin(t * 3.0) * danceSway;
     this.stoneWorker.x = (cx + 120) + Math.sin(t * 2.5 + 2) * danceSway;
     this.fisherman.x = (cx + 200) + Math.sin(t * 2.8 + 4) * danceSway;
     
@@ -6531,9 +6537,13 @@ export class VillageLedgerGame {
     ctx.fillRect(djBoothX + 6, djBoothY + 6, djBoothW - 12, djBoothH - 22);
     
     const eqBars = 12;
+    const eqPanelLeft = djBoothX + 8;
+    const eqPanelRight = djBoothX + djBoothW - 8;
+    const eqPanelWidth = eqPanelRight - eqPanelLeft;
+    const eqBarSpacing = eqPanelWidth / eqBars;
     for (let i = 0; i < eqBars; i++) {
       const barH = 6 + Math.abs(Math.sin(t * 8 + i * 0.8)) * 22;
-      const bx = djBoothX + 10 + i * 10;
+      const bx = eqPanelLeft + i * eqBarSpacing + (eqBarSpacing - 6) / 2;
       ctx.fillStyle = `hsl(${(t * 60 + i * 40) % 360}, 100%, 60%)`;
       ctx.fillRect(bx, djBoothY + 38 - barH, 6, barH);
     }
@@ -6729,7 +6739,7 @@ export class VillageLedgerGame {
         const worldX = lightPositions[i];
         const lx = worldX - this.cameraX;
         if (lx < -100 || lx > w + 100) continue;
-        const sweepAngle = Math.sin(at * 2.5 + i * 1.2) * 0.6 - Math.PI / 2;
+        const sweepAngle = Math.sin(at * 2.5 + i * 1.2) * 1.2 - Math.PI / 2;
         const beamLen = groundY + 20;
         const endX = lx + Math.cos(sweepAngle) * beamLen * 0.4;
         const lightGrad = ctx.createLinearGradient(lx, dialogueTop, endX, 0);
@@ -6804,9 +6814,13 @@ export class VillageLedgerGame {
       ctx.fillStyle = '#1A1A2E';
       ctx.fillRect(boothX + 6, boothY + 6, boothW - 12, boothH - 22);
       const eqBars = 12;
+      const eqPanelLeft = boothX + 8;
+      const eqPanelRight = boothX + boothW - 8;
+      const eqPanelWidth = eqPanelRight - eqPanelLeft;
+      const eqBarSpacing = eqPanelWidth / eqBars;
       for (let i = 0; i < eqBars; i++) {
         const barH = 6 + Math.abs(Math.sin(at * 8 + i * 0.8)) * 22;
-        const bx = boothX + 10 + i * 10;
+        const bx = eqPanelLeft + i * eqBarSpacing + (eqBarSpacing - 6) / 2;
         ctx.fillStyle = `hsl(${(at * 60 + i * 40) % 360}, 100%, 60%)`;
         ctx.fillRect(bx, boothY + 38 - barH, 6, barH);
       }
@@ -6962,7 +6976,7 @@ export class VillageLedgerGame {
       
       if (lx < -100 || lx > w + 100) continue;
       
-      const sweepAngle = Math.sin(t * 2.5 + i * 1.2) * 0.6 - Math.PI / 2;
+      const sweepAngle = Math.sin(t * 2.5 + i * 1.2) * 1.2 - Math.PI / 2;
       const beamLen = groundY + 20;
       const endX = lx + Math.cos(sweepAngle) * beamLen * 0.4;
       
@@ -7488,20 +7502,7 @@ export class VillageLedgerGame {
     if (this.badgePopupButtonArea) {
       const btn = this.badgePopupButtonArea;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
-        soundManager.play('choiceSelect');
-        // Add badge to earned badges
-        if (this.state.pendingBadge) {
-          this.state.badges.push(this.state.pendingBadge.name);
-        }
-        this.state.showBadgePopup = false;
-        this.state.pendingBadge = null;
-        
-        // Run callback after badge is dismissed
-        if (this.badgeDismissCallback) {
-          const callback = this.badgeDismissCallback;
-          this.badgeDismissCallback = null;
-          callback();
-        }
+        this.dismissBadgePopup();
       }
     }
   }
@@ -7514,6 +7515,8 @@ export class VillageLedgerGame {
   // Callback to run after badge popup is dismissed
   private badgeDismissCallback: (() => void) | null = null;
   
+  private badgeAutoTimer: ReturnType<typeof setTimeout> | null = null;
+
   private awardBadge(name: string, description: string, onDismiss?: () => void): void {
     // Don't award duplicates
     if (!this.state.badges.includes(name)) {
@@ -7522,9 +7525,33 @@ export class VillageLedgerGame {
       this.state.lastBadgeEarnedTime = Date.now();
       this.badgeDismissCallback = onDismiss || null;
       soundManager.play('badgeReward');
+      if (this.badgeAutoTimer) clearTimeout(this.badgeAutoTimer);
+      this.badgeAutoTimer = setTimeout(() => {
+        if (this.state.showBadgePopup) {
+          this.dismissBadgePopup();
+        }
+      }, 2500);
     } else if (onDismiss) {
       // Badge already earned, call callback immediately
       onDismiss();
+    }
+  }
+
+  private dismissBadgePopup(): void {
+    if (this.badgeAutoTimer) {
+      clearTimeout(this.badgeAutoTimer);
+      this.badgeAutoTimer = null;
+    }
+    soundManager.play('choiceSelect');
+    if (this.state.pendingBadge) {
+      this.state.badges.push(this.state.pendingBadge.name);
+    }
+    this.state.showBadgePopup = false;
+    this.state.pendingBadge = null;
+    if (this.badgeDismissCallback) {
+      const callback = this.badgeDismissCallback;
+      this.badgeDismissCallback = null;
+      callback();
     }
   }
 
@@ -10637,7 +10664,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       slingshotCombo: 0,
       slingshotMaxCombo: 0,
       slingshotBalloons: [],
-      slingshotProjectile: null,
+      slingshotProjectiles: [],
       slingshotAiming: false,
       slingshotLocked: false,
       slingshotAimStart: null,
@@ -10789,7 +10816,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       slingshotCombo: 0,
       slingshotMaxCombo: 0,
       slingshotBalloons: [],
-      slingshotProjectile: null,
+      slingshotProjectiles: [],
       slingshotAiming: false,
       slingshotLocked: false,
       slingshotAimStart: null,

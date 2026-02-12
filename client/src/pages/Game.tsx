@@ -521,10 +521,12 @@ function IntroScreen({ onStart, onMount, preloadedImages }: { onStart: () => voi
   };
 
   const startedRef = useRef(false);
+  const [starting, setStarting] = useState(false);
 
   const handleStart = () => {
     if (startedRef.current) return;
     startedRef.current = true;
+    setStarting(true);
     onStart();
   };
 
@@ -635,18 +637,22 @@ function IntroScreen({ onStart, onMount, preloadedImages }: { onStart: () => voi
           </span>
           <button
             onClick={handleStart}
+            disabled={starting}
             className="cursor-pointer"
             style={{
               fontFamily: '"Press Start 2P", monospace',
               fontSize: 'clamp(10px, 2.5vw, 14px)',
               color: '#1a1208',
-              background: 'linear-gradient(180deg, #C9B896 0%, #a89478 100%)',
+              background: starting
+                ? 'linear-gradient(180deg, #a89478 0%, #8B7355 100%)'
+                : 'linear-gradient(180deg, #C9B896 0%, #a89478 100%)',
               border: '2px solid #8B7355',
               borderRadius: '8px',
               padding: '14px 32px',
               textShadow: '0 1px 0 rgba(255,255,255,0.2)',
               boxShadow: '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
               transition: 'transform 0.1s, box-shadow 0.1s',
+              opacity: starting ? 0.7 : 1,
             }}
             onMouseDown={(e) => {
               e.currentTarget.style.transform = 'scale(0.97)';
@@ -662,7 +668,7 @@ function IntroScreen({ onStart, onMount, preloadedImages }: { onStart: () => voi
             }}
             data-testid="button-start"
           >
-            Start
+            {starting ? 'Loading...' : 'Start'}
           </button>
         </div>
       </div>

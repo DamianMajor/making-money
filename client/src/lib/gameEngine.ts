@@ -3851,7 +3851,8 @@ export class VillageLedgerGame {
         // Walk toward target
         const dir = Math.sign(dx);
         this.player.x += dir * this.playerSpeed * dt;
-        this.player.x = Math.max(this.player.width / 2, Math.min(this.fisherman.x - 20, this.player.x));
+        const fishBoundary = (this.fisherman.originalX || 3025) - 20;
+        this.player.x = Math.max(this.player.width / 2, Math.min(fishBoundary, this.player.x));
         this.player.bobOffset = Math.sin(this.bobTimer) * 1.5;
         this.player.facingDirection = dir;
         this.player.isWalking = true;
@@ -3868,7 +3869,8 @@ export class VillageLedgerGame {
     // Regular player movement (manual touch controls)
     else if (this.moveDirection !== 0 && !this.state.currentDialogue) {
       this.player.x += this.moveDirection * this.playerSpeed * dt;
-      this.player.x = Math.max(this.player.width / 2, Math.min(this.fisherman.x - 20, this.player.x));
+      const fishBoundary2 = (this.fisherman.originalX || 3025) - 20;
+      this.player.x = Math.max(this.player.width / 2, Math.min(fishBoundary2, this.player.x));
 
       // Update player bob
       this.player.bobOffset = Math.sin(this.bobTimer) * 1.5;
@@ -5199,7 +5201,7 @@ export class VillageLedgerGame {
     const djBoothW = 96;
     const djBoothH = 60;
     const djBoothX = elderScreenX - djBoothW / 2;
-    const djBoothY = groundY - djBoothH + 15;
+    const djBoothY = groundY - djBoothH + 22;
     
     ctx.fillStyle = '#2D1B0E';
     ctx.strokeStyle = '#8B6914';
@@ -5308,11 +5310,12 @@ export class VillageLedgerGame {
       ctx.fillRect(faderX, topY - mixerH + 2 + faderPos, 3, 3);
     }
     
-    // ── DISCO BALL (2x size, centered vertically) ──
+    // ── DISCO BALL (2x size, centered vertically, world-fixed above elder) ──
     const discoBallR = 36;
     const targetY = groundY * 0.45;
     const discoBallDropY = Math.min(targetY, t * 30);
-    const discoBallX = elderScreenX;
+    const discoBallWorldX = this.villageElder.x;
+    const discoBallX = discoBallWorldX - this.cameraX;
     const discoBallY = discoBallDropY;
     
     // String from top
@@ -5336,16 +5339,23 @@ export class VillageLedgerGame {
     ctx.lineWidth = 0.5;
     ctx.stroke();
     
-    // Mirror tiles on the ball
-    for (let row = -4; row <= 4; row++) {
-      for (let col = -5; col <= 5; col++) {
+    // Mirror tiles on the ball — denser grid, larger tiles for better coverage
+    const tileSpacing = 4.5;
+    const tileSize = 4;
+    const maxRows = Math.ceil(discoBallR / tileSpacing);
+    for (let row = -maxRows; row <= maxRows; row++) {
+      const rowY = row * tileSpacing;
+      const rowRadius = Math.sqrt(Math.max(0, discoBallR * discoBallR - rowY * rowY));
+      const numCols = Math.ceil(rowRadius / tileSpacing);
+      for (let col = -numCols; col <= numCols; col++) {
         const tileAngle = t * 2 + row * 0.5 + col * 0.7;
-        const tileX = discoBallX + col * 6 * Math.cos(row * 0.5);
-        const tileY = discoBallY + row * 6;
+        const perspectiveScale = Math.cos(row * 0.15);
+        const tileX = discoBallX + col * tileSpacing * perspectiveScale;
+        const tileY = discoBallY + rowY;
         const dist = Math.sqrt((tileX - discoBallX) ** 2 + (tileY - discoBallY) ** 2);
-        if (dist < discoBallR - 3) {
-          ctx.fillStyle = `hsl(${(tileAngle * 60) % 360}, 80%, ${60 + Math.sin(tileAngle) * 20}%)`;
-          ctx.fillRect(tileX - 2.5, tileY - 2.5, 5, 5);
+        if (dist < discoBallR - 1.5) {
+          ctx.fillStyle = `hsl(${(tileAngle * 60) % 360}, 85%, ${55 + Math.sin(tileAngle) * 25}%)`;
+          ctx.fillRect(tileX - tileSize / 2, tileY - tileSize / 2, tileSize, tileSize);
         }
       }
     }
@@ -5424,10 +5434,16 @@ export class VillageLedgerGame {
       ctx.fill();
     }
     
-    // Corner spotlights
+    // Corner spotlights (world-fixed to party zone edges)
+    const partyLeftWorld = this.villageCenterX - 400;
+    const partyRightWorld = this.villageCenterX + 400;
     for (let i = 0; i < 4; i++) {
-      const cornerX = (i % 2 === 0) ? 0 : w;
+      const worldCornerX = (i % 2 === 0) ? partyLeftWorld : partyRightWorld;
+      const cornerX = worldCornerX - this.cameraX;
       const cornerY = (i < 2) ? 0 : groundY;
+      
+      if (cornerX < -200 || cornerX > w + 200) continue;
+      
       const sweepAngle = Math.sin(t * 1.8 + i * 1.2) * 0.5;
       const baseAngle = (i % 2 === 0) ? 0 : Math.PI;
       const angle = baseAngle + sweepAngle + (i < 2 ? 0.3 : -0.3);
@@ -5447,21 +5463,26 @@ export class VillageLedgerGame {
       ctx.stroke();
     }
     
-    // ── CONFETTI ──
+    // ── CONFETTI (world-fixed around party center) ──
     const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#9B59B6', '#2ECC71', '#FF69B4'];
+    const partyWorldCenterX = this.villageCenterX;
+    const confettiSpread = 500;
     for (let i = 0; i < 40; i++) {
       const seed = i * 137.5;
-      const baseX = seed * 7.3;
+      const baseX = (seed * 7.3) % (confettiSpread * 2) - confettiSpread;
       const baseY = seed * 3.7;
       const fallSpeed = 100 + (i % 5) * 25;
-      const driftSpeed = 60 + (i % 3) * 20;
-      const x = (baseX + t * driftSpeed) % w;
+      const driftSpeed = 30 + (i % 3) * 10;
+      const worldX = partyWorldCenterX + baseX + Math.sin(t * 0.5 + i) * driftSpeed;
+      const screenX = worldX - this.cameraX;
       const y = ((baseY + t * fallSpeed) % (groundY - 60)) + 30;
       const size = 3 + (i % 3) * 2;
       const rotation = t * (4 + i % 3);
       
+      if (screenX < -50 || screenX > w + 50) continue;
+      
       ctx.save();
-      ctx.translate(x, y);
+      ctx.translate(screenX, y);
       ctx.rotate(rotation);
       ctx.fillStyle = confettiColors[i % confettiColors.length];
       if (i % 3 === 0) {
@@ -5504,8 +5525,9 @@ export class VillageLedgerGame {
       }
     }
     
-    // ── "DEBTS SETTLED!" text ──
+    // ── "DEBTS SETTLED!" text (world-fixed above party center) ──
     if (t <= 5) {
+      const textScreenX = this.villageCenterX - this.cameraX;
       const textAlpha = t <= 3 ? Math.min(1, t / 0.5) : Math.max(0, 1 - (t - 3) / 2);
       ctx.globalAlpha = introFade * textAlpha;
       ctx.font = `24px ${this.retroFont}`;
@@ -5515,8 +5537,8 @@ export class VillageLedgerGame {
       ctx.fillStyle = `hsl(${textHue}, 100%, 70%)`;
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 3;
-      ctx.strokeText('DEBTS SETTLED!', w / 2, celebY);
-      ctx.fillText('DEBTS SETTLED!', w / 2, celebY);
+      ctx.strokeText('DEBTS SETTLED!', textScreenX, celebY);
+      ctx.fillText('DEBTS SETTLED!', textScreenX, celebY);
     }
     
     ctx.restore();

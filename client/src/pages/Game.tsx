@@ -893,6 +893,35 @@ function LoadingScreen({ onLoaded }: { onLoaded: () => void }) {
   );
 }
 
+const preloadMoneyIcons = (): Promise<void> => {
+  return new Promise((resolve) => {
+    let loadedCount = 0;
+    const totalIcons = MONEY_ICONS.length;
+    
+    if (totalIcons === 0) {
+      resolve();
+      return;
+    }
+    
+    MONEY_ICONS.forEach((name) => {
+      const img = new Image();
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount >= totalIcons) {
+          resolve();
+        }
+      };
+      img.onerror = () => {
+        loadedCount++;
+        if (loadedCount >= totalIcons) {
+          resolve();
+        }
+      };
+      img.src = `/sprites/${name}.png`;
+    });
+  });
+};
+
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<VillageLedgerGame | null>(null);
@@ -900,10 +929,17 @@ export default function Game() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioGraphRef = useRef<AudioGraph | null>(null);
   const [screen, setScreen] = useState<'loading' | 'reflection' | 'intro' | 'game'>('loading');
+  const [iconsPreloaded, setIconsPreloaded] = useState(false);
   const gameInitialized = useRef(false);
   const [smartPathPrompt, setSmartPathPrompt] = useState<string | null>(null);
   const smartPathCallbackRef = useRef<((text: string) => void) | null>(null);
   const [smartPathAnswer, setSmartPathAnswer] = useState('');
+
+  useEffect(() => {
+    preloadMoneyIcons().then(() => {
+      setIconsPreloaded(true);
+    });
+  }, []);
 
   const handleSmartPathSubmit = useCallback(() => {
     if (smartPathAnswer.trim() && smartPathCallbackRef.current) {
@@ -949,8 +985,14 @@ export default function Game() {
   }, []);
 
   const handleLoadingComplete = useCallback(() => {
+    // Wait for both loading screen completion and icons to be preloaded
+    if (!iconsPreloaded) {
+      // If icons aren't preloaded yet, wait a bit and try again
+      setTimeout(handleLoadingComplete, 100);
+      return;
+    }
     setScreen('reflection');
-  }, []);
+  }, [iconsPreloaded]);
 
   const handleReflectionContinue = useCallback((answer: string) => {
     if (answer.trim()) {

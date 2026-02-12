@@ -169,6 +169,7 @@ interface GameState {
     radius: number;
   } | null;
   slingshotAiming: boolean;
+  slingshotLocked: boolean;
   slingshotAimStart: { x: number; y: number } | null;
   slingshotAimCurrent: { x: number; y: number } | null;
   slingshotLastSpawnTime: number;
@@ -197,6 +198,7 @@ interface GameState {
   stormCountdownActive: boolean;
   stormCountdownTimer: number;
   forceHutEntry: boolean;
+  partyEnded: boolean;
 }
 
 // Game Engine Class
@@ -613,7 +615,7 @@ export class VillageLedgerGame {
     this.villageElder = {
       id: 'villageElder',
       name: 'VILLAGE ELDER',
-      x: 1600, // At Stone Tablet area - matches debt settlement position in Loop 2
+      x: 1588, // At Stone Tablet area - matches debt settlement position in Loop 2
       y: 0,
       width: 100,
       height: 140,
@@ -750,6 +752,7 @@ export class VillageLedgerGame {
       slingshotBalloons: [],
       slingshotProjectile: null,
       slingshotAiming: false,
+      slingshotLocked: false,
       slingshotAimStart: null,
       slingshotAimCurrent: null,
       slingshotLastSpawnTime: 0,
@@ -773,7 +776,8 @@ export class VillageLedgerGame {
       choiceOptions: [],
       stormCountdownActive: false,
       stormCountdownTimer: 0,
-      forceHutEntry: false
+      forceHutEntry: false,
+      partyEnded: false
     };
 
     // Setup event listeners
@@ -985,6 +989,31 @@ export class VillageLedgerGame {
       return;
     }
 
+    // Check slingshot enter/exit buttons
+    if (this.state.slingshotGameActive) {
+      if (this.slingshotEnterButton && !this.state.slingshotLocked) {
+        const btn = this.slingshotEnterButton;
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          this.state.slingshotLocked = true;
+          const platformWorldX = this.villageCenterX + 400;
+          this.player.x = platformWorldX;
+          this.state.playerBlockedForCarving = true;
+          this.slingshotEnterButton = null;
+          return;
+        }
+      }
+      if (this.slingshotExitButton && this.state.slingshotLocked) {
+        const btn = this.slingshotExitButton;
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          this.state.slingshotLocked = false;
+          this.state.playerBlockedForCarving = false;
+          this.state.slingshotAiming = false;
+          this.slingshotExitButton = null;
+          return;
+        }
+      }
+    }
+
     // Handle slingshot game touch during celebration
     if (this.state.showCelebration && this.state.slingshotGameActive) {
       this.handleSlingshotTouchStart(x, y);
@@ -1072,7 +1101,7 @@ export class VillageLedgerGame {
     const tappedTarget = this.getTappedInteractable(x, y);
     const interactionRange = 25; // Small range for natural proximity-based interactions
     
-    if (tappedTarget) {
+    if (tappedTarget && !(this.state.showCelebration && typeof tappedTarget !== 'string')) {
       if (tappedTarget === 'home') {
         const inRange = Math.abs(this.player.x - this.playerHomeX) < interactionRange;
         if (inRange) {
@@ -1142,6 +1171,27 @@ export class VillageLedgerGame {
   
   // Helper to trigger NPC interaction by id
   private triggerNPCInteraction(npcId: string): void {
+    if (this.state.showCelebration) {
+      const partyReviewLines: Record<string, { speaker: string; text: string }[]> = {
+        'woodcutter': [
+          { speaker: 'WOODCUTTER', text: "The ledger keeps track of all our debts. No more confusion!" },
+        ],
+        'stoneWorker': [
+          { speaker: 'STONE-WORKER', text: "When debts are written down, everyone can verify them." },
+        ],
+        'fisherman': [
+          { speaker: 'FISHERMAN', text: "Fair trades need proof. The Stone Tablet gives us that!" },
+        ],
+        'villageElder': [
+          { speaker: 'VILLAGE ELDER', text: "You've learned well! The ledger brings trust to our village." },
+        ],
+      };
+      const reviewLines = partyReviewLines[npcId];
+      if (reviewLines) {
+        this.queueDialogue(reviewLines);
+      }
+      return;
+    }
     if (npcId === 'woodcutter') {
       this.handleWoodcutterInteraction();
     } else if (npcId === 'villageElder') {
@@ -4523,11 +4573,6 @@ export class VillageLedgerGame {
           this.villageElder.facingDirection = elderToPlayer >= 0 ? 1 : -1;
         }
       }
-      // Trigger failure sound 0.25s before fail screen (at 3.75s)
-      if (this.state.brawlTimer > 3.75 && !this.booFailureTriggered) {
-        this.booFailureTriggered = true;
-        soundManager.playFailureThenBoo();
-      }
       // End brawl at 4 seconds, show fail screen
       if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.1) {
         this.state.showBrawl = false;
@@ -4543,6 +4588,10 @@ export class VillageLedgerGame {
               0,
               "Without a record, everyone remembered the deals differently. Verbal promises aren't reliable!",
               () => {
+                if (!this.booFailureTriggered) {
+                  this.booFailureTriggered = true;
+                  soundManager.playFailureThenBoo();
+                }
                 this.state.showFail = true;
               }
             );
@@ -4566,9 +4615,6 @@ export class VillageLedgerGame {
           this.stormTriggered = true;
           this.triggerStormClouds();
         }
-        if (!this.state.roofRepaired) {
-          this.state.roofRepaired = true;
-        }
         this.autoWalkTarget = { x: 200, type: 'location' };
         this.state.forceHutEntry = true;
       }
@@ -4576,11 +4622,7 @@ export class VillageLedgerGame {
 
     if (this.state.forceHutEntry && this.player.x < 250 && !this.state.showNightTransition && !this.state.playerEnteredHut) {
       this.state.forceHutEntry = false;
-      this.state.playerBlockedForCarving = true;
-      if (!this.state.roofRepaired) {
-        this.state.roofRepaired = true;
-      }
-      this.triggerEnterHutSequence();
+      this.handleHomeInteraction();
     }
 
     if (this.state.showCelebration) {
@@ -4856,6 +4898,9 @@ export class VillageLedgerGame {
   
   private endDiscoParty(): void {
     this.state.slingshotGameActive = false;
+    this.state.slingshotLocked = false;
+    this.state.playerBlockedForCarving = false;
+    this.state.partyEnded = true;
     this.state.showCelebration = false;
     this.celebrationEndTime = Date.now();
     soundManager.stop('partySong');
@@ -5052,7 +5097,7 @@ export class VillageLedgerGame {
         }
 
         if (this.state.slingshotProjectile) {
-          const speakerWorldXs = [50, this.worldWidth - 50];
+          const speakerWorldXs = [this.villageCenterX - 300, this.villageCenterX + 350];
           const speakerW = 180;
           const speakerH = 156 * 2;
           for (const spkWorldX of speakerWorldXs) {
@@ -5134,21 +5179,22 @@ export class VillageLedgerGame {
 
   private drawSlingshotGame(ctx: CanvasRenderingContext2D): void {
     if (!this.state.slingshotGameActive) return;
+    this.slingshotEnterButton = null;
+    this.slingshotExitButton = null;
     
     const w = this.logicalWidth;
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
     const platformWorldX = this.villageCenterX + 400;
-    const platformW = 80;
-    const platformH = 12;
+    const platformW = 120;
+    const platformH = 16;
     const platformScreenX = platformWorldX - this.cameraX;
     const slingshotWorldX = platformWorldX;
     const slingshotScreenX = slingshotWorldX - this.cameraX;
     const slingshotY = groundY - 20;
     
-    this.slingshotPlatformActive = this.state.showCelebration && 
-      Math.abs(this.player.x - platformWorldX) < 60;
+    this.slingshotPlatformActive = this.state.showCelebration && this.state.slingshotLocked;
     
     if (platformScreenX > -100 && platformScreenX < w + 100) {
       ctx.fillStyle = '#8B6914';
@@ -5162,7 +5208,7 @@ export class VillageLedgerGame {
       ctx.fillStyle = '#6B3A1F';
       ctx.fillRect(platformScreenX - platformW / 2 + 4, groundY - platformH - 2, platformW - 8, 3);
       
-      const signPostX = platformScreenX + platformW / 2 - 8;
+      const signPostX = platformScreenX + platformW / 2 + 20;
       ctx.strokeStyle = '#6B3A1F';
       ctx.lineWidth = 4;
       ctx.beginPath();
@@ -5183,6 +5229,45 @@ export class VillageLedgerGame {
       ctx.textAlign = 'center';
       ctx.fillText('TEST YOUR', signPostX - 17, groundY - platformH - 40);
       ctx.fillText('AIM!', signPostX - 17, groundY - platformH - 32);
+    }
+
+    if (this.state.showCelebration) {
+      const nearPlatform = Math.abs(this.player.x - platformWorldX) < 80;
+      if (nearPlatform && !this.state.slingshotLocked) {
+        const enterBtnW = 70;
+        const enterBtnH = 24;
+        const enterBtnX = platformScreenX - enterBtnW / 2;
+        const enterBtnY = groundY + 5;
+        ctx.fillStyle = '#22C55E';
+        ctx.beginPath();
+        ctx.roundRect(enterBtnX, enterBtnY, enterBtnW, enterBtnH, 6);
+        ctx.fill();
+        ctx.strokeStyle = '#15803D';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.font = `bold 10px ${this.uiFont}`;
+        ctx.fillStyle = '#FFF';
+        ctx.textAlign = 'center';
+        ctx.fillText('PLAY!', platformScreenX, enterBtnY + enterBtnH / 2 + 4);
+        this.slingshotEnterButton = { x: enterBtnX, y: enterBtnY, w: enterBtnW, h: enterBtnH };
+      } else if (this.state.slingshotLocked) {
+        const exitBtnW = 60;
+        const exitBtnH = 22;
+        const exitBtnX = platformScreenX - exitBtnW / 2;
+        const exitBtnY = groundY + 5;
+        ctx.fillStyle = '#DC2626';
+        ctx.beginPath();
+        ctx.roundRect(exitBtnX, exitBtnY, exitBtnW, exitBtnH, 6);
+        ctx.fill();
+        ctx.strokeStyle = '#991B1B';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.font = `bold 9px ${this.uiFont}`;
+        ctx.fillStyle = '#FFF';
+        ctx.textAlign = 'center';
+        ctx.fillText('EXIT', platformScreenX, exitBtnY + exitBtnH / 2 + 3);
+        this.slingshotExitButton = { x: exitBtnX, y: exitBtnY, w: exitBtnW, h: exitBtnH };
+      }
     }
     
     for (const b of this.state.slingshotBalloons) {
@@ -5434,6 +5519,7 @@ export class VillageLedgerGame {
   private updateDancingNPCs(dt: number): void {
     const t = this.state.celebrationTimer;
     const cx = this.villageCenterX;
+    this.villageElder.facingDirection = 1;
     
     const danceSway = 40;
     this.woodcutter.x = (cx - 120) + Math.sin(t * 3.0) * danceSway;
@@ -5683,7 +5769,7 @@ export class VillageLedgerGame {
     }
     
     // Draw celebration animation if active
-    if (this.state.showCelebration) {
+    if (this.state.showCelebration || this.state.partyEnded) {
       this.drawCelebrationAnimation(ctx);
       if (this.state.slingshotGameActive) {
         this.drawSlingshotGame(ctx);
@@ -5697,10 +5783,10 @@ export class VillageLedgerGame {
       ctx.font = `bold 16px ${this.uiFont}`;
       const pulse = 0.6 + 0.4 * Math.sin(Date.now() / 300);
       ctx.fillStyle = `rgba(220, 38, 38, ${pulse})`;
-      ctx.fillText(countdownText, this.logicalWidth / 2, 50);
+      ctx.fillText(countdownText, this.logicalWidth / 2, 80);
       ctx.font = `12px ${this.uiFont}`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.fillText('Get back to your hut!', this.logicalWidth / 2, 70);
+      ctx.fillText('Get back to your hut!', this.logicalWidth / 2, 100);
       ctx.restore();
       const progress = 1 - (this.state.stormCountdownTimer / 35);
       if (progress > 0.3) {
@@ -6375,6 +6461,97 @@ export class VillageLedgerGame {
     const t = this.state.celebrationTimer;
     
     const introFade = Math.min(1, t / 1.5);
+
+    if (this.state.partyEnded && !this.state.showCelebration) {
+      ctx.save();
+      
+      const staticSpeakerPositions = [this.villageCenterX - 300, this.villageCenterX + 350];
+      for (let side = 0; side < 2; side++) {
+        const speakerWorldX = staticSpeakerPositions[side];
+        const speakerScreenX = speakerWorldX - this.cameraX;
+        if (speakerScreenX < -200 || speakerScreenX > w + 200) continue;
+        const baseY = groundY - 10;
+        ctx.save();
+        ctx.translate(speakerScreenX, baseY);
+        ctx.translate(-90, 0);
+        for (let cab = 0; cab < 2; cab++) {
+          const cabY = -cab * 165;
+          const cabW = 180;
+          const cabH = 156;
+          ctx.fillStyle = '#1A1A1A';
+          ctx.strokeStyle = '#333';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.roundRect(0, cabY - cabH, cabW, cabH, 6);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#222';
+          ctx.beginPath();
+          ctx.roundRect(9, cabY - cabH + 9, cabW - 18, cabH - 18, 4);
+          ctx.fill();
+          const coneX = cabW / 2;
+          const coneY = cabY - cabH / 2 - 15;
+          const coneR = 48;
+          ctx.fillStyle = '#111';
+          ctx.beginPath();
+          ctx.arc(coneX, coneY, coneR + 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#2A2A2A';
+          ctx.beginPath();
+          ctx.arc(coneX, coneY, coneR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#333';
+          ctx.beginPath();
+          ctx.arc(coneX, coneY, 15, 0, Math.PI * 2);
+          ctx.fill();
+          const tweeterY = cabY - cabH + 42;
+          ctx.fillStyle = '#111';
+          ctx.beginPath();
+          ctx.arc(coneX, tweeterY, 18, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#383838';
+          ctx.beginPath();
+          ctx.arc(coneX, tweeterY, 8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      
+      const elderScreenX = this.villageElder.x - this.cameraX;
+      const boothW = 120;
+      const boothH = 75;
+      const boothX = elderScreenX - boothW / 2;
+      const boothY = groundY - boothH + 27;
+      ctx.fillStyle = '#2D1B0E';
+      ctx.strokeStyle = '#1A0F06';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(boothX, boothY, boothW, boothH, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#1A0F06';
+      ctx.beginPath();
+      ctx.roundRect(boothX + 8, boothY + 8, boothW - 16, boothH - 20, 4);
+      ctx.fill();
+      
+      const discoBallR = 36;
+      const discoBallY = groundY * 0.45;
+      const discoBallWorldX = this.villageElder.x;
+      const discoBallScreenX = discoBallWorldX - this.cameraX;
+      ctx.fillStyle = '#555';
+      ctx.beginPath();
+      ctx.arc(discoBallScreenX, discoBallY, discoBallR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#444';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(discoBallScreenX, discoBallY - discoBallR);
+      ctx.lineTo(discoBallScreenX, 0);
+      ctx.stroke();
+      
+      ctx.restore();
+      return;
+    }
     
     ctx.save();
     ctx.globalAlpha = introFade;
@@ -6384,7 +6561,7 @@ export class VillageLedgerGame {
     const conePump = Math.sin(t * 8) * 9;
     const speakerShake = Math.sin(t * 15) * 3;
     
-    const speakerWorldPositions = [50, this.worldWidth - 50];
+    const speakerWorldPositions = [this.villageCenterX - 300, this.villageCenterX + 350];
     for (let side = 0; side < 2; side++) {
       const speakerWorldX = speakerWorldPositions[side];
       const speakerScreenX = speakerWorldX - this.cameraX;
@@ -6464,7 +6641,8 @@ export class VillageLedgerGame {
     const elderScreenX = this.villageElder.x - this.cameraX;
 
     // Draw sunglasses on the Village Elder (adjusted for 3/4 side-facing view)
-    const elderHeadY = this.villageElder.y + 20;
+    const elderBob = Math.sin(this.state.celebrationTimer * 4) * 2;
+    const elderHeadY = this.villageElder.y + 20 + elderBob;
     const glassW = 20;
     const glassH = 7;
     const bridgeY = elderHeadY;
@@ -7119,7 +7297,7 @@ export class VillageLedgerGame {
     if (this.state.badges.length === 0) return;
 
     const x = this.inventoryPanelLeftX - 44;
-    const y = 12;
+    const y = 24;
     const size = 32;
 
     const timeSinceLastBadge = (Date.now() - this.state.lastBadgeEarnedTime) / 1000;
@@ -7157,7 +7335,7 @@ export class VillageLedgerGame {
     ctx.font = `bold 9px ${this.uiFont}`;
     ctx.fillStyle = '#FFF';
     ctx.textAlign = 'center';
-    ctx.fillText(`${this.state.badges.length}/${this.ALL_BADGES.length}`, x + size / 2, y + size + 2);
+    ctx.fillText(`${this.state.badges.length}/6`, x + size / 2, y + size + 6);
 
     this.badgeTrayButtonArea = { x, y, w: size, h: size + 8 };
   }
@@ -8091,7 +8269,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const muteButtonSize = 36;
     const muteRightEdge = this.logicalWidth - 12;
     const x = muteRightEdge - muteButtonSize - 12 - this.hudWidth;
-    const y = 24;
+    const y = 20;
     const w = this.hudWidth;
     const h = this.hudHeight;
 
@@ -8110,10 +8288,24 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
     // Draw beveled edge
     ctx.beginPath();
-    ctx.roundRect(x, y, w, h, 6);
+    ctx.roundRect(x, y, w, h, 12);
     ctx.fill();
 
+    // Stone texture details - subtle cracks
+    ctx.strokeStyle = 'rgba(139, 115, 85, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x + 15, y + 5);
+    ctx.lineTo(x + 25, y + h - 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + w - 30, y + 8);
+    ctx.lineTo(x + w - 15, y + h - 5);
+    ctx.stroke();
+
     // Inner shadow for depth
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, 12);
     ctx.strokeStyle = '#8B7355';
     ctx.lineWidth = 6;
     ctx.stroke();
@@ -8356,7 +8548,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const muteButtonSize = 36;
     const muteRightEdge = this.logicalWidth - 12;
     const stoneTabletHudX = muteRightEdge - muteButtonSize - 12 - this.hudWidth;
-    const stoneTabletHudY = 24;
+    const stoneTabletHudY = 20;
     const panelX = stoneTabletHudX - panelWidth - 12;
     const yPos = stoneTabletHudY;
     let xPos = panelX + padding / 2;
@@ -8929,15 +9121,15 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
     // Determine the target name to display
     let targetName = '';
-    if (this.state.nearbyNPC) {
-      // Get friendly name for display
-      switch (this.state.nearbyNPC.id) {
+    const nearbyNPC = this.state.nearbyNPC;
+    if (nearbyNPC) {
+      switch (nearbyNPC.id) {
         case 'woodcutter': targetName = 'Woodcutter'; break;
         case 'stoneWorker': targetName = 'Stone-worker'; break;
         case 'fisherman': targetName = 'Fisherman'; break;
         case 'villageElder': targetName = 'Elder'; break;
         case 'berryBush': targetName = 'Berry Bush'; break;
-        default: targetName = this.state.nearbyNPC.name;
+        default: targetName = nearbyNPC.name;
       }
     } else if (this.state.nearbyLocation === 'home') {
       targetName = 'Home';
@@ -9110,7 +9302,27 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.font = `10px ${this.retroFont}`;
       ctx.fillStyle = textColor;
       ctx.textAlign = 'center';
-      ctx.fillText(opt, w / 2, optY + optH / 2 + 4);
+      const optMaxW = optW - 30;
+      const optWords2 = opt.split(' ');
+      let optLine2 = '';
+      const optLines2: string[] = [];
+      for (const word of optWords2) {
+        const testLine = optLine2 + word + ' ';
+        if (ctx.measureText(testLine).width > optMaxW && optLine2 !== '') {
+          optLines2.push(optLine2.trim());
+          optLine2 = word + ' ';
+        } else {
+          optLine2 = testLine;
+        }
+      }
+      optLines2.push(optLine2.trim());
+      const lineH2 = 14;
+      const totalH2 = optLines2.length * lineH2;
+      let ly = optY + (optH - totalH2) / 2 + lineH2 / 2 + 4;
+      for (const l of optLines2) {
+        ctx.fillText(l, w / 2, ly);
+        ly += lineH2;
+      }
       
       this.checkpointQuizOptionAreas.push({ x: optX, y: optY, w: optW, h: optH, idx: i });
     });
@@ -9403,7 +9615,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillStyle = '#FFF';
       
       // Wrap option text to fit button width (account for checkbox in multi-select)
-      const optMaxWidth = isMultiSelect ? btnW - 50 : btnW - 20;
+      const optMaxWidth = isMultiSelect ? btnW - 50 : btnW - 30;
       const textCenterX = isMultiSelect ? btnX + 30 + (btnW - 30) / 2 : btnX + btnW / 2;
       const optWords = option.split(' ');
       let optLine = '';
@@ -10159,6 +10371,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   }
 
   private playAgainButton: { x: number; y: number; w: number; h: number } | null = null;
+  private slingshotEnterButton: { x: number; y: number; w: number; h: number } | null = null;
+  private slingshotExitButton: { x: number; y: number; w: number; h: number } | null = null;
 
   private handleSuccessTouch(x: number, y: number): void {
     if (this.playAgainButton) {
@@ -10251,6 +10465,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       slingshotBalloons: [],
       slingshotProjectile: null,
       slingshotAiming: false,
+      slingshotLocked: false,
       slingshotAimStart: null,
       slingshotAimCurrent: null,
       slingshotLastSpawnTime: 0,
@@ -10274,7 +10489,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       choiceOptions: [],
       stormCountdownActive: false,
       stormCountdownTimer: 0,
-      forceHutEntry: false
+      forceHutEntry: false,
+      partyEnded: false
     };
     this.currentQuizQuestion = 0;
     this.playAgainButton = null;
@@ -10287,7 +10503,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
-    this.villageElder.x = 1600;
+    this.villageElder.x = 1588;
     this.villageElder.targetX = undefined;
     
     // Reset animation/sound flags
@@ -10316,6 +10532,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     soundManager.fadeIn('ambientVillage', 1000);
     soundManager.startDaytimeMusic();
     
+    const savedBadges = [...this.state.badges];
+    const savedLastBadgeTime = this.state.lastBadgeEarnedTime;
     this.player.x = 190;
     this.player.facingDirection = 1;
     this.state = {
@@ -10397,6 +10615,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       slingshotBalloons: [],
       slingshotProjectile: null,
       slingshotAiming: false,
+      slingshotLocked: false,
       slingshotAimStart: null,
       slingshotAimCurrent: null,
       slingshotLastSpawnTime: 0,
@@ -10420,8 +10639,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       choiceOptions: [],
       stormCountdownActive: false,
       stormCountdownTimer: 0,
-      forceHutEntry: false
+      forceHutEntry: false,
+      partyEnded: false
     };
+    this.state.badges = savedBadges;
+    this.state.lastBadgeEarnedTime = savedLastBadgeTime;
     
     // Reset NPC positions to original locations
     this.woodcutter.x = this.woodcutter.originalX || 815;
@@ -10430,7 +10652,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.stoneWorker.targetX = undefined;
     this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
-    this.villageElder.x = 1600;
+    this.villageElder.x = 1588;
     this.villageElder.targetX = undefined;
     
     // Reset animation/sound flags for loop 2

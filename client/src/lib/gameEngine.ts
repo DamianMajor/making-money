@@ -100,6 +100,7 @@ interface GameState {
   // Elder is walking toward player to celebrate after both debts settled
   elderWalkingToCelebrate: boolean;
   // Track if player gave in to inflated demands (leads to failure path)
+  smartPathTaken: boolean;
   gaveInToWoodcutter: boolean;
   gaveInToStoneWorker: boolean;
   // Extra berry spawns after giving in - allows getting 1 more fish but not enough for both
@@ -165,6 +166,8 @@ interface GameState {
   }>;
   rhythmLastSpawnTime: number;
   rhythmHitFlash: number;
+  partyDialogueTimer: number;
+  partyDialogueIndex: number;
   nightBgCrossfade: number; // 0-1 crossfade progress to night background
   showNightTransition: boolean; // Nighttime transition before quiz
   nightTransitionTimer: number;
@@ -685,6 +688,7 @@ export class VillageLedgerGame {
       pendingStoneWorkerDispute: false,
       elderVerified: false,
       elderWalkingToCelebrate: false,
+      smartPathTaken: false,
       gaveInToWoodcutter: false,
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
@@ -729,6 +733,8 @@ export class VillageLedgerGame {
       rhythmNotes: [],
       rhythmLastSpawnTime: 0,
       rhythmHitFlash: 0,
+      partyDialogueTimer: 0,
+      partyDialogueIndex: 0,
       nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
@@ -996,7 +1002,8 @@ export class VillageLedgerGame {
     }
 
     // Block input during night transition (cutscene) - but allow quiz/quiz review above
-    if (this.state.showNightTransition) {
+    // Don't block during celebration (party uses night transition for visual effect)
+    if (this.state.showNightTransition && !this.state.showCelebration) {
       return;
     }
 
@@ -1239,7 +1246,7 @@ export class VillageLedgerGame {
     
     // LOOP 2 SUCCESS: Debts settled, time to return home
     // Player must interact with hut to fix roof and enter - allow interaction even during clouds animation
-    if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && !this.state.showNightTransition && !this.state.showSuccess && !this.state.playerEnteredHut) {
+    if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && (!this.state.showNightTransition || this.state.showCelebration) && !this.state.showSuccess && !this.state.playerEnteredHut) {
       
       if (this.state.showCelebration) {
         this.endDiscoParty();
@@ -1674,12 +1681,26 @@ export class VillageLedgerGame {
         const recorded = this.state.woodcutterDebtRecorded;
         
         if (recorded) {
-          // Carving sequence: NPC is stopped at tablet, play carving sound, record debt, THEN deliver item
-          this.queueDialogue([
-            {
-              speaker: 'WOODCUTTER',
-              text: "Let me carve this agreement into the Stone Tablet...",
+          const dialogues: any[] = [];
+          
+          if (this.state.smartPathTaken) {
+            dialogues.push({
+              speaker: 'VILLAGE ELDER',
+              text: "Welcome! I see you've brought a clever idea. This is the Great Stone - a ledger that everyone in the village can see."
+            });
+            dialogues.push({
+              speaker: 'VILLAGE ELDER',
+              text: "When someone gives you something on credit, we carve the agreement into this stone. That way, no one can deny or forget what was promised.",
               onComplete: () => {
+                this.state.smartPathTaken = false;
+              }
+            });
+          }
+          
+          dialogues.push({
+            speaker: 'WOODCUTTER',
+            text: "Let me carve this agreement into the Stone Tablet...",
+            onComplete: () => {
                 // Block player movement during carving
                 this.state.playerBlockedForCarving = true;
                 
@@ -1744,8 +1765,9 @@ export class VillageLedgerGame {
                   ]);
                 }, 2500); // Wait for carving sound to finish
               }
-            }
-          ]);
+            });
+          
+          this.queueDialogue(dialogues);
         } else {
           // Verbal promise path - deliver item immediately
           this.queueDialogue([
@@ -2250,32 +2272,21 @@ export class VillageLedgerGame {
               text: "The Village Elder has a great stone tablet in the center of the village. Let's go talk to him!",
               onComplete: () => {
                 this.state.loop = 2;
-                this.state.phase = 'loop2_need_wood';
-                this.state.inventory.wood = 0;
-                this.state.obtainedWood = false;
-                this.woodcutter.targetX = this.player.x + 60;
-
-                this.queueDialogue([
-                  {
-                    speaker: 'VILLAGE ELDER',
-                    text: "I hear you have a clever idea! Yes, we can use the Stone Tablet to record debts. When someone gives you something on credit, we carve it into the stone for everyone to see."
-                  },
-                  {
-                    speaker: 'VILLAGE ELDER',
-                    text: "This way, no one can deny what they owe. Go ahead - ask the Woodcutter for wood, and we'll record your debt on the tablet.",
-                    onComplete: () => {
-                      this.state.inventory.wood = 1;
-                      this.state.obtainedWood = true;
-                      this.state.woodIntroduced = true;
-                      this.state.stoneIntroduced = true;
-                      this.state.fishIntroduced = true;
-                      this.showInventoryPopup('+1 WOOD');
-                      this.setMood('happy');
-                      this.state.escortingNPC = 'woodcutter';
-                      this.state.phase = 'loop2_escorting_woodcutter';
-                    }
-                  }
-                ]);
+                this.state.smartPathTaken = true;
+                
+                this.state.inventory.wood = 1;
+                this.state.obtainedWood = true;
+                this.state.woodIntroduced = true;
+                this.state.stoneIntroduced = true;
+                this.state.fishIntroduced = true;
+                this.showInventoryPopup('+1 WOOD');
+                this.setMood('happy');
+                
+                this.state.escortingNPC = 'woodcutter';
+                this.state.woodcutterDebtRecorded = true;
+                this.state.phase = 'loop2_escorting_woodcutter';
+                
+                this.woodcutter.targetX = this.villageCenterX - 80;
               }
             }
           ]);
@@ -3007,7 +3018,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "The 'Double Coincidence of Wants' strikes again! But this time, let's use a shared Ledger instead of trusting memory.",
+          text: "The 'Double Coincidence of Wants'! We don't have what each other wants. But we can use the shared Ledger to record a debt.",
           onComplete: showRecordChoice
         }
       ]);
@@ -3019,7 +3030,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "I need fish, not tools! Same problem as before - but maybe a shared record will help this time.",
+          text: "I need fish, not tools! But we can use the Ledger to record a fair deal.",
           onComplete: showRecordChoice
         }
       ]);
@@ -3031,7 +3042,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "Fish is what I need! You know the drill - let's record this properly.",
+          text: "Fish is what I need! But we can record a fair deal on the Ledger.",
           onComplete: showRecordChoice
         }
       ]);
@@ -3043,7 +3054,7 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'STONE-WORKER',
-          text: "I work with stone! Fish is what my family needs. Let's just record it this time.",
+          text: "I work with stone! Fish is what my family needs. We can record a deal on the Ledger.",
           onComplete: showRecordChoice
         }
       ]);
@@ -4502,6 +4513,28 @@ export class VillageLedgerGame {
       this.state.celebrationTimer += dt;
       this.updateDancingNPCs(dt);
       this.updateRhythmGame(dt);
+      // Gradually fade to night during celebration
+      if (this.state.nightBgCrossfade < 1) {
+        this.state.nightBgCrossfade = Math.min(1, this.state.nightBgCrossfade + dt / 6);
+      }
+      // Cycle party dialogue one-liners
+      this.state.partyDialogueTimer += dt;
+      if (this.state.partyDialogueTimer > 5 && !this.state.currentDialogue && !this.state.showChoice) {
+        this.state.partyDialogueTimer = 0;
+        const partyLines = [
+          { speaker: 'WOODCUTTER', text: "When everyone can see the ledger, no one can cheat!" },
+          { speaker: 'STONE-WORKER', text: "A written record beats a fuzzy memory every time." },
+          { speaker: 'FISHERMAN', text: "Fair trades make happy neighbors!" },
+          { speaker: 'VILLAGE ELDER', text: "The Stone Tablet preserves the truth for all to see." },
+          { speaker: 'WOODCUTTER', text: "Imagine if we could carry the ledger everywhere we go..." },
+          { speaker: 'FISHERMAN', text: "Trust is good, but proof is better!" },
+          { speaker: 'STONE-WORKER', text: "With debts recorded, I can trade without worry." },
+          { speaker: 'VILLAGE ELDER', text: "Sound money starts with honest records." },
+        ];
+        const line = partyLines[this.state.partyDialogueIndex % partyLines.length];
+        this.state.partyDialogueIndex++;
+        this.queueDialogue([{ speaker: line.speaker, text: line.text }]);
+      }
     }
     
     // Update thunderstorm animation timer
@@ -4694,6 +4727,10 @@ export class VillageLedgerGame {
         debt: e.debt.replace('OWED', 'SETTLED').replace('VERIFIED', 'SETTLED')
       }));
       this.hudGlow = 1;
+      this.awardBadge(
+        'Debt Settled',
+        'All debts paid off! When debts are recorded and settled, everyone is happy.'
+      );
     }
   }
   
@@ -4760,6 +4797,8 @@ export class VillageLedgerGame {
     this.state.rhythmNotes = [];
     this.state.rhythmLastSpawnTime = 0;
     this.state.rhythmHitFlash = 0;
+    this.state.showNightTransition = true;
+    this.state.nightTransitionTimer = 0;
     this.stormTriggered = false;
     this.celebrationEndTime = 0;
     
@@ -4776,29 +4815,25 @@ export class VillageLedgerGame {
     this.woodcutter.targetX = this.villageCenterX - 120;
     this.stoneWorker.targetX = this.villageCenterX + 120;
     this.fisherman.targetX = this.villageCenterX + 200;
-    this.awardBadge(
-      'Debt Settled',
-      'All debts paid off! When debts are recorded and settled, everyone is happy.'
-    );
   }
   
   private updateRhythmGame(dt: number): void {
     if (!this.state.rhythmGameActive) return;
     
+    const w = this.logicalWidth;
     const h = this.logicalHeight;
-    const tapZoneY = h - this.groundHeight - this.dialogueBoxHeight - 50;
+    const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
     
-    if (t - this.state.rhythmLastSpawnTime > 0.8) {
+    if (t - this.state.rhythmLastSpawnTime > 1.2) {
       this.state.rhythmLastSpawnTime = t;
       const colors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600', '#CC33FF'];
-      const w = this.logicalWidth;
       this.state.rhythmNotes.push({
-        x: this.cameraX + 60 + Math.random() * (w - 120),
-        y: -20,
-        speed: 80 + Math.random() * 40,
+        x: this.cameraX + 40 + Math.random() * (w - 80),
+        y: 40 + Math.random() * (groundY - 100),
+        speed: 0.5 + Math.random() * 0.5,
         color: colors[Math.floor(Math.random() * colors.length)],
-        radius: 8 + Math.random() * 6,
+        radius: 10 + Math.random() * 6,
         hit: false,
         missed: false,
         hitAnim: 0,
@@ -4808,8 +4843,12 @@ export class VillageLedgerGame {
     
     for (const note of this.state.rhythmNotes) {
       if (!note.hit && !note.missed) {
-        note.y += note.speed * dt;
-        if (note.y > tapZoneY + 40) {
+        const seed = note.x * 0.01 + note.y * 0.02;
+        note.x += Math.sin(t * note.speed + seed) * 0.3;
+        note.y += Math.cos(t * note.speed * 0.7 + seed) * 0.2;
+        
+        note.missAnim += dt;
+        if (note.missAnim > 3.5) {
           note.missed = true;
           note.missAnim = 0;
           if (this.state.rhythmCombo > this.state.rhythmMaxCombo) {
@@ -4820,13 +4859,13 @@ export class VillageLedgerGame {
       } else if (note.hit) {
         note.hitAnim += dt;
       } else if (note.missed) {
-        note.missAnim += dt;
+        note.hitAnim += dt;
       }
     }
     
     this.state.rhythmNotes = this.state.rhythmNotes.filter(n => {
       if (n.hit && n.hitAnim > 0.5) return false;
-      if (n.missed && n.missAnim > 0.3) return false;
+      if (n.missed && n.hitAnim > 0.3) return false;
       return true;
     });
     
@@ -4839,30 +4878,15 @@ export class VillageLedgerGame {
     if (!this.state.rhythmGameActive) return;
     
     const w = this.logicalWidth;
-    const h = this.logicalHeight;
-    const tapZoneY = h - this.groundHeight - this.dialogueBoxHeight - 50;
-    const tapZoneH = 30;
-    
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.fillRect(0, tapZoneY - tapZoneH / 2, w, tapZoneH);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([8, 8]);
-    ctx.beginPath();
-    ctx.moveTo(0, tapZoneY);
-    ctx.lineTo(w, tapZoneY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    
-    if (this.state.rhythmHitFlash > 0) {
-      ctx.fillStyle = `rgba(255, 215, 0, ${this.state.rhythmHitFlash * 0.15})`;
-      ctx.fillRect(0, tapZoneY - tapZoneH, w, tapZoneH * 2);
-    }
+    const t = this.state.celebrationTimer;
     
     for (const note of this.state.rhythmNotes) {
       const noteScreenX = note.x - this.cameraX;
+      
+      if (noteScreenX < -30 || noteScreenX > w + 30) continue;
+      
       if (note.hit) {
-        const scale = 1 + note.hitAnim * 3;
+        const scale = 1 + note.hitAnim * 4;
         const alpha = 1 - note.hitAnim * 2;
         if (alpha <= 0) continue;
         ctx.globalAlpha = alpha;
@@ -4873,40 +4897,42 @@ export class VillageLedgerGame {
         ctx.strokeStyle = '#FFD700';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(noteScreenX, note.y, note.radius * scale * 1.3, 0, Math.PI * 2);
+        ctx.arc(noteScreenX, note.y, note.radius * scale * 1.5, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1;
-      } else if (note.missed) {
-        const alpha = 1 - note.missAnim * 3;
+      } else if (note.missed && note.hitAnim > 0) {
+        const alpha = 1 - note.hitAnim * 3;
         if (alpha <= 0) continue;
-        ctx.globalAlpha = alpha * 0.4;
+        ctx.globalAlpha = alpha * 0.3;
         ctx.fillStyle = '#888';
         ctx.beginPath();
         ctx.arc(noteScreenX, note.y, note.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1;
-      } else {
-        const inZone = Math.abs(note.y - tapZoneY) < tapZoneH;
+      } else if (!note.hit && !note.missed) {
+        const lifetime = note.missAnim;
+        const fadeIn = Math.min(1, lifetime * 3);
+        const fadeOut = lifetime > 2.5 ? 1 - (lifetime - 2.5) : 1;
+        const pulse = 0.85 + 0.15 * Math.sin(t * 4 + note.x * 0.1);
         
-        if (inZone) {
-          ctx.fillStyle = `rgba(255, 255, 255, 0.15)`;
-          ctx.beginPath();
-          ctx.arc(noteScreenX, note.y, note.radius + 8, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        ctx.globalAlpha = fadeIn * fadeOut * pulse;
+        
+        ctx.fillStyle = note.color + '30';
+        ctx.beginPath();
+        ctx.arc(noteScreenX, note.y, note.radius + 6, 0, Math.PI * 2);
+        ctx.fill();
         
         ctx.fillStyle = note.color;
-        ctx.globalAlpha = 0.85;
         ctx.beginPath();
         ctx.arc(noteScreenX, note.y, note.radius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1;
         
-        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-        ctx.lineWidth = 2;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.beginPath();
-        ctx.arc(noteScreenX, note.y, note.radius, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.arc(noteScreenX - note.radius * 0.25, note.y - note.radius * 0.25, note.radius * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.globalAlpha = 1;
       }
     }
     
@@ -4929,35 +4955,34 @@ export class VillageLedgerGame {
     }
     
     if (this.state.celebrationTimer < 3) {
+      const w2 = this.logicalWidth;
       ctx.textAlign = 'center';
       ctx.font = `bold 11px ${this.uiFont}`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.fillText('Tap the circles!', w / 2, tapZoneY - tapZoneH - 10);
+      ctx.fillText('Pop the bubbles!', w2 / 2, 85);
     }
   }
 
   private handleRhythmTap(x: number, y: number): boolean {
     if (!this.state.rhythmGameActive) return false;
     
-    const h = this.logicalHeight;
-    const tapZoneY = h - this.groundHeight - this.dialogueBoxHeight - 50;
-    const tapZoneH = 40;
-    
     let hitNote = false;
     for (const note of this.state.rhythmNotes) {
       if (note.hit || note.missed) continue;
       
-      const dx = x - (note.x - this.cameraX);
+      const noteScreenX = note.x - this.cameraX;
+      const dx = x - noteScreenX;
       const dy = y - note.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
       
-      if (dist < note.radius + 25 && Math.abs(note.y - tapZoneY) < tapZoneH) {
+      if (dist < note.radius + 20) {
         note.hit = true;
         note.hitAnim = 0;
         hitNote = true;
         
-        const accuracy = 1 - Math.abs(note.y - tapZoneY) / tapZoneH;
-        const basePoints = Math.round(10 + accuracy * 20);
+        const lifetime = note.missAnim;
+        const earlyBonus = Math.max(0, 1 - lifetime / 3.5);
+        const basePoints = Math.round(10 + earlyBonus * 20);
         const comboMultiplier = Math.min(4, 1 + this.state.rhythmCombo * 0.2);
         this.state.rhythmScore += Math.round(basePoints * comboMultiplier);
         this.state.rhythmCombo++;
@@ -4993,6 +5018,9 @@ export class VillageLedgerGame {
     this.woodcutter.walkFrame = (this.woodcutter.walkFrame || 0) + dt * 12;
     this.stoneWorker.walkFrame = (this.stoneWorker.walkFrame || 0) + dt * 10;
     this.fisherman.walkFrame = (this.fisherman.walkFrame || 0) + dt * 11;
+
+    const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
+    this.villageElder.y = groundY - this.villageElder.height - 15;
   }
 
   // Storm approaching after celebration - player goes home, fixes roof, enters hut, then rain (legacy)
@@ -5875,36 +5903,44 @@ export class VillageLedgerGame {
     
     const elderScreenX = this.villageElder.x - this.cameraX;
 
-    // Draw sunglasses on the Village Elder
-    const elderHeadY = this.villageElder.y + 8;
-    const glassW = 22;
-    const glassH = 8;
+    // Draw sunglasses on the Village Elder (adjusted for 3/4 side-facing view)
+    const elderHeadY = this.villageElder.y + 10;
+    const glassW = 20;
+    const glassH = 7;
     const bridgeY = elderHeadY;
+    const sideOffset = 3;
 
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 1.5;
 
     ctx.beginPath();
-    ctx.roundRect(elderScreenX - glassW/2 - 2, bridgeY, glassW/2 - 1, glassH, 2);
+    ctx.roundRect(elderScreenX - glassW/2 + sideOffset - 1, bridgeY, glassW/2, glassH, 2);
     ctx.fill();
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.roundRect(elderScreenX + 3, bridgeY, glassW/2 - 1, glassH, 2);
+    ctx.roundRect(elderScreenX + sideOffset + 3, bridgeY, glassW/2 - 2, glassH - 1, 2);
     ctx.fill();
     ctx.stroke();
 
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(elderScreenX - 2, bridgeY + glassH/2);
-    ctx.lineTo(elderScreenX + 3, bridgeY + glassH/2);
+    ctx.moveTo(elderScreenX + sideOffset - 1, bridgeY + glassH/2);
+    ctx.lineTo(elderScreenX + sideOffset + 3, bridgeY + glassH/2);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(elderScreenX - glassW/2 + sideOffset - 1, bridgeY + glassH/2);
+    ctx.lineTo(elderScreenX - glassW/2 + sideOffset - 6, bridgeY + glassH/2 + 2);
     ctx.stroke();
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
     ctx.beginPath();
-    ctx.arc(elderScreenX - glassW/4, bridgeY + 3, 2, 0, Math.PI * 2);
+    ctx.arc(elderScreenX - glassW/4 + sideOffset + 1, bridgeY + 3, 1.5, 0, Math.PI * 2);
     ctx.fill();
 
     const discoBallR = 36;
@@ -5935,27 +5971,35 @@ export class VillageLedgerGame {
       }
     }
     
-    // ── GROUND SPOTLIGHTS (fixed world positions, with casings) ──
-    const lightColors = ['#FF0066', '#00FF66', '#0066FF', '#FF6600', '#CC00FF', '#FFFF00', '#00FFCC', '#FF3399'];
-    const numLights = 8;
-    const worldSpacing = 475;
-    const lightsStartX = this.villageCenterX - (numLights - 1) * worldSpacing / 2;
+    // ── STAGE LIGHTS (3 left, 3 right, none over center stone) ──
+    const lightColors = ['#FF0066', '#00FF66', '#0066FF', '#FF6600', '#CC00FF', '#FFFF00'];
+    
+    const stoneCenter = this.villageCenterX;
+    const clearance = 250;
+    const spacing = 200;
+    const lightPositions = [
+      stoneCenter - clearance - spacing * 2,
+      stoneCenter - clearance - spacing,
+      stoneCenter - clearance,
+      stoneCenter + clearance,
+      stoneCenter + clearance + spacing,
+      stoneCenter + clearance + spacing * 2,
+    ];
+    
     const casingH = 14;
     const casingW = 18;
     const casingY = dialogueTop - casingH;
     
-    for (let i = 0; i < numLights; i++) {
-      const worldX = lightsStartX + i * worldSpacing;
+    for (let i = 0; i < lightPositions.length; i++) {
+      const worldX = lightPositions[i];
       const lx = worldX - this.cameraX;
       
-      // Skip if off-screen
       if (lx < -100 || lx > w + 100) continue;
       
-      const sweepAngle = Math.sin(t * 2.5 + i * 0.8) * 0.6 - Math.PI / 2;
+      const sweepAngle = Math.sin(t * 2.5 + i * 1.2) * 0.6 - Math.PI / 2;
       const beamLen = groundY + 20;
       const endX = lx + Math.cos(sweepAngle) * beamLen * 0.4;
       
-      // Light beam (cone)
       const lightGrad = ctx.createLinearGradient(lx, dialogueTop, endX, 0);
       const color = lightColors[i % lightColors.length];
       lightGrad.addColorStop(0, color + 'AA');
@@ -5971,7 +6015,6 @@ export class VillageLedgerGame {
       ctx.closePath();
       ctx.fill();
       
-      // Spotlight casing (dark housing)
       ctx.fillStyle = '#1A1A1A';
       ctx.strokeStyle = '#333';
       ctx.lineWidth = 1;
@@ -5980,7 +6023,6 @@ export class VillageLedgerGame {
       ctx.fill();
       ctx.stroke();
       
-      // Lens glow at top of casing
       ctx.fillStyle = color + '88';
       ctx.beginPath();
       ctx.arc(lx, casingY + 2, 4, 0, Math.PI * 2);
@@ -6495,7 +6537,7 @@ export class VillageLedgerGame {
     if (this.state.showQuiz || this.state.showSuccess || this.state.showFail || this.state.showBrawl || this.state.showQuizReview) return;
     if (this.state.badges.length === 0) return;
 
-    const x = 12;
+    const x = this.logicalWidth - 44;
     const y = 12;
     const size = 32;
 
@@ -9582,6 +9624,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       pendingStoneWorkerDispute: false,
       elderVerified: false,
       elderWalkingToCelebrate: false,
+      smartPathTaken: false,
       gaveInToWoodcutter: false,
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
@@ -9626,6 +9669,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       rhythmNotes: [],
       rhythmLastSpawnTime: 0,
       rhythmHitFlash: 0,
+      partyDialogueTimer: 0,
+      partyDialogueIndex: 0,
       nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
@@ -9718,6 +9763,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       pendingStoneWorkerDispute: false,
       elderVerified: false,
       elderWalkingToCelebrate: false,
+      smartPathTaken: false,
       gaveInToWoodcutter: false,
       gaveInToStoneWorker: false,
       extraBerryAvailable: false,
@@ -9762,6 +9808,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       rhythmNotes: [],
       rhythmLastSpawnTime: 0,
       rhythmHitFlash: 0,
+      partyDialogueTimer: 0,
+      partyDialogueIndex: 0,
       nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,

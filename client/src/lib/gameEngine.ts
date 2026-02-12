@@ -60,6 +60,9 @@ interface GameState {
   // Show badge popup
   showBadgePopup: boolean;
   pendingBadge: { name: string; description: string } | null;
+  showBadgeTray: boolean;
+  badgeTrayAnimTimer: number;
+  lastBadgeEarnedTime: number;
   // Inventory hint for first trade
   showInventoryHint: boolean;
   inventoryHintShown: boolean; // Track if hint has been shown to avoid repeating
@@ -128,11 +131,40 @@ interface GameState {
   showQuiz: boolean;
   showSuccess: boolean;
   showQuizReview: boolean; // Post-quiz review of all answers
+  showCheckpointQuiz: boolean;
+  checkpointQuizData: {
+    question: string;
+    options: string[];
+    correct: number;
+    explanation: string;
+    funLabel: string;
+  } | null;
+  checkpointQuizAnswered: boolean;
+  checkpointQuizCorrect: boolean;
+  checkpointQuizSelected: number;
+  checkpointQuizDismissCallback: (() => void) | null;
   showFail: boolean;
   showBrawl: boolean;
   brawlTimer: number;
   showCelebration: boolean; // Dance animation when debts settled
   celebrationTimer: number;
+  rhythmGameActive: boolean;
+  rhythmScore: number;
+  rhythmCombo: number;
+  rhythmMaxCombo: number;
+  rhythmNotes: Array<{
+    x: number;
+    y: number;
+    speed: number;
+    color: string;
+    radius: number;
+    hit: boolean;
+    missed: boolean;
+    hitAnim: number;
+    missAnim: number;
+  }>;
+  rhythmLastSpawnTime: number;
+  rhythmHitFlash: number;
   nightBgCrossfade: number; // 0-1 crossfade progress to night background
   showNightTransition: boolean; // Nighttime transition before quiz
   nightTransitionTimer: number;
@@ -297,6 +329,18 @@ export class VillageLedgerGame {
     bushNoBerriesNight: new Image()
   };
   private parallaxLoaded: boolean = false;
+
+  private readonly ALL_BADGES = [
+    { id: 'double_coincidence', name: 'Double Coincidence of Wants', description: 'You discovered the fundamental problem of barter — both traders must want exactly what the other has!', icon: 'trade' },
+    { id: 'debt', name: 'Debt', description: 'You took on a debt — a promise to pay someone back later. But can promises always be trusted?', icon: 'scroll' },
+    { id: 'no_trust', name: 'No Trust, No Trade', description: 'Without proof, promises can be broken. Trust alone is not enough for trade to work.', icon: 'broken' },
+    { id: 'the_ledger', name: 'The Ledger', description: 'A written record that everyone can see! The ledger keeps track of debts so no one can cheat.', icon: 'tablet' },
+    { id: 'debt_settled', name: 'Debt Settled', description: 'All debts paid off! When debts are recorded and settled, everyone is happy.', icon: 'check' },
+    { id: 'money_scholar', name: 'Money Scholar', description: 'You understand that money is really just a system for keeping track of who owes what!', icon: 'star' },
+  ];
+
+  private badgeTrayButtonArea: { x: number; y: number; w: number; h: number } | null = null;
+  private badgeTrayCloseButton: { x: number; y: number; w: number; h: number } | null = null;
   
   private characterSprites: { [key: string]: HTMLImageElement } = {};
   private processedSprites: { [key: string]: HTMLCanvasElement } = {};
@@ -338,6 +382,9 @@ export class VillageLedgerGame {
   // Font constants (retro monospace for dialogue/HUD)
   private readonly retroFont: string = '"Press Start 2P", monospace';
   private readonly uiFont: string = '"Open Sans", sans-serif';
+
+  // Smart Path input handler
+  private smartPathInputHandler: ((prompt: string, callback: (answer: string) => void) => void) | null = null;
 
   // Callbacks
   private onStateChange?: (state: GameState) => void;
@@ -611,6 +658,9 @@ export class VillageLedgerGame {
       badges: [],
       showBadgePopup: false,
       pendingBadge: null,
+      showBadgeTray: false,
+      badgeTrayAnimTimer: 0,
+      lastBadgeEarnedTime: 0,
       showInventoryHint: false,
       inventoryHintShown: false,
       pendingChoiceAfterHint: false,
@@ -659,6 +709,12 @@ export class VillageLedgerGame {
       showHUD: false,
       quizAnswers: [],
       showQuiz: false,
+      showCheckpointQuiz: false,
+      checkpointQuizData: null,
+      checkpointQuizAnswered: false,
+      checkpointQuizCorrect: false,
+      checkpointQuizSelected: -1,
+      checkpointQuizDismissCallback: null,
       showSuccess: false,
       showQuizReview: false,
       showFail: false,
@@ -666,6 +722,13 @@ export class VillageLedgerGame {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
+      rhythmGameActive: false,
+      rhythmScore: 0,
+      rhythmCombo: 0,
+      rhythmMaxCombo: 0,
+      rhythmNotes: [],
+      rhythmLastSpawnTime: 0,
+      rhythmHitFlash: 0,
       nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
@@ -829,6 +892,11 @@ export class VillageLedgerGame {
           return;
         }
       }
+
+      // Check badge tray icon tap
+      if (this.badgeTrayButtonArea && !this.state.showChoice && !this.state.currentDialogue) {
+        this.handleBadgeTrayTouch(x, y);
+      }
       
       // Check if clicking on inventory HUD to open popup (also dismisses hint)
       if (this.inventoryButtonArea) {
@@ -875,6 +943,17 @@ export class VillageLedgerGame {
       return;
     }
 
+    // Handle badge tray
+    if (this.state.showBadgeTray) {
+      this.handleBadgeTrayTouch(x, y);
+      return;
+    }
+
+    // Handle rhythm game taps during celebration
+    if (this.state.showCelebration && this.state.rhythmGameActive) {
+      this.handleRhythmTap(x, y);
+    }
+
     // Handle badge popup touches
     if (this.state.showBadgePopup) {
       this.handleBadgePopupTouch(x, y);
@@ -898,6 +977,12 @@ export class VillageLedgerGame {
       return;
     }
     
+    // Handle checkpoint quiz touches
+    if (this.state.showCheckpointQuiz) {
+      this.handleCheckpointQuizTouch(x, y);
+      return;
+    }
+
     // Handle quiz touches (check before night transition block since quiz shows over night scene)
     if (this.state.showQuiz) {
       this.handleQuizTouch(x, y);
@@ -1605,11 +1690,20 @@ export class VillageLedgerGame {
                   
                   // Award Ledger badge 1 second after carving starts (if second entry)
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('WOODCUTTER'));
-                  if (!alreadyRecorded && this.state.ledgerEntries.length >= 1) {
+                  if (!alreadyRecorded) {
                     setTimeout(() => {
                       this.awardBadge(
-                        'Ledger Master',
-                        'You recorded your second debt on the Stone Tablet! A shared ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
+                        'The Ledger',
+                        'A written record that everyone can see! The ledger keeps track of debts so no one can cheat.',
+                        () => {
+                          this.showCheckpointQuiz(
+                            'Think About It!',
+                            "What makes the Stone Tablet better than a verbal promise?",
+                            ["It's a permanent record everyone can check", "It looks cooler"],
+                            0,
+                            "A written record can't be changed or forgotten. Everyone can verify what was agreed - no more arguments!"
+                          );
+                        }
                       );
                     }, 1000);
                   }
@@ -1981,21 +2075,45 @@ export class VillageLedgerGame {
         },
         {
           speaker: 'WOODCUTTER',
-          text: "That's the problem! I want fish, but you don't have fish. You want what I have, but I don't want what you have. This problem is called the 'Double Coincidence of Wants'."
-        },
-        {
-          speaker: 'WOODCUTTER',
-          text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
+          text: "That's the problem! I want fish, but you don't have fish. You want what I have, but I don't want what you have. This problem is called the 'Double Coincidence of Wants'.",
           onComplete: () => {
-            this.state.inventory.wood = 1;
-            this.state.obtainedWood = true;
-            this.state.woodIntroduced = true;
-            this.state.stoneIntroduced = true;
-            this.state.fishIntroduced = true;
-            this.showInventoryPopup('+1 WOOD');
-            this.setMood('happy');
-            this.state.phase = 'got_wood_need_stone';
-            this.woodcutter.targetX = this.villageCenterX + 160;
+            this.state.showChoice = true;
+            this.state.choiceOptions = [
+              {
+                text: "OK, I'll owe you",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.queueDialogue([{
+                    speaker: 'WOODCUTTER',
+                    text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
+                    onComplete: () => {
+                      this.awardBadge(
+                        'Debt',
+                        'You took on a debt - a promise to pay someone back later. But can promises always be trusted?',
+                        () => {
+                          this.state.inventory.wood = 1;
+                          this.state.obtainedWood = true;
+                          this.state.woodIntroduced = true;
+                          this.state.stoneIntroduced = true;
+                          this.state.fishIntroduced = true;
+                          this.showInventoryPopup('+1 WOOD');
+                          this.setMood('happy');
+                          this.state.phase = 'got_wood_need_stone';
+                          this.woodcutter.targetX = this.villageCenterX + 160;
+                        }
+                      );
+                    }
+                  }]);
+                }
+              },
+              {
+                text: "Wait... I have an idea!",
+                action: () => {
+                  this.state.showChoice = false;
+                  this.showSmartPathInput();
+                }
+              }
+            ];
           }
         }
       ]);
@@ -2017,15 +2135,21 @@ export class VillageLedgerGame {
           speaker: 'WOODCUTTER',
           text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
           onComplete: () => {
-            this.state.inventory.wood = 1;
-            this.state.obtainedWood = true;
-            this.state.woodIntroduced = true;
-            this.state.stoneIntroduced = true;
-            this.state.fishIntroduced = true;
-            this.showInventoryPopup('+1 WOOD');
-            this.setMood('happy');
-            this.state.phase = 'got_wood_need_stone';
-            this.woodcutter.targetX = this.villageCenterX + 160;
+            this.awardBadge(
+              'Debt',
+              'You took on a debt - a promise to pay someone back later. But can promises always be trusted?',
+              () => {
+                this.state.inventory.wood = 1;
+                this.state.obtainedWood = true;
+                this.state.woodIntroduced = true;
+                this.state.stoneIntroduced = true;
+                this.state.fishIntroduced = true;
+                this.showInventoryPopup('+1 WOOD');
+                this.setMood('happy');
+                this.state.phase = 'got_wood_need_stone';
+                this.woodcutter.targetX = this.villageCenterX + 160;
+              }
+            );
           }
         }
       ]);
@@ -2047,15 +2171,21 @@ export class VillageLedgerGame {
           speaker: 'WOODCUTTER',
           text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
           onComplete: () => {
-            this.state.inventory.wood = 1;
-            this.state.obtainedWood = true;
-            this.state.woodIntroduced = true;
-            this.state.stoneIntroduced = true;
-            this.state.fishIntroduced = true;
-            this.showInventoryPopup('+1 WOOD');
-            this.setMood('happy');
-            this.state.phase = 'got_wood_need_stone';
-            this.woodcutter.targetX = this.villageCenterX + 160;
+            this.awardBadge(
+              'Debt',
+              'You took on a debt - a promise to pay someone back later. But can promises always be trusted?',
+              () => {
+                this.state.inventory.wood = 1;
+                this.state.obtainedWood = true;
+                this.state.woodIntroduced = true;
+                this.state.stoneIntroduced = true;
+                this.state.fishIntroduced = true;
+                this.showInventoryPopup('+1 WOOD');
+                this.setMood('happy');
+                this.state.phase = 'got_wood_need_stone';
+                this.woodcutter.targetX = this.villageCenterX + 160;
+              }
+            );
           }
         }
       ]);
@@ -2063,6 +2193,101 @@ export class VillageLedgerGame {
       // Some other item (shouldn't happen at this stage)
       this.continueWoodcutterTradeDialogue(null);
     }
+  }
+
+  private showSmartPathInput(): void {
+    this.requestSmartPathInput(
+      "What's your idea for solving the trading problem?",
+      (answer: string) => {
+        const keywords = ['write', 'record', 'ledger', 'tablet', 'stone', 'note', 'track', 'log', 'book', 'carve', 'engrave', 'mark', 'scratch', 'paper', 'list', 'tally'];
+        const lowerAnswer = answer.toLowerCase();
+        const matched = keywords.some(kw => lowerAnswer.includes(kw));
+
+        if (matched) {
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "Write it down? That's a brilliant idea! If we could record our deals somewhere everyone can see..."
+            },
+            {
+              speaker: 'WOODCUTTER',
+              text: "The Village Elder has a great stone tablet in the center of the village. Let's go talk to him!",
+              onComplete: () => {
+                this.state.loop = 2;
+                this.state.phase = 'loop2_need_wood';
+                this.state.inventory.wood = 0;
+                this.state.obtainedWood = false;
+                this.woodcutter.targetX = this.player.x + 60;
+
+                this.queueDialogue([
+                  {
+                    speaker: 'VILLAGE ELDER',
+                    text: "I hear you have a clever idea! Yes, we can use the Stone Tablet to record debts. When someone gives you something on credit, we carve it into the stone for everyone to see."
+                  },
+                  {
+                    speaker: 'VILLAGE ELDER',
+                    text: "This way, no one can deny what they owe. Go ahead - ask the Woodcutter for wood, and we'll record your debt on the tablet.",
+                    onComplete: () => {
+                      this.state.inventory.wood = 1;
+                      this.state.obtainedWood = true;
+                      this.state.woodIntroduced = true;
+                      this.state.stoneIntroduced = true;
+                      this.state.fishIntroduced = true;
+                      this.showInventoryPopup('+1 WOOD');
+                      this.setMood('happy');
+                      this.state.escortingNPC = 'woodcutter';
+                      this.state.phase = 'loop2_escorting_woodcutter';
+                    }
+                  }
+                ]);
+              }
+            }
+          ]);
+        } else {
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "Hmm, that's interesting... but I'm not sure how that would help. Think about it - what if we could keep a permanent record somehow?",
+              onComplete: () => {
+                this.state.showChoice = true;
+                this.state.choiceOptions = [
+                  {
+                    text: "OK, I'll owe you",
+                    action: () => {
+                      this.state.showChoice = false;
+                      this.queueDialogue([{
+                        speaker: 'WOODCUTTER',
+                        text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
+                        onComplete: () => {
+                          this.awardBadge('Debt', 'You took on a debt - a promise to pay someone back later. But can promises always be trusted?', () => {
+                            this.state.inventory.wood = 1;
+                            this.state.obtainedWood = true;
+                            this.state.woodIntroduced = true;
+                            this.state.stoneIntroduced = true;
+                            this.state.fishIntroduced = true;
+                            this.showInventoryPopup('+1 WOOD');
+                            this.setMood('happy');
+                            this.state.phase = 'got_wood_need_stone';
+                            this.woodcutter.targetX = this.villageCenterX + 160;
+                          });
+                        }
+                      }]);
+                    }
+                  },
+                  {
+                    text: "Let me try again!",
+                    action: () => {
+                      this.state.showChoice = false;
+                      this.showSmartPathInput();
+                    }
+                  }
+                ];
+              }
+            }
+          ]);
+        }
+      }
+    );
   }
 
   // Loop 2: Shorter woodcutter dialogue - references past experience
@@ -2280,11 +2505,11 @@ export class VillageLedgerGame {
                   
                   // Award Ledger badge 1 second after carving starts (if second entry)
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('STONE-WORKER'));
-                  if (!alreadyRecorded && this.state.ledgerEntries.length >= 1) {
+                  if (!alreadyRecorded) {
                     setTimeout(() => {
                       this.awardBadge(
-                        'Ledger Master',
-                        'You recorded your second debt on the Stone Tablet! A shared ledger is a permanent record that everyone can verify - no more disputes about who owes what. Money is a system for humans to keep track of debt.'
+                        'The Ledger',
+                        'A written record that everyone can see! The ledger keeps track of debts so no one can cheat.'
                       );
                     }, 1000);
                   }
@@ -3755,6 +3980,16 @@ export class VillageLedgerGame {
     soundManager.init();
   }
 
+  public setSmartPathHandler(handler: (prompt: string, callback: (answer: string) => void) => void): void {
+    this.smartPathInputHandler = handler;
+  }
+
+  private requestSmartPathInput(prompt: string, callback: (answer: string) => void): void {
+    if (this.smartPathInputHandler) {
+      this.smartPathInputHandler(prompt, callback);
+    }
+  }
+
   public beginGameplay(): void {
     soundManager.init();
     soundManager.resumeContext();
@@ -4201,8 +4436,23 @@ export class VillageLedgerGame {
       // End brawl at 4 seconds, show fail screen
       if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.1) {
         this.state.showBrawl = false;
-        this.state.showFail = true;
         this.state.phase = 'fail';
+        this.awardBadge(
+          'No Trust, No Trade',
+          'Without proof, promises can be broken. Trust alone is not enough for trade to work.',
+          () => {
+            this.showCheckpointQuiz(
+              'Quick Check!',
+              "Why did the villagers start fighting?",
+              ["They couldn't remember who owed what", "They didn't like each other"],
+              0,
+              "Without a record, everyone remembered the deals differently. Verbal promises aren't reliable!",
+              () => {
+                this.state.showFail = true;
+              }
+            );
+          }
+        );
       }
     }
     
@@ -4215,6 +4465,7 @@ export class VillageLedgerGame {
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
       this.updateDancingNPCs(dt);
+      this.updateRhythmGame(dt);
     }
     
     // Update thunderstorm animation timer
@@ -4446,6 +4697,7 @@ export class VillageLedgerGame {
   }
   
   private endDiscoParty(): void {
+    this.state.rhythmGameActive = false;
     this.state.showCelebration = false;
     this.celebrationEndTime = Date.now();
     soundManager.fadeOut('moneySong', 1500);
@@ -4467,6 +4719,13 @@ export class VillageLedgerGame {
     this.state.phase = 'loop2_return';
     this.state.showCelebration = true;
     this.state.celebrationTimer = 0;
+    this.state.rhythmGameActive = true;
+    this.state.rhythmScore = 0;
+    this.state.rhythmCombo = 0;
+    this.state.rhythmMaxCombo = 0;
+    this.state.rhythmNotes = [];
+    this.state.rhythmLastSpawnTime = 0;
+    this.state.rhythmHitFlash = 0;
     this.stormTriggered = false;
     this.celebrationEndTime = 0;
     
@@ -4478,8 +4737,203 @@ export class VillageLedgerGame {
     this.woodcutter.targetX = this.villageCenterX - 120;
     this.stoneWorker.targetX = this.villageCenterX + 120;
     this.fisherman.targetX = this.villageCenterX + 200;
+    this.awardBadge(
+      'Debt Settled',
+      'All debts paid off! When debts are recorded and settled, everyone is happy.'
+    );
   }
   
+  private updateRhythmGame(dt: number): void {
+    if (!this.state.rhythmGameActive) return;
+    
+    const h = this.logicalHeight;
+    const tapZoneY = h - this.groundHeight - this.dialogueBoxHeight - 50;
+    const t = this.state.celebrationTimer;
+    
+    if (t - this.state.rhythmLastSpawnTime > 0.8) {
+      this.state.rhythmLastSpawnTime = t;
+      const colors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600', '#CC33FF'];
+      const w = this.logicalWidth;
+      this.state.rhythmNotes.push({
+        x: 60 + Math.random() * (w - 120),
+        y: -20,
+        speed: 80 + Math.random() * 40,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        radius: 16 + Math.random() * 8,
+        hit: false,
+        missed: false,
+        hitAnim: 0,
+        missAnim: 0,
+      });
+    }
+    
+    for (const note of this.state.rhythmNotes) {
+      if (!note.hit && !note.missed) {
+        note.y += note.speed * dt;
+        if (note.y > tapZoneY + 40) {
+          note.missed = true;
+          note.missAnim = 0;
+          if (this.state.rhythmCombo > this.state.rhythmMaxCombo) {
+            this.state.rhythmMaxCombo = this.state.rhythmCombo;
+          }
+          this.state.rhythmCombo = 0;
+        }
+      } else if (note.hit) {
+        note.hitAnim += dt;
+      } else if (note.missed) {
+        note.missAnim += dt;
+      }
+    }
+    
+    this.state.rhythmNotes = this.state.rhythmNotes.filter(n => {
+      if (n.hit && n.hitAnim > 0.5) return false;
+      if (n.missed && n.missAnim > 0.3) return false;
+      return true;
+    });
+    
+    if (this.state.rhythmHitFlash > 0) {
+      this.state.rhythmHitFlash -= dt * 4;
+    }
+  }
+
+  private drawRhythmGame(ctx: CanvasRenderingContext2D): void {
+    if (!this.state.rhythmGameActive) return;
+    
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    const tapZoneY = h - this.groundHeight - this.dialogueBoxHeight - 50;
+    const tapZoneH = 30;
+    
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fillRect(0, tapZoneY - tapZoneH / 2, w, tapZoneH);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([8, 8]);
+    ctx.beginPath();
+    ctx.moveTo(0, tapZoneY);
+    ctx.lineTo(w, tapZoneY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    if (this.state.rhythmHitFlash > 0) {
+      ctx.fillStyle = `rgba(255, 215, 0, ${this.state.rhythmHitFlash * 0.15})`;
+      ctx.fillRect(0, tapZoneY - tapZoneH, w, tapZoneH * 2);
+    }
+    
+    for (const note of this.state.rhythmNotes) {
+      if (note.hit) {
+        const scale = 1 + note.hitAnim * 3;
+        const alpha = 1 - note.hitAnim * 2;
+        if (alpha <= 0) continue;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = note.color;
+        ctx.beginPath();
+        ctx.arc(note.x, note.y, note.radius * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(note.x, note.y, note.radius * scale * 1.3, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (note.missed) {
+        const alpha = 1 - note.missAnim * 3;
+        if (alpha <= 0) continue;
+        ctx.globalAlpha = alpha * 0.4;
+        ctx.fillStyle = '#888';
+        ctx.beginPath();
+        ctx.arc(note.x, note.y, note.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      } else {
+        const inZone = Math.abs(note.y - tapZoneY) < tapZoneH;
+        
+        if (inZone) {
+          ctx.fillStyle = `rgba(255, 255, 255, 0.15)`;
+          ctx.beginPath();
+          ctx.arc(note.x, note.y, note.radius + 8, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        ctx.fillStyle = note.color;
+        ctx.globalAlpha = 0.85;
+        ctx.beginPath();
+        ctx.arc(note.x, note.y, note.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(note.x, note.y, note.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    
+    ctx.textAlign = 'right';
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText(`${this.state.rhythmScore}`, w - 15, 25);
+    
+    ctx.font = `9px ${this.uiFont}`;
+    ctx.fillStyle = '#C4A77D';
+    ctx.fillText('SCORE', w - 15, 38);
+    
+    if (this.state.rhythmCombo >= 2) {
+      ctx.font = `bold 12px ${this.uiFont}`;
+      ctx.fillStyle = '#FF6600';
+      ctx.fillText(`${this.state.rhythmCombo}x`, w - 15, 58);
+      ctx.font = `8px ${this.uiFont}`;
+      ctx.fillStyle = '#C4A77D';
+      ctx.fillText('COMBO', w - 15, 68);
+    }
+    
+    if (this.state.celebrationTimer < 3) {
+      ctx.textAlign = 'center';
+      ctx.font = `bold 11px ${this.uiFont}`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.fillText('Tap the circles!', w / 2, tapZoneY - tapZoneH - 10);
+    }
+  }
+
+  private handleRhythmTap(x: number, y: number): boolean {
+    if (!this.state.rhythmGameActive) return false;
+    
+    const h = this.logicalHeight;
+    const tapZoneY = h - this.groundHeight - this.dialogueBoxHeight - 50;
+    const tapZoneH = 40;
+    
+    let hitNote = false;
+    for (const note of this.state.rhythmNotes) {
+      if (note.hit || note.missed) continue;
+      
+      const dx = x - note.x;
+      const dy = y - note.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < note.radius + 25 && Math.abs(note.y - tapZoneY) < tapZoneH) {
+        note.hit = true;
+        note.hitAnim = 0;
+        hitNote = true;
+        
+        const accuracy = 1 - Math.abs(note.y - tapZoneY) / tapZoneH;
+        const basePoints = Math.round(10 + accuracy * 20);
+        const comboMultiplier = Math.min(4, 1 + this.state.rhythmCombo * 0.2);
+        this.state.rhythmScore += Math.round(basePoints * comboMultiplier);
+        this.state.rhythmCombo++;
+        if (this.state.rhythmCombo > this.state.rhythmMaxCombo) {
+          this.state.rhythmMaxCombo = this.state.rhythmCombo;
+        }
+        this.state.rhythmHitFlash = 1;
+        
+        soundManager.play('dialogueAdvance');
+        break;
+      }
+    }
+    
+    return hitNote;
+  }
+
   private updateDancingNPCs(dt: number): void {
     const t = this.state.celebrationTimer;
     const cx = this.villageCenterX;
@@ -4681,6 +5135,9 @@ export class VillageLedgerGame {
     // Draw mute button in upper-right corner (always visible)
     this.drawMuteButton(ctx);
 
+    // Draw badge tray icon
+    this.drawBadgeTrayIcon(ctx);
+
     // Draw inventory HUD at top of screen (on top of trees)
     this.drawInventoryHUD(ctx);
     
@@ -4719,6 +5176,9 @@ export class VillageLedgerGame {
     // Draw celebration animation if active
     if (this.state.showCelebration) {
       this.drawCelebrationAnimation(ctx);
+      if (this.state.rhythmGameActive) {
+        this.drawRhythmGame(ctx);
+      }
     }
     
     // Draw thunderstorm animation if active
@@ -4750,7 +5210,17 @@ export class VillageLedgerGame {
     if (this.state.showStoneTabletPopup) {
       this.drawStoneTabletPopup(ctx);
     }
+
+    // Draw badge tray panel if open
+    if (this.state.showBadgeTray) {
+      this.drawBadgeTrayPanel(ctx);
+    }
     
+    // Draw checkpoint quiz overlay if active
+    if (this.state.showCheckpointQuiz) {
+      this.drawCheckpointQuiz(ctx);
+    }
+
     // Draw quiz overlay if active
     if (this.state.showQuiz) {
       if (this.showQuizFeedback) {
@@ -5934,11 +6404,217 @@ export class VillageLedgerGame {
     if (!this.state.badges.includes(name)) {
       this.state.pendingBadge = { name, description };
       this.state.showBadgePopup = true;
+      this.state.lastBadgeEarnedTime = Date.now();
       this.badgeDismissCallback = onDismiss || null;
       soundManager.play('badgeReward');
     } else if (onDismiss) {
       // Badge already earned, call callback immediately
       onDismiss();
+    }
+  }
+
+  private drawBadgeTrayIcon(ctx: CanvasRenderingContext2D): void {
+    if (this.state.showQuiz || this.state.showSuccess || this.state.showFail || this.state.showBrawl || this.state.showQuizReview) return;
+    if (this.state.badges.length === 0) return;
+
+    const x = 12;
+    const y = 12;
+    const size = 32;
+
+    const timeSinceLastBadge = (Date.now() - this.state.lastBadgeEarnedTime) / 1000;
+    if (timeSinceLastBadge < 3) {
+      const glowAlpha = 0.3 + 0.3 * Math.sin(timeSinceLastBadge * 8);
+      ctx.fillStyle = `rgba(255, 215, 0, ${glowAlpha})`;
+      ctx.beginPath();
+      ctx.arc(x + size / 2, y + size / 2, size * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = 'rgba(45, 27, 14, 0.85)';
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    const starX = x + size / 2;
+    const starY = y + size / 2 - 2;
+    const starSize = 10;
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const angle = (i * 4 * Math.PI / 5) - Math.PI / 2;
+      const px = starX + Math.cos(angle) * starSize;
+      const py = starY + Math.sin(angle) * starSize;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.font = `bold 9px ${this.uiFont}`;
+    ctx.fillStyle = '#FFF';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${this.state.badges.length}/${this.ALL_BADGES.length}`, x + size / 2, y + size + 2);
+
+    this.badgeTrayButtonArea = { x, y, w: size, h: size + 8 };
+  }
+
+  private drawBadgeTrayPanel(ctx: CanvasRenderingContext2D): void {
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(0, 0, w, h);
+
+    const panelW = Math.min(550, w - 40);
+    const panelH = Math.min(450, h - 40);
+    const panelX = (w - panelW) / 2;
+    const panelY = (h - panelH) / 2;
+
+    const gradient = ctx.createLinearGradient(panelX, panelY, panelX, panelY + panelH);
+    gradient.addColorStop(0, '#4A3728');
+    gradient.addColorStop(1, '#2D1B0E');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(panelX, panelY, panelW, panelH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.font = `bold 20px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('Badges', w / 2, panelY + 35);
+
+    ctx.font = `12px ${this.uiFont}`;
+    ctx.fillStyle = '#C4A77D';
+    ctx.fillText(`${this.state.badges.length} of ${this.ALL_BADGES.length} earned`, w / 2, panelY + 55);
+
+    const cols = 3;
+    const badgeSize = 70;
+    const gapX = 20;
+    const gapY = 20;
+    const gridW = cols * badgeSize + (cols - 1) * gapX;
+    const startX = (w - gridW) / 2;
+    const startY = panelY + 75;
+
+    this.ALL_BADGES.forEach((badge, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const bx = startX + col * (badgeSize + gapX);
+      const by = startY + row * (badgeSize + gapY + 40);
+      const earned = this.state.badges.includes(badge.name);
+
+      if (earned) {
+        ctx.fillStyle = '#4A3728';
+        ctx.strokeStyle = '#FFD700';
+      } else {
+        ctx.fillStyle = '#2A1A0E';
+        ctx.strokeStyle = '#555';
+      }
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(bx + badgeSize / 2, by + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      if (earned) {
+        const cx = bx + badgeSize / 2;
+        const cy = by + badgeSize / 2;
+        ctx.fillStyle = '#FFD700';
+
+        ctx.beginPath();
+        for (let j = 0; j < 5; j++) {
+          const angle = (j * 4 * Math.PI / 5) - Math.PI / 2;
+          const px = cx + Math.cos(angle) * 18;
+          const py = cy + Math.sin(angle) * 18;
+          if (j === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        const cx = bx + badgeSize / 2;
+        const cy = by + badgeSize / 2;
+        ctx.fillStyle = '#555';
+        ctx.font = `bold 24px ${this.uiFont}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('?', cx, cy + 8);
+      }
+
+      ctx.font = `bold 9px ${this.uiFont}`;
+      ctx.fillStyle = earned ? '#F5DEB3' : '#666';
+      ctx.textAlign = 'center';
+
+      const nameWords = badge.name.split(' ');
+      let nameLine = '';
+      let nameY = by + badgeSize + 14;
+      for (const word of nameWords) {
+        const test = nameLine + word + ' ';
+        if (ctx.measureText(test).width > badgeSize + 10 && nameLine !== '') {
+          ctx.fillText(nameLine.trim(), bx + badgeSize / 2, nameY);
+          nameLine = word + ' ';
+          nameY += 12;
+        } else {
+          nameLine = test;
+        }
+      }
+      if (nameLine.trim()) {
+        ctx.fillText(nameLine.trim(), bx + badgeSize / 2, nameY);
+      }
+
+      if (earned) {
+        ctx.font = `8px ${this.uiFont}`;
+        ctx.fillStyle = '#A89070';
+        const shortDesc = badge.description.length > 45 ? badge.description.substring(0, 42) + '...' : badge.description;
+        ctx.fillText(shortDesc, bx + badgeSize / 2, nameY + 14);
+      }
+    });
+
+    const closeBtnW = 120;
+    const closeBtnH = 36;
+    const closeBtnX = (w - closeBtnW) / 2;
+    const closeBtnY = panelY + panelH - 50;
+
+    ctx.fillStyle = '#5D4837';
+    ctx.beginPath();
+    ctx.roundRect(closeBtnX, closeBtnY, closeBtnW, closeBtnH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = '#F5DEB3';
+    ctx.textAlign = 'center';
+    ctx.fillText('Close', w / 2, closeBtnY + 24);
+
+    this.badgeTrayCloseButton = { x: closeBtnX, y: closeBtnY, w: closeBtnW, h: closeBtnH };
+  }
+
+  private handleBadgeTrayTouch(x: number, y: number): void {
+    if (this.state.showBadgeTray) {
+      if (this.badgeTrayCloseButton) {
+        const btn = this.badgeTrayCloseButton;
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          this.state.showBadgeTray = false;
+          soundManager.play('dialogueAdvance');
+          return;
+        }
+      }
+      this.state.showBadgeTray = false;
+      return;
+    }
+
+    if (this.badgeTrayButtonArea) {
+      const btn = this.badgeTrayButtonArea;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.state.showBadgeTray = true;
+        soundManager.play('dialogueAdvance');
+      }
     }
   }
 
@@ -7620,6 +8296,200 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
   }
 
+  private showCheckpointQuiz(
+    funLabel: string,
+    question: string,
+    options: string[],
+    correct: number,
+    explanation: string,
+    onDismiss?: () => void
+  ): void {
+    this.state.showCheckpointQuiz = true;
+    this.state.checkpointQuizData = { question, options, correct, explanation, funLabel };
+    this.state.checkpointQuizAnswered = false;
+    this.state.checkpointQuizCorrect = false;
+    this.state.checkpointQuizSelected = -1;
+    this.state.checkpointQuizDismissCallback = onDismiss || null;
+  }
+
+  private checkpointQuizOptionAreas: { x: number; y: number; w: number; h: number; idx: number }[] = [];
+  private checkpointQuizContinueBtn: { x: number; y: number; w: number; h: number } | null = null;
+
+  private drawCheckpointQuiz(ctx: CanvasRenderingContext2D): void {
+    if (!this.state.checkpointQuizData) return;
+    
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    const data = this.state.checkpointQuizData;
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(0, 0, w, h);
+    
+    const cardW = Math.min(480, w - 50);
+    const cardH = 340;
+    const cardX = (w - cardW) / 2;
+    const cardY = (h - cardH) / 2;
+    
+    const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
+    gradient.addColorStop(0, '#4A3728');
+    gradient.addColorStop(1, '#2D1B0E');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.font = `bold 11px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText(data.funLabel, w / 2, cardY + 30);
+    
+    ctx.font = `11px ${this.retroFont}`;
+    ctx.fillStyle = '#F5DEB3';
+    
+    const maxLineW = cardW - 40;
+    const words = data.question.split(' ');
+    let line = '';
+    let lineY = cardY + 65;
+    for (const word of words) {
+      const test = line + word + ' ';
+      if (ctx.measureText(test).width > maxLineW && line !== '') {
+        ctx.fillText(line.trim(), w / 2, lineY);
+        line = word + ' ';
+        lineY += 20;
+      } else {
+        line = test;
+      }
+    }
+    if (line.trim()) {
+      ctx.fillText(line.trim(), w / 2, lineY);
+    }
+    
+    this.checkpointQuizOptionAreas = [];
+    const optStartY = lineY + 30;
+    const optW = cardW - 60;
+    const optH = 36;
+    const optGap = 8;
+    
+    data.options.forEach((opt, i) => {
+      const optX = (w - optW) / 2;
+      const optY = optStartY + i * (optH + optGap);
+      
+      let bgColor = 'rgba(60, 45, 25, 0.8)';
+      let borderColor = '#5a4a32';
+      let textColor = '#E8D5A8';
+      
+      if (this.state.checkpointQuizAnswered) {
+        if (i === data.correct) {
+          bgColor = 'rgba(34, 197, 94, 0.3)';
+          borderColor = '#22C55E';
+          textColor = '#22C55E';
+        } else if (i === this.state.checkpointQuizSelected && i !== data.correct) {
+          bgColor = 'rgba(239, 68, 68, 0.3)';
+          borderColor = '#EF4444';
+          textColor = '#EF4444';
+        }
+      } else if (i === this.state.checkpointQuizSelected) {
+        bgColor = 'rgba(255, 215, 0, 0.2)';
+        borderColor = '#FFD700';
+      }
+      
+      ctx.fillStyle = bgColor;
+      ctx.beginPath();
+      ctx.roundRect(optX, optY, optW, optH, 8);
+      ctx.fill();
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.font = `10px ${this.retroFont}`;
+      ctx.fillStyle = textColor;
+      ctx.textAlign = 'center';
+      ctx.fillText(opt, w / 2, optY + optH / 2 + 4);
+      
+      this.checkpointQuizOptionAreas.push({ x: optX, y: optY, w: optW, h: optH, idx: i });
+    });
+    
+    if (this.state.checkpointQuizAnswered) {
+      const explY = optStartY + data.options.length * (optH + optGap) + 10;
+      ctx.font = `9px ${this.uiFont}`;
+      ctx.fillStyle = '#C4A77D';
+      ctx.textAlign = 'center';
+      
+      const explWords = data.explanation.split(' ');
+      let explLine = '';
+      let explLineY = explY;
+      for (const word of explWords) {
+        const test = explLine + word + ' ';
+        if (ctx.measureText(test).width > cardW - 50 && explLine !== '') {
+          ctx.fillText(explLine.trim(), w / 2, explLineY);
+          explLine = word + ' ';
+          explLineY += 14;
+        } else {
+          explLine = test;
+        }
+      }
+      if (explLine.trim()) {
+        ctx.fillText(explLine.trim(), w / 2, explLineY);
+      }
+      
+      const btnW = 140;
+      const btnH = 34;
+      const btnX = (w - btnW) / 2;
+      const btnY = cardY + cardH - 48;
+      
+      ctx.fillStyle = this.state.checkpointQuizCorrect ? '#22C55E' : '#D97706';
+      ctx.beginPath();
+      ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+      ctx.fill();
+      
+      ctx.font = `bold 11px ${this.uiFont}`;
+      ctx.fillStyle = '#FFF';
+      ctx.textAlign = 'center';
+      ctx.fillText('Continue', w / 2, btnY + btnH / 2 + 4);
+      
+      this.checkpointQuizContinueBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
+    } else {
+      this.checkpointQuizContinueBtn = null;
+    }
+  }
+
+  private handleCheckpointQuizTouch(x: number, y: number): void {
+    if (!this.state.checkpointQuizData) return;
+    
+    if (this.state.checkpointQuizAnswered) {
+      if (this.checkpointQuizContinueBtn) {
+        const btn = this.checkpointQuizContinueBtn;
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          const callback = this.state.checkpointQuizDismissCallback;
+          this.state.showCheckpointQuiz = false;
+          this.state.checkpointQuizData = null;
+          this.state.checkpointQuizDismissCallback = null;
+          soundManager.play('dialogueAdvance');
+          if (callback) callback();
+        }
+      }
+      return;
+    }
+    
+    for (const area of this.checkpointQuizOptionAreas) {
+      if (x >= area.x && x <= area.x + area.w && y >= area.y && y <= area.y + area.h) {
+        this.state.checkpointQuizSelected = area.idx;
+        this.state.checkpointQuizAnswered = true;
+        this.state.checkpointQuizCorrect = area.idx === this.state.checkpointQuizData!.correct;
+        
+        if (this.state.checkpointQuizCorrect) {
+          soundManager.play('quizCorrect');
+        } else {
+          soundManager.play('quizWrong');
+        }
+        return;
+      }
+    }
+  }
+
   // Quiz questions - some are single-select, some are multi-select
   private quizQuestions: Array<{
     question: string;
@@ -7629,22 +8499,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     multiSelect?: boolean;
   }> = [
     {
-      question: "What is the 'Double Coincidence of Wants' problem?",
-      options: ["A: Both people must want exactly what the other has to trade", "B: Everyone wants the same thing at the same time"],
-      correct: 0,
-      explanation: "For direct trade to work, you need what I have AND I need what you have - at the same time. This rarely happens!"
-    },
-    {
       question: "Why couldn't you trade directly with the Woodcutter?",
       options: ["A: He was being unfriendly", "B: He wanted fish, but you didn't have fish"],
       correct: 1,
       explanation: "You needed wood, but could only offer a slingshot or berries. The Woodcutter wanted fish - a classic Double Coincidence of Wants problem."
-    },
-    {
-      question: "What problem does the Stone Ledger solve?",
-      options: ["A: Keeping a permanent record everyone can verify", "B: Making debts disappear"],
-      correct: 0,
-      explanation: "The ledger creates a shared, unchangeable record. No more disputes about who owes what - it's carved in stone for all to see."
     },
     {
       question: "Why is recording debts better than relying on memory?",
@@ -8016,9 +8874,15 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         soundManager.play('quizCorrect');
         const applauseDuration = soundManager.getBufferDuration('crowdApplause');
         soundManager.playForDuration('crowdApplause', Math.max(1000, applauseDuration * 0.25));
-        this.state.showQuiz = false;
-        this.state.showQuizReview = true;
-        this.quizReviewScrollOffset = 0;
+        this.awardBadge(
+          'Money Scholar',
+          'You understand that money is really just a system for keeping track of who owes what!',
+          () => {
+            this.state.showQuiz = false;
+            this.state.showQuizReview = true;
+            this.quizReviewScrollOffset = 0;
+          }
+        );
       }
     }
   }
@@ -8435,63 +9299,146 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private drawSuccessScreen(ctx: CanvasRenderingContext2D): void {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
-
+    
     // Dark overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.fillRect(0, 0, w, h);
-
-    // Success card
-    const cardW = Math.min(500, w - 60);
-    const cardH = 350;
+    
+    // Badge summary card - taller for badge grid
+    const cardW = Math.min(520, w - 40);
+    const cardH = Math.min(480, h - 30);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
-
+    
     // Card background
-    ctx.fillStyle = '#C9B896';
+    const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
+    gradient.addColorStop(0, '#4A3728');
+    gradient.addColorStop(1, '#2D1B0E');
+    ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.roundRect(cardX, cardY, cardW, cardH, 16);
     ctx.fill();
-    ctx.strokeStyle = '#8B7355';
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
     ctx.stroke();
-
+    
     // Title
-    ctx.font = `20px ${this.retroFont}`;
+    ctx.font = `bold 18px ${this.uiFont}`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#22C55E';
-    ctx.fillText('SUCCESS!', w / 2, cardY + 60);
-
-    // Score calculation - handle both single-select and multi-select
-    let correct = 0;
-    this.state.quizAnswers.forEach((answer, i) => {
-      const q = this.quizQuestions[i];
-      if (q.multiSelect) {
-        // Multi-select: compare arrays
-        const correctArr = q.correct as number[];
-        const answerArr = answer as number[];
-        const isCorrect = correctArr.length === answerArr.length && 
-          correctArr.every(v => answerArr.includes(v));
-        if (isCorrect) correct++;
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('LESSON COMPLETE!', w / 2, cardY + 35);
+    
+    // Badge count
+    const badgeCount = this.state.badges.length;
+    const totalBadges = this.ALL_BADGES.length;
+    ctx.font = `12px ${this.uiFont}`;
+    ctx.fillStyle = '#C4A77D';
+    ctx.fillText(`${badgeCount} of ${totalBadges} badges earned`, w / 2, cardY + 58);
+    
+    // Badge grid - 3 columns, 2 rows
+    const cols = 3;
+    const badgeSize = 52;
+    const gapX = 16;
+    const gapY = 12;
+    const gridW = cols * badgeSize + (cols - 1) * gapX;
+    const startX = (w - gridW) / 2;
+    const startY = cardY + 75;
+    
+    this.ALL_BADGES.forEach((badge, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const bx = startX + col * (badgeSize + gapX);
+      const by = startY + row * (badgeSize + gapY + 30);
+      const earned = this.state.badges.includes(badge.name);
+      
+      // Badge circle
+      if (earned) {
+        ctx.fillStyle = '#4A3728';
+        ctx.strokeStyle = '#FFD700';
       } else {
-        // Single-select: compare numbers
-        if (answer === q.correct) correct++;
+        ctx.fillStyle = '#2A1A0E';
+        ctx.strokeStyle = '#444';
+      }
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(bx + badgeSize / 2, by + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      
+      if (earned) {
+        // Gold star
+        const cx = bx + badgeSize / 2;
+        const cy = by + badgeSize / 2;
+        ctx.fillStyle = '#FFD700';
+        ctx.beginPath();
+        for (let j = 0; j < 5; j++) {
+          const angle = (j * 4 * Math.PI / 5) - Math.PI / 2;
+          const px = cx + Math.cos(angle) * 14;
+          const py = cy + Math.sin(angle) * 14;
+          if (j === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        // Lock icon
+        ctx.fillStyle = '#555';
+        ctx.font = `bold 20px ${this.uiFont}`;
+        ctx.textAlign = 'center';
+        ctx.fillText('?', bx + badgeSize / 2, by + badgeSize / 2 + 7);
+      }
+      
+      // Badge name
+      ctx.font = `bold 8px ${this.uiFont}`;
+      ctx.fillStyle = earned ? '#F5DEB3' : '#555';
+      ctx.textAlign = 'center';
+      
+      const nameWords = badge.name.split(' ');
+      let nameLine = '';
+      let nameY = by + badgeSize + 12;
+      for (const word of nameWords) {
+        const test = nameLine + word + ' ';
+        if (ctx.measureText(test).width > badgeSize + 10 && nameLine !== '') {
+          ctx.fillText(nameLine.trim(), bx + badgeSize / 2, nameY);
+          nameLine = word + ' ';
+          nameY += 10;
+        } else {
+          nameLine = test;
+        }
+      }
+      if (nameLine.trim()) {
+        ctx.fillText(nameLine.trim(), bx + badgeSize / 2, nameY);
       }
     });
-
-    ctx.font = `12px ${this.retroFont}`;
-    ctx.fillStyle = '#3D2914';
-    ctx.fillText(`You answered ${correct} of ${this.quizQuestions.length} correctly!`, w / 2, cardY + 120);
-
-    ctx.font = `10px ${this.retroFont}`;
-    ctx.fillText('You learned about the importance of', w / 2, cardY + 170);
-    ctx.fillText('record-keeping and trust in trade.', w / 2, cardY + 195);
-
+    
+    // Encouragement message
+    const msgY = startY + 2 * (badgeSize + gapY + 30) + 25;
+    ctx.font = `11px ${this.uiFont}`;
+    ctx.fillStyle = '#C4A77D';
+    ctx.textAlign = 'center';
+    
+    if (badgeCount >= totalBadges) {
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText('Amazing! You collected every badge!', w / 2, msgY);
+      ctx.font = `9px ${this.uiFont}`;
+      ctx.fillStyle = '#C4A77D';
+      ctx.fillText('You are a true Money Scholar!', w / 2, msgY + 18);
+    } else if (badgeCount >= 4) {
+      ctx.fillText('Great job! Can you earn them all?', w / 2, msgY);
+      ctx.font = `9px ${this.uiFont}`;
+      ctx.fillText('Play again to collect the missing badges!', w / 2, msgY + 18);
+    } else {
+      ctx.fillText(`${totalBadges - badgeCount} badges still locked!`, w / 2, msgY);
+      ctx.font = `9px ${this.uiFont}`;
+      ctx.fillText('Play again to discover more concepts!', w / 2, msgY + 18);
+    }
+    
     // Play Again button
-    const btnW = 200;
-    const btnH = 50;
+    const btnW = 180;
+    const btnH = 42;
     const btnX = (w - btnW) / 2;
-    const btnY = cardY + 250;
-
+    const btnY = cardY + cardH - 55;
+    
     ctx.fillStyle = '#22C55E';
     ctx.beginPath();
     ctx.roundRect(btnX, btnY, btnW, btnH, 8);
@@ -8499,12 +9446,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.strokeStyle = '#15803D';
     ctx.lineWidth = 3;
     ctx.stroke();
-
-    ctx.font = `12px ${this.retroFont}`;
+    
+    ctx.font = `bold 12px ${this.uiFont}`;
     ctx.fillStyle = '#FFF';
+    ctx.textAlign = 'center';
     ctx.fillText('PLAY AGAIN', w / 2, btnY + btnH / 2 + 4);
-
-    // Store play again button area
+    
     this.playAgainButton = { x: btnX, y: btnY, w: btnW, h: btnH };
   }
 
@@ -8529,6 +9476,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       badges: [],
       showBadgePopup: false,
       pendingBadge: null,
+      showBadgeTray: false,
+      badgeTrayAnimTimer: 0,
+      lastBadgeEarnedTime: 0,
       showInventoryHint: false,
       inventoryHintShown: false,
       pendingChoiceAfterHint: false,
@@ -8577,6 +9527,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       showHUD: false,
       quizAnswers: [],
       showQuiz: false,
+      showCheckpointQuiz: false,
+      checkpointQuizData: null,
+      checkpointQuizAnswered: false,
+      checkpointQuizCorrect: false,
+      checkpointQuizSelected: -1,
+      checkpointQuizDismissCallback: null,
       showSuccess: false,
       showQuizReview: false,
       showFail: false,
@@ -8584,6 +9540,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
+      rhythmGameActive: false,
+      rhythmScore: 0,
+      rhythmCombo: 0,
+      rhythmMaxCombo: 0,
+      rhythmNotes: [],
+      rhythmLastSpawnTime: 0,
+      rhythmHitFlash: 0,
       nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
@@ -8649,6 +9612,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       badges: [],
       showBadgePopup: false,
       pendingBadge: null,
+      showBadgeTray: false,
+      badgeTrayAnimTimer: 0,
+      lastBadgeEarnedTime: 0,
       showInventoryHint: false,
       inventoryHintShown: false,
       pendingChoiceAfterHint: false,
@@ -8697,6 +9663,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       showHUD: false,
       quizAnswers: [],
       showQuiz: false,
+      showCheckpointQuiz: false,
+      checkpointQuizData: null,
+      checkpointQuizAnswered: false,
+      checkpointQuizCorrect: false,
+      checkpointQuizSelected: -1,
+      checkpointQuizDismissCallback: null,
       showSuccess: false,
       showQuizReview: false,
       showFail: false,
@@ -8704,6 +9676,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
+      rhythmGameActive: false,
+      rhythmScore: 0,
+      rhythmCombo: 0,
+      rhythmMaxCombo: 0,
+      rhythmNotes: [],
+      rhythmLastSpawnTime: 0,
+      rhythmHitFlash: 0,
       nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,

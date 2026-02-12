@@ -900,12 +900,30 @@ export default function Game() {
   const audioGraphRef = useRef<AudioGraph | null>(null);
   const [screen, setScreen] = useState<'loading' | 'reflection' | 'intro' | 'game'>('loading');
   const gameInitialized = useRef(false);
+  const [smartPathPrompt, setSmartPathPrompt] = useState<string | null>(null);
+  const smartPathCallbackRef = useRef<((text: string) => void) | null>(null);
+  const [smartPathAnswer, setSmartPathAnswer] = useState('');
+
+  const handleSmartPathSubmit = useCallback(() => {
+    if (smartPathAnswer.trim() && smartPathCallbackRef.current) {
+      const cb = smartPathCallbackRef.current;
+      smartPathCallbackRef.current = null;
+      setSmartPathPrompt(null);
+      setSmartPathAnswer('');
+      cb(smartPathAnswer.trim());
+    }
+  }, [smartPathAnswer]);
 
   const initGameEngine = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || gameInitialized.current) return;
     gameInitialized.current = true;
     gameRef.current = new VillageLedgerGame(canvas);
+    gameRef.current.setSmartPathHandler((prompt, callback) => {
+      setSmartPathPrompt(prompt);
+      smartPathCallbackRef.current = callback;
+      setSmartPathAnswer('');
+    });
     gameRef.current.preloadAudio();
     gameRef.current.start(false);
   }, []);
@@ -988,6 +1006,90 @@ export default function Game() {
           >
             THE BARTER SYSTEM
           </span>
+        </div>
+      )}
+      {smartPathPrompt && screen === 'game' && (
+        <div
+          className="fixed inset-0 flex items-center justify-center"
+          style={{ zIndex: 100, background: 'rgba(0,0,0,0.8)' }}
+          data-testid="smart-path-overlay"
+        >
+          <div
+            className="flex flex-col items-center w-full max-w-md px-6 py-8"
+            style={{
+              background: 'linear-gradient(180deg, #4A3728 0%, #2D1B0E 100%)',
+              border: '3px solid #8B6914',
+              borderRadius: '16px',
+            }}
+          >
+            <h2
+              style={{
+                fontFamily: '"Press Start 2P", monospace',
+                fontSize: 'clamp(10px, 2vw, 14px)',
+                color: '#FFD700',
+                textAlign: 'center',
+                marginBottom: '16px',
+                lineHeight: 1.6,
+              }}
+            >
+              YOUR IDEA
+            </h2>
+            <p
+              style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: 'clamp(13px, 2.5vw, 16px)',
+                color: '#E8D5A8',
+                textAlign: 'center',
+                marginBottom: '20px',
+                lineHeight: 1.5,
+              }}
+            >
+              {smartPathPrompt}
+            </p>
+            <input
+              type="text"
+              value={smartPathAnswer}
+              onChange={(e) => setSmartPathAnswer(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSmartPathSubmit(); }}
+              placeholder="Type your idea..."
+              autoFocus
+              style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: 'clamp(13px, 2.5vw, 16px)',
+                color: '#E8D5A8',
+                background: 'rgba(30, 22, 12, 0.9)',
+                border: '2px solid #5a4a32',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                width: '100%',
+                marginBottom: '16px',
+                outline: 'none',
+                textAlign: 'center',
+              }}
+              data-testid="input-smart-path"
+            />
+            <button
+              onClick={handleSmartPathSubmit}
+              disabled={!smartPathAnswer.trim()}
+              className="cursor-pointer"
+              style={{
+                fontFamily: '"Press Start 2P", monospace',
+                fontSize: 'clamp(9px, 2vw, 12px)',
+                color: !smartPathAnswer.trim() ? '#666' : '#1a1208',
+                background: !smartPathAnswer.trim()
+                  ? 'linear-gradient(180deg, #555 0%, #444 100%)'
+                  : 'linear-gradient(180deg, #C9B896 0%, #a89478 100%)',
+                border: `2px solid ${!smartPathAnswer.trim() ? '#444' : '#8B7355'}`,
+                borderRadius: '8px',
+                padding: '12px 32px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                opacity: !smartPathAnswer.trim() ? 0.5 : 1,
+              }}
+              data-testid="button-submit-idea"
+            >
+              SUBMIT
+            </button>
+          </div>
         </div>
       )}
       {screen === 'loading' && <LoadingScreen onLoaded={handleLoadingComplete} />}

@@ -49,19 +49,20 @@ function MoneyRainCanvas() {
 
     let loadedCount = 0;
     let initStarted = false;
+    const totalIcons = MONEY_ICONS.length;
     MONEY_ICONS.forEach((name, i) => {
       const img = new Image();
       img.onload = () => {
         imagesRef.current[i] = img;
         loadedCount++;
-        if (loadedCount >= 3 && !initStarted) {
+        if (loadedCount >= totalIcons && !initStarted) {
           initStarted = true;
           initItems(canvas.width, canvas.height);
         }
       };
       img.onerror = () => {
         loadedCount++;
-        if (loadedCount >= 3 && !initStarted) {
+        if (loadedCount >= totalIcons && !initStarted) {
           initStarted = true;
           initItems(canvas.width, canvas.height);
         }

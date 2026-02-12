@@ -410,10 +410,6 @@ export class VillageLedgerGame {
   // Smart Path input handler
   private smartPathInputHandler: ((prompt: string, callback: (answer: string) => void) => void) | null = null;
 
-  // External audio element from intro/reflection screens for seamless crossfade
-  private externalAudio: HTMLAudioElement | null = null;
-  private externalAudioContext: AudioContext | null = null;
-
   // Callbacks
   private onStateChange?: (state: GameState) => void;
 
@@ -4133,11 +4129,6 @@ export class VillageLedgerGame {
     this.smartPathInputHandler = handler;
   }
 
-  public setExternalAudio(audio: HTMLAudioElement | null, audioContext?: AudioContext | null): void {
-    this.externalAudio = audio;
-    this.externalAudioContext = audioContext ?? null;
-  }
-
   private requestSmartPathInput(prompt: string, callback: (answer: string) => void): void {
     if (this.smartPathInputHandler) {
       this.smartPathInputHandler(prompt, callback);
@@ -4147,34 +4138,7 @@ export class VillageLedgerGame {
   public beginGameplay(): void {
     soundManager.init();
     soundManager.resumeContext();
-
-    if (this.externalAudio) {
-      const audio = this.externalAudio;
-      const extCtx = this.externalAudioContext;
-      this.externalAudio = null;
-      this.externalAudioContext = null;
-      const fadeStep = 0.02;
-      const fadeInterval = setInterval(() => {
-        if (audio.volume > fadeStep) {
-          audio.volume -= fadeStep;
-        } else {
-          audio.volume = 0;
-          audio.pause();
-          clearInterval(fadeInterval);
-          if (extCtx) {
-            extCtx.close().catch(() => {});
-          }
-        }
-      }, 50);
-
-      setTimeout(() => {
-        soundManager.playLoop('ambientVillage');
-        soundManager.startDaytimeMusic();
-      }, 2000);
-    } else {
-      soundManager.playLoop('ambientVillage');
-      soundManager.startDaytimeMusic();
-    }
+    soundManager.playLoop('ambientVillage');
 
     setTimeout(() => this.triggerIntro(), 500);
   }

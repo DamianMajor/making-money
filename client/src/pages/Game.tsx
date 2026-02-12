@@ -311,14 +311,7 @@ function MoneyRainCanvas({ preloadedImages }: { preloadedImages: HTMLImageElemen
   );
 }
 
-interface AudioGraph {
-  ctx: AudioContext;
-  dry: GainNode;
-  wetGain: GainNode;
-  feedback: GainNode;
-}
-
-function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue: (answer: string) => void; audioRef: React.MutableRefObject<HTMLAudioElement | null>; audioGraphRef: React.MutableRefObject<AudioGraph | null> }) {
+function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void }) {
   const [answer, setAnswer] = useState('');
   const [muted, setMuted] = useState(() => {
     try {
@@ -327,13 +320,20 @@ function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue:
     } catch {}
     return false;
   });
+  const musicStartedRef = useRef(false);
+
+  const startMusicOnInteraction = useCallback(() => {
+    if (musicStartedRef.current) return;
+    musicStartedRef.current = true;
+    soundManager.init().then(() => {
+      soundManager.resumeContext();
+      soundManager.startDaytimeMusic();
+    });
+  }, []);
 
   const toggleMute = () => {
     const newMuted = !muted;
     setMuted(newMuted);
-    if (audioRef.current) {
-      audioRef.current.muted = newMuted;
-    }
     soundManager.setMuted(newMuted);
     try {
       const stored = localStorage.getItem('villageLedger_soundSettings');
@@ -344,68 +344,19 @@ function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue:
   };
 
   useEffect(() => {
-    const muted = (() => {
-      try {
-        const stored = localStorage.getItem('villageLedger_soundSettings');
-        if (stored) return JSON.parse(stored).muted ?? false;
-      } catch {}
-      return false;
-    })();
-    const audio = new Audio('/sounds/backgroundmusic-day.mp3');
-    audio.loop = true;
-    audio.volume = 0.25;
-    audio.preload = 'auto';
-    audio.muted = muted;
-    audioRef.current = audio;
+    soundManager.prefetch();
 
-    try {
-      const ctx = new AudioContext();
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-      const source = ctx.createMediaElementSource(audio);
-      (audio as any)._mediaSourceAttached = true;
-
-      const dry = ctx.createGain();
-      dry.gain.value = 1.0;
-
-      const delayNode = ctx.createDelay(2.0);
-      delayNode.delayTime.value = 0.5;
-
-      const feedback = ctx.createGain();
-      feedback.gain.value = 0;
-
-      const wetGain = ctx.createGain();
-      wetGain.gain.value = 0;
-
-      source.connect(dry);
-      dry.connect(ctx.destination);
-
-      source.connect(delayNode);
-      delayNode.connect(feedback);
-      feedback.connect(delayNode);
-      delayNode.connect(wetGain);
-      wetGain.connect(ctx.destination);
-
-      audioGraphRef.current = { ctx, dry, wetGain, feedback };
-    } catch (e) {
-      console.warn('[ReflectionScreen] AudioContext setup failed:', e);
-    }
-
-    if (!muted) {
-      audio.play().catch(() => {
-        const resumeOnInteraction = () => {
-          audioRef.current?.play().catch(() => {});
-          document.removeEventListener('click', resumeOnInteraction);
-          document.removeEventListener('touchstart', resumeOnInteraction);
-        };
-        document.addEventListener('click', resumeOnInteraction);
-        document.addEventListener('touchstart', resumeOnInteraction);
-      });
-    }
-  }, [audioRef, audioGraphRef]);
+    const handler = () => startMusicOnInteraction();
+    document.addEventListener('click', handler, { once: true });
+    document.addEventListener('touchstart', handler, { once: true });
+    return () => {
+      document.removeEventListener('click', handler);
+      document.removeEventListener('touchstart', handler);
+    };
+  }, [startMusicOnInteraction]);
 
   const handleContinue = () => {
+    startMusicOnInteraction();
     onContinue(answer);
   };
 
@@ -544,7 +495,7 @@ function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue:
   );
 }
 
-function IntroScreen({ onStart, audioRef, audioGraphRef, onMount, preloadedImages }: { onStart: () => void; audioRef: React.MutableRefObject<HTMLAudioElement | null>; audioGraphRef: React.MutableRefObject<AudioGraph | null>; onMount?: () => void; preloadedImages: HTMLImageElement[] }) {
+function IntroScreen({ onStart, onMount, preloadedImages }: { onStart: () => void; onMount?: () => void; preloadedImages: HTMLImageElement[] }) {
   const [muted, setMuted] = useState(() => {
     try {
       const stored = localStorage.getItem('villageLedger_soundSettings');
@@ -555,27 +506,12 @@ function IntroScreen({ onStart, audioRef, audioGraphRef, onMount, preloadedImage
 
   useEffect(() => {
     if (onMount) onMount();
-
-    return () => {
-      if (startedRef.current) {
-        return;
-      }
-      if (audioGraphRef.current) {
-        audioGraphRef.current.ctx.close().catch(() => {});
-        audioGraphRef.current = null;
-      }
-      if (audioRef.current) {
-        (audioRef.current as any)._mediaSourceAttached = false;
-      }
-    };
-  }, [onMount, audioRef, audioGraphRef]);
+  }, [onMount]);
 
   const toggleMute = () => {
     const newMuted = !muted;
     setMuted(newMuted);
-    if (audioRef.current) {
-      audioRef.current.muted = newMuted;
-    }
+    soundManager.setMuted(newMuted);
     try {
       const stored = localStorage.getItem('villageLedger_soundSettings');
       const settings = stored ? JSON.parse(stored) : {};
@@ -589,19 +525,6 @@ function IntroScreen({ onStart, audioRef, audioGraphRef, onMount, preloadedImage
   const handleStart = () => {
     if (startedRef.current) return;
     startedRef.current = true;
-
-    if (audioGraphRef.current) {
-      const { ctx, dry, wetGain, feedback } = audioGraphRef.current;
-
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-
-      const now = ctx.currentTime;
-      wetGain.gain.setValueAtTime(0, now);
-      feedback.gain.setValueAtTime(0, now);
-      dry.gain.setValueAtTime(1.0, now);
-    }
     onStart();
   };
 
@@ -883,8 +806,6 @@ export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const gameRef = useRef<VillageLedgerGame | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioGraphRef = useRef<AudioGraph | null>(null);
   const preloadedImagesRef = useRef<HTMLImageElement[]>([]);
   const [screen, setScreen] = useState<'loading' | 'reflection' | 'intro' | 'game'>('loading');
   const [iconsPreloaded, setIconsPreloaded] = useState(false);
@@ -920,7 +841,6 @@ export default function Game() {
       smartPathCallbackRef.current = callback;
       setSmartPathAnswer('');
     });
-    gameRef.current.setExternalAudio(audioRef.current, audioGraphRef.current?.ctx);
     gameRef.current.preloadAudio();
     gameRef.current.start(false);
   }, []);
@@ -1096,8 +1016,8 @@ export default function Game() {
         </div>
       )}
       {screen === 'loading' && <LoadingScreen onLoaded={handleLoadingComplete} />}
-      {screen === 'reflection' && <ReflectionScreen onContinue={handleReflectionContinue} audioRef={audioRef} audioGraphRef={audioGraphRef} />}
-      {screen === 'intro' && <IntroScreen onStart={handleGameStart} audioRef={audioRef} audioGraphRef={audioGraphRef} onMount={handleIntroMount} preloadedImages={preloadedImagesRef.current} />}
+      {screen === 'reflection' && <ReflectionScreen onContinue={handleReflectionContinue} />}
+      {screen === 'intro' && <IntroScreen onStart={handleGameStart} onMount={handleIntroMount} preloadedImages={preloadedImagesRef.current} />}
     </div>
   );
 }

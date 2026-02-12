@@ -149,23 +149,34 @@ interface GameState {
   brawlTimer: number;
   showCelebration: boolean; // Dance animation when debts settled
   celebrationTimer: number;
-  rhythmGameActive: boolean;
-  rhythmScore: number;
-  rhythmCombo: number;
-  rhythmMaxCombo: number;
-  rhythmNotes: Array<{
-    x: number;
-    y: number;
-    speed: number;
+  slingshotGameActive: boolean;
+  slingshotScore: number;
+  slingshotCombo: number;
+  slingshotMaxCombo: number;
+  slingshotBalloons: Array<{
+    x: number; y: number;
+    vx: number; vy: number;
     color: string;
     radius: number;
-    hit: boolean;
-    missed: boolean;
-    hitAnim: number;
-    missAnim: number;
+    popped: boolean;
+    popAnim: number;
+    bobPhase: number;
   }>;
-  rhythmLastSpawnTime: number;
-  rhythmHitFlash: number;
+  slingshotProjectile: {
+    x: number; y: number;
+    vx: number; vy: number;
+    active: boolean;
+    radius: number;
+  } | null;
+  slingshotAiming: boolean;
+  slingshotAimStart: { x: number; y: number } | null;
+  slingshotAimCurrent: { x: number; y: number } | null;
+  slingshotLastSpawnTime: number;
+  slingshotFloatingTexts: Array<{
+    x: number; y: number;
+    text: string;
+    timer: number;
+  }>;
   partyDialogueTimer: number;
   partyDialogueIndex: number;
   nightBgCrossfade: number; // 0-1 crossfade progress to night background
@@ -726,13 +737,17 @@ export class VillageLedgerGame {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
-      rhythmGameActive: false,
-      rhythmScore: 0,
-      rhythmCombo: 0,
-      rhythmMaxCombo: 0,
-      rhythmNotes: [],
-      rhythmLastSpawnTime: 0,
-      rhythmHitFlash: 0,
+      slingshotGameActive: false,
+      slingshotScore: 0,
+      slingshotCombo: 0,
+      slingshotMaxCombo: 0,
+      slingshotBalloons: [],
+      slingshotProjectile: null,
+      slingshotAiming: false,
+      slingshotAimStart: null,
+      slingshotAimCurrent: null,
+      slingshotLastSpawnTime: 0,
+      slingshotFloatingTexts: [],
       partyDialogueTimer: 0,
       partyDialogueIndex: 0,
       nightBgCrossfade: 0,
@@ -824,7 +839,7 @@ export class VillageLedgerGame {
     e.preventDefault();
     if (e.touches.length > 0) {
       const touch = e.touches[0];
-      this.processTouchMove(touch.clientX);
+      this.processTouchMove(touch.clientX, touch.clientY);
     }
   }
 
@@ -840,7 +855,9 @@ export class VillageLedgerGame {
 
   private handleMouseMove(e: MouseEvent): void {
     if (this.touchActive) {
-      this.processTouchMove(e.clientX);
+      this.processTouchMove(e.clientX, e.clientY);
+    } else if (this.state.showCelebration && this.state.slingshotAiming) {
+      this.processTouchMove(e.clientX, e.clientY);
     }
   }
 
@@ -849,13 +866,17 @@ export class VillageLedgerGame {
   }
 
   private processTouchEnd(): void {
+    if (this.state.showCelebration && this.state.slingshotAiming) {
+      this.handleSlingshotTouchEnd();
+      this.touchActive = false;
+      this.moveDirection = 0;
+      return;
+    }
+    
     const holdDuration = performance.now() - this.touchStartTime;
     
-    // If it was a quick tap (< holdThreshold), walk to that exact point
     if (holdDuration < this.holdThreshold && this.touchActive) {
-      // Convert screen X to world X position
       const worldX = this.touchStartX + this.cameraX;
-      // Clamp to world bounds
       const clampedWorldX = Math.max(this.player.width / 2, Math.min(this.worldWidth - this.player.width / 2, worldX));
       this.autoWalkTarget = { x: clampedWorldX, type: 'location' };
     }
@@ -955,9 +976,9 @@ export class VillageLedgerGame {
       return;
     }
 
-    // Handle rhythm game taps during celebration
-    if (this.state.showCelebration && this.state.rhythmGameActive) {
-      this.handleRhythmTap(x, y);
+    // Handle slingshot game touch during celebration
+    if (this.state.showCelebration && this.state.slingshotGameActive) {
+      this.handleSlingshotTouchStart(x, y);
     }
 
     // Handle badge popup touches
@@ -1125,11 +1146,17 @@ export class VillageLedgerGame {
     }
   }
 
-  private processTouchMove(clientX: number): void {
-    if (!this.touchActive) return;
+  private processTouchMove(clientX: number, clientY?: number): void {
     const rect = this.canvas.getBoundingClientRect();
-    // Use CSS pixel coordinates
     const x = clientX - rect.left;
+    const y = clientY !== undefined ? clientY - rect.top : 0;
+    
+    if (this.state.showCelebration && this.state.slingshotAiming) {
+      this.handleSlingshotTouchMove(x, y);
+      return;
+    }
+    
+    if (!this.touchActive) return;
     this.touchX = x;
     this.updateMoveDirection(x);
   }
@@ -4522,7 +4549,7 @@ export class VillageLedgerGame {
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
       this.updateDancingNPCs(dt);
-      this.updateRhythmGame(dt);
+      this.updateSlingshotGame(dt);
       // Gradually fade to night during celebration
       if (this.state.nightBgCrossfade < 1) {
         this.state.nightBgCrossfade = Math.min(1, this.state.nightBgCrossfade + dt / 6);
@@ -4787,7 +4814,7 @@ export class VillageLedgerGame {
   }
   
   private endDiscoParty(): void {
-    this.state.rhythmGameActive = false;
+    this.state.slingshotGameActive = false;
     this.state.showCelebration = false;
     this.celebrationEndTime = Date.now();
     soundManager.fadeOut('moneySong', 1500);
@@ -4807,13 +4834,32 @@ export class VillageLedgerGame {
     this.state.phase = 'loop2_return';
     this.state.showCelebration = true;
     this.state.celebrationTimer = 0;
-    this.state.rhythmGameActive = true;
-    this.state.rhythmScore = 0;
-    this.state.rhythmCombo = 0;
-    this.state.rhythmMaxCombo = 0;
-    this.state.rhythmNotes = [];
-    this.state.rhythmLastSpawnTime = 0;
-    this.state.rhythmHitFlash = 0;
+    this.state.slingshotGameActive = true;
+    this.state.slingshotScore = 0;
+    this.state.slingshotCombo = 0;
+    this.state.slingshotMaxCombo = 0;
+    this.state.slingshotProjectile = null;
+    this.state.slingshotAiming = false;
+    this.state.slingshotAimStart = null;
+    this.state.slingshotAimCurrent = null;
+    this.state.slingshotLastSpawnTime = 0;
+    this.state.slingshotFloatingTexts = [];
+    this.state.slingshotBalloons = [];
+    const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
+    const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
+    for (let i = 0; i < 9; i++) {
+      this.state.slingshotBalloons.push({
+        x: 80 + Math.random() * (this.logicalWidth - 160),
+        y: 30 + Math.random() * (groundY * 0.55),
+        vx: (Math.random() - 0.5) * 30,
+        vy: (Math.random() - 0.5) * 16,
+        color: balloonColors[Math.floor(Math.random() * balloonColors.length)],
+        radius: 16 + Math.random() * 6,
+        popped: false,
+        popAnim: 0,
+        bobPhase: Math.random() * Math.PI * 2,
+      });
+    }
     this.stormTriggered = false;
     this.celebrationEndTime = 0;
     
@@ -4832,186 +4878,363 @@ export class VillageLedgerGame {
     this.fisherman.targetX = this.villageCenterX + 200;
   }
   
-  private updateRhythmGame(dt: number): void {
-    if (!this.state.rhythmGameActive) return;
+  private updateSlingshotGame(dt: number): void {
+    if (!this.state.slingshotGameActive) return;
     
     const w = this.logicalWidth;
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
+    const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
     
-    if (t - this.state.rhythmLastSpawnTime > 1.2) {
-      this.state.rhythmLastSpawnTime = t;
-      const colors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600', '#CC33FF'];
-      this.state.rhythmNotes.push({
-        x: this.cameraX + 40 + Math.random() * (w - 80),
-        y: 40 + Math.random() * (groundY - 100),
-        speed: 0.5 + Math.random() * 0.5,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        radius: 10 + Math.random() * 6,
-        hit: false,
-        missed: false,
-        hitAnim: 0,
-        missAnim: 0,
+    const activeBalloons = this.state.slingshotBalloons.filter(b => !b.popped);
+    if (t - this.state.slingshotLastSpawnTime > 2.5 && activeBalloons.length < 15) {
+      this.state.slingshotLastSpawnTime = t;
+      const fromLeft = Math.random() > 0.5;
+      this.state.slingshotBalloons.push({
+        x: fromLeft ? -20 : w + 20,
+        y: 30 + Math.random() * (groundY * 0.55),
+        vx: fromLeft ? (5 + Math.random() * 10) : -(5 + Math.random() * 10),
+        vy: (Math.random() - 0.5) * 16,
+        color: balloonColors[Math.floor(Math.random() * balloonColors.length)],
+        radius: 16 + Math.random() * 6,
+        popped: false,
+        popAnim: 0,
+        bobPhase: Math.random() * Math.PI * 2,
       });
     }
     
-    for (const note of this.state.rhythmNotes) {
-      if (!note.hit && !note.missed) {
-        const seed = note.x * 0.01 + note.y * 0.02;
-        note.x += Math.sin(t * note.speed + seed) * 0.3;
-        note.y += Math.cos(t * note.speed * 0.7 + seed) * 0.2;
-        
-        note.missAnim += dt;
-        if (note.missAnim > 3.5) {
-          note.missed = true;
-          note.missAnim = 0;
-          if (this.state.rhythmCombo > this.state.rhythmMaxCombo) {
-            this.state.rhythmMaxCombo = this.state.rhythmCombo;
-          }
-          this.state.rhythmCombo = 0;
-        }
-      } else if (note.hit) {
-        note.hitAnim += dt;
-      } else if (note.missed) {
-        note.hitAnim += dt;
+    for (const b of this.state.slingshotBalloons) {
+      if (!b.popped) {
+        b.x += b.vx * dt;
+        b.y += b.vy * dt + Math.sin(t * 1.5 + b.bobPhase) * 0.5;
+        if (b.x < -40) b.x = w + 30;
+        if (b.x > w + 40) b.x = -30;
+        if (b.y < 10) b.vy = Math.abs(b.vy) * 0.5 + 2;
+        if (b.y > groundY * 0.6) b.vy = -Math.abs(b.vy) * 0.5 - 2;
+      } else {
+        b.popAnim += dt;
       }
     }
-    
-    this.state.rhythmNotes = this.state.rhythmNotes.filter(n => {
-      if (n.hit && n.hitAnim > 0.5) return false;
-      if (n.missed && n.hitAnim > 0.3) return false;
+    this.state.slingshotBalloons = this.state.slingshotBalloons.filter(b => {
+      if (b.popped && b.popAnim > 0.5) return false;
       return true;
     });
     
-    if (this.state.rhythmHitFlash > 0) {
-      this.state.rhythmHitFlash -= dt * 4;
+    const proj = this.state.slingshotProjectile;
+    if (proj && proj.active) {
+      proj.vy += 400 * dt;
+      proj.x += proj.vx * dt;
+      proj.y += proj.vy * dt;
+      
+      if (proj.y > h || proj.x < -50 || proj.x > w + 50) {
+        this.state.slingshotProjectile = null;
+      } else {
+        for (const b of this.state.slingshotBalloons) {
+          if (b.popped) continue;
+          const dx = proj.x - b.x;
+          const dy = proj.y - b.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < b.radius + proj.radius) {
+            const speed = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
+            if (speed < 150) {
+              soundManager.play('balloonBop');
+              const nx = dx / dist;
+              const ny = dy / dist;
+              proj.vx = -proj.vx * 0.4;
+              proj.vy = -proj.vy * 0.4;
+              proj.x = b.x + nx * (b.radius + proj.radius + 2);
+              proj.y = b.y + ny * (b.radius + proj.radius + 2);
+            } else {
+              const chainPopped = this.chainPopBalloons(b);
+              const points = chainPopped * 10 + chainPopped * chainPopped * 5;
+              this.state.slingshotScore += points;
+              this.state.slingshotCombo++;
+              if (this.state.slingshotCombo > this.state.slingshotMaxCombo) {
+                this.state.slingshotMaxCombo = this.state.slingshotCombo;
+              }
+              this.state.slingshotFloatingTexts.push({
+                x: b.x, y: b.y,
+                text: `+${points}`,
+                timer: 0,
+              });
+              const popSound = Math.random() > 0.5 ? 'balloonPop1' : 'balloonPop2';
+              soundManager.play(popSound);
+              this.state.slingshotProjectile = null;
+            }
+            break;
+          }
+        }
+      }
     }
+    
+    this.state.slingshotFloatingTexts = this.state.slingshotFloatingTexts.filter(ft => {
+      ft.timer += dt;
+      ft.y -= 40 * dt;
+      return ft.timer < 1.5;
+    });
+  }
+  
+  private chainPopBalloons(startBalloon: { x: number; y: number; vx: number; vy: number; color: string; radius: number; popped: boolean; popAnim: number; bobPhase: number }): number {
+    const color = startBalloon.color;
+    const toVisit = [startBalloon];
+    const visited = new Set<typeof startBalloon>();
+    let count = 0;
+    
+    while (toVisit.length > 0) {
+      const current = toVisit.pop()!;
+      if (visited.has(current) || current.popped) continue;
+      if (current.color !== color) continue;
+      visited.add(current);
+      current.popped = true;
+      current.popAnim = count * 0.05;
+      count++;
+      
+      for (const other of this.state.slingshotBalloons) {
+        if (other.popped || other.color !== color || visited.has(other)) continue;
+        const dx = current.x - other.x;
+        const dy = current.y - other.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < current.radius + other.radius + 8) {
+          toVisit.push(other);
+        }
+      }
+    }
+    return count;
   }
 
-  private drawRhythmGame(ctx: CanvasRenderingContext2D): void {
-    if (!this.state.rhythmGameActive) return;
+  private drawSlingshotGame(ctx: CanvasRenderingContext2D): void {
+    if (!this.state.slingshotGameActive) return;
     
     const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
+    const slingshotX = 70;
+    const slingshotY = groundY - 20;
     
-    for (const note of this.state.rhythmNotes) {
-      const noteScreenX = note.x - this.cameraX;
-      
-      if (noteScreenX < -30 || noteScreenX > w + 30) continue;
-      
-      if (note.hit) {
-        const scale = 1 + note.hitAnim * 4;
-        const alpha = 1 - note.hitAnim * 2;
+    for (const b of this.state.slingshotBalloons) {
+      if (b.popped) {
+        const scale = 1 + b.popAnim * 5;
+        const alpha = Math.max(0, 1 - b.popAnim * 2.5);
         if (alpha <= 0) continue;
         ctx.globalAlpha = alpha;
-        ctx.fillStyle = note.color;
-        ctx.beginPath();
-        ctx.arc(noteScreenX, note.y, note.radius * scale, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#FFD700';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(noteScreenX, note.y, note.radius * scale * 1.5, 0, Math.PI * 2);
-        ctx.stroke();
+        for (let i = 0; i < 6; i++) {
+          const angle = (i / 6) * Math.PI * 2 + b.popAnim * 3;
+          const dist = b.radius * scale * 0.6;
+          const px = b.x + Math.cos(angle) * dist;
+          const py = b.y + Math.sin(angle) * dist;
+          ctx.fillStyle = b.color;
+          ctx.beginPath();
+          ctx.arc(px, py, 3 - b.popAnim * 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.globalAlpha = 1;
-      } else if (note.missed && note.hitAnim > 0) {
-        const alpha = 1 - note.hitAnim * 3;
-        if (alpha <= 0) continue;
-        ctx.globalAlpha = alpha * 0.3;
-        ctx.fillStyle = '#888';
+      } else {
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.scale(1, 1.25);
+        ctx.fillStyle = b.color;
         ctx.beginPath();
-        ctx.arc(noteScreenX, note.y, note.radius, 0, Math.PI * 2);
+        ctx.arc(0, 0, b.radius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalAlpha = 1;
-      } else if (!note.hit && !note.missed) {
-        const lifetime = note.missAnim;
-        const fadeIn = Math.min(1, lifetime * 3);
-        const fadeOut = lifetime > 2.5 ? 1 - (lifetime - 2.5) : 1;
-        const pulse = 0.85 + 0.15 * Math.sin(t * 4 + note.x * 0.1);
-        
-        ctx.globalAlpha = fadeIn * fadeOut * pulse;
-        
-        ctx.fillStyle = note.color + '30';
-        ctx.beginPath();
-        ctx.arc(noteScreenX, note.y, note.radius + 6, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.fillStyle = note.color;
-        ctx.beginPath();
-        ctx.arc(noteScreenX, note.y, note.radius, 0, Math.PI * 2);
-        ctx.fill();
-        
         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
         ctx.beginPath();
-        ctx.arc(noteScreenX - note.radius * 0.25, note.y - note.radius * 0.25, note.radius * 0.35, 0, Math.PI * 2);
+        ctx.arc(-b.radius * 0.3, -b.radius * 0.35, b.radius * 0.25, 0, Math.PI * 2);
         ctx.fill();
-        
-        ctx.globalAlpha = 1;
+        ctx.restore();
+        ctx.strokeStyle = b.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y + b.radius * 1.25);
+        ctx.lineTo(b.x, b.y + b.radius * 1.25 + 12);
+        ctx.stroke();
       }
+    }
+    
+    ctx.strokeStyle = '#6B3A1F';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(slingshotX, slingshotY);
+    ctx.lineTo(slingshotX, slingshotY - 40);
+    ctx.stroke();
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(slingshotX, slingshotY - 30);
+    ctx.lineTo(slingshotX - 12, slingshotY - 50);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(slingshotX, slingshotY - 30);
+    ctx.lineTo(slingshotX + 12, slingshotY - 50);
+    ctx.stroke();
+    
+    const leftProngX = slingshotX - 12;
+    const leftProngY = slingshotY - 50;
+    const rightProngX = slingshotX + 12;
+    const rightProngY = slingshotY - 50;
+    
+    if (this.state.slingshotAiming && this.state.slingshotAimCurrent) {
+      const aimX = this.state.slingshotAimCurrent.x;
+      const aimY = this.state.slingshotAimCurrent.y;
+      
+      ctx.strokeStyle = '#8B4513';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(leftProngX, leftProngY);
+      ctx.lineTo(aimX, aimY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(rightProngX, rightProngY);
+      ctx.lineTo(aimX, aimY);
+      ctx.stroke();
+      
+      ctx.fillStyle = '#666';
+      ctx.beginPath();
+      ctx.arc(aimX, aimY, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#888';
+      ctx.beginPath();
+      ctx.arc(aimX - 1.5, aimY - 1.5, 2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = '#8B4513';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(leftProngX, leftProngY);
+      ctx.quadraticCurveTo(slingshotX, leftProngY + 8, rightProngX, rightProngY);
+      ctx.stroke();
+    }
+    
+    const proj = this.state.slingshotProjectile;
+    if (proj && proj.active) {
+      const speed = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
+      const normVx = speed > 0 ? proj.vx / speed : 0;
+      const normVy = speed > 0 ? proj.vy / speed : 0;
+      for (let i = 3; i >= 1; i--) {
+        const trailX = proj.x - normVx * i * 5;
+        const trailY = proj.y - normVy * i * 5;
+        ctx.globalAlpha = 0.15 * (4 - i);
+        ctx.fillStyle = '#777';
+        ctx.beginPath();
+        ctx.arc(trailX, trailY, proj.radius - i, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#666';
+      ctx.beginPath();
+      ctx.arc(proj.x, proj.y, proj.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#888';
+      ctx.beginPath();
+      ctx.arc(proj.x - 1.5, proj.y - 1.5, 2, 0, Math.PI * 2);
+      ctx.fill();
     }
     
     ctx.textAlign = 'right';
     ctx.font = `bold 14px ${this.uiFont}`;
     ctx.fillStyle = '#FFD700';
-    ctx.fillText(`${this.state.rhythmScore}`, w - 15, 25);
+    ctx.fillText(`SCORE: ${this.state.slingshotScore}`, w - 15, 25);
     
-    ctx.font = `9px ${this.uiFont}`;
-    ctx.fillStyle = '#C4A77D';
-    ctx.fillText('SCORE', w - 15, 38);
-    
-    if (this.state.rhythmCombo >= 2) {
+    if (this.state.slingshotCombo >= 2) {
       ctx.font = `bold 12px ${this.uiFont}`;
       ctx.fillStyle = '#FF6600';
-      ctx.fillText(`${this.state.rhythmCombo}x`, w - 15, 58);
-      ctx.font = `8px ${this.uiFont}`;
-      ctx.fillStyle = '#C4A77D';
-      ctx.fillText('COMBO', w - 15, 68);
+      ctx.fillText(`x${this.state.slingshotCombo}`, w - 15, 45);
     }
     
-    if (this.state.celebrationTimer < 3) {
-      const w2 = this.logicalWidth;
+    for (const ft of this.state.slingshotFloatingTexts) {
+      const alpha = Math.max(0, 1 - ft.timer / 1.5);
+      ctx.globalAlpha = alpha;
+      ctx.textAlign = 'center';
+      ctx.font = `bold 14px ${this.uiFont}`;
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText(ft.text, ft.x, ft.y);
+      ctx.globalAlpha = 1;
+    }
+    
+    if (t < 4) {
+      const alpha = t < 3 ? 1 : 1 - (t - 3);
+      ctx.globalAlpha = Math.max(0, alpha) * 0.8;
       ctx.textAlign = 'center';
       ctx.font = `bold 11px ${this.uiFont}`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.fillText('Pop the bubbles!', w2 / 2, 85);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText('Pull the slingshot to pop balloons!', w / 2, groundY - 10);
+      ctx.globalAlpha = 1;
     }
   }
 
-  private handleRhythmTap(x: number, y: number): boolean {
-    if (!this.state.rhythmGameActive) return false;
+  private handleSlingshotTouchStart(x: number, y: number): void {
+    if (!this.state.slingshotGameActive) return;
     
-    let hitNote = false;
-    for (const note of this.state.rhythmNotes) {
-      if (note.hit || note.missed) continue;
+    const h = this.logicalHeight;
+    const groundY = h - this.groundHeight - this.dialogueBoxHeight;
+    const slingshotX = 70;
+    const slingshotY = groundY - 20;
+    
+    const dx = x - slingshotX;
+    const dy = y - (slingshotY - 30);
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist < 60) {
+      this.state.slingshotAiming = true;
+      this.state.slingshotAimStart = { x, y };
+      this.state.slingshotAimCurrent = { x, y };
+    }
+  }
+  
+  private handleSlingshotTouchMove(x: number, y: number): void {
+    if (!this.state.slingshotGameActive || !this.state.slingshotAiming) return;
+    
+    const h = this.logicalHeight;
+    const groundY = h - this.groundHeight - this.dialogueBoxHeight;
+    const slingshotX = 70;
+    const slingshotY = groundY - 30;
+    
+    const dx = x - slingshotX;
+    const dy = y - slingshotY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const maxPull = 120;
+    
+    if (dist > maxPull) {
+      const angle = Math.atan2(dy, dx);
+      this.state.slingshotAimCurrent = {
+        x: slingshotX + Math.cos(angle) * maxPull,
+        y: slingshotY + Math.sin(angle) * maxPull,
+      };
+    } else {
+      this.state.slingshotAimCurrent = { x, y };
+    }
+  }
+  
+  private handleSlingshotTouchEnd(): void {
+    if (!this.state.slingshotGameActive || !this.state.slingshotAiming) return;
+    
+    const h = this.logicalHeight;
+    const groundY = h - this.groundHeight - this.dialogueBoxHeight;
+    const slingshotX = 70;
+    const slingshotY = groundY - 30;
+    
+    if (this.state.slingshotAimCurrent) {
+      const pullX = this.state.slingshotAimCurrent.x - slingshotX;
+      const pullY = this.state.slingshotAimCurrent.y - slingshotY;
+      const pullDist = Math.sqrt(pullX * pullX + pullY * pullY);
       
-      const noteScreenX = note.x - this.cameraX;
-      const dx = x - noteScreenX;
-      const dy = y - note.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      
-      if (dist < note.radius + 20) {
-        note.hit = true;
-        note.hitAnim = 0;
-        hitNote = true;
-        
-        const lifetime = note.missAnim;
-        const earlyBonus = Math.max(0, 1 - lifetime / 3.5);
-        const basePoints = Math.round(10 + earlyBonus * 20);
-        const comboMultiplier = Math.min(4, 1 + this.state.rhythmCombo * 0.2);
-        this.state.rhythmScore += Math.round(basePoints * comboMultiplier);
-        this.state.rhythmCombo++;
-        if (this.state.rhythmCombo > this.state.rhythmMaxCombo) {
-          this.state.rhythmMaxCombo = this.state.rhythmCombo;
-        }
-        this.state.rhythmHitFlash = 1;
-        
-        soundManager.play('dialogueAdvance');
-        break;
+      if (pullDist > 10) {
+        const launchPower = 4.5;
+        this.state.slingshotProjectile = {
+          x: slingshotX,
+          y: slingshotY,
+          vx: -pullX * launchPower,
+          vy: -pullY * launchPower,
+          active: true,
+          radius: 6,
+        };
+        this.state.slingshotCombo = 0;
       }
     }
     
-    return hitNote;
+    this.state.slingshotAiming = false;
+    this.state.slingshotAimStart = null;
+    this.state.slingshotAimCurrent = null;
   }
 
   private updateDancingNPCs(dt: number): void {
@@ -5268,8 +5491,8 @@ export class VillageLedgerGame {
     // Draw celebration animation if active
     if (this.state.showCelebration) {
       this.drawCelebrationAnimation(ctx);
-      if (this.state.rhythmGameActive) {
-        this.drawRhythmGame(ctx);
+      if (this.state.slingshotGameActive) {
+        this.drawSlingshotGame(ctx);
       }
     }
     
@@ -9799,13 +10022,17 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
-      rhythmGameActive: false,
-      rhythmScore: 0,
-      rhythmCombo: 0,
-      rhythmMaxCombo: 0,
-      rhythmNotes: [],
-      rhythmLastSpawnTime: 0,
-      rhythmHitFlash: 0,
+      slingshotGameActive: false,
+      slingshotScore: 0,
+      slingshotCombo: 0,
+      slingshotMaxCombo: 0,
+      slingshotBalloons: [],
+      slingshotProjectile: null,
+      slingshotAiming: false,
+      slingshotAimStart: null,
+      slingshotAimCurrent: null,
+      slingshotLastSpawnTime: 0,
+      slingshotFloatingTexts: [],
       partyDialogueTimer: 0,
       partyDialogueIndex: 0,
       nightBgCrossfade: 0,
@@ -9938,13 +10165,17 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       brawlTimer: 0,
       showCelebration: false,
       celebrationTimer: 0,
-      rhythmGameActive: false,
-      rhythmScore: 0,
-      rhythmCombo: 0,
-      rhythmMaxCombo: 0,
-      rhythmNotes: [],
-      rhythmLastSpawnTime: 0,
-      rhythmHitFlash: 0,
+      slingshotGameActive: false,
+      slingshotScore: 0,
+      slingshotCombo: 0,
+      slingshotMaxCombo: 0,
+      slingshotBalloons: [],
+      slingshotProjectile: null,
+      slingshotAiming: false,
+      slingshotAimStart: null,
+      slingshotAimCurrent: null,
+      slingshotLastSpawnTime: 0,
+      slingshotFloatingTexts: [],
       partyDialogueTimer: 0,
       partyDialogueIndex: 0,
       nightBgCrossfade: 0,

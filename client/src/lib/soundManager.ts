@@ -34,7 +34,11 @@ export type SoundName =
   | 'settle'
   | 'badgeReward'
   | 'stream'
-  | 'moneySong';
+  | 'moneySong'
+  | 'silverScreenVillain1'
+  | 'silverScreenVillain2'
+  | 'silverScreenVillain3'
+  | 'sixtesCinemaTrillsA';
 
 interface SoundConfig {
   src: string;
@@ -80,6 +84,10 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   badgeReward: { src: '/sounds/badge-reward.mp3', volume: 0.6, loop: false },
   stream: { src: '/sounds/stream.aac', volume: 0.4, loop: true },
   moneySong: { src: '/sounds/money_song_1.mp3', volume: 0.5, loop: true },
+  silverScreenVillain1: { src: '/sounds/silver-screen-villain-1.mp3', volume: 0.5, loop: false },
+  silverScreenVillain2: { src: '/sounds/silver-screen-villain-2.mp3', volume: 0.5, loop: false },
+  silverScreenVillain3: { src: '/sounds/silver-screen-villain-3.mp3', volume: 0.5, loop: false },
+  sixtesCinemaTrillsA: { src: '/sounds/sixties-cinema-trills-1.mp3', volume: 0.5, loop: false },
 };
 
 const FIGHT_ALWAYS_SOUNDS: SoundName[] = [
@@ -128,7 +136,7 @@ export class SoundManager {
       const stored = localStorage.getItem('villageLedger_soundSettings');
       if (stored) {
         const settings = JSON.parse(stored);
-        this.muted = settings.muted ?? false;
+        // Always start unmuted - don't restore muted state from storage
         this.masterVolume = settings.masterVolume ?? 1.0;
       }
     } catch {

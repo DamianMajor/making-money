@@ -1616,6 +1616,7 @@ export class VillageLedgerGame {
             // Show inventory hint on first trade interaction - BEFORE yes/no choice
             if (!this.state.inventoryHintShown) {
               this.state.showInventoryHint = true;
+              soundManager.play('choiceSelect');
               this.state.inventoryHintShown = true;
               // Hint stays visible until player taps inventory - choice appears after
               this.state.pendingChoiceAfterHint = true;
@@ -1836,6 +1837,7 @@ export class VillageLedgerGame {
           speaker: 'WOODCUTTER',
           text: "Finally! Give me my Sharp Stone and the 3 Fish you promised!",
           onComplete: () => {
+            soundManager.play('silverScreenVillain3');
             this.setMood('angry');
           }
         },
@@ -2664,6 +2666,7 @@ export class VillageLedgerGame {
           speaker: 'STONE-WORKER',
           text: "And where are my 4 Fish?! You promised me 4 Fish for that stone!",
           onComplete: () => {
+            soundManager.play('silverScreenVillain2');
             this.setMood('angry');
           }
         },
@@ -3326,6 +3329,7 @@ export class VillageLedgerGame {
             speaker: 'VILLAGE ELDER',
             text: "But... there is nothing written here. No record of these debts.",
             onComplete: () => {
+              soundManager.play('silverScreenVillain1');
               this.setMood('angry');
             }
           },
@@ -3402,6 +3406,7 @@ export class VillageLedgerGame {
                 // Show enlarged tablet view
                 this.state.showStoneTabletPopup = true;
                 soundManager.play('stoneLedger');
+                soundManager.play('sixtesCinemaTrillsA');
               }
             },
             {
@@ -3445,7 +3450,10 @@ export class VillageLedgerGame {
         dialogueLines.push(
           {
             speaker: 'VILLAGE ELDER',
-            text: "I see nothing recorded here... Without a written record, there is no way to know the truth."
+            text: "I see nothing recorded here... Without a written record, there is no way to know the truth.",
+            onComplete: () => {
+              soundManager.play('silverScreenVillain1');
+            }
           },
           {
             speaker: 'WOODCUTTER',
@@ -4625,7 +4633,10 @@ export class VillageLedgerGame {
     // First, Elder settles recorded debts peacefully
     dialogueLines.push({
       speaker: 'VILLAGE ELDER',
-      text: "Let me check the Stone Tablet... I see some debts recorded here."
+      text: "Let me check the Stone Tablet... I see some debts recorded here.",
+      onComplete: () => {
+        soundManager.play('sixtesCinemaTrillsA');
+      }
     });
     
     // Settle recorded debts
@@ -4666,7 +4677,10 @@ export class VillageLedgerGame {
     // Now the unrecorded debts cause dispute
     dialogueLines.push({
       speaker: 'VILLAGE ELDER',
-      text: "But wait... there are debts not recorded on the tablet!"
+      text: "But wait... there are debts not recorded on the tablet!",
+      onComplete: () => {
+        soundManager.play('silverScreenVillain1');
+      }
     });
     
     if (!this.state.woodcutterDebtRecorded) {
@@ -4698,6 +4712,7 @@ export class VillageLedgerGame {
       speaker: 'VILLAGE ELDER',
       text: "Without a record, there is no way to know the truth...",
       onComplete: () => {
+        soundManager.play('silverScreenVillain1');
         // Trigger the brawl - NPCs run to player, Elder steps aside
         this.woodcutter.targetX = this.player.x - 30;
         this.stoneWorker.targetX = this.player.x + 30;
@@ -8014,7 +8029,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fill();
     
     // Draw arrow stem
-    ctx.fillRect(centerX - 5, arrowY - 4, 10, 12);
+    ctx.fillRect(centerX - 5, arrowY - 1, 10, 12);
     
     // Draw subtle outline for triangle
     ctx.strokeStyle = '#DAA520';
@@ -8027,7 +8042,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.stroke();
     
     // Draw outline for stem
-    ctx.strokeRect(centerX - 5, arrowY - 4, 10, 12);
+    ctx.strokeRect(centerX - 5, arrowY - 1, 10, 12);
     
     // Hint text
     ctx.font = `bold 11px ${this.retroFont}`;

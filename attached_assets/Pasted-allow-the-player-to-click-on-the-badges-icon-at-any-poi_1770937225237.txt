@@ -1,0 +1,17 @@
+allow the player to click on the badges icon at any point during play to view which badges they have collected, and which badges they are still missing. When they are viewing the expanded badges window, either game or after the game is finished, allow them to click on individual badges and to get educational information about that particular badge subject.
+move the star inside the badge icon up one pixel.
+the badge screen appears very abruptly. Can we animate it better? And/or maybe the badge can sparkle/rotate when it's displayed on screen?
+when the player checks the Stone ledger with the NPC to settle the debt dispute, the relief sound should play. It should be triggered, regardless of whether it is the village elder or an NPC who first looks at the Stone ledger.
+Clean up the speaker graphic by moving both circles down a bit (photo attached)
+Make the elder's sunglasses 5% smaller.
+The encore still fails. The crowd applause sound triggers instead of the money-remix song
+side note, I don't see where you put the currently played money song. I see the remix in a separate folder from the other sounds. I think we should keep all sounds together, no?
+Trigger the thunder sound one time immediately after the character goes inside
+face in the rain overlay graphic more gradually.
+There is a delay after completing the quiz. I heard a sound that sounded like i earned a badge, but didn't see any graphic to indicate that i had. (maybe it was covered by the "lesson complete" graphic? Since we determined that the "lesson complete" page is too text heavy, let's hide that and only make that page accessible from a "learn more" or "review" tab, for students who want to read more.
+we currently make the player have to walk too close to the stone worker in order to initiate the Stone workers carving sequence. Let's allow the carving sequence to start before the player gets so close. Let's increase the range by 50 pixels.
+this slingshot graphic is sloppy. Can we make it cleaner? Position the sling shot at one side of the platform, make the player character stand on the platform when interacting, fix the vertical spacing on the "test your aim" sign, move the score to the bottom of the platform. Move the entire graphic down about 20px.
+Got it, two more items to add. Let me update the task list with these additions:
+
+let's make a lot more balloons at the top of the screen during the party.
+our character should be dancing during this phase too. He should still be able to walk but he should be grooving the whole time.

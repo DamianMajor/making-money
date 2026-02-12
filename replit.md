@@ -24,9 +24,13 @@
 - **Badge System**: 6 collectible badges (Double Coincidence of Wants, Debt, No Trust No Trade, The Ledger, Debt Settled, Money Scholar) with persistent tray HUD (X/6 progress), tap-to-expand panel, golden glow animation on earn, sparkle popup, and badge-centric success screen.
 - **Smart Path**: After DCW explanation, players can decline verbal credit and suggest a recording system via text input. Keyword matching (write/record/ledger/tablet/etc) skips Loop 1 failure and jumps directly to Loop 2 success path with elder introducing stone tablet.
 - **Checkpoint Quizzes**: Distributed "Quick Check!" single-question pop-ups after brawl and first ledger recording, plus shortened 3-question final quiz. Fun labels and immediate feedback.
-- **Rhythm-Tap Mini-Game**: During disco party celebration, colored circles fall toward a tap zone. Players tap for accuracy-based scoring with combo multiplier. Score and combo displayed in corner.
+- **Slingshot Balloon-Pop Mini-Game**: During disco party celebration, a "Test Your Aim" platform appears in world-space. Player walks to platform to activate the slingshot. Angry Birds-style pull-and-release mechanic with arc physics (gravity 400px/s²). Near-circular balloons float in world-space with bobbing motion. Chain-pop flood-fill for same-color clusters. Force threshold (speed < 150px/s bounces with bop sound). Collision detection for disco ball (25pts), NPCs (5pts, "Oops!"), speakers (10pts), and DJ booth (10pts) with dedicated hit sounds. Rubber band stretch sound while aiming, stretch release + random woosh on launch.
+- **Party Flow**: Party song plays once through (no loop/fade). When song ends naturally, 35-second storm countdown starts with pulsing red warning. Player must walk to hut before countdown expires. Auto-walk to hut on countdown expiry.
+- **DJ Booth**: 25% scaled up (120x75px), speakers 300% larger (180x156px cabinets) in world-space, disco ball with collision.
+- **Badge Tray**: Positioned to the left of the inventory box (not top-right corner).
 - **Audio System**: Web Audio API with `AudioContext` for dynamic soundscapes, including pitch-varied footsteps, layered brawl audio, and dynamic background music. Audio preloading and `resumeContext()` for compatibility.
 - **Visual Style**: Painted/illustrated backgrounds, pixel-art character sprites, earth tones, natural materials, and monospace fonts for dialogue ("Press Start 2P") with bold sans-serif for UI. Responsive canvas design for tablet aspect ratios.
+- **Music Strategy**: Reflection screen plays standard background music (backgroundmusic-day.mp3) instead of money song. Party song (money-yell-open.mp3) loads with SoundManager on first interaction, maximizing impact during celebration.
 - **Screen Flow**: Loading → Reflection → Intro → Game, with phased loading and asset optimization (compressed sprites, background PNGs, and audio files).
 
 ### Backend

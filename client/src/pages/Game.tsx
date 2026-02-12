@@ -371,9 +371,9 @@ function ReflectionScreen({ onContinue, audioRef, audioGraphRef }: { onContinue:
       } catch {}
       return false;
     })();
-    const audio = new Audio('/sounds/money_song_1.mp3');
+    const audio = new Audio('/sounds/backgroundmusic-day.mp3');
     audio.loop = true;
-    audio.volume = 0.5;
+    audio.volume = 0.25;
     audio.preload = 'auto';
     audio.muted = muted;
     audioRef.current = audio;
@@ -826,7 +826,7 @@ function LoadingScreen({ onLoaded }: { onLoaded: () => void }) {
     songCheck.preload = 'auto';
     const songLoaded = () => { tick(); songCheck.removeEventListener('canplaythrough', songLoaded); };
     songCheck.addEventListener('canplaythrough', songLoaded);
-    songCheck.src = '/sounds/money_song_1.mp3';
+    songCheck.src = '/sounds/backgroundmusic-day.mp3';
     const songTimeout = setTimeout(() => { songCheck.removeEventListener('canplaythrough', songLoaded); tick(); }, 8000);
 
     return () => { cancelled = true; clearTimeout(songTimeout); };

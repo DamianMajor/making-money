@@ -41,7 +41,20 @@ export type SoundName =
   | 'sixtesCinemaTrillsA'
   | 'balloonPop1'
   | 'balloonPop2'
-  | 'balloonBop';
+  | 'balloonBop'
+  | 'rubberBandStretch'
+  | 'stretchRelease'
+  | 'projectileWoosh1'
+  | 'projectileWoosh2'
+  | 'projectileWoosh3'
+  | 'projectileWoosh4'
+  | 'discoBallHit1'
+  | 'discoBallHit2'
+  | 'discoBallHit3'
+  | 'npcHit'
+  | 'basicHit1'
+  | 'basicHit2'
+  | 'partySong';
 
 interface SoundConfig {
   src: string;
@@ -94,6 +107,19 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   balloonPop1: { src: '/sounds/balloon-pop-1.mp3', volume: 0.6, loop: false },
   balloonPop2: { src: '/sounds/balloon-pop-2.mp3', volume: 0.6, loop: false },
   balloonBop: { src: '/sounds/balloon-bop.mp3', volume: 0.5, loop: false },
+  rubberBandStretch: { src: '/sounds/rubber-band-stretch.mp3', volume: 0.5, loop: false },
+  stretchRelease: { src: '/sounds/stretch-release.mp3', volume: 0.5, loop: false },
+  projectileWoosh1: { src: '/sounds/projectile-woosh-1.mp3', volume: 0.4, loop: false },
+  projectileWoosh2: { src: '/sounds/projectile-woosh-2.mp3', volume: 0.4, loop: false },
+  projectileWoosh3: { src: '/sounds/projectile-woosh-3.mp3', volume: 0.4, loop: false },
+  projectileWoosh4: { src: '/sounds/projectile-woosh-4.mp3', volume: 0.4, loop: false },
+  discoBallHit1: { src: '/sounds/disco-ball-hit-1.mp3', volume: 0.5, loop: false },
+  discoBallHit2: { src: '/sounds/disco-ball-hit-2.mp3', volume: 0.5, loop: false },
+  discoBallHit3: { src: '/sounds/disco-ball-hit-3.mp3', volume: 0.5, loop: false },
+  npcHit: { src: '/sounds/npc-hit.mp3', volume: 0.5, loop: false },
+  basicHit1: { src: '/sounds/basic-hit-1.mp3', volume: 0.5, loop: false },
+  basicHit2: { src: '/sounds/basic-hit-2.mp3', volume: 0.5, loop: false },
+  partySong: { src: '/sounds/money-yell-open.mp3', volume: 0.5, loop: false },
 };
 
 const FIGHT_ALWAYS_SOUNDS: SoundName[] = [

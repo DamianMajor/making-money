@@ -194,6 +194,9 @@ interface GameState {
   showStoneTabletPopup: boolean; // Popup view of Stone Tablet
   showChoice: boolean;
   choiceOptions: { text: string; action: () => void }[];
+  stormCountdownActive: boolean;
+  stormCountdownTimer: number;
+  forceHutEntry: boolean;
 }
 
 // Game Engine Class
@@ -389,6 +392,9 @@ export class VillageLedgerGame {
   private stormTriggered: boolean = false;
   private rainSoundStarted: boolean = false;
   private celebrationEndTime: number = 0;
+  private partySongEndTime: number = 0;
+  private slingshotPlatformActive: boolean = false;
+  private inventoryPanelLeftX: number = 0;
   
   // Auto-walk feature: player walks to clicked target and interacts
   private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush' | 'stoneTablet' | 'location'; id?: string } | null = null;
@@ -764,7 +770,10 @@ export class VillageLedgerGame {
       playerAlpha: 1,
       showStoneTabletPopup: false,
       showChoice: false,
-      choiceOptions: []
+      choiceOptions: [],
+      stormCountdownActive: false,
+      stormCountdownTimer: 0,
+      forceHutEntry: false
     };
 
     // Setup event listeners
@@ -1276,8 +1285,10 @@ export class VillageLedgerGame {
     if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && (!this.state.showNightTransition || this.state.showCelebration) && !this.state.showSuccess && !this.state.playerEnteredHut) {
       
       if (this.state.showCelebration) {
-        this.endDiscoParty();
+        this.queueDialogue([{ speaker: 'YOU', text: "The party is still going! I should enjoy it while it lasts!" }]);
+        return;
       }
+      this.state.stormCountdownActive = false;
       
       // If roof needs fixing, fix it first, then trigger storm sequence
       if (!this.state.roofRepaired && hasWood) {
@@ -4546,8 +4557,38 @@ export class VillageLedgerGame {
       }
     }
 
+    if (this.state.stormCountdownActive) {
+      this.state.stormCountdownTimer -= dt;
+      if (this.state.stormCountdownTimer <= 0) {
+        this.state.stormCountdownActive = false;
+        this.state.phase = 'complete_success';
+        if (!this.stormTriggered) {
+          this.stormTriggered = true;
+          this.triggerStormClouds();
+        }
+        if (!this.state.roofRepaired) {
+          this.state.roofRepaired = true;
+        }
+        this.autoWalkTarget = { x: 200, type: 'location' };
+        this.state.forceHutEntry = true;
+      }
+    }
+
+    if (this.state.forceHutEntry && this.player.x < 250 && !this.state.showNightTransition && !this.state.playerEnteredHut) {
+      this.state.forceHutEntry = false;
+      this.state.playerBlockedForCarving = true;
+      if (!this.state.roofRepaired) {
+        this.state.roofRepaired = true;
+      }
+      this.triggerEnterHutSequence();
+    }
+
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
+      if (this.partySongEndTime > 0 && Date.now() >= this.partySongEndTime && this.state.showCelebration) {
+        this.partySongEndTime = 0;
+        this.endDiscoParty();
+      }
       this.updateDancingNPCs(dt);
       this.updateSlingshotGame(dt);
       // Gradually fade to night during celebration
@@ -4817,17 +4858,15 @@ export class VillageLedgerGame {
     this.state.slingshotGameActive = false;
     this.state.showCelebration = false;
     this.celebrationEndTime = Date.now();
-    soundManager.fadeOut('moneySong', 1500);
+    soundManager.stop('partySong');
     soundManager.fadeOut('crowdApplause', 1500);
     soundManager.fadeOut('celebration', 1500);
     this.woodcutter.isWalking = false;
     this.stoneWorker.isWalking = false;
     this.fisherman.isWalking = false;
     this.state.phase = 'complete_success';
-    if (!this.stormTriggered) {
-      this.stormTriggered = true;
-      this.triggerStormClouds();
-    }
+    this.state.stormCountdownActive = true;
+    this.state.stormCountdownTimer = 35;
   }
   
   private startDiscoParty(): void {
@@ -4849,7 +4888,7 @@ export class VillageLedgerGame {
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     for (let i = 0; i < 9; i++) {
       this.state.slingshotBalloons.push({
-        x: 80 + Math.random() * (this.logicalWidth - 160),
+        x: 80 + Math.random() * (this.worldWidth - 160),
         y: 30 + Math.random() * (groundY * 0.55),
         vx: (Math.random() - 0.5) * 30,
         vy: (Math.random() - 0.5) * 16,
@@ -4868,7 +4907,9 @@ export class VillageLedgerGame {
     soundManager.stopDaytimeMusic();
     soundManager.fadeOut('ambientVillage', 500);
     
-    soundManager.play('moneySong');
+    soundManager.play('partySong');
+    const partySongDuration = soundManager.getBufferDuration('partySong');
+    this.partySongEndTime = Date.now() + partySongDuration;
     soundManager.play('celebration');
     const fullDuration = soundManager.getBufferDuration('crowdApplause');
     soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 8000));
@@ -4892,7 +4933,7 @@ export class VillageLedgerGame {
       this.state.slingshotLastSpawnTime = t;
       const fromLeft = Math.random() > 0.5;
       this.state.slingshotBalloons.push({
-        x: fromLeft ? -20 : w + 20,
+        x: fromLeft ? -20 : this.worldWidth + 20,
         y: 30 + Math.random() * (groundY * 0.55),
         vx: fromLeft ? (5 + Math.random() * 10) : -(5 + Math.random() * 10),
         vy: (Math.random() - 0.5) * 16,
@@ -4908,8 +4949,8 @@ export class VillageLedgerGame {
       if (!b.popped) {
         b.x += b.vx * dt;
         b.y += b.vy * dt + Math.sin(t * 1.5 + b.bobPhase) * 0.5;
-        if (b.x < -40) b.x = w + 30;
-        if (b.x > w + 40) b.x = -30;
+        if (b.x < -40) b.x = this.worldWidth + 30;
+        if (b.x > this.worldWidth + 40) b.x = -30;
         if (b.y < 10) b.vy = Math.abs(b.vy) * 0.5 + 2;
         if (b.y > groundY * 0.6) b.vy = -Math.abs(b.vy) * 0.5 - 2;
       } else {
@@ -4932,7 +4973,8 @@ export class VillageLedgerGame {
       } else {
         for (const b of this.state.slingshotBalloons) {
           if (b.popped) continue;
-          const dx = proj.x - b.x;
+          const screenBX = b.x - this.cameraX;
+          const dx = proj.x - screenBX;
           const dy = proj.y - b.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < b.radius + proj.radius) {
@@ -4943,7 +4985,7 @@ export class VillageLedgerGame {
               const ny = dy / dist;
               proj.vx = -proj.vx * 0.4;
               proj.vy = -proj.vy * 0.4;
-              proj.x = b.x + nx * (b.radius + proj.radius + 2);
+              proj.x = screenBX + nx * (b.radius + proj.radius + 2);
               proj.y = b.y + ny * (b.radius + proj.radius + 2);
             } else {
               const chainPopped = this.chainPopBalloons(b);
@@ -4963,6 +5005,93 @@ export class VillageLedgerGame {
               this.state.slingshotProjectile = null;
             }
             break;
+          }
+        }
+
+        if (this.state.slingshotProjectile) {
+          const discoBallWorldX = this.villageElder.x;
+          const discoBallScreenX = discoBallWorldX - this.cameraX;
+          const discoBallR = 45;
+          const discoBallY = Math.min(groundY * 0.45, this.state.celebrationTimer * 30);
+          const dbDx = this.state.slingshotProjectile.x - discoBallScreenX;
+          const dbDy = this.state.slingshotProjectile.y - discoBallY;
+          const dbDist = Math.sqrt(dbDx * dbDx + dbDy * dbDy);
+          if (dbDist < discoBallR + this.state.slingshotProjectile.radius) {
+            const hitSounds = ['discoBallHit1', 'discoBallHit2', 'discoBallHit3'] as const;
+            soundManager.play(hitSounds[Math.floor(Math.random() * hitSounds.length)]);
+            this.state.slingshotScore += 25;
+            this.state.slingshotFloatingTexts.push({
+              x: discoBallWorldX, y: discoBallY,
+              text: '+25',
+              timer: 0,
+            });
+            this.state.slingshotProjectile = null;
+          }
+        }
+
+        if (this.state.slingshotProjectile) {
+          const npcsToCheck = [this.woodcutter, this.stoneWorker, this.fisherman, this.villageElder];
+          for (const npc of npcsToCheck) {
+            if (!this.state.slingshotProjectile) break;
+            const npcScreenX = npc.x - this.cameraX;
+            const npcCenterY = npc.y + 20;
+            const nDx = this.state.slingshotProjectile.x - npcScreenX;
+            const nDy = this.state.slingshotProjectile.y - npcCenterY;
+            const nDist = Math.sqrt(nDx * nDx + nDy * nDy);
+            if (nDist < 25 + this.state.slingshotProjectile.radius) {
+              soundManager.play('npcHit');
+              this.state.slingshotScore += 5;
+              this.state.slingshotFloatingTexts.push({
+                x: npc.x, y: npcCenterY,
+                text: 'Oops!',
+                timer: 0,
+              });
+              this.state.slingshotProjectile = null;
+            }
+          }
+        }
+
+        if (this.state.slingshotProjectile) {
+          const speakerWorldXs = [50, this.worldWidth - 50];
+          const speakerW = 180;
+          const speakerH = 156 * 2;
+          for (const spkWorldX of speakerWorldXs) {
+            if (!this.state.slingshotProjectile) break;
+            const spkScreenX = spkWorldX - this.cameraX;
+            const spkLeft = spkScreenX - speakerW / 2;
+            const spkTop = groundY - speakerH;
+            if (this.state.slingshotProjectile.x >= spkLeft && this.state.slingshotProjectile.x <= spkLeft + speakerW &&
+                this.state.slingshotProjectile.y >= spkTop && this.state.slingshotProjectile.y <= groundY) {
+              const spkHitSounds = ['basicHit1', 'basicHit2'] as const;
+              soundManager.play(spkHitSounds[Math.floor(Math.random() * spkHitSounds.length)]);
+              this.state.slingshotScore += 10;
+              this.state.slingshotFloatingTexts.push({
+                x: spkWorldX, y: spkTop + speakerH / 2,
+                text: '+10',
+                timer: 0,
+              });
+              this.state.slingshotProjectile = null;
+            }
+          }
+        }
+
+        if (this.state.slingshotProjectile) {
+          const elderScreenX = this.villageElder.x - this.cameraX;
+          const boothLeft = elderScreenX - 60;
+          const boothTop = groundY - 75 + 27;
+          const boothW = 120;
+          const boothH = 75;
+          if (this.state.slingshotProjectile.x >= boothLeft && this.state.slingshotProjectile.x <= boothLeft + boothW &&
+              this.state.slingshotProjectile.y >= boothTop && this.state.slingshotProjectile.y <= boothTop + boothH) {
+            const boothHitSounds = ['basicHit1', 'basicHit2'] as const;
+            soundManager.play(boothHitSounds[Math.floor(Math.random() * boothHitSounds.length)]);
+            this.state.slingshotScore += 10;
+            this.state.slingshotFloatingTexts.push({
+              x: this.villageElder.x, y: boothTop + boothH / 2,
+              text: '+10',
+              timer: 0,
+            });
+            this.state.slingshotProjectile = null;
           }
         }
       }
@@ -5010,10 +5139,55 @@ export class VillageLedgerGame {
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
-    const slingshotX = 70;
+    const platformWorldX = this.villageCenterX + 400;
+    const platformW = 80;
+    const platformH = 12;
+    const platformScreenX = platformWorldX - this.cameraX;
+    const slingshotWorldX = platformWorldX;
+    const slingshotScreenX = slingshotWorldX - this.cameraX;
     const slingshotY = groundY - 20;
     
+    this.slingshotPlatformActive = this.state.showCelebration && 
+      Math.abs(this.player.x - platformWorldX) < 60;
+    
+    if (platformScreenX > -100 && platformScreenX < w + 100) {
+      ctx.fillStyle = '#8B6914';
+      ctx.strokeStyle = '#5D4837';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(platformScreenX - platformW / 2, groundY - platformH, platformW, platformH, 3);
+      ctx.fill();
+      ctx.stroke();
+      
+      ctx.fillStyle = '#6B3A1F';
+      ctx.fillRect(platformScreenX - platformW / 2 + 4, groundY - platformH - 2, platformW - 8, 3);
+      
+      const signPostX = platformScreenX + platformW / 2 - 8;
+      ctx.strokeStyle = '#6B3A1F';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(signPostX, groundY - platformH);
+      ctx.lineTo(signPostX, groundY - platformH - 50);
+      ctx.stroke();
+      
+      ctx.fillStyle = '#8B6914';
+      ctx.strokeStyle = '#5D4837';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect(signPostX - 40, groundY - platformH - 50, 45, 20, 3);
+      ctx.fill();
+      ctx.stroke();
+      
+      ctx.font = `bold 7px ${this.uiFont}`;
+      ctx.fillStyle = '#FFF';
+      ctx.textAlign = 'center';
+      ctx.fillText('TEST YOUR', signPostX - 17, groundY - platformH - 40);
+      ctx.fillText('AIM!', signPostX - 17, groundY - platformH - 32);
+    }
+    
     for (const b of this.state.slingshotBalloons) {
+      const screenX = b.x - this.cameraX;
+      if (screenX < -50 || screenX > w + 50) continue;
       if (b.popped) {
         const scale = 1 + b.popAnim * 5;
         const alpha = Math.max(0, 1 - b.popAnim * 2.5);
@@ -5022,7 +5196,7 @@ export class VillageLedgerGame {
         for (let i = 0; i < 6; i++) {
           const angle = (i / 6) * Math.PI * 2 + b.popAnim * 3;
           const dist = b.radius * scale * 0.6;
-          const px = b.x + Math.cos(angle) * dist;
+          const px = screenX + Math.cos(angle) * dist;
           const py = b.y + Math.sin(angle) * dist;
           ctx.fillStyle = b.color;
           ctx.beginPath();
@@ -5032,8 +5206,8 @@ export class VillageLedgerGame {
         ctx.globalAlpha = 1;
       } else {
         ctx.save();
-        ctx.translate(b.x, b.y);
-        ctx.scale(1, 1.25);
+        ctx.translate(screenX, b.y);
+        ctx.scale(1, 1.05);
         ctx.fillStyle = b.color;
         ctx.beginPath();
         ctx.arc(0, 0, b.radius, 0, Math.PI * 2);
@@ -5046,34 +5220,36 @@ export class VillageLedgerGame {
         ctx.strokeStyle = b.color;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(b.x, b.y + b.radius * 1.25);
-        ctx.lineTo(b.x, b.y + b.radius * 1.25 + 12);
+        ctx.moveTo(screenX, b.y + b.radius * 1.05);
+        ctx.lineTo(screenX, b.y + b.radius * 1.05 + 12);
         ctx.stroke();
       }
     }
     
-    ctx.strokeStyle = '#6B3A1F';
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(slingshotX, slingshotY);
-    ctx.lineTo(slingshotX, slingshotY - 40);
-    ctx.stroke();
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(slingshotX, slingshotY - 30);
-    ctx.lineTo(slingshotX - 12, slingshotY - 50);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(slingshotX, slingshotY - 30);
-    ctx.lineTo(slingshotX + 12, slingshotY - 50);
-    ctx.stroke();
+    if (slingshotScreenX > -50 && slingshotScreenX < w + 50) {
+      ctx.strokeStyle = '#6B3A1F';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(slingshotScreenX, slingshotY);
+      ctx.lineTo(slingshotScreenX, slingshotY - 40);
+      ctx.stroke();
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(slingshotScreenX, slingshotY - 30);
+      ctx.lineTo(slingshotScreenX - 12, slingshotY - 50);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(slingshotScreenX, slingshotY - 30);
+      ctx.lineTo(slingshotScreenX + 12, slingshotY - 50);
+      ctx.stroke();
+    }
     
-    const leftProngX = slingshotX - 12;
+    const leftProngX = slingshotScreenX - 12;
     const leftProngY = slingshotY - 50;
-    const rightProngX = slingshotX + 12;
+    const rightProngX = slingshotScreenX + 12;
     const rightProngY = slingshotY - 50;
     
-    if (this.state.slingshotAiming && this.state.slingshotAimCurrent) {
+    if (this.state.slingshotAiming && this.state.slingshotAimCurrent && this.slingshotPlatformActive) {
       const aimX = this.state.slingshotAimCurrent.x;
       const aimY = this.state.slingshotAimCurrent.y;
       
@@ -5096,12 +5272,12 @@ export class VillageLedgerGame {
       ctx.beginPath();
       ctx.arc(aimX - 1.5, aimY - 1.5, 2, 0, Math.PI * 2);
       ctx.fill();
-    } else {
+    } else if (slingshotScreenX > -50 && slingshotScreenX < w + 50) {
       ctx.strokeStyle = '#8B4513';
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(leftProngX, leftProngY);
-      ctx.quadraticCurveTo(slingshotX, leftProngY + 8, rightProngX, rightProngY);
+      ctx.quadraticCurveTo(slingshotScreenX, leftProngY + 8, rightProngX, rightProngY);
       ctx.stroke();
     }
     
@@ -5130,47 +5306,56 @@ export class VillageLedgerGame {
       ctx.fill();
     }
     
-    ctx.textAlign = 'right';
-    ctx.font = `bold 14px ${this.uiFont}`;
-    ctx.fillStyle = '#FFD700';
-    ctx.fillText(`SCORE: ${this.state.slingshotScore}`, w - 15, 25);
-    
-    if (this.state.slingshotCombo >= 2) {
-      ctx.font = `bold 12px ${this.uiFont}`;
-      ctx.fillStyle = '#FF6600';
-      ctx.fillText(`x${this.state.slingshotCombo}`, w - 15, 45);
+    if (platformScreenX > -100 && platformScreenX < w + 100) {
+      ctx.textAlign = 'center';
+      ctx.font = `bold 14px ${this.uiFont}`;
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText(`SCORE: ${this.state.slingshotScore}`, platformScreenX, groundY - platformH - 65);
+      
+      if (this.state.slingshotCombo >= 2) {
+        ctx.font = `bold 12px ${this.uiFont}`;
+        ctx.fillStyle = '#FF6600';
+        ctx.fillText(`x${this.state.slingshotCombo}`, platformScreenX, groundY - platformH - 50);
+      }
     }
     
     for (const ft of this.state.slingshotFloatingTexts) {
+      const ftScreenX = ft.x - this.cameraX;
+      if (ftScreenX < -50 || ftScreenX > w + 50) continue;
       const alpha = Math.max(0, 1 - ft.timer / 1.5);
       ctx.globalAlpha = alpha;
       ctx.textAlign = 'center';
       ctx.font = `bold 14px ${this.uiFont}`;
       ctx.fillStyle = '#FFD700';
-      ctx.fillText(ft.text, ft.x, ft.y);
+      ctx.fillText(ft.text, ftScreenX, ft.y);
       ctx.globalAlpha = 1;
     }
     
-    if (t < 4) {
+    if (t < 4 && platformScreenX > -100 && platformScreenX < w + 100) {
       const alpha = t < 3 ? 1 : 1 - (t - 3);
       ctx.globalAlpha = Math.max(0, alpha) * 0.8;
       ctx.textAlign = 'center';
       ctx.font = `bold 11px ${this.uiFont}`;
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillText('Pull the slingshot to pop balloons!', w / 2, groundY - 10);
+      if (this.slingshotPlatformActive) {
+        ctx.fillText('Pull the slingshot to pop balloons!', platformScreenX, groundY - platformH - 80);
+      } else {
+        ctx.fillText('Walk to the platform to use the slingshot!', platformScreenX, groundY - platformH - 80);
+      }
       ctx.globalAlpha = 1;
     }
   }
 
   private handleSlingshotTouchStart(x: number, y: number): void {
-    if (!this.state.slingshotGameActive) return;
+    if (!this.state.slingshotGameActive || !this.slingshotPlatformActive) return;
     
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
-    const slingshotX = 70;
+    const platformWorldX = this.villageCenterX + 400;
+    const slingshotScreenX = platformWorldX - this.cameraX;
     const slingshotY = groundY - 20;
     
-    const dx = x - slingshotX;
+    const dx = x - slingshotScreenX;
     const dy = y - (slingshotY - 30);
     const dist = Math.sqrt(dx * dx + dy * dy);
     
@@ -5178,6 +5363,7 @@ export class VillageLedgerGame {
       this.state.slingshotAiming = true;
       this.state.slingshotAimStart = { x, y };
       this.state.slingshotAimCurrent = { x, y };
+      soundManager.play('rubberBandStretch');
     }
   }
   
@@ -5186,10 +5372,11 @@ export class VillageLedgerGame {
     
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
-    const slingshotX = 70;
+    const platformWorldX = this.villageCenterX + 400;
+    const slingshotScreenX = platformWorldX - this.cameraX;
     const slingshotY = groundY - 30;
     
-    const dx = x - slingshotX;
+    const dx = x - slingshotScreenX;
     const dy = y - slingshotY;
     const dist = Math.sqrt(dx * dx + dy * dy);
     const maxPull = 120;
@@ -5197,7 +5384,7 @@ export class VillageLedgerGame {
     if (dist > maxPull) {
       const angle = Math.atan2(dy, dx);
       this.state.slingshotAimCurrent = {
-        x: slingshotX + Math.cos(angle) * maxPull,
+        x: slingshotScreenX + Math.cos(angle) * maxPull,
         y: slingshotY + Math.sin(angle) * maxPull,
       };
     } else {
@@ -5210,18 +5397,23 @@ export class VillageLedgerGame {
     
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
-    const slingshotX = 70;
+    const platformWorldX = this.villageCenterX + 400;
+    const slingshotScreenX = platformWorldX - this.cameraX;
     const slingshotY = groundY - 30;
     
     if (this.state.slingshotAimCurrent) {
-      const pullX = this.state.slingshotAimCurrent.x - slingshotX;
+      const pullX = this.state.slingshotAimCurrent.x - slingshotScreenX;
       const pullY = this.state.slingshotAimCurrent.y - slingshotY;
       const pullDist = Math.sqrt(pullX * pullX + pullY * pullY);
       
       if (pullDist > 10) {
+        soundManager.stop('rubberBandStretch');
+        soundManager.play('stretchRelease');
+        const wooshSounds = ['projectileWoosh1', 'projectileWoosh2', 'projectileWoosh3', 'projectileWoosh4'] as const;
+        soundManager.play(wooshSounds[Math.floor(Math.random() * wooshSounds.length)]);
         const launchPower = 4.5;
         this.state.slingshotProjectile = {
-          x: slingshotX,
+          x: slingshotScreenX,
           y: slingshotY,
           vx: -pullX * launchPower,
           vy: -pullY * launchPower,
@@ -5229,6 +5421,8 @@ export class VillageLedgerGame {
           radius: 6,
         };
         this.state.slingshotCombo = 0;
+      } else {
+        soundManager.stop('rubberBandStretch');
       }
     }
     
@@ -5493,6 +5687,28 @@ export class VillageLedgerGame {
       this.drawCelebrationAnimation(ctx);
       if (this.state.slingshotGameActive) {
         this.drawSlingshotGame(ctx);
+      }
+    }
+
+    if (this.state.stormCountdownActive && !this.state.showCelebration) {
+      const countdownText = `STORM APPROACHING: ${Math.ceil(this.state.stormCountdownTimer)}s`;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.font = `bold 16px ${this.uiFont}`;
+      const pulse = 0.6 + 0.4 * Math.sin(Date.now() / 300);
+      ctx.fillStyle = `rgba(220, 38, 38, ${pulse})`;
+      ctx.fillText(countdownText, this.logicalWidth / 2, 50);
+      ctx.font = `12px ${this.uiFont}`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.fillText('Get back to your hut!', this.logicalWidth / 2, 70);
+      ctx.restore();
+      const progress = 1 - (this.state.stormCountdownTimer / 35);
+      if (progress > 0.3) {
+        ctx.save();
+        ctx.globalAlpha = (progress - 0.3) * 0.5;
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, this.logicalWidth, 30);
+        ctx.restore();
       }
     }
     
@@ -5999,10 +6215,10 @@ export class VillageLedgerGame {
     
     const elderScreenX = this.villageElder.x - this.cameraX;
     
-    const djBoothW = 96;
-    const djBoothH = 60;
+    const djBoothW = 120;
+    const djBoothH = 75;
     const djBoothX = elderScreenX - djBoothW / 2;
-    const djBoothY = groundY - djBoothH + 22;
+    const djBoothY = groundY - djBoothH + 27;
     
     ctx.fillStyle = '#2D1B0E';
     ctx.strokeStyle = '#8B6914';
@@ -6013,33 +6229,33 @@ export class VillageLedgerGame {
     ctx.stroke();
     
     ctx.fillStyle = '#1A1A2E';
-    ctx.fillRect(djBoothX + 5, djBoothY + 5, djBoothW - 10, djBoothH - 18);
+    ctx.fillRect(djBoothX + 6, djBoothY + 6, djBoothW - 12, djBoothH - 22);
     
-    const eqBars = 10;
+    const eqBars = 12;
     for (let i = 0; i < eqBars; i++) {
-      const barH = 5 + Math.abs(Math.sin(t * 8 + i * 0.8)) * 18;
-      const bx = djBoothX + 8 + i * 8;
+      const barH = 6 + Math.abs(Math.sin(t * 8 + i * 0.8)) * 22;
+      const bx = djBoothX + 10 + i * 10;
       ctx.fillStyle = `hsl(${(t * 60 + i * 40) % 360}, 100%, 60%)`;
-      ctx.fillRect(bx, djBoothY + 30 - barH, 5, barH);
+      ctx.fillRect(bx, djBoothY + 38 - barH, 6, barH);
     }
     
     const knobColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
     for (let i = 0; i < 5; i++) {
-      const kx = djBoothX + 10 + i * 18;
-      const ky = djBoothY + djBoothH - 8;
+      const kx = djBoothX + 12 + i * 22;
+      const ky = djBoothY + djBoothH - 10;
       ctx.fillStyle = knobColors[i];
       ctx.globalAlpha = introFade * (0.5 + 0.5 * Math.sin(t * 6 + i * 1.5));
       ctx.beginPath();
-      ctx.arc(kx, ky, 3, 0, Math.PI * 2);
+      ctx.arc(kx, ky, 4, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = introFade;
     
-    const topY = djBoothY - 4;
+    const topY = djBoothY - 5;
     
-    const ttW = 28;
-    const ttH = 6;
-    const leftTTX = djBoothX + 8;
+    const ttW = 35;
+    const ttH = 8;
+    const leftTTX = djBoothX + 10;
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#444';
     ctx.lineWidth = 1;
@@ -6052,17 +6268,17 @@ export class VillageLedgerGame {
     ctx.strokeStyle = '#666';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(platterCX1 - 10 * Math.cos(spinAngle1), topY - ttH / 2);
-    ctx.lineTo(platterCX1 + 10 * Math.cos(spinAngle1), topY - ttH / 2);
+    ctx.moveTo(platterCX1 - 12 * Math.cos(spinAngle1), topY - ttH / 2);
+    ctx.lineTo(platterCX1 + 12 * Math.cos(spinAngle1), topY - ttH / 2);
     ctx.stroke();
     ctx.strokeStyle = '#888';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(leftTTX + ttW - 2, topY - ttH);
-    ctx.lineTo(leftTTX + ttW - 8, topY - ttH - 5);
+    ctx.lineTo(leftTTX + ttW - 10, topY - ttH - 6);
     ctx.stroke();
     
-    const rightTTX = djBoothX + djBoothW - 8 - ttW;
+    const rightTTX = djBoothX + djBoothW - 10 - ttW;
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#444';
     ctx.lineWidth = 1;
@@ -6075,18 +6291,18 @@ export class VillageLedgerGame {
     ctx.strokeStyle = '#666';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(platterCX2 - 10 * Math.cos(spinAngle2), topY - ttH / 2);
-    ctx.lineTo(platterCX2 + 10 * Math.cos(spinAngle2), topY - ttH / 2);
+    ctx.moveTo(platterCX2 - 12 * Math.cos(spinAngle2), topY - ttH / 2);
+    ctx.lineTo(platterCX2 + 12 * Math.cos(spinAngle2), topY - ttH / 2);
     ctx.stroke();
     ctx.strokeStyle = '#888';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(rightTTX + 2, topY - ttH);
-    ctx.lineTo(rightTTX + 8, topY - ttH - 5);
+    ctx.lineTo(rightTTX + 10, topY - ttH - 6);
     ctx.stroke();
     
-    const mixerW = 20;
-    const mixerH = 8;
+    const mixerW = 25;
+    const mixerH = 10;
     const mixerX = djBoothX + (djBoothW - mixerW) / 2;
     ctx.fillStyle = '#1A1A2E';
     ctx.strokeStyle = '#555';
@@ -6096,10 +6312,10 @@ export class VillageLedgerGame {
     ctx.fill();
     ctx.stroke();
     for (let i = 0; i < 3; i++) {
-      const faderX = mixerX + 4 + i * 6;
-      const faderPos = Math.sin(t * 4 + i * 2) * 2;
+      const faderX = mixerX + 5 + i * 8;
+      const faderPos = Math.sin(t * 4 + i * 2) * 2.5;
       ctx.fillStyle = '#FF3366';
-      ctx.fillRect(faderX, topY - mixerH + 2 + faderPos, 3, 3);
+      ctx.fillRect(faderX, topY - mixerH + 2 + faderPos, 4, 4);
     }
     
     const discoBallR = 36;
@@ -6163,49 +6379,54 @@ export class VillageLedgerGame {
     ctx.save();
     ctx.globalAlpha = introFade;
     
-    // ── GIANT SPEAKER STACKS (screen-fixed, left and right) ──
+    // ── GIANT SPEAKER STACKS (world-space, left and right) ──
     const speakerPulse = Math.sin(t * 12) * 0.02;
-    const conePump = Math.sin(t * 8) * 3;
-    const speakerShake = Math.sin(t * 15) * 1.5;
+    const conePump = Math.sin(t * 8) * 9;
+    const speakerShake = Math.sin(t * 15) * 3;
     
+    const speakerWorldPositions = [50, this.worldWidth - 50];
     for (let side = 0; side < 2; side++) {
-      const sx = side === 0 ? 10 : w - 70;
+      const speakerWorldX = speakerWorldPositions[side];
+      const speakerScreenX = speakerWorldX - this.cameraX;
+      
+      if (speakerScreenX < -200 || speakerScreenX > w + 200) continue;
+      
       const baseY = groundY - 10;
       
       ctx.save();
-      ctx.translate(sx + 30, baseY);
+      ctx.translate(speakerScreenX, baseY);
       ctx.translate(speakerShake * (side === 0 ? 1 : -1), speakerShake * 0.5);
       ctx.scale(1 + speakerPulse, 1 + speakerPulse);
-      ctx.translate(-30, 0);
+      ctx.translate(-90, 0);
       
       for (let cab = 0; cab < 2; cab++) {
-        const cabY = -cab * 55;
-        const cabW = 60;
-        const cabH = 52;
+        const cabY = -cab * 165;
+        const cabW = 180;
+        const cabH = 156;
         
         ctx.fillStyle = '#1A1A1A';
         ctx.strokeStyle = '#333';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3;
         ctx.beginPath();
-        ctx.roundRect(0, cabY - cabH, cabW, cabH, 3);
+        ctx.roundRect(0, cabY - cabH, cabW, cabH, 6);
         ctx.fill();
         ctx.stroke();
         
         ctx.fillStyle = '#222';
         ctx.beginPath();
-        ctx.roundRect(3, cabY - cabH + 3, cabW - 6, cabH - 6, 2);
+        ctx.roundRect(9, cabY - cabH + 9, cabW - 18, cabH - 18, 4);
         ctx.fill();
         
         const coneX = cabW / 2;
-        const coneY = cabY - cabH / 2 - 5;
-        const coneR = 16 + conePump;
+        const coneY = cabY - cabH / 2 - 15;
+        const coneR = 48 + conePump;
         
         ctx.fillStyle = '#111';
         ctx.beginPath();
-        ctx.arc(coneX, coneY, coneR + 3, 0, Math.PI * 2);
+        ctx.arc(coneX, coneY, coneR + 6, 0, Math.PI * 2);
         ctx.fill();
         
-        const coneGrad = ctx.createRadialGradient(coneX, coneY, 2, coneX, coneY, coneR);
+        const coneGrad = ctx.createRadialGradient(coneX, coneY, 4, coneX, coneY, coneR);
         coneGrad.addColorStop(0, '#444');
         coneGrad.addColorStop(0.5, '#2A2A2A');
         coneGrad.addColorStop(1, '#111');
@@ -6216,24 +6437,24 @@ export class VillageLedgerGame {
         
         ctx.fillStyle = '#333';
         ctx.beginPath();
-        ctx.arc(coneX, coneY, 5, 0, Math.PI * 2);
+        ctx.arc(coneX, coneY, 15, 0, Math.PI * 2);
         ctx.fill();
         
-        const tweeterY = cabY - cabH + 14;
+        const tweeterY = cabY - cabH + 42;
         ctx.fillStyle = '#111';
         ctx.beginPath();
-        ctx.arc(coneX, tweeterY, 6, 0, Math.PI * 2);
+        ctx.arc(coneX, tweeterY, 18, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#383838';
         ctx.beginPath();
-        ctx.arc(coneX, tweeterY, 4, 0, Math.PI * 2);
+        ctx.arc(coneX, tweeterY, 12, 0, Math.PI * 2);
         ctx.fill();
         
         ctx.strokeStyle = '#444';
-        ctx.lineWidth = 0.5;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(1, cabY - cabH + 3);
-        ctx.lineTo(1, cabY - 3);
+        ctx.moveTo(3, cabY - cabH + 9);
+        ctx.lineTo(3, cabY - 9);
         ctx.stroke();
       }
       
@@ -6243,7 +6464,7 @@ export class VillageLedgerGame {
     const elderScreenX = this.villageElder.x - this.cameraX;
 
     // Draw sunglasses on the Village Elder (adjusted for 3/4 side-facing view)
-    const elderHeadY = this.villageElder.y + 10;
+    const elderHeadY = this.villageElder.y + 20;
     const glassW = 20;
     const glassH = 7;
     const bridgeY = elderHeadY;
@@ -6897,7 +7118,7 @@ export class VillageLedgerGame {
     if (this.state.showQuiz || this.state.showSuccess || this.state.showFail || this.state.showBrawl || this.state.showQuizReview) return;
     if (this.state.badges.length === 0) return;
 
-    const x = this.logicalWidth - 44;
+    const x = this.inventoryPanelLeftX - 44;
     const y = 12;
     const size = 32;
 
@@ -8175,6 +8396,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     // Store inventory area for click detection
     this.inventoryButtonArea = { x: panelX, y: yPos - 4, w: panelWidth, h: panelHeight };
+    this.inventoryPanelLeftX = panelX;
     
     // Draw inventory detail popup if open
     if (this.showInventoryDetailPopup) {
@@ -10049,7 +10271,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       playerAlpha: 1,
       showStoneTabletPopup: false,
       showChoice: false,
-      choiceOptions: []
+      choiceOptions: [],
+      stormCountdownActive: false,
+      stormCountdownTimer: 0,
+      forceHutEntry: false
     };
     this.currentQuizQuestion = 0;
     this.playAgainButton = null;
@@ -10192,7 +10417,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       playerAlpha: 1,
       showStoneTabletPopup: false,
       showChoice: false,
-      choiceOptions: []
+      choiceOptions: [],
+      stormCountdownActive: false,
+      stormCountdownTimer: 0,
+      forceHutEntry: false
     };
     
     // Reset NPC positions to original locations

@@ -1156,6 +1156,10 @@ export class VillageLedgerGame {
     // Player must interact with hut to fix roof and enter - allow interaction even during clouds animation
     if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && !this.state.showNightTransition && !this.state.showSuccess && !this.state.playerEnteredHut) {
       
+      if (this.state.showCelebration) {
+        this.endDiscoParty();
+      }
+      
       // If roof needs fixing, fix it first, then trigger storm sequence
       if (!this.state.roofRepaired && hasWood) {
         this.queueDialogue([
@@ -4208,33 +4212,7 @@ export class VillageLedgerGame {
 
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
-      
       this.updateDancingNPCs(dt);
-      
-      const halfwayToHome = (this.villageCenterX + this.playerHomeX) / 2;
-      if (this.player.x <= halfwayToHome) {
-        this.state.showCelebration = false;
-        this.celebrationEndTime = Date.now();
-        soundManager.fadeOut('moneySong', 3000);
-        soundManager.fadeOut('crowdApplause', 3000);
-        soundManager.fadeOut('celebration', 3000);
-        this.woodcutter.isWalking = false;
-        this.stoneWorker.isWalking = false;
-        this.fisherman.isWalking = false;
-        this.woodcutter.targetX = this.woodcutter.originalX || 815;
-        this.stoneWorker.targetX = this.stoneWorker.originalX || 2150;
-        this.fisherman.targetX = this.fisherman.originalX || 3025;
-      }
-    }
-    
-    if (this.state.phase === 'loop2_return' && !this.state.showCelebration && !this.stormTriggered && 
-        !this.state.showCloudsAnimation && !this.state.showRainfall && !this.state.showQuiz) {
-      const timeSinceCelebrationEnd = this.celebrationEndTime > 0 ? (Date.now() - this.celebrationEndTime) / 1000 : 0;
-      
-      if (timeSinceCelebrationEnd >= 1) {
-        this.stormTriggered = true;
-        this.triggerStormClouds();
-      }
     }
     
     // Update thunderstorm animation timer
@@ -4463,6 +4441,24 @@ export class VillageLedgerGame {
     soundManager.play('thunder');
     // "A STORM IS APPROACHING..." text is drawn in drawCloudsAnimation
     // Player must now interact with hut to proceed
+  }
+  
+  private endDiscoParty(): void {
+    this.state.showCelebration = false;
+    this.celebrationEndTime = Date.now();
+    soundManager.fadeOut('moneySong', 1500);
+    soundManager.fadeOut('crowdApplause', 1500);
+    soundManager.fadeOut('celebration', 1500);
+    this.woodcutter.isWalking = false;
+    this.stoneWorker.isWalking = false;
+    this.fisherman.isWalking = false;
+    this.woodcutter.targetX = this.woodcutter.originalX || 815;
+    this.stoneWorker.targetX = this.stoneWorker.originalX || 2150;
+    this.fisherman.targetX = this.fisherman.originalX || 3025;
+    if (!this.stormTriggered) {
+      this.stormTriggered = true;
+      this.triggerStormClouds();
+    }
   }
   
   private startDiscoParty(): void {
@@ -5189,24 +5185,21 @@ export class VillageLedgerGame {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
+    const dialogueTop = h - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
     
-    const halfwayToHome = (this.villageCenterX + this.playerHomeX) / 2;
-    const distToHalfway = Math.abs(this.player.x - halfwayToHome);
-    const fadeRange = 200;
-    let fadeAlpha = Math.min(1, distToHalfway / fadeRange);
     const introFade = Math.min(1, t / 1.5);
-    fadeAlpha = Math.min(fadeAlpha, introFade);
     
     ctx.save();
-    ctx.globalAlpha = fadeAlpha;
+    ctx.globalAlpha = introFade;
     
     const elderScreenX = this.villageElder.x - this.cameraX;
     
-    const djBoothW = 80;
-    const djBoothH = 50;
+    // ── DJ BOOTH (20% larger, lowered to cover elder's feet) ──
+    const djBoothW = 96;
+    const djBoothH = 60;
     const djBoothX = elderScreenX - djBoothW / 2;
-    const djBoothY = groundY - djBoothH + 5;
+    const djBoothY = groundY - djBoothH + 15;
     
     ctx.fillStyle = '#2D1B0E';
     ctx.strokeStyle = '#8B6914';
@@ -5216,45 +5209,125 @@ export class VillageLedgerGame {
     ctx.fill();
     ctx.stroke();
     
+    // Front panel graphic (equalizer)
     ctx.fillStyle = '#1A1A2E';
-    ctx.fillRect(djBoothX + 5, djBoothY + 5, djBoothW - 10, djBoothH - 15);
+    ctx.fillRect(djBoothX + 5, djBoothY + 5, djBoothW - 10, djBoothH - 18);
     
-    const knobColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00'];
-    for (let i = 0; i < 4; i++) {
-      const kx = djBoothX + 12 + i * 16;
+    const eqBars = 10;
+    for (let i = 0; i < eqBars; i++) {
+      const barH = 5 + Math.abs(Math.sin(t * 8 + i * 0.8)) * 18;
+      const bx = djBoothX + 8 + i * 8;
+      ctx.fillStyle = `hsl(${(t * 60 + i * 40) % 360}, 100%, 60%)`;
+      ctx.fillRect(bx, djBoothY + 30 - barH, 5, barH);
+    }
+    
+    // Blinking knobs on lower front
+    const knobColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
+    for (let i = 0; i < 5; i++) {
+      const kx = djBoothX + 10 + i * 18;
       const ky = djBoothY + djBoothH - 8;
       ctx.fillStyle = knobColors[i];
-      ctx.globalAlpha = fadeAlpha * (0.5 + 0.5 * Math.sin(t * 6 + i * 1.5));
+      ctx.globalAlpha = introFade * (0.5 + 0.5 * Math.sin(t * 6 + i * 1.5));
       ctx.beginPath();
       ctx.arc(kx, ky, 3, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.globalAlpha = fadeAlpha;
+    ctx.globalAlpha = introFade;
     
-    const eqBars = 8;
-    for (let i = 0; i < eqBars; i++) {
-      const barH = 5 + Math.abs(Math.sin(t * 8 + i * 0.8)) * 15;
-      const bx = djBoothX + 8 + i * 8;
-      ctx.fillStyle = `hsl(${(t * 60 + i * 40) % 360}, 100%, 60%)`;
-      ctx.fillRect(bx, djBoothY + 25 - barH, 5, barH);
-    }
+    // ── TURNTABLES AND MIXER ON TOP ──
+    const topY = djBoothY - 4;
     
-    const discoBallX = elderScreenX;
-    const discoBallDropY = Math.min(35, t * 25);
-    const discoBallY = discoBallDropY;
-    const discoBallR = 18;
-    
-    ctx.strokeStyle = '#888';
+    // Left turntable (profile view - thin rectangle with spinning platter edge)
+    const ttW = 28;
+    const ttH = 6;
+    const leftTTX = djBoothX + 8;
+    ctx.fillStyle = '#111';
+    ctx.strokeStyle = '#444';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(discoBallX, 0);
-    ctx.lineTo(discoBallX, discoBallY);
+    ctx.roundRect(leftTTX, topY - ttH, ttW, ttH, 2);
+    ctx.fill();
+    ctx.stroke();
+    // Spinning platter line
+    const spinAngle1 = t * 3;
+    const platterCX1 = leftTTX + ttW / 2;
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(platterCX1 - 10 * Math.cos(spinAngle1), topY - ttH / 2);
+    ctx.lineTo(platterCX1 + 10 * Math.cos(spinAngle1), topY - ttH / 2);
+    ctx.stroke();
+    // Tonearm
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(leftTTX + ttW - 2, topY - ttH);
+    ctx.lineTo(leftTTX + ttW - 8, topY - ttH - 5);
     ctx.stroke();
     
-    const grad = ctx.createRadialGradient(discoBallX - 4, discoBallY - 4, 2, discoBallX, discoBallY, discoBallR);
+    // Right turntable
+    const rightTTX = djBoothX + djBoothW - 8 - ttW;
+    ctx.fillStyle = '#111';
+    ctx.strokeStyle = '#444';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(rightTTX, topY - ttH, ttW, ttH, 2);
+    ctx.fill();
+    ctx.stroke();
+    const spinAngle2 = t * 3.2 + 1;
+    const platterCX2 = rightTTX + ttW / 2;
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(platterCX2 - 10 * Math.cos(spinAngle2), topY - ttH / 2);
+    ctx.lineTo(platterCX2 + 10 * Math.cos(spinAngle2), topY - ttH / 2);
+    ctx.stroke();
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(rightTTX + 2, topY - ttH);
+    ctx.lineTo(rightTTX + 8, topY - ttH - 5);
+    ctx.stroke();
+    
+    // Mixer in the center
+    const mixerW = 20;
+    const mixerH = 8;
+    const mixerX = djBoothX + (djBoothW - mixerW) / 2;
+    ctx.fillStyle = '#1A1A2E';
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(mixerX, topY - mixerH, mixerW, mixerH, 2);
+    ctx.fill();
+    ctx.stroke();
+    // Mixer fader lines
+    for (let i = 0; i < 3; i++) {
+      const faderX = mixerX + 4 + i * 6;
+      const faderPos = Math.sin(t * 4 + i * 2) * 2;
+      ctx.fillStyle = '#FF3366';
+      ctx.fillRect(faderX, topY - mixerH + 2 + faderPos, 3, 3);
+    }
+    
+    // ── DISCO BALL (2x size, centered vertically) ──
+    const discoBallR = 36;
+    const targetY = groundY * 0.45;
+    const discoBallDropY = Math.min(targetY, t * 30);
+    const discoBallX = elderScreenX;
+    const discoBallY = discoBallDropY;
+    
+    // String from top
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(discoBallX, 0);
+    ctx.lineTo(discoBallX, discoBallY - discoBallR);
+    ctx.stroke();
+    
+    // Main ball
+    const grad = ctx.createRadialGradient(discoBallX - 8, discoBallY - 8, 4, discoBallX, discoBallY, discoBallR);
     grad.addColorStop(0, '#FFFFFF');
     grad.addColorStop(0.3, '#C0C0C0');
-    grad.addColorStop(1, '#606060');
+    grad.addColorStop(1, '#505050');
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.arc(discoBallX, discoBallY, discoBallR, 0, Math.PI * 2);
@@ -5263,30 +5336,32 @@ export class VillageLedgerGame {
     ctx.lineWidth = 0.5;
     ctx.stroke();
     
-    for (let row = -2; row <= 2; row++) {
-      for (let col = -3; col <= 3; col++) {
+    // Mirror tiles on the ball
+    for (let row = -4; row <= 4; row++) {
+      for (let col = -5; col <= 5; col++) {
         const tileAngle = t * 2 + row * 0.5 + col * 0.7;
-        const tileX = discoBallX + col * 5 * Math.cos(row * 0.6);
-        const tileY = discoBallY + row * 5;
+        const tileX = discoBallX + col * 6 * Math.cos(row * 0.5);
+        const tileY = discoBallY + row * 6;
         const dist = Math.sqrt((tileX - discoBallX) ** 2 + (tileY - discoBallY) ** 2);
-        if (dist < discoBallR - 2) {
+        if (dist < discoBallR - 3) {
           ctx.fillStyle = `hsl(${(tileAngle * 60) % 360}, 80%, ${60 + Math.sin(tileAngle) * 20}%)`;
-          ctx.fillRect(tileX - 2, tileY - 2, 4, 4);
+          ctx.fillRect(tileX - 2.5, tileY - 2.5, 5, 5);
         }
       }
     }
     
-    const numBeams = 12;
+    // Light beams from disco ball
+    const numBeams = 16;
     for (let i = 0; i < numBeams; i++) {
       const angle = (t * 1.5 + i * (Math.PI * 2 / numBeams));
-      const beamLen = 250 + Math.sin(t * 3 + i) * 80;
+      const beamLen = 300 + Math.sin(t * 3 + i) * 100;
       const endX = discoBallX + Math.cos(angle) * beamLen;
       const endY = discoBallY + Math.sin(angle) * beamLen;
       
-      if (endY > 0) {
+      if (endY > discoBallY) {
         const beamGrad = ctx.createLinearGradient(discoBallX, discoBallY, endX, endY);
-        const hue = (t * 40 + i * 30) % 360;
-        beamGrad.addColorStop(0, `hsla(${hue}, 100%, 80%, 0.4)`);
+        const hue = (t * 40 + i * 22) % 360;
+        beamGrad.addColorStop(0, `hsla(${hue}, 100%, 80%, 0.35)`);
         beamGrad.addColorStop(1, `hsla(${hue}, 100%, 60%, 0)`);
         ctx.strokeStyle = beamGrad;
         ctx.lineWidth = 3;
@@ -5297,15 +5372,28 @@ export class VillageLedgerGame {
       }
     }
     
-    const lightColors = ['#FF0066', '#00FF66', '#0066FF', '#FF6600', '#CC00FF', '#FFFF00'];
+    // ── GROUND SPOTLIGHTS (fixed world positions, with casings) ──
+    const lightColors = ['#FF0066', '#00FF66', '#0066FF', '#FF6600', '#CC00FF', '#FFFF00', '#00FFCC', '#FF3399'];
     const numLights = 8;
+    const worldSpacing = 475;
+    const lightsStartX = this.villageCenterX - (numLights - 1) * worldSpacing / 2;
+    const casingH = 14;
+    const casingW = 18;
+    const casingY = dialogueTop - casingH;
+    
     for (let i = 0; i < numLights; i++) {
-      const lx = (w / (numLights + 1)) * (i + 1);
+      const worldX = lightsStartX + i * worldSpacing;
+      const lx = worldX - this.cameraX;
+      
+      // Skip if off-screen
+      if (lx < -100 || lx > w + 100) continue;
+      
       const sweepAngle = Math.sin(t * 2.5 + i * 0.8) * 0.6 - Math.PI / 2;
       const beamLen = groundY + 20;
       const endX = lx + Math.cos(sweepAngle) * beamLen * 0.4;
       
-      const lightGrad = ctx.createLinearGradient(lx, groundY, endX, 0);
+      // Light beam (cone)
+      const lightGrad = ctx.createLinearGradient(lx, dialogueTop, endX, 0);
       const color = lightColors[i % lightColors.length];
       lightGrad.addColorStop(0, color + 'AA');
       lightGrad.addColorStop(0.5, color + '33');
@@ -5313,14 +5401,30 @@ export class VillageLedgerGame {
       
       ctx.fillStyle = lightGrad;
       ctx.beginPath();
-      ctx.moveTo(lx - 8, groundY);
-      ctx.lineTo(endX - 30, 10);
-      ctx.lineTo(endX + 30, 10);
-      ctx.lineTo(lx + 8, groundY);
+      ctx.moveTo(lx - 6, dialogueTop);
+      ctx.lineTo(endX - 35, 10);
+      ctx.lineTo(endX + 35, 10);
+      ctx.lineTo(lx + 6, dialogueTop);
       ctx.closePath();
+      ctx.fill();
+      
+      // Spotlight casing (dark housing)
+      ctx.fillStyle = '#1A1A1A';
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.roundRect(lx - casingW / 2, casingY, casingW, casingH, [3, 3, 0, 0]);
+      ctx.fill();
+      ctx.stroke();
+      
+      // Lens glow at top of casing
+      ctx.fillStyle = color + '88';
+      ctx.beginPath();
+      ctx.arc(lx, casingY + 2, 4, 0, Math.PI * 2);
       ctx.fill();
     }
     
+    // Corner spotlights
     for (let i = 0; i < 4; i++) {
       const cornerX = (i % 2 === 0) ? 0 : w;
       const cornerY = (i < 2) ? 0 : groundY;
@@ -5343,6 +5447,7 @@ export class VillageLedgerGame {
       ctx.stroke();
     }
     
+    // ── CONFETTI ──
     const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#9B59B6', '#2ECC71', '#FF69B4'];
     for (let i = 0; i < 40; i++) {
       const seed = i * 137.5;
@@ -5369,6 +5474,7 @@ export class VillageLedgerGame {
       ctx.restore();
     }
     
+    // ── MUSICAL NOTES above dancing NPCs ──
     const characters = [this.woodcutter, this.stoneWorker, this.fisherman];
     for (let i = 0; i < characters.length; i++) {
       const npc = characters[i];
@@ -5398,12 +5504,13 @@ export class VillageLedgerGame {
       }
     }
     
+    // ── "DEBTS SETTLED!" text ──
     if (t <= 5) {
       const textAlpha = t <= 3 ? Math.min(1, t / 0.5) : Math.max(0, 1 - (t - 3) / 2);
-      ctx.globalAlpha = fadeAlpha * textAlpha;
+      ctx.globalAlpha = introFade * textAlpha;
       ctx.font = `24px ${this.retroFont}`;
       ctx.textAlign = 'center';
-      const celebY = groundY * 0.35 + Math.sin(t * 5) * 8;
+      const celebY = groundY * 0.2 + Math.sin(t * 5) * 8;
       const textHue = (t * 60) % 360;
       ctx.fillStyle = `hsl(${textHue}, 100%, 70%)`;
       ctx.strokeStyle = '#000';

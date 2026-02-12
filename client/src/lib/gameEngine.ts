@@ -2026,6 +2026,7 @@ export class VillageLedgerGame {
       // NPC disputes - triggers verification need
       this.setMood('angry');
       this.triggerHintPulse();
+      soundManager.play('silverScreenVillain3');
       this.queueDialogue([
         {
           speaker: 'WOODCUTTER',
@@ -2839,6 +2840,7 @@ export class VillageLedgerGame {
       // NPC disputes - triggers verification need
       this.setMood('angry');
       this.triggerHintPulse();
+      soundManager.play('silverScreenVillain2');
       this.queueDialogue([
         {
           speaker: 'STONE-WORKER',
@@ -4812,8 +4814,6 @@ export class VillageLedgerGame {
     this.state.rhythmNotes = [];
     this.state.rhythmLastSpawnTime = 0;
     this.state.rhythmHitFlash = 0;
-    this.state.showNightTransition = true;
-    this.state.nightTransitionTimer = 0;
     this.stormTriggered = false;
     this.celebrationEndTime = 0;
     
@@ -5035,7 +5035,7 @@ export class VillageLedgerGame {
     this.fisherman.walkFrame = (this.fisherman.walkFrame || 0) + dt * 11;
 
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    this.villageElder.y = groundY - this.villageElder.height - 15;
+    this.villageElder.y = groundY - this.villageElder.height - 5;
   }
 
   // Storm approaching after celebration - player goes home, fixes roof, enters hut, then rain (legacy)
@@ -5157,6 +5157,10 @@ export class VillageLedgerGame {
     this.drawLocationMarkers(ctx, groundY);
 
     if (this.state.showCelebration) {
+      // Draw elder BEFORE DJ booth so he appears behind it (DJing)
+      if (this.villageElder.visible) {
+        this.drawCharacter(ctx, this.villageElder);
+      }
       this.drawCelebrationBackground(ctx);
     }
 
@@ -5166,8 +5170,9 @@ export class VillageLedgerGame {
     
     // Draw NPCs (in front of location markers)
     // But fisherman is drawn AFTER player if player is in fisherman's area
+    // During celebration, skip elder since he's already drawn behind the DJ booth
     this.npcs.forEach(npc => {
-      if (npc.visible && npc.id !== 'fisherman') {
+      if (npc.visible && npc.id !== 'fisherman' && !(this.state.showCelebration && npc.id === 'villageElder')) {
         this.drawCharacter(ctx, npc);
       }
     });
@@ -5609,14 +5614,33 @@ export class VillageLedgerGame {
     ctx.fillStyle = '#F5DEB3';
     ctx.fillText(this.state.pendingBadge.name, popupX + popupWidth / 2, popupY + 150);
     
-    // Badge description (word wrap)
+    // Badge description (word wrap) - centered between name and Continue button
     ctx.font = `14px ${this.uiFont}`;
     ctx.fillStyle = '#C4A77D';
     const desc = this.state.pendingBadge.description;
     const maxWidth = popupWidth - 40;
     const words = desc.split(' ');
+    
+    // Pre-calculate description height for vertical centering
+    let tempLine = '';
+    let descLineCount = 1;
+    words.forEach((word) => {
+      const testLine = tempLine + word + ' ';
+      const metrics = ctx.measureText(testLine);
+      if (metrics.width > maxWidth && tempLine !== '') {
+        descLineCount++;
+        tempLine = word + ' ';
+      } else {
+        tempLine = testLine;
+      }
+    });
+    const descTotalHeight = descLineCount * 20;
+    const nameBottomY = popupY + 160;
+    const btnTopY = popupY + popupHeight - 55;
+    const descStartY = nameBottomY + (btnTopY - nameBottomY - descTotalHeight) / 2 + 14;
+    
     let line = '';
-    let lineY = popupY + 180;
+    let lineY = descStartY;
     
     words.forEach((word) => {
       const testLine = line + word + ' ';
@@ -8604,8 +8628,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.checkpointQuizOptionAreas = [];
     const optStartY = lineY + 30;
     const optW = cardW - 60;
-    const optH = 36;
-    const optGap = 8;
+    const optH = 46;
+    const optGap = 10;
     
     data.options.forEach((opt, i) => {
       const optX = (w - optW) / 2;

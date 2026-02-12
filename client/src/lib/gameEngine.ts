@@ -948,15 +948,14 @@ export class VillageLedgerGame {
       if (this.inventoryButtonArea) {
         const btn = this.inventoryButtonArea;
         if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
-          this.showInventoryDetailPopup = true;
-          // Also dismiss inventory hint if showing
           if (this.state.showInventoryHint) {
             this.state.showInventoryHint = false;
-            // Show pending choice after hint is dismissed
             if (this.state.pendingChoiceAfterHint) {
               this.state.pendingChoiceAfterHint = false;
               this.showWoodcutterTradeChoice();
             }
+          } else {
+            this.showInventoryDetailPopup = true;
           }
           soundManager.play('buttonClick');
           return;
@@ -4148,28 +4147,31 @@ export class VillageLedgerGame {
   public beginGameplay(): void {
     soundManager.init();
     soundManager.resumeContext();
-    soundManager.playLoop('ambientVillage');
-    soundManager.startDaytimeMusic();
 
-    if (this.externalAudio) {
-      const audio = this.externalAudio;
-      const extCtx = this.externalAudioContext;
-      const fadeStep = 0.02;
-      const fadeInterval = setInterval(() => {
-        if (audio.volume > fadeStep) {
-          audio.volume -= fadeStep;
-        } else {
-          audio.volume = 0;
-          audio.pause();
-          clearInterval(fadeInterval);
-          if (extCtx) {
-            extCtx.close().catch(() => {});
+    setTimeout(() => {
+      soundManager.playLoop('ambientVillage');
+      soundManager.startDaytimeMusic();
+
+      if (this.externalAudio) {
+        const audio = this.externalAudio;
+        const extCtx = this.externalAudioContext;
+        const fadeStep = 0.02;
+        const fadeInterval = setInterval(() => {
+          if (audio.volume > fadeStep) {
+            audio.volume -= fadeStep;
+          } else {
+            audio.volume = 0;
+            audio.pause();
+            clearInterval(fadeInterval);
+            if (extCtx) {
+              extCtx.close().catch(() => {});
+            }
           }
-        }
-      }, 50);
-      this.externalAudio = null;
-      this.externalAudioContext = null;
-    }
+        }, 50);
+        this.externalAudio = null;
+        this.externalAudioContext = null;
+      }
+    }, 1500);
 
     setTimeout(() => this.triggerIntro(), 500);
   }

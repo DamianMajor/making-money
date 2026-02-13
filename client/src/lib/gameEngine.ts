@@ -120,6 +120,7 @@ interface GameState {
   stoneIntroduced: boolean;
   berriesIntroduced: boolean;
   berryRestockUsed: boolean;
+  bushCurrentlyEmpty: boolean;
   slingshotIntroduced: boolean;
   ledgerEntries: LedgerEntry[];
   dialogueQueue: DialogueLine[];
@@ -804,6 +805,7 @@ export class VillageLedgerGame {
       stoneIntroduced: false,
       berriesIntroduced: false,
       berryRestockUsed: false,
+      bushCurrentlyEmpty: false,
       slingshotIntroduced: true,
       ledgerEntries: [],
       dialogueQueue: [],
@@ -1492,6 +1494,8 @@ export class VillageLedgerGame {
       this.state.stormCountdownActive = false;
       soundManager.fadeOut('partySong', 3000);
       soundManager.fadeOut('genreRemix', 3000);
+      soundManager.fadeOut('celebration', 1500);
+      soundManager.fadeOut('crowdApplause', 1500);
       
       // If roof needs fixing, fix it first, then trigger storm sequence
       if (!this.state.roofRepaired && hasWood) {
@@ -3640,9 +3644,7 @@ export class VillageLedgerGame {
   private handleBerryBushInteraction(): void {
     this.bushShakeTimer = this.bushShakeDuration;
     
-    const bushIsEmpty = this.state.resourcesDepleted || 
-                        (this.state.berryRestockUsed && this.state.inventory.berries <= 0) ||
-                        (this.state.inventory.berries >= 3 && this.state.berryRestockUsed);
+    const bushIsEmpty = this.state.resourcesDepleted || this.state.bushCurrentlyEmpty;
     
     if (bushIsEmpty) {
       soundManager.playForDurationWithFade('bush', 1500, 300);
@@ -3675,6 +3677,7 @@ export class VillageLedgerGame {
         soundManager.playBushSequence();
         const added = Math.min(3, 3 - this.state.inventory.berries);
         this.state.inventory.berries += added;
+        this.state.bushCurrentlyEmpty = false;
         this.state.berryRestockUsed = true;
         this.showInventoryPopup(`+${added} BERRIES!`, true);
         this.setMood('happy');
@@ -3684,6 +3687,7 @@ export class VillageLedgerGame {
             text: `I found ${added} more berries! I have ${this.state.inventory.berries} now. They look really good!`,
             onComplete: () => {
               if (this.state.inventory.berries >= 3) {
+                this.state.bushCurrentlyEmpty = true;
                 this.state.showChoice = true;
                 this.state.choiceOptions = [
                   {
@@ -3737,6 +3741,7 @@ export class VillageLedgerGame {
           }
         ]);
       } else if (this.state.inventory.berries >= 3) {
+        this.state.bushCurrentlyEmpty = true;
         this.queueDialogue([
           {
             speaker: 'YOU',
@@ -6904,51 +6909,6 @@ export class VillageLedgerGame {
     ctx.translate(-w / 2, -h / 2);
     ctx.globalAlpha = popupAlpha;
     
-    // Add sparkle particles - outer ring
-    const now = Date.now() / 1000;
-    const sparkleColors = ['#FFD700', '#FFA500', '#FFFFFF'];
-    for (let i = 0; i < 40; i++) {
-      const angle = (i / 40) * Math.PI * 2 + now;
-      const dist = 120 + Math.sin(now * 3 + i) * 60;
-      const sparkleX = w / 2 + Math.cos(angle) * dist;
-      const sparkleY = h / 2 + Math.sin(angle) * dist * 0.5;
-      const size = 4 + Math.sin(now * 5 + i * 0.5) * 3;
-      const color = sparkleColors[i % 3];
-      
-      ctx.fillStyle = color === '#FFD700' ? 'rgba(255,215,0,0.3)' : color === '#FFA500' ? 'rgba(255,165,0,0.3)' : 'rgba(255,255,255,0.3)';
-      ctx.globalAlpha = popupAlpha * 0.3;
-      ctx.beginPath();
-      ctx.arc(sparkleX, sparkleY, size * 2.5, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.globalAlpha = popupAlpha;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // Inner ring of smaller sparkles
-    for (let i = 0; i < 15; i++) {
-      const angle = (i / 15) * Math.PI * 2 - now * 1.5;
-      const dist = 60 + Math.sin(now * 4 + i) * 20;
-      const sparkleX = w / 2 + Math.cos(angle) * dist;
-      const sparkleY = h / 2 + Math.sin(angle) * dist * 0.5;
-      const size = 2 + Math.sin(now * 6 + i * 0.7) * 2;
-      const color = sparkleColors[i % 3];
-      
-      ctx.globalAlpha = popupAlpha * 0.25;
-      ctx.fillStyle = color === '#FFD700' ? 'rgba(255,215,0,0.25)' : color === '#FFA500' ? 'rgba(255,165,0,0.25)' : 'rgba(255,255,255,0.25)';
-      ctx.beginPath();
-      ctx.arc(sparkleX, sparkleY, size * 2.5, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.globalAlpha = popupAlpha;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    
     // Popup background with gradient effect
     const gradient = ctx.createLinearGradient(popupX, popupY, popupX, popupY + popupHeight);
     gradient.addColorStop(0, '#4A3728');
@@ -7057,6 +7017,53 @@ export class VillageLedgerGame {
     ctx.fillText('Continue', btnX + btnWidth / 2, btnY + 23);
     
     this.badgePopupButtonArea = { x: btnX, y: btnY, w: btnWidth, h: btnHeight };
+    
+    // Sparkle particles - drawn after badge content so they appear on top
+    const now = Date.now() / 1000;
+    const sparkleColors = ['#FFD700', '#FFA500', '#FFFFFF'];
+    const sparkleFade = animElapsed > 2 ? Math.max(0, 1 - (animElapsed - 2) / 1.5) : 1;
+    // Outer ring
+    for (let i = 0; i < 40; i++) {
+      const angle = (i / 40) * Math.PI * 2 + now;
+      const dist = 120 + Math.sin(now * 3 + i) * 60;
+      const sparkleX = w / 2 + Math.cos(angle) * dist;
+      const sparkleY = h / 2 + Math.sin(angle) * dist;
+      const size = 4 + Math.sin(now * 5 + i * 0.5) * 3;
+      const color = sparkleColors[i % 3];
+      
+      ctx.fillStyle = color === '#FFD700' ? 'rgba(255,215,0,0.3)' : color === '#FFA500' ? 'rgba(255,165,0,0.3)' : 'rgba(255,255,255,0.3)';
+      ctx.globalAlpha = popupAlpha * 0.3 * sparkleFade;
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, size * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.globalAlpha = popupAlpha * sparkleFade;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Inner ring of smaller sparkles
+    for (let i = 0; i < 15; i++) {
+      const angle = (i / 15) * Math.PI * 2 - now * 1.5;
+      const dist = 60 + Math.sin(now * 4 + i) * 20;
+      const sparkleX = w / 2 + Math.cos(angle) * dist;
+      const sparkleY = h / 2 + Math.sin(angle) * dist;
+      const size = 2 + Math.sin(now * 6 + i * 0.7) * 2;
+      const color = sparkleColors[i % 3];
+      
+      ctx.globalAlpha = popupAlpha * 0.25 * sparkleFade;
+      ctx.fillStyle = color === '#FFD700' ? 'rgba(255,215,0,0.25)' : color === '#FFA500' ? 'rgba(255,165,0,0.25)' : 'rgba(255,255,255,0.25)';
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, size * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.globalAlpha = popupAlpha * sparkleFade;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
     
     ctx.restore();
   }
@@ -9548,8 +9555,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   // 2. Berry bush uses sprite image instead of placeholder rectangle
   if (char.id === 'berryBush' && this.parallaxLayers.berryBush.naturalWidth > 0) {
-    const bushIsEmpty = this.state.resourcesDepleted || 
-                        (this.state.berryRestockUsed && this.state.inventory.berries <= 0);
+    const bushIsEmpty = this.state.resourcesDepleted || this.state.bushCurrentlyEmpty;
     const bushImg = (bushIsEmpty && this.parallaxLayers.bushNoBerries.naturalWidth > 0)
       ? this.parallaxLayers.bushNoBerries
       : this.parallaxLayers.berryBush;
@@ -11891,23 +11897,26 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             unlocked.push(btn.genre);
             localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
           }
+          // Stop current music immediately (not fade)
+          soundManager.stop('genreRemix');
+          soundManager.stop('partySong');
           soundManager.play('recordScratch');
-          soundManager.fadeOut('genreRemix', 500);
-          soundManager.fadeOut('partySong', 500);
           const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
           this.queueDialogue([{
             speaker: 'VILLAGE ELDER',
             text: "Give me just one second while I pull this out of my record bag...",
             onComplete: () => {
               soundManager.play('recordScratch');
-              soundManager.loadAndPlayGenre(genreUrl);
+              setTimeout(() => {
+                soundManager.loadAndPlayGenre(genreUrl);
+              }, 500);
               this.partySongEndTime = Date.now() + 240000;
               setTimeout(() => {
                 const dur = soundManager.getGenreRemixDuration();
                 if (dur > 0) {
                   this.partySongEndTime = Date.now() + dur;
                 }
-              }, 3000);
+              }, 3500);
             }
           }]);
         } else {
@@ -12371,6 +12380,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stoneIntroduced: false,
       berriesIntroduced: false,
       berryRestockUsed: false,
+      bushCurrentlyEmpty: false,
       slingshotIntroduced: true,
       ledgerEntries: [],
       dialogueQueue: [],
@@ -12543,6 +12553,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stoneIntroduced: false,
       berriesIntroduced: false,
       berryRestockUsed: false,
+      bushCurrentlyEmpty: false,
       slingshotIntroduced: true,
       ledgerEntries: [],
       dialogueQueue: [],

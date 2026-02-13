@@ -205,6 +205,8 @@ interface GameState {
   forceHutEntry: boolean;
   partyEnded: boolean;
   remixPlayed: boolean;
+  showSongChoice: boolean;
+  selectedGenre: string;
 }
 
 // Game Engine Class
@@ -359,7 +361,6 @@ export class VillageLedgerGame {
   private readonly ALL_BADGES = [
     { id: 'double_coincidence', name: 'Double Coincidence of Wants', description: 'You discovered the fundamental problem of barter — both traders must want exactly what the other has!', icon: 'trade' },
     { id: 'debt', name: 'Debt', description: 'You took on a debt — a promise to pay someone back later. But can promises always be trusted?', icon: 'scroll' },
-    { id: 'no_trust', name: 'No Trust, No Trade', description: 'Without proof, promises can be broken. Trust alone is not enough for trade to work.', icon: 'broken' },
     { id: 'the_ledger', name: 'The Ledger', description: 'A written record that everyone can see! The ledger keeps track of debts so no one can cheat.', icon: 'tablet' },
     { id: 'debt_settled', name: 'Debt Settled', description: 'All debts paid off! When debts are recorded and settled, everyone is happy.', icon: 'check' },
     { id: 'money_scholar', name: 'Money Scholar', description: 'You understand that money is really just a system for keeping track of who owes what!', icon: 'star' },
@@ -371,6 +372,7 @@ export class VillageLedgerGame {
   private badgeItemAreas: { x: number; y: number; w: number; h: number; idx: number }[] = [];
   private badgeDetailBackButton: { x: number; y: number; w: number; h: number } | null = null;
   private badgeTrayPanelBounds: { x: number; y: number; w: number; h: number } | null = null;
+  private songChoiceButtons: { x: number; y: number; w: number; h: number; genre: string }[] = [];
 
   private readonly BADGE_EDUCATIONAL_INFO: Record<string, { title: string; lesson: string; realWorld: string }> = {
     'Double Coincidence of Wants': {
@@ -382,11 +384,6 @@ export class VillageLedgerGame {
       title: 'Debt',
       lesson: 'A debt is a promise to pay someone back later. It lets people trade even when they don\'t have what the other person wants right now.',
       realWorld: 'When you borrow a book from a friend, you owe them — that\'s a debt. The problem is: what if you forget, or disagree about what was promised?'
-    },
-    'No Trust, No Trade': {
-      title: 'No Trust, No Trade',
-      lesson: 'Without a way to prove what was promised, people can argue about debts. Trust alone isn\'t enough when memory fails or people disagree.',
-      realWorld: 'Think about lending a toy to someone who says they never borrowed it. Without proof, there\'s no way to settle the argument fairly.'
     },
     'The Ledger': {
       title: 'The Ledger',
@@ -832,7 +829,9 @@ export class VillageLedgerGame {
       stormCountdownTimer: 0,
       forceHutEntry: false,
       partyEnded: false,
-      remixPlayed: false
+      remixPlayed: false,
+      showSongChoice: false,
+      selectedGenre: ''
     };
 
     // Setup event listeners
@@ -1108,6 +1107,12 @@ export class VillageLedgerGame {
     // Handle quiz touches (check before night transition block since quiz shows over night scene)
     if (this.state.showQuiz) {
       this.handleQuizTouch(x, y);
+      return;
+    }
+
+    // Handle song choice touches
+    if (this.state.showSongChoice) {
+      this.handleSongChoiceTouch(x, y);
       return;
     }
 
@@ -1421,6 +1426,8 @@ export class VillageLedgerGame {
         return;
       }
       this.state.stormCountdownActive = false;
+      soundManager.fadeOut('partySong', 3000);
+      soundManager.fadeOut('remixSong', 3000);
       
       // If roof needs fixing, fix it first, then trigger storm sequence
       if (!this.state.roofRepaired && hasWood) {
@@ -1870,13 +1877,7 @@ export class VillageLedgerGame {
             });
             dialogues.push({
               speaker: 'VILLAGE ELDER',
-              text: "When someone gives you something on credit, we carve the agreement into this stone. That way, no one can deny or forget what was promised.",
-              onComplete: () => {
-                this.awardBadge(
-                  'No Trust, No Trade',
-                  "Without proof, promises can be broken. That's why the village records every agreement - so trust is built on evidence, not just words!"
-                );
-              }
+              text: "When someone gives you something on credit, we carve the agreement into this stone. That way, no one can deny or forget what was promised."
             });
           }
           
@@ -1946,7 +1947,7 @@ export class VillageLedgerGame {
                         this.setMood('happy');
                         this.state.phase = 'loop2_got_wood';
                         this.state.escortingNPC = null;
-                        this.woodcutter.targetX = this.villageCenterX + 160;
+                        this.woodcutter.targetX = this.villageCenterX - 160;
                       }
                     }
                   ]);
@@ -1975,7 +1976,7 @@ export class VillageLedgerGame {
                 this.setMood('happy');
                 this.state.phase = 'loop2_got_wood';
                 this.state.escortingNPC = null;
-                this.woodcutter.targetX = this.villageCenterX + 160;
+                this.woodcutter.targetX = this.villageCenterX - 160;
               }
             }
           ]);
@@ -2237,12 +2238,21 @@ export class VillageLedgerGame {
       ]);
     } 
     else {
-      this.queueDialogue([
-        {
-          speaker: 'WOODCUTTER',
-          text: "Hello traveler! I can help you with wood if you need it."
-        }
-      ]);
+      if (this.state.woodcutterDebtRecorded && !this.state.woodcutterSettled) {
+        this.queueDialogue([
+          {
+            speaker: 'WOODCUTTER',
+            text: "Don't forget - you still owe me 1 Sharp Stone and 1 Fish! It's all recorded on the Stone Tablet."
+          }
+        ]);
+      } else {
+        this.queueDialogue([
+          {
+            speaker: 'WOODCUTTER',
+            text: "Hello traveler! I can help you with wood if you need it."
+          }
+        ]);
+      }
     }
   }
 
@@ -2310,7 +2320,7 @@ export class VillageLedgerGame {
                           this.showInventoryPopup('+1 WOOD');
                           this.setMood('happy');
                           this.state.phase = 'got_wood_need_stone';
-                          this.woodcutter.targetX = this.villageCenterX + 160;
+                          this.woodcutter.targetX = this.villageCenterX - 160;
                         }
                       );
                     }
@@ -2364,7 +2374,7 @@ export class VillageLedgerGame {
                           this.showInventoryPopup('+1 WOOD');
                           this.setMood('happy');
                           this.state.phase = 'got_wood_need_stone';
-                          this.woodcutter.targetX = this.villageCenterX + 160;
+                          this.woodcutter.targetX = this.villageCenterX - 160;
                         }
                       );
                     }
@@ -2418,7 +2428,7 @@ export class VillageLedgerGame {
                           this.showInventoryPopup('+1 WOOD');
                           this.setMood('happy');
                           this.state.phase = 'got_wood_need_stone';
-                          this.woodcutter.targetX = this.villageCenterX + 160;
+                          this.woodcutter.targetX = this.villageCenterX - 160;
                         }
                       );
                     }
@@ -2510,7 +2520,7 @@ export class VillageLedgerGame {
                             this.showInventoryPopup('+1 WOOD');
                             this.setMood('happy');
                             this.state.phase = 'got_wood_need_stone';
-                            this.woodcutter.targetX = this.villageCenterX + 160;
+                            this.woodcutter.targetX = this.villageCenterX - 160;
                           });
                         }
                       }]);
@@ -2796,7 +2806,7 @@ export class VillageLedgerGame {
                         this.setMood('happy');
                         this.state.phase = 'loop2_got_stone';
                         this.state.escortingNPC = null;
-                        this.stoneWorker.targetX = this.villageCenterX - 160;
+                        this.stoneWorker.targetX = this.villageCenterX + 160;
                       }
                     }
                   ]);
@@ -2823,7 +2833,7 @@ export class VillageLedgerGame {
                 this.setMood('happy');
                 this.state.phase = 'loop2_got_stone';
                 this.state.escortingNPC = null;
-                this.stoneWorker.targetX = this.villageCenterX - 160;
+                this.stoneWorker.targetX = this.villageCenterX + 160;
               }
             }
           ]);
@@ -3075,7 +3085,7 @@ export class VillageLedgerGame {
       this.showInventoryPopup('+1 SHARP STONE');
       this.setMood('happy');
       this.state.phase = 'got_stone_need_fish';
-      this.stoneWorker.targetX = this.villageCenterX - 160;
+      this.stoneWorker.targetX = this.villageCenterX + 160;
     };
 
     const awardBadgeThenCreditOffer = () => {
@@ -3487,7 +3497,41 @@ export class VillageLedgerGame {
         this.queueDialogue([
           {
             speaker: 'YOU',
-            text: `I found ${added} more berries! I have ${this.state.inventory.berries} now. Better not waste these...`
+            text: `I found ${added} more berries! I have ${this.state.inventory.berries} now. They look really good!`,
+            onComplete: () => {
+              if (this.state.inventory.berries >= 3) {
+                this.state.showChoice = true;
+                this.state.choiceOptions = [
+                  {
+                    text: "Eat some berries - I'm hungry!",
+                    action: () => {
+                      this.state.showChoice = false;
+                      this.state.inventory.berries -= 2;
+                      this.showInventoryPopup('-2 BERRIES', false);
+                      this.setMood('happy');
+                      this.queueDialogue([
+                        {
+                          speaker: 'YOU',
+                          text: "Mmm, those were tasty! I only have 1 berry left now..."
+                        }
+                      ]);
+                    }
+                  },
+                  {
+                    text: "No, I should save them",
+                    action: () => {
+                      this.state.showChoice = false;
+                      this.queueDialogue([
+                        {
+                          speaker: 'YOU',
+                          text: "I'll hold onto these for now. They might come in handy."
+                        }
+                      ]);
+                    }
+                  }
+                ];
+              }
+            }
           }
         ]);
         return;
@@ -3900,7 +3944,10 @@ export class VillageLedgerGame {
         dialogueLines.push(
           {
             speaker: 'VILLAGE ELDER',
-            text: "Let me see... The Woodcutter: 1 Fish. The Stone-worker: 2 Fish. All debts are recorded clearly!"
+            text: "Let me see... The Woodcutter: 1 Fish. The Stone-worker: 2 Fish. All debts are recorded clearly!",
+            onComplete: () => {
+              soundManager.play('reliefTrillSound');
+            }
           },
           {
             speaker: 'WOODCUTTER',
@@ -3963,8 +4010,9 @@ export class VillageLedgerGame {
               speaker: 'WOODCUTTER',
               text: "...Wait. The Ledger says 1 Stone and 1 Fish. I was wrong... I apologize.",
               onComplete: () => {
+                soundManager.play('reliefTrillSound');
                 this.state.elderVerified = true;
-                this.woodcutter.targetX = this.villageCenterX + 160;
+                this.woodcutter.targetX = this.villageCenterX - 160;
                 const hasStone = this.state.inventory.stone >= 1;
                 const hasFish = this.state.inventory.fish >= 1;
                 if (hasStone && hasFish) {
@@ -4121,8 +4169,9 @@ export class VillageLedgerGame {
               speaker: 'STONE-WORKER',
               text: "...Wait. The Ledger says 1 Wood and 2 Fish. I was wrong... I apologize.",
               onComplete: () => {
+                soundManager.play('reliefTrillSound');
                 this.state.elderVerified = true;
-                this.stoneWorker.targetX = this.villageCenterX - 160;
+                this.stoneWorker.targetX = this.villageCenterX + 160;
                 const hasWood = this.state.inventory.wood >= 1;
                 const hasFish = this.state.inventory.fish >= 2;
                 if (hasWood && hasFish) {
@@ -4861,24 +4910,18 @@ export class VillageLedgerGame {
       if (this.state.brawlTimer > 4 && this.state.brawlTimer <= 4.1) {
         this.state.showBrawl = false;
         this.state.phase = 'fail';
-        this.awardBadge(
-          'No Trust, No Trade',
-          'Without proof, promises can be broken. Trust alone is not enough for trade to work.',
+        this.showCheckpointQuiz(
+          'Quick Check!',
+          "Why did the villagers start fighting?",
+          ["They couldn't remember who owed what", "They didn't like each other"],
+          0,
+          "Without a record, everyone remembered the deals differently. Verbal promises aren't reliable!",
           () => {
-            this.showCheckpointQuiz(
-              'Quick Check!',
-              "Why did the villagers start fighting?",
-              ["They couldn't remember who owed what", "They didn't like each other"],
-              0,
-              "Without a record, everyone remembered the deals differently. Verbal promises aren't reliable!",
-              () => {
-                if (!this.booFailureTriggered) {
-                  this.booFailureTriggered = true;
-                  soundManager.playFailureThenBoo();
-                }
-                this.state.showFail = true;
-              }
-            );
+            if (!this.booFailureTriggered) {
+              this.booFailureTriggered = true;
+              soundManager.playFailureThenBoo();
+            }
+            this.state.showFail = true;
           }
         );
       }
@@ -5175,10 +5218,12 @@ export class VillageLedgerGame {
     this.state.showThunderstorm = true;
     this.state.thunderstormTimer = 0;
     soundManager.play('thunder');
+    soundManager.play('rain');
 
     setTimeout(() => {
       this.state.showThunderstorm = false;
       this.stormFailureActive = false;
+      soundManager.stop('rain');
       this.queueDialogue([
         {
           speaker: 'YOU',
@@ -5228,7 +5273,7 @@ export class VillageLedgerGame {
     this.woodcutter.isWalking = false;
     this.stoneWorker.isWalking = false;
     this.fisherman.isWalking = false;
-    this.villageElder.y = (this.logicalHeight - this.groundHeight - this.dialogueBoxHeight) - this.villageElder.height;
+    this.villageElder.y = (this.logicalHeight - this.groundHeight - this.dialogueBoxHeight) - this.villageElder.height + 12;
     this.villageElder.bobOffset = 0;
     this.state.phase = 'complete_success';
     this.state.stormCountdownActive = true;
@@ -5285,7 +5330,7 @@ export class VillageLedgerGame {
     
     this.woodcutter.targetX = this.villageCenterX - 160;
     this.stoneWorker.targetX = this.villageCenterX + 120;
-    this.fisherman.targetX = this.villageCenterX + 200;
+    this.fisherman.targetX = this.villageCenterX + 500;
   }
   
   private updateSlingshotGame(dt: number): void {
@@ -5859,7 +5904,7 @@ export class VillageLedgerGame {
     const danceSway = 40;
     this.woodcutter.x = (cx - 160) + Math.sin(t * 3.0) * danceSway;
     this.stoneWorker.x = (cx + 120) + Math.sin(t * 2.5 + 2) * danceSway;
-    this.fisherman.x = (cx + 200) + Math.sin(t * 2.8 + 4) * danceSway;
+    this.fisherman.x = (cx + 500) + Math.sin(t * 2.8 + 4) * danceSway;
     
     this.woodcutter.targetX = undefined;
     this.stoneWorker.targetX = undefined;
@@ -6137,10 +6182,9 @@ export class VillageLedgerGame {
 
       if (progress > 0.1) {
         const darkProgress = Math.min(1, (progress - 0.1) / 0.9);
-        const overlayHeight = 30 + darkProgress * 40;
-        ctx.globalAlpha = darkProgress * 0.6;
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(0, 0, this.logicalWidth, overlayHeight);
+        ctx.globalAlpha = darkProgress * 0.4;
+        ctx.fillStyle = '#0a0a1e';
+        ctx.fillRect(0, 0, this.logicalWidth, this.logicalHeight);
         ctx.globalAlpha = 1;
       }
 
@@ -6150,19 +6194,23 @@ export class VillageLedgerGame {
       const pulseSpeed = 300 - urgency * 200;
       const pulse = 0.6 + 0.4 * Math.sin(Date.now() / pulseSpeed);
       const fontSize = this.state.stormCountdownTimer <= 10 ?
-        16 + (1 - this.state.stormCountdownTimer / 10) * 8 : 16;
+        22 + (1 - this.state.stormCountdownTimer / 10) * 14 : 22;
       ctx.font = `bold ${fontSize}px ${this.uiFont}`;
+      ctx.shadowColor = 'rgba(220, 38, 38, 0.8)';
+      ctx.shadowBlur = 10 + urgency * 20;
       ctx.fillStyle = `rgba(220, 38, 38, ${pulse})`;
       ctx.fillText(countdownText, this.logicalWidth / 2, 80);
-      ctx.font = `12px ${this.uiFont}`;
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.font = `14px ${this.uiFont}`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.fillText('Get back to your hut!', this.logicalWidth / 2, 100);
+      ctx.fillText('Get back to your hut!', this.logicalWidth / 2, 115);
 
       const rainProgress = Math.max(0, progress - 0.3) / 0.7;
       if (rainProgress > 0) {
         ctx.strokeStyle = `rgba(180, 200, 255, ${0.3 * rainProgress})`;
         ctx.lineWidth = 1;
-        const rainCount = Math.floor(50 * rainProgress);
+        const rainCount = Math.floor(120 * rainProgress);
         const t = Date.now() / 1000;
         for (let i = 0; i < rainCount; i++) {
           const seed = i * 1234.5678;
@@ -6231,6 +6279,11 @@ export class VillageLedgerGame {
     // Draw quiz review screen
     if (this.state.showQuizReview) {
       this.drawQuizReview(ctx);
+    }
+
+    // Draw song choice screen
+    if (this.state.showSongChoice) {
+      this.drawSongChoice(ctx);
     }
 
     // Draw success screen if complete
@@ -6460,9 +6513,9 @@ export class VillageLedgerGame {
     const scale = 0.5 + 0.5 * eased;
     const popupAlpha = eased;
     
-    // Popup dimensions - increased height for text and button spacing
-    const popupWidth = 420;
-    const popupHeight = 360;
+    // Popup dimensions
+    const popupWidth = 340;
+    const popupHeight = 280;
     const popupX = (w - popupWidth) / 2;
     const popupY = (h - popupHeight) / 2;
     
@@ -6477,16 +6530,46 @@ export class VillageLedgerGame {
     ctx.translate(-w / 2, -h / 2);
     ctx.globalAlpha = popupAlpha;
     
-    // Add sparkle particles
+    // Add sparkle particles - outer ring
     const now = Date.now() / 1000;
-    for (let i = 0; i < 20; i++) {
-      const angle = (i / 20) * Math.PI * 2 + now;
-      const dist = 180 + Math.sin(now * 3 + i) * 30;
+    const sparkleColors = ['#FFD700', '#FFA500', '#FFFFFF'];
+    for (let i = 0; i < 40; i++) {
+      const angle = (i / 40) * Math.PI * 2 + now;
+      const dist = 120 + Math.sin(now * 3 + i) * 60;
       const sparkleX = w / 2 + Math.cos(angle) * dist;
       const sparkleY = h / 2 + Math.sin(angle) * dist * 0.5;
-      const size = 3 + Math.sin(now * 5 + i * 0.5) * 2;
+      const size = 4 + Math.sin(now * 5 + i * 0.5) * 3;
+      const color = sparkleColors[i % 3];
       
-      ctx.fillStyle = '#FFD700';
+      ctx.fillStyle = color === '#FFD700' ? 'rgba(255,215,0,0.3)' : color === '#FFA500' ? 'rgba(255,165,0,0.3)' : 'rgba(255,255,255,0.3)';
+      ctx.globalAlpha = popupAlpha * 0.3;
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, size * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.globalAlpha = popupAlpha;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Inner ring of smaller sparkles
+    for (let i = 0; i < 15; i++) {
+      const angle = (i / 15) * Math.PI * 2 - now * 1.5;
+      const dist = 60 + Math.sin(now * 4 + i) * 20;
+      const sparkleX = w / 2 + Math.cos(angle) * dist;
+      const sparkleY = h / 2 + Math.sin(angle) * dist * 0.5;
+      const size = 2 + Math.sin(now * 6 + i * 0.7) * 2;
+      const color = sparkleColors[i % 3];
+      
+      ctx.globalAlpha = popupAlpha * 0.25;
+      ctx.fillStyle = color === '#FFD700' ? 'rgba(255,215,0,0.25)' : color === '#FFA500' ? 'rgba(255,165,0,0.25)' : 'rgba(255,255,255,0.25)';
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, size * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.globalAlpha = popupAlpha;
+      ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
       ctx.fill();
@@ -6507,15 +6590,15 @@ export class VillageLedgerGame {
     ctx.stroke();
     
     // "Badge Earned!" header
-    ctx.font = `bold 24px ${this.uiFont}`;
+    ctx.font = `bold 20px ${this.uiFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFD700';
     ctx.fillText('Badge Earned!', popupX + popupWidth / 2, popupY + 40);
     
     // Badge icon (star/medal shape)
     const badgeX = popupX + popupWidth / 2;
-    const badgeY = popupY + 90;
-    const badgeSize = 40;
+    const badgeY = popupY + 70;
+    const badgeSize = 30;
     
     // Draw star shape
     ctx.fillStyle = '#FFD700';
@@ -6534,12 +6617,12 @@ export class VillageLedgerGame {
     ctx.stroke();
     
     // Badge name
-    ctx.font = `bold 18px ${this.uiFont}`;
+    ctx.font = `bold 15px ${this.uiFont}`;
     ctx.fillStyle = '#F5DEB3';
-    ctx.fillText(this.state.pendingBadge.name, popupX + popupWidth / 2, popupY + 150);
+    ctx.fillText(this.state.pendingBadge.name, popupX + popupWidth / 2, popupY + 115);
     
     // Badge description (word wrap) - centered between name and Continue button
-    ctx.font = `14px ${this.uiFont}`;
+    ctx.font = `12px ${this.uiFont}`;
     ctx.fillStyle = '#C4A77D';
     const desc = this.state.pendingBadge.description;
     const maxWidth = popupWidth - 40;
@@ -6559,8 +6642,8 @@ export class VillageLedgerGame {
       }
     });
     const descTotalHeight = descLineCount * 20;
-    const nameBottomY = popupY + 160;
-    const btnTopY = popupY + popupHeight - 55;
+    const nameBottomY = popupY + 125;
+    const btnTopY = popupY + popupHeight - 45;
     const descStartY = nameBottomY + (btnTopY - nameBottomY - descTotalHeight) / 2 + 14;
     
     let line = '';
@@ -6582,10 +6665,10 @@ export class VillageLedgerGame {
     }
     
     // Continue button
-    const btnWidth = 120;
-    const btnHeight = 40;
+    const btnWidth = 100;
+    const btnHeight = 35;
     const btnX = popupX + (popupWidth - btnWidth) / 2;
-    const btnY = popupY + popupHeight - 55;
+    const btnY = popupY + popupHeight - 45;
     
     ctx.fillStyle = '#22C55E';
     ctx.beginPath();
@@ -6595,9 +6678,9 @@ export class VillageLedgerGame {
     ctx.lineWidth = 2;
     ctx.stroke();
     
-    ctx.font = `bold 16px ${this.uiFont}`;
+    ctx.font = `bold 14px ${this.uiFont}`;
     ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('Continue', btnX + btnWidth / 2, btnY + 26);
+    ctx.fillText('Continue', btnX + btnWidth / 2, btnY + 23);
     
     this.badgePopupButtonArea = { x: btnX, y: btnY, w: btnWidth, h: btnHeight };
     
@@ -7046,12 +7129,33 @@ export class VillageLedgerGame {
         ctx.fill();
       }
 
+      const worldXPositions = [
+        this.villageCenterX - 300,
+        this.villageCenterX + 300,
+        this.villageCenterX - 200,
+        this.villageCenterX + 200
+      ];
       for (let i = 0; i < 4; i++) {
         const isRight = (i % 2 === 1);
         const isTop = (i < 2);
-        const cornerX = isRight ? w : 0;
+        const cornerScreenX = worldXPositions[i] - this.cameraX;
         const cornerY = isTop ? 0 : groundY;
-        
+
+        const fixtureW = 20;
+        const fixtureH = 12;
+        const hueBase = (at * 50 + i * 90) % 360;
+        ctx.fillStyle = '#333';
+        ctx.beginPath();
+        ctx.roundRect(cornerScreenX - fixtureW / 2, cornerY - (isTop ? 0 : fixtureH), fixtureW, fixtureH, 3);
+        ctx.fill();
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = `hsla(${hueBase}, 100%, 70%, 0.8)`;
+        ctx.beginPath();
+        ctx.arc(cornerScreenX, cornerY - (isTop ? -6 : 6), 4, 0, Math.PI * 2);
+        ctx.fill();
+
         for (let beam = 0; beam < 3; beam++) {
           const sweepAngle = Math.sin(at * 1.8 + i * 1.2 + beam * 0.8) * 0.4;
           let baseAngle: number;
@@ -7062,20 +7166,20 @@ export class VillageLedgerGame {
           
           const angle = baseAngle + sweepAngle;
           const beamLen = 250 + beam * 40;
-          let endX = cornerX + Math.cos(angle) * beamLen;
+          let endX = cornerScreenX + Math.cos(angle) * beamLen;
           let endY = cornerY + Math.sin(angle) * beamLen;
           
           endX = Math.max(0, Math.min(w, endX));
           endY = Math.max(0, Math.min(groundY, endY));
           
           const hue = (at * 50 + i * 90 + beam * 30) % 360;
-          const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
+          const cornerGrad = ctx.createLinearGradient(cornerScreenX, cornerY, endX, endY);
           cornerGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.35)`);
           cornerGrad.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
           ctx.strokeStyle = cornerGrad;
           ctx.lineWidth = 4;
           ctx.beginPath();
-          ctx.moveTo(cornerX, cornerY);
+          ctx.moveTo(cornerScreenX, cornerY);
           ctx.lineTo(endX, endY);
           ctx.stroke();
         }
@@ -7325,16 +7429,14 @@ export class VillageLedgerGame {
       }
     }
     
-    // ── CONFETTI (screen-fixed, full width, does NOT track camera) ──
+    // ── CONFETTI (world-relative, spans full world width) ──
     ctx.save();
-    const currentTransform = ctx.getTransform();
-    ctx.setTransform(currentTransform.a, 0, 0, currentTransform.d, 0, 0);
     
     const confettiColors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#9B59B6', '#2ECC71', '#FF69B4', '#FF4444', '#44AAFF'];
     const confettiCount = 100;
     for (let i = 0; i < confettiCount; i++) {
       const seed = i * 137.5;
-      const screenXPos = (seed * 7.3 + i * 31.7) % w;
+      const screenXPos = (seed * 7.3 + i * 31.7) % this.worldWidth;
       const baseY = (seed * 3.7 + i * 17.3) % (groundY * 2);
       const fallSpeed = 60 + (i % 7) * 20;
       const driftAmplitude = 15 + (i % 5) * 8;
@@ -7458,7 +7560,7 @@ export class VillageLedgerGame {
     ctx.strokeStyle = 'rgba(150, 180, 220, 0.6)';
     ctx.lineWidth = 1;
     const rainSpeed = 800;
-    const rainCount = 100;
+    const rainCount = 200;
     for (let i = 0; i < rainCount; i++) {
       const rainX = (i * 37 + t * rainSpeed * 0.3) % (w + 100) - 50;
       const rainY = (i * 53 + t * rainSpeed) % (h + 50) - 25;
@@ -8265,11 +8367,11 @@ export class VillageLedgerGame {
         const treesFarYOffset = h - this.dialogueBoxHeight - treesFarH + 55;
         const treesFarScreenX = -treesFarOffset;
         ctx.save();
-        ctx.globalAlpha = 0.85;
+        ctx.globalAlpha = 1.0;
         ctx.drawImage(this.parallaxLayers.treesFar, 0, 0, treesFarW, treesFarH,
           treesFarScreenX, treesFarYOffset, treesFarDrawWidth, treesFarH);
         if (this.state.nightBgCrossfade > 0 && this.parallaxLayers.treesFarNight.naturalWidth > 0) {
-          ctx.globalAlpha = this.state.nightBgCrossfade * 0.85;
+          ctx.globalAlpha = this.state.nightBgCrossfade;
           const nightW = this.parallaxLayers.treesFarNight.naturalWidth;
           const nightH = this.parallaxLayers.treesFarNight.naturalHeight;
           ctx.drawImage(this.parallaxLayers.treesFarNight, 0, 0, nightW, nightH,
@@ -8288,11 +8390,11 @@ export class VillageLedgerGame {
         const treesCloseYOffset = h - this.dialogueBoxHeight - treesCloseH + 55;
         const treesCloseScreenX = -treesCloseOffset;
         ctx.save();
-        ctx.globalAlpha = 0.9;
+        ctx.globalAlpha = 1.0;
         ctx.drawImage(this.parallaxLayers.treesClose, 0, 0, treesCloseW, treesCloseH,
           treesCloseScreenX, treesCloseYOffset, treesCloseDrawWidth, treesCloseH);
         if (this.state.nightBgCrossfade > 0 && this.parallaxLayers.treesCloseNight.naturalWidth > 0) {
-          ctx.globalAlpha = this.state.nightBgCrossfade * 0.9;
+          ctx.globalAlpha = this.state.nightBgCrossfade;
           const nightW = this.parallaxLayers.treesCloseNight.naturalWidth;
           const nightH = this.parallaxLayers.treesCloseNight.naturalHeight;
           ctx.drawImage(this.parallaxLayers.treesCloseNight, 0, 0, nightW, nightH,
@@ -10793,17 +10895,102 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private reviewPrevButton: { x: number; y: number; w: number; h: number } | null = null;
   private reviewNextButton: { x: number; y: number; w: number; h: number } | null = null;
   
+  private drawSongChoice(ctx: CanvasRenderingContext2D): void {
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.fillRect(0, 0, w, h);
+    
+    const cardW = Math.min(400, w - 40);
+    const cardH = 320;
+    const cardX = (w - cardW) / 2;
+    const cardY = (h - cardH) / 2;
+    
+    const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
+    gradient.addColorStop(0, '#4A3728');
+    gradient.addColorStop(1, '#2D1B0E');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    
+    ctx.font = `bold 18px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('Choose Your Celebration Song!', w / 2, cardY + 35);
+    
+    ctx.font = `12px ${this.uiFont}`;
+    ctx.fillStyle = '#C4A77D';
+    ctx.fillText('Pick a genre for your victory remix', w / 2, cardY + 55);
+    
+    const genres = ['Hip-Hop', 'Rock', 'K-Pop', 'Funk'];
+    const genreColors = ['#FF6B6B', '#9B59B6', '#4ECDC4', '#FFD700'];
+    const btnW = 140;
+    const btnH = 80;
+    const gapX = 20;
+    const gapY = 20;
+    const gridStartX = cardX + (cardW - btnW * 2 - gapX) / 2;
+    const gridStartY = cardY + 80;
+    
+    this.songChoiceButtons = [];
+    
+    genres.forEach((genre, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const bx = gridStartX + col * (btnW + gapX);
+      const by = gridStartY + row * (btnH + gapY);
+      
+      this.songChoiceButtons.push({ x: bx, y: by, w: btnW, h: btnH, genre });
+      
+      ctx.fillStyle = genreColors[i];
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, btnW, btnH, 12);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      
+      ctx.strokeStyle = genreColors[i];
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.font = `24px ${this.uiFont}`;
+      ctx.fillStyle = genreColors[i];
+      ctx.textAlign = 'center';
+      ctx.fillText('\u266A', bx + btnW / 2, by + 35);
+      
+      ctx.font = `bold 14px ${this.uiFont}`;
+      ctx.fillStyle = '#F5DEB3';
+      ctx.fillText(genre, bx + btnW / 2, by + 60);
+    });
+  }
+
+  private handleSongChoiceTouch(x: number, y: number): void {
+    for (const btn of this.songChoiceButtons) {
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.state.selectedGenre = btn.genre;
+        this.state.showSongChoice = false;
+        this.state.showNightTransition = false;
+        this.state.showSuccess = true;
+        this.state.phase = 'complete';
+        soundManager.fadeOut('ambientNight', 1000);
+        soundManager.play('remixSong');
+        soundManager.play('buttonClick');
+        return;
+      }
+    }
+  }
+
   private handleQuizReviewTouch(x: number, y: number): void {
     // Check continue button
     if (this.reviewContinueButton) {
       const btn = this.reviewContinueButton;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.state.showQuizReview = false;
-        this.state.showNightTransition = false;
-        this.state.showSuccess = true;
-        this.state.phase = 'complete';
-        // Fade out ambient night when quiz completes
-        soundManager.fadeOut('ambientNight', 1000);
+        this.state.showSongChoice = true;
         return;
       }
     }
@@ -10923,7 +11110,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Badge summary card - taller for badge grid
     const cardW = Math.min(520, w - 40);
     const hasChampion = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE;
-    const cardH = Math.min(hasChampion ? 510 : 480, h - 30);
+    const reflectionAnswer = localStorage.getItem('makingMoney_moneyAnswer');
+    const hasReflection = !!reflectionAnswer;
+    let baseCardH = hasChampion ? 510 : 480;
+    if (hasReflection) baseCardH += 80;
+    const cardH = Math.min(baseCardH, h - 30);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
     
@@ -11069,6 +11260,57 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = '#A89070';
     ctx.textAlign = 'center';
     ctx.fillText('Tap the badge icon to learn more about each concept', w / 2, hintY);
+
+    // Reflection comparison - "Your Journey"
+    if (hasReflection) {
+      const reflY = hintY + 18;
+      const reflBoxW = cardW - 40;
+      const reflBoxX = cardX + 20;
+      
+      // Divider line
+      ctx.strokeStyle = 'rgba(196, 167, 125, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(reflBoxX, reflY);
+      ctx.lineTo(reflBoxX + reflBoxW, reflY);
+      ctx.stroke();
+      
+      // Label
+      ctx.font = `bold 10px ${this.uiFont}`;
+      ctx.fillStyle = '#FFD700';
+      ctx.textAlign = 'center';
+      ctx.fillText('YOUR JOURNEY', w / 2, reflY + 18);
+      
+      // "Before" section
+      ctx.font = `8px ${this.uiFont}`;
+      ctx.fillStyle = '#A89070';
+      ctx.textAlign = 'left';
+      ctx.fillText('Before playing, you said:', reflBoxX + 5, reflY + 35);
+      
+      ctx.font = `9px ${this.uiFont}`;
+      ctx.fillStyle = '#F5DEB3';
+      let displayAnswer = reflectionAnswer!;
+      if (displayAnswer.length > 80) {
+        displayAnswer = displayAnswer.substring(0, 77) + '...';
+      }
+      const answerMaxW = reflBoxW - 10;
+      const answerWords = displayAnswer.split(' ');
+      let answerLine = '';
+      let answerLineY = reflY + 50;
+      for (const word of answerWords) {
+        const testLine = answerLine + word + ' ';
+        if (ctx.measureText(testLine).width > answerMaxW && answerLine !== '') {
+          ctx.fillText(answerLine.trim(), reflBoxX + 5, answerLineY);
+          answerLine = word + ' ';
+          answerLineY += 13;
+        } else {
+          answerLine = testLine;
+        }
+      }
+      if (answerLine.trim()) {
+        ctx.fillText(answerLine.trim(), reflBoxX + 5, answerLineY);
+      }
+    }
 
     // Play Again button
     const btnW = 180;
@@ -11244,7 +11486,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stormCountdownTimer: 0,
       forceHutEntry: false,
       partyEnded: false,
-      remixPlayed: false
+      remixPlayed: false,
+      showSongChoice: false,
+      selectedGenre: ''
     };
     this.currentQuizQuestion = 0;
     this.playAgainButton = null;
@@ -11258,7 +11502,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
     this.villageElder.x = 1568;
-    this.villageElder.y = (this.logicalHeight - this.groundHeight - this.dialogueBoxHeight) - this.villageElder.height;
+    this.villageElder.y = (this.logicalHeight - this.groundHeight - this.dialogueBoxHeight) - this.villageElder.height + 12;
     this.villageElder.targetX = undefined;
     
     // Reset animation/sound flags
@@ -11404,7 +11648,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       stormCountdownTimer: 0,
       forceHutEntry: false,
       partyEnded: false,
-      remixPlayed: false
+      remixPlayed: false,
+      showSongChoice: false,
+      selectedGenre: ''
     };
     this.state.badges = savedBadges;
     this.state.lastBadgeEarnedTime = savedLastBadgeTime;
@@ -11417,7 +11663,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
     this.villageElder.x = 1568;
-    this.villageElder.y = (this.logicalHeight - this.groundHeight - this.dialogueBoxHeight) - this.villageElder.height;
+    this.villageElder.y = (this.logicalHeight - this.groundHeight - this.dialogueBoxHeight) - this.villageElder.height + 12;
     this.villageElder.targetX = undefined;
     
     // Reset animation/sound flags for loop 2

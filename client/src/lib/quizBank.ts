@@ -219,8 +219,87 @@ export const ALL_QUESTIONS: QuizQuestion[] = [
     explanation: "When many people can see and check the records, it becomes very hard for anyone to cheat without getting caught. That's the power of decentralization!",
     hint: "Think about what happens when MANY eyes are watching the records...",
     category: 'extra_credit'
+  },
+  {
+    id: 16,
+    question: "What happened when the villagers tried to trade using just verbal promises?",
+    options: [
+      "A: Everyone was happy and trades went smoothly",
+      "B: People forgot or disagreed about what was promised",
+      "C: The village elder banned all trading",
+      "D: They invented coins right away"
+    ],
+    correct: 1,
+    explanation: "Without written records, people forgot what they promised or remembered differently. This led to arguments and broken trust!",
+    hint: "Think about what happened in the village when promises were only spoken...",
+    category: 'debt'
+  },
+  {
+    id: 17,
+    question: "Why did the villagers carve agreements into a stone tablet instead of just remembering them?",
+    options: [
+      "A: They liked the sound of chiseling",
+      "B: Written records can't be forgotten or easily disputed",
+      "C: The elder needed something to do",
+      "D: Stones are prettier than paper"
+    ],
+    correct: 1,
+    explanation: "Carving agreements into stone creates a permanent record that everyone can see and nobody can deny. It solves the problem of forgetful or dishonest promises!",
+    hint: "What's the advantage of writing something down versus just remembering it?",
+    category: 'ledger'
+  },
+  {
+    id: 18,
+    question: "In the village, what makes the Stone Tablet work as a fair system?",
+    options: [
+      "A: Only the elder can read it",
+      "B: It's placed where everyone can see it and verify the records",
+      "C: It's very heavy so no one can steal it",
+      "D: It's made of expensive stone"
+    ],
+    correct: 1,
+    explanation: "The Stone Tablet works because it's in a public place where any villager can check the records. Transparency builds trust!",
+    hint: "Think about where the Stone Tablet is placed and who can look at it...",
+    category: 'ledger'
+  },
+  {
+    id: 19,
+    question: "What is the main reason barter systems eventually led people to invent money?",
+    options: [
+      "A: People got bored of trading",
+      "B: Barter required too many perfect matches between traders",
+      "C: Kings wanted to collect taxes",
+      "D: Animals couldn't be traded"
+    ],
+    correct: 1,
+    explanation: "Barter was slow and difficult because you always needed someone who wanted exactly what you had. Money solved this by being universally accepted!",
+    hint: "Think about the biggest frustration with barter...",
+    category: 'dcw'
+  },
+  {
+    id: 20,
+    question: "If the fisherman owes the woodcutter 5 logs worth of fish, who keeps track of that agreement?",
+    options: [
+      "A: Nobody - they just hope everyone remembers",
+      "B: The agreement is carved into the Stone Tablet for everyone to see",
+      "C: Only the fisherman writes it down secretly",
+      "D: They flip a coin to decide"
+    ],
+    correct: 1,
+    explanation: "The Stone Tablet records debts publicly so both parties and the whole village can verify what was agreed. No more 'I forgot!'",
+    hint: "What tool did the village create to solve the problem of forgotten promises?",
+    category: 'ledger'
   }
 ];
+
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
 
 export function getDJQuizQuestions(playCount: number = 1): QuizQuestion[] {
   if (playCount <= 1) {
@@ -247,12 +326,26 @@ export function getBackupDJQuestion(usedIds: number[]): QuizQuestion | null {
 }
 
 export function getFinalQuizQuestions(playCount: number = 1): QuizQuestion[] {
+  const picked: QuizQuestion[] = [];
+  
+  const dcwQuestions = shuffleArray(ALL_QUESTIONS.filter(q => q.category === 'dcw'));
+  const debtQuestions = shuffleArray(ALL_QUESTIONS.filter(q => q.category === 'debt'));
   let ledgerQuestions = ALL_QUESTIONS.filter(q => q.category === 'ledger');
+  
   if (playCount <= 1) {
     ledgerQuestions = ledgerQuestions.filter(q => q.id !== 8 && q.id !== 9 && q.id !== 10);
   }
-  const extraCreditQuestions = ALL_QUESTIONS.filter(q => q.category === 'extra_credit');
-  const shuffled = extraCreditQuestions.sort(() => Math.random() - 0.5);
-  const bonusQuestion = shuffled[0];
-  return [...ledgerQuestions, bonusQuestion];
+  ledgerQuestions = shuffleArray(ledgerQuestions);
+  
+  const extraCreditQuestions = shuffleArray(ALL_QUESTIONS.filter(q => q.category === 'extra_credit'));
+  
+  picked.push(dcwQuestions[0]);
+  picked.push(debtQuestions[0]);
+  picked.push(ledgerQuestions[0]);
+  if (ledgerQuestions.length > 1) {
+    picked.push(ledgerQuestions[1]);
+  }
+  picked.push(extraCreditQuestions[0]);
+  
+  return picked;
 }

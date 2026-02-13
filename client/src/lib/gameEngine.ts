@@ -172,6 +172,7 @@ interface GameState {
     vx: number; vy: number;
     active: boolean;
     radius: number;
+    hasRicocheted?: boolean;
   }>;
   slingshotAiming: boolean;
   slingshotLocked: boolean;
@@ -948,6 +949,7 @@ export class VillageLedgerGame {
   private handleTouchStart(e: TouchEvent): void {
     e.preventDefault();
     soundManager.init();
+    soundManager.resumeContext();
     if (e.touches.length > 0) {
       const touch = e.touches[0];
       this.processTouchStart(touch.clientX, touch.clientY);
@@ -969,6 +971,7 @@ export class VillageLedgerGame {
 
   private handleMouseDown(e: MouseEvent): void {
     soundManager.init();
+    soundManager.resumeContext();
     this.processTouchStart(e.clientX, e.clientY);
   }
 
@@ -5784,22 +5787,42 @@ export class VillageLedgerGame {
             proj.x = screenBX + nx * (b.radius + proj.radius + 2);
             proj.y = b.y + ny * (b.radius + proj.radius + 2);
           } else {
-            const chainPopped = this.chainPopBalloons(b);
-            const points = chainPopped * 10 + chainPopped * chainPopped * 5;
-            this.state.slingshotScore += points;
-            this.state.slingshotCombo++;
-            if (this.state.slingshotCombo > this.state.slingshotMaxCombo) {
-              this.state.slingshotMaxCombo = this.state.slingshotCombo;
+            const isRicochet = !proj.hasRicocheted && Math.random() < 0.08;
+            if (isRicochet) {
+              soundManager.play('balloonBop');
+              const nx = dx / dist;
+              const ny = dy / dist;
+              proj.vx = -proj.vx * 0.6 + nx * 80;
+              proj.vy = -proj.vy * 0.6 + ny * 80;
+              proj.x = screenBX + nx * (b.radius + proj.radius + 2);
+              proj.y = b.y + ny * (b.radius + proj.radius + 2);
+              proj.hasRicocheted = true;
+            } else if (proj.hasRicocheted && Math.random() < 0.5) {
+              soundManager.play('balloonBop');
+              const nx = dx / dist;
+              const ny = dy / dist;
+              proj.vx = -proj.vx * 0.3;
+              proj.vy = -proj.vy * 0.3;
+              proj.x = screenBX + nx * (b.radius + proj.radius + 2);
+              proj.y = b.y + ny * (b.radius + proj.radius + 2);
+            } else {
+              const chainPopped = this.chainPopBalloons(b);
+              const points = chainPopped * 10 + chainPopped * chainPopped * 5;
+              this.state.slingshotScore += points;
+              this.state.slingshotCombo++;
+              if (this.state.slingshotCombo > this.state.slingshotMaxCombo) {
+                this.state.slingshotMaxCombo = this.state.slingshotCombo;
+              }
+              this.state.slingshotFloatingTexts.push({
+                x: b.x, y: b.y,
+                text: `+${points}`,
+                timer: 0,
+              });
+              const popSound = Math.random() > 0.5 ? 'balloonPop1' : 'balloonPop2';
+              soundManager.play(popSound);
+              proj.active = false;
+              hit = true;
             }
-            this.state.slingshotFloatingTexts.push({
-              x: b.x, y: b.y,
-              text: `+${points}`,
-              timer: 0,
-            });
-            const popSound = Math.random() > 0.5 ? 'balloonPop1' : 'balloonPop2';
-            soundManager.play(popSound);
-            proj.active = false;
-            hit = true;
           }
           break;
         }
@@ -5816,6 +5839,7 @@ export class VillageLedgerGame {
         if (dbDist < discoBallR + proj.radius) {
           const hitSounds = ['discoBallHit1', 'discoBallHit2', 'discoBallHit3'] as const;
           soundManager.play(hitSounds[Math.floor(Math.random() * hitSounds.length)]);
+          soundManager.playRandomDJTransition();
           this.state.slingshotScore += 25;
           this.state.slingshotFloatingTexts.push({
             x: discoBallWorldX, y: discoBallY,
@@ -5836,7 +5860,11 @@ export class VillageLedgerGame {
           const nDy = proj.y - npcCenterY;
           const nDist = Math.sqrt(nDx * nDx + nDy * nDy);
           if (nDist < 25 + proj.radius) {
-            soundManager.play('npcHit');
+            if (npc === this.villageElder) {
+              soundManager.playRandomRecordScratch();
+            } else {
+              soundManager.play('npcHit');
+            }
             this.state.slingshotScore += 5;
             this.state.slingshotFloatingTexts.push({
               x: npc.x, y: npcCenterY,
@@ -5858,8 +5886,7 @@ export class VillageLedgerGame {
         const boothH = 75;
         if (proj.x >= boothLeft && proj.x <= boothLeft + boothW &&
             proj.y >= boothTop && proj.y <= boothTop + boothH) {
-          const boothHitSounds = ['basicHit1', 'basicHit2'] as const;
-          soundManager.play(boothHitSounds[Math.floor(Math.random() * boothHitSounds.length)]);
+          soundManager.playRandomRecordScratch();
           this.state.slingshotScore += 10;
           this.state.slingshotFloatingTexts.push({
             x: this.villageElder.x, y: boothTop + boothH / 2,
@@ -6288,6 +6315,7 @@ export class VillageLedgerGame {
           vy: -pullY * launchPower,
           active: true,
           radius: 6,
+          hasRicocheted: false,
         });
         this.state.slingshotCombo = 0;
       } else {
@@ -7768,29 +7796,30 @@ export class VillageLedgerGame {
       ctx.fill();
     } else {
       const sideOffset = -7;
+      const leftShift = -5;
       ctx.beginPath();
-      ctx.roundRect(elderScreenX - sideOffset - glassW/2 + 1, bridgeY, glassW/2, glassH, 2);
+      ctx.roundRect(elderScreenX + leftShift - sideOffset - glassW/2 + 1, bridgeY, glassW/2, glassH, 2);
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
-      ctx.roundRect(elderScreenX + sideOffset - glassW/2 + 3, bridgeY, glassW/2 - 2, glassH - 1, 2);
+      ctx.roundRect(elderScreenX + leftShift + sideOffset - glassW/2 + 3, bridgeY, glassW/2 - 2, glassH - 1, 2);
       ctx.fill();
       ctx.stroke();
       ctx.strokeStyle = '#333';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(elderScreenX + sideOffset + glassW/2 - 3, bridgeY + glassH/2);
-      ctx.lineTo(elderScreenX - sideOffset - glassW/2 + 1, bridgeY + glassH/2);
+      ctx.moveTo(elderScreenX + leftShift + sideOffset + glassW/2 - 3, bridgeY + glassH/2);
+      ctx.lineTo(elderScreenX + leftShift - sideOffset - glassW/2 + 1, bridgeY + glassH/2);
       ctx.stroke();
       ctx.strokeStyle = '#333';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(elderScreenX - sideOffset + 1, bridgeY + glassH/2);
-      ctx.lineTo(elderScreenX - sideOffset + 6, bridgeY + glassH/2 + 2);
+      ctx.moveTo(elderScreenX + leftShift - sideOffset + 1, bridgeY + glassH/2);
+      ctx.lineTo(elderScreenX + leftShift - sideOffset + 6, bridgeY + glassH/2 + 2);
       ctx.stroke();
       ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
       ctx.beginPath();
-      ctx.arc(elderScreenX + glassW/4 + sideOffset - 1, bridgeY + 3, 1.5, 0, Math.PI * 2);
+      ctx.arc(elderScreenX + leftShift + glassW/4 + sideOffset - 1, bridgeY + 3, 1.5, 0, Math.PI * 2);
       ctx.fill();
     }
 

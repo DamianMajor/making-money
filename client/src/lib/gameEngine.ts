@@ -4419,13 +4419,17 @@ export class VillageLedgerGame {
     if (playSound) {
       soundManager.play('dialogueAdvance');
     }
-    const onCompleteFn = this.state.currentDialogue?.onComplete;
+    const prevDialogue = this.state.currentDialogue;
+    const onCompleteFn = prevDialogue?.onComplete;
     if (onCompleteFn) {
-      this.state.currentDialogue!.onComplete = undefined;
+      prevDialogue!.onComplete = undefined;
       try {
         onCompleteFn();
       } catch (e) {
         console.error('Error in dialogue onComplete callback:', e);
+      }
+      if (this.state.currentDialogue !== prevDialogue) {
+        return;
       }
     }
 

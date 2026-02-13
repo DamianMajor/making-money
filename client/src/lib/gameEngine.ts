@@ -1054,6 +1054,16 @@ export class VillageLedgerGame {
           return;
         }
       }
+
+      if (this.musicCollectionIconArea && !this.state.showChoice && !this.state.currentDialogue) {
+        const mc = this.musicCollectionIconArea;
+        if (x >= mc.x && x <= mc.x + mc.w && y >= mc.y && y <= mc.y + mc.h) {
+          this.state.showMusicCollection = !this.state.showMusicCollection;
+          this.state.showBadgeTray = false;
+          soundManager.play('buttonClick');
+          return;
+        }
+      }
       
       // Check if clicking on inventory HUD to open popup (also dismisses hint)
       if (this.inventoryButtonArea) {
@@ -7091,17 +7101,16 @@ export class VillageLedgerGame {
     
     this.badgePopupButtonArea = { x: btnX, y: btnY, w: btnWidth, h: btnHeight };
     
-    // Sparkle particles - drawn after badge content so they appear on top
     const now = Date.now() / 1000;
     const sparkleColors = ['#FFD700', '#FFA500', '#FFFFFF'];
-    const sparkleFade = animElapsed > 2 ? Math.max(0, 1 - (animElapsed - 2) / 1.5) : 1;
-    // Outer ring
+    const sparkleFade = animElapsed > 1 ? Math.max(0, 1 - (animElapsed - 1) / 0.8) : 1;
+    const expandRate = 80;
     for (let i = 0; i < 40; i++) {
-      const angle = (i / 40) * Math.PI * 2 + now;
-      const dist = 120 + Math.sin(now * 3 + i) * 60;
-      const sparkleX = w / 2 + Math.cos(angle) * dist;
-      const sparkleY = h / 2 + Math.sin(angle) * dist;
-      const size = 4 + Math.sin(now * 5 + i * 0.5) * 3;
+      const angle = (i / 40) * Math.PI * 2 + i * 0.3;
+      const baseDist = 40 + animElapsed * expandRate + Math.sin(i * 1.7) * 20;
+      const sparkleX = w / 2 + Math.cos(angle) * baseDist;
+      const sparkleY = h / 2 + Math.sin(angle) * baseDist;
+      const size = Math.max(0, (4 + Math.sin(now * 5 + i * 0.5) * 3) * sparkleFade);
       const color = sparkleColors[i % 3];
       
       ctx.globalAlpha = popupAlpha * sparkleFade;
@@ -7110,13 +7119,12 @@ export class VillageLedgerGame {
       ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
       ctx.fill();
     }
-    // Inner ring of smaller sparkles
     for (let i = 0; i < 15; i++) {
-      const angle = (i / 15) * Math.PI * 2 - now * 1.5;
-      const dist = 60 + Math.sin(now * 4 + i) * 20;
-      const sparkleX = w / 2 + Math.cos(angle) * dist;
-      const sparkleY = h / 2 + Math.sin(angle) * dist;
-      const size = 2 + Math.sin(now * 6 + i * 0.7) * 2;
+      const angle = (i / 15) * Math.PI * 2 + i * 0.5;
+      const baseDist = 20 + animElapsed * expandRate * 0.6 + Math.sin(i * 2.3) * 10;
+      const sparkleX = w / 2 + Math.cos(angle) * baseDist;
+      const sparkleY = h / 2 + Math.sin(angle) * baseDist;
+      const size = Math.max(0, (2 + Math.sin(now * 6 + i * 0.7) * 2) * sparkleFade);
       const color = sparkleColors[i % 3];
       
       ctx.globalAlpha = popupAlpha * sparkleFade;

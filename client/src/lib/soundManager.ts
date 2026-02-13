@@ -645,6 +645,21 @@ export class SoundManager {
     return this.genreRemixDuration || 240000;
   }
 
+  private genreBufferCache: Map<string, AudioBuffer> = new Map();
+
+  public async preloadGenre(url: string): Promise<void> {
+    if (!this.audioContext || this.genreBufferCache.has(url)) return;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return;
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      this.genreBufferCache.set(url, audioBuffer);
+    } catch (error) {
+      console.warn('[SoundManager] Failed to preload genre:', url, error);
+    }
+  }
+
   public fadeOut(name: SoundName, duration: number = 1000): void {
     const activeSound = this.activeSources.get(name);
     if (!activeSound || !this.audioContext) return;

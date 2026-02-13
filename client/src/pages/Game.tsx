@@ -570,6 +570,174 @@ function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void
   );
 }
 
+function NameInputScreen({ onContinue }: { onContinue: (name: string) => void }) {
+  const [name, setName] = useState('');
+  const [muted, setMuted] = useState(() => {
+    try {
+      const stored = localStorage.getItem('villageLedger_soundSettings');
+      if (stored) return JSON.parse(stored).muted ?? false;
+    } catch {}
+    return false;
+  });
+
+  const toggleMute = () => {
+    const newMuted = !muted;
+    setMuted(newMuted);
+    soundManager.setMuted(newMuted);
+    try {
+      const stored = localStorage.getItem('villageLedger_soundSettings');
+      const settings = stored ? JSON.parse(stored) : {};
+      settings.muted = newMuted;
+      localStorage.setItem('villageLedger_soundSettings', JSON.stringify(settings));
+    } catch {}
+  };
+
+  const handleContinue = () => {
+    if (name.trim()) {
+      localStorage.setItem('makingMoney_playerName', name.trim());
+    }
+    onContinue(name);
+  };
+
+  const handleSkip = () => {
+    onContinue('');
+  };
+
+  return (
+    <div
+      className="fixed inset-0 w-full h-full flex items-center justify-center"
+      style={{
+        background: 'linear-gradient(180deg, #1a1208 0%, #2d1f0e 30%, #3d2b14 60%, #2a1c0a 100%)',
+        zIndex: 50
+      }}
+      data-testid="name-input-screen"
+    >
+      <button
+        onClick={toggleMute}
+        className="cursor-pointer"
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          zIndex: 10,
+          background: 'none',
+          border: 'none',
+          padding: '8px',
+          opacity: 0.4,
+          transition: 'opacity 0.2s',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4'; }}
+        data-testid="button-mute-name"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {muted ? (
+            <>
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#888888" />
+              <line x1="23" y1="9" x2="17" y2="15" />
+              <line x1="17" y1="9" x2="23" y2="15" />
+            </>
+          ) : (
+            <>
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#888888" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+            </>
+          )}
+        </svg>
+      </button>
+      <div className="flex flex-col items-center max-w-lg w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
+        <h2
+          className="text-center mb-6"
+          style={{
+            fontFamily: '"Press Start 2P", monospace',
+            fontSize: 'clamp(16px, 4vw, 28px)',
+            color: '#E8D5A8',
+            textShadow: '2px 2px 0px #5a4a32, 0 0 15px rgba(255,215,100,0.4)',
+            lineHeight: 1.4
+          }}
+          data-testid="text-name-title"
+        >
+          What's your name?
+        </h2>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) handleContinue(); }}
+          placeholder="Enter your name"
+          maxLength={15}
+          autoFocus
+          className="w-full mb-6"
+          style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 'clamp(12px, 2vw, 15px)',
+            textAlign: 'center',
+            color: '#E8D5A8',
+            background: 'rgba(30, 22, 12, 0.8)',
+            border: '2px solid #5a4a32',
+            borderRadius: '8px',
+            padding: '14px',
+            height: '50px',
+            outline: 'none',
+          }}
+          data-testid="input-player-name"
+        />
+        <button
+          onClick={handleContinue}
+          className="cursor-pointer"
+          style={{
+            fontFamily: '"Press Start 2P", monospace',
+            fontSize: 'clamp(10px, 2.5vw, 14px)',
+            color: '#1a1208',
+            background: 'linear-gradient(180deg, #C9B896 0%, #a89478 100%)',
+            border: '2px solid #8B7355',
+            borderRadius: '8px',
+            padding: '14px 32px',
+            textShadow: '0 1px 0 rgba(255,255,255,0.2)',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+            transition: 'transform 0.1s, box-shadow 0.1s',
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = 'scale(0.97)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
+          }}
+          data-testid="button-name-continue"
+        >
+          Continue
+        </button>
+        <button
+          onClick={handleSkip}
+          className="cursor-pointer"
+          style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 'clamp(10px, 2vw, 13px)',
+            color: '#9B8A6A',
+            background: 'none',
+            border: 'none',
+            padding: '12px',
+            marginTop: '8px',
+            transition: 'color 0.2s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#B8A07A'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = '#9B8A6A'; }}
+          data-testid="button-name-skip"
+        >
+          Skip
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function IntroScreen({ onStart, onMount, preloadedImages }: { onStart: () => void; onMount?: () => void; preloadedImages: HTMLImageElement[] }) {
   const [muted, setMuted] = useState(() => {
     try {
@@ -888,12 +1056,14 @@ export default function Game() {
   const gameRef = useRef<VillageLedgerGame | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const preloadedImagesRef = useRef<HTMLImageElement[]>([]);
-  const [screen, setScreen] = useState<'loading' | 'reflection' | 'intro' | 'game'>('loading');
+  const [screen, setScreen] = useState<'loading' | 'reflection' | 'name' | 'intro' | 'game'>('loading');
   const [iconsPreloaded, setIconsPreloaded] = useState(false);
   const gameInitialized = useRef(false);
   const [smartPathPrompt, setSmartPathPrompt] = useState<string | null>(null);
   const smartPathCallbackRef = useRef<((text: string) => void) | null>(null);
   const [smartPathAnswer, setSmartPathAnswer] = useState('');
+  const [reflectionPrompt, setReflectionPrompt] = useState<{ originalAnswer: string; callback: (answer: string) => void } | null>(null);
+  const [reflectionAnswer, setReflectionAnswer] = useState('');
   const isPortrait = useIsPortrait();
 
   useEffect(() => {
@@ -922,6 +1092,24 @@ export default function Game() {
     }
   }, [smartPathAnswer]);
 
+  const handleReflectionSubmit = useCallback(() => {
+    if (reflectionPrompt) {
+      const cb = reflectionPrompt.callback;
+      setReflectionPrompt(null);
+      setReflectionAnswer('');
+      cb(reflectionAnswer.trim());
+    }
+  }, [reflectionAnswer, reflectionPrompt]);
+
+  const handleReflectionSkip = useCallback(() => {
+    if (reflectionPrompt) {
+      const cb = reflectionPrompt.callback;
+      setReflectionPrompt(null);
+      setReflectionAnswer('');
+      cb('');
+    }
+  }, [reflectionPrompt]);
+
   const initGameEngine = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || gameInitialized.current) return;
@@ -931,6 +1119,10 @@ export default function Game() {
       setSmartPathPrompt(prompt);
       smartPathCallbackRef.current = callback;
       setSmartPathAnswer('');
+    });
+    gameRef.current.setReflectionHandler((originalAnswer, callback) => {
+      setReflectionPrompt({ originalAnswer, callback });
+      setReflectionAnswer('');
     });
     gameRef.current.preloadAudio();
     gameRef.current.start(false);
@@ -968,6 +1160,15 @@ export default function Game() {
   const handleReflectionContinue = useCallback((answer: string) => {
     if (answer.trim()) {
       localStorage.setItem('makingMoney_moneyAnswer', answer.trim());
+    }
+    setScreen('name');
+  }, []);
+
+  const handleNameContinue = useCallback((name: string) => {
+    if (name.trim()) {
+      localStorage.setItem('makingMoney_playerName', name.trim());
+    } else {
+      localStorage.removeItem('makingMoney_playerName');
     }
     setScreen('intro');
   }, []);
@@ -1032,6 +1233,133 @@ export default function Game() {
           >
             THE BARTER SYSTEM
           </span>
+        </div>
+      )}
+      {reflectionPrompt && screen === 'game' && (
+        <div
+          className="fixed inset-0 flex items-center justify-center"
+          style={{ zIndex: 100, background: 'rgba(0,0,0,0.85)' }}
+          data-testid="reflection-overlay"
+        >
+          <div
+            className="flex flex-col items-center w-full max-w-md px-6 py-8"
+            style={{
+              background: 'linear-gradient(180deg, #4A3728 0%, #2D1B0E 100%)',
+              border: '3px solid #8B6914',
+              borderRadius: '16px',
+            }}
+          >
+            <h2
+              style={{
+                fontFamily: '"Press Start 2P", monospace',
+                fontSize: 'clamp(10px, 2vw, 14px)',
+                color: '#FFD700',
+                textAlign: 'center',
+                marginBottom: '16px',
+                lineHeight: 1.6,
+              }}
+            >
+              YOUR JOURNEY
+            </h2>
+            <p
+              style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: 'clamp(10px, 2vw, 12px)',
+                color: '#A89070',
+                textAlign: 'center',
+                marginBottom: '8px',
+                lineHeight: 1.5,
+              }}
+            >
+              Before playing, you said money is:
+            </p>
+            <p
+              style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: 'clamp(12px, 2.5vw, 15px)',
+                color: '#F5DEB3',
+                textAlign: 'center',
+                marginBottom: '20px',
+                lineHeight: 1.5,
+                fontStyle: 'italic',
+              }}
+              data-testid="text-original-answer"
+            >
+              &ldquo;{reflectionPrompt.originalAnswer.length > 100 ? reflectionPrompt.originalAnswer.substring(0, 97) + '...' : reflectionPrompt.originalAnswer}&rdquo;
+            </p>
+            <p
+              style={{
+                fontFamily: '"Press Start 2P", monospace',
+                fontSize: 'clamp(8px, 1.5vw, 10px)',
+                color: '#C4A77D',
+                textAlign: 'center',
+                marginBottom: '12px',
+                lineHeight: 1.6,
+              }}
+            >
+              Would you change your answer?
+            </p>
+            <textarea
+              value={reflectionAnswer}
+              onChange={(e) => setReflectionAnswer(e.target.value)}
+              placeholder="Type your new answer here..."
+              style={{
+                fontFamily: 'Georgia, serif',
+                fontSize: 'clamp(12px, 2vw, 15px)',
+                textAlign: 'center',
+                color: '#E8D5A8',
+                background: 'rgba(30, 22, 12, 0.9)',
+                border: '2px solid #5a4a32',
+                borderRadius: '8px',
+                padding: '12px 14px',
+                width: '100%',
+                minHeight: '60px',
+                resize: 'none',
+                outline: 'none',
+                marginBottom: '16px',
+              }}
+              data-testid="input-post-reflection"
+            />
+            <div className="flex gap-4 items-center">
+              <button
+                onClick={handleReflectionSubmit}
+                disabled={!reflectionAnswer.trim()}
+                className="cursor-pointer"
+                style={{
+                  fontFamily: '"Press Start 2P", monospace',
+                  fontSize: 'clamp(9px, 2vw, 12px)',
+                  color: !reflectionAnswer.trim() ? '#666' : '#1a1208',
+                  background: !reflectionAnswer.trim()
+                    ? 'linear-gradient(180deg, #555 0%, #444 100%)'
+                    : 'linear-gradient(180deg, #C9B896 0%, #a89478 100%)',
+                  border: `2px solid ${!reflectionAnswer.trim() ? '#444' : '#8B7355'}`,
+                  borderRadius: '8px',
+                  padding: '12px 24px',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                  opacity: !reflectionAnswer.trim() ? 0.5 : 1,
+                }}
+                data-testid="button-submit-reflection"
+              >
+                SUBMIT
+              </button>
+              <button
+                onClick={handleReflectionSkip}
+                className="cursor-pointer"
+                style={{
+                  fontFamily: '"Press Start 2P", monospace',
+                  fontSize: 'clamp(8px, 1.5vw, 10px)',
+                  color: '#9B8A6A',
+                  background: 'none',
+                  border: 'none',
+                  padding: '8px',
+                  textDecoration: 'underline',
+                }}
+                data-testid="button-skip-reflection"
+              >
+                Skip
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {smartPathPrompt && screen === 'game' && (
@@ -1120,6 +1448,7 @@ export default function Game() {
       )}
       {screen === 'loading' && <LoadingScreen onLoaded={handleLoadingComplete} />}
       {screen === 'reflection' && <ReflectionScreen onContinue={handleReflectionContinue} />}
+      {screen === 'name' && <NameInputScreen onContinue={handleNameContinue} />}
       {screen === 'intro' && <IntroScreen onStart={handleGameStart} onMount={handleIntroMount} preloadedImages={preloadedImagesRef.current} />}
     </div>
   );

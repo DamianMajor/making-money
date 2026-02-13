@@ -377,6 +377,7 @@ export class VillageLedgerGame {
     { id: 'the_ledger', name: 'The Ledger', description: 'A written record that everyone can see! The ledger keeps track of debts so no one can cheat.', icon: 'tablet' },
     { id: 'debt_settled', name: 'Debt Settled', description: 'All debts paid off! When debts are recorded and settled, everyone is happy.', icon: 'check' },
     { id: 'money_scholar', name: 'Money Scholar', description: 'You understand that money is really just a system for keeping track of who owes what!', icon: 'star' },
+    { id: 'music_scholar', name: 'Music Scholar', description: 'You collected every genre in the music collection! A true connoisseur of celebration!', icon: 'music' },
   ];
 
   private badgeTrayButtonArea: { x: number; y: number; w: number; h: number } | null = null;
@@ -443,13 +444,18 @@ export class VillageLedgerGame {
     }
   };
   
+  private discoSpriteUnlocked: boolean = false;
+  private useDiscoSprite: boolean = false;
+  private discoAvatarToggleBtn: { x: number; y: number; w: number; h: number } | null = null;
+
+  private playerName: string = 'YOU';
   private characterSprites: { [key: string]: HTMLImageElement } = {};
   private processedSprites: { [key: string]: HTMLCanvasElement } = {};
   private spriteFallbackTimer: number = 0;
   private showSpriteFallbacks: boolean = false;
   private spritesReady: boolean = false;
   private spriteLoadCount: number = 0;
-  private spriteTotal: number = 5;
+  private spriteTotal: number = 6;
   
   // Sound mute button
   private muteButtonArea: { x: number; y: number; w: number; h: number } | null = null;
@@ -494,6 +500,7 @@ export class VillageLedgerGame {
 
   // Smart Path input handler
   private smartPathInputHandler: ((prompt: string, callback: (answer: string) => void) => void) | null = null;
+  private reflectionInputHandler: ((originalAnswer: string, callback: (newAnswer: string) => void) => void) | null = null;
   private smartPathElderIntroShown: boolean = false;
 
   // Callbacks
@@ -554,7 +561,7 @@ export class VillageLedgerGame {
     }
 
     // Load character sprites and remove background via chroma key (blue backgrounds)
-    const spriteIds = ['player', 'stone-worker', 'fisherman', 'village-elder', 'woodcutter'];
+    const spriteIds = ['player', 'player-disco', 'stone-worker', 'fisherman', 'village-elder', 'woodcutter'];
     spriteIds.forEach(id => {
       const img = new Image();
       img.onload = () => {
@@ -664,10 +671,19 @@ export class VillageLedgerGame {
       img.onerror = checkAllLoaded; // Count errors too so we don't get stuck
     });
 
+    const storedName = localStorage.getItem('makingMoney_playerName');
+    if (storedName) this.playerName = storedName.toUpperCase();
+
+    const unlockedGenres = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+    const allGenreCount = Object.keys(this.GENRE_AUDIO_MAP).length;
+    this.discoSpriteUnlocked = unlockedGenres.length >= allGenreCount;
+    const savedDiscoChoice = localStorage.getItem('makingMoney_useDiscoSprite');
+    this.useDiscoSprite = this.discoSpriteUnlocked && savedDiscoChoice === 'true';
+
     // Initialize player at home (far left)
     this.player = {
       id: 'player',
-      name: 'PLAYER',
+      name: this.playerName,
       x: 185, // Player Home position (+35px right)
       y: 0,
       width: 100,
@@ -1017,6 +1033,10 @@ export class VillageLedgerGame {
       if (x >= this.resetRecordsBtn.x && x <= this.resetRecordsBtn.x + this.resetRecordsBtn.w &&
           y >= this.resetRecordsBtn.y && y <= this.resetRecordsBtn.y + this.resetRecordsBtn.h) {
         localStorage.removeItem('makingMoney_unlockedGenres');
+        localStorage.removeItem('makingMoney_completionCount');
+        localStorage.removeItem('makingMoney_playerName');
+        localStorage.removeItem('makingMoney_useDiscoSprite');
+        localStorage.removeItem('makingMoney_postReflection');
         soundManager.play('buttonClick');
         return;
       }
@@ -2033,7 +2053,7 @@ export class VillageLedgerGame {
                   // Only add entry if not already recorded (prevent duplicates)
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('WOODCUTTER'));
                   if (!alreadyRecorded) {
-                    this.state.ledgerEntries.push({ name: 'PLAYER', debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
+                    this.state.ledgerEntries.push({ name: this.playerName, debt: '1 STONE + 1 FISH | OWED TO WOODCUTTER' });
                   }
                   this.state.showHUD = true;
                   this.state.ledgerIconPulseTimer = 3;
@@ -2966,7 +2986,7 @@ export class VillageLedgerGame {
                   // Only add entry if not already recorded (prevent duplicates)
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('STONE-WORKER'));
                   if (!alreadyRecorded) {
-                    this.state.ledgerEntries.push({ name: 'PLAYER', debt: '2 FISH | OWED TO STONE-WORKER' });
+                    this.state.ledgerEntries.push({ name: this.playerName, debt: '2 FISH | OWED TO STONE-WORKER' });
                   }
                   this.hudGlow = 1;
                   // Now deliver the stone and move to final position
@@ -4782,6 +4802,19 @@ export class VillageLedgerGame {
     this.smartPathInputHandler = handler;
   }
 
+  public setReflectionHandler(handler: (originalAnswer: string, callback: (newAnswer: string) => void) => void): void {
+    this.reflectionInputHandler = handler;
+  }
+
+  private requestReflectionInput(callback: (newAnswer: string) => void): void {
+    const originalAnswer = localStorage.getItem('makingMoney_moneyAnswer') || '';
+    if (this.reflectionInputHandler && originalAnswer) {
+      this.reflectionInputHandler(originalAnswer, callback);
+    } else {
+      callback('');
+    }
+  }
+
   private requestSmartPathInput(prompt: string, callback: (answer: string) => void): void {
     if (this.smartPathInputHandler) {
       this.smartPathInputHandler(prompt, callback);
@@ -4792,6 +4825,8 @@ export class VillageLedgerGame {
     soundManager.init();
     soundManager.resumeContext();
     soundManager.playLoop('ambientVillage');
+
+    this.checkMusicScholarBadge();
 
     setTimeout(() => this.triggerIntro(), 500);
   }
@@ -5630,12 +5665,28 @@ export class VillageLedgerGame {
     this.state.phase = 'loop2_return';
     this.state.showCelebration = true;
     setTimeout(() => {
+      const playCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
       const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
-      if (!unlocked.includes('Funk')) {
-        unlocked.push('Funk');
-        localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
-        this.lastRecordUnlockTime = Date.now();
-        this.showRecordRewardPopup('Funk');
+      const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
+      
+      if (playCount === 0) {
+        // First playthrough: always unlock Funk
+        if (!unlocked.includes('Funk')) {
+          unlocked.push('Funk');
+          localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
+          this.lastRecordUnlockTime = Date.now();
+          this.showRecordRewardPopup('Funk');
+        }
+      } else {
+        // Repeat playthroughs: unlock a random uncollected genre
+        const unearned = allGenres.filter(g => !unlocked.includes(g));
+        if (unearned.length > 0) {
+          const randomGenre = unearned[Math.floor(Math.random() * unearned.length)];
+          unlocked.push(randomGenre);
+          localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
+          this.lastRecordUnlockTime = Date.now();
+          this.showRecordRewardPopup(randomGenre);
+        }
       }
     }, 5000);
     this.state.celebrationTimer = 0;
@@ -8491,7 +8542,7 @@ export class VillageLedgerGame {
     ctx.font = `bold 9px ${this.uiFont}`;
     ctx.fillStyle = '#FFF';
     ctx.textAlign = 'center';
-    ctx.fillText(`${this.state.badges.length}/5`, x + size / 2, y + size + 14);
+    ctx.fillText(`${this.state.badges.length}/${this.ALL_BADGES.length}`, x + size / 2, y + size + 14);
 
     this.badgeTrayButtonArea = { x, y, w: size, h: size + 16 };
 
@@ -8563,7 +8614,7 @@ export class VillageLedgerGame {
         bx = topStartX + i * (badgeSize + gapX);
         by = startY;
       } else {
-        const botRowW = 2 * badgeSize + 1 * gapX;
+        const botRowW = 3 * badgeSize + 2 * gapX;
         const botStartX = (w - botRowW) / 2;
         bx = botStartX + (i - 3) * (badgeSize + gapX);
         by = startY + rowHeight;
@@ -8858,6 +8909,18 @@ export class VillageLedgerGame {
     this.recordRewardStartTime = Date.now();
     this.showRecordReward = true;
     soundManager.playRandomDJTransition();
+    this.checkMusicScholarBadge();
+  }
+
+  private checkMusicScholarBadge(): void {
+    const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+    const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
+    if (unlocked.length >= allGenres.length && !this.state.badges.includes('Music Scholar')) {
+      this.discoSpriteUnlocked = true;
+      setTimeout(() => {
+        this.awardBadge('Music Scholar', 'You collected every genre in the music collection! A true connoisseur of celebration!');
+      }, 3000);
+    }
   }
 
   private drawRecordRewardPopup(ctx: CanvasRenderingContext2D): void {
@@ -9143,7 +9206,43 @@ export class VillageLedgerGame {
       ctx.fillText('MUTED', bgBtnX + bgBtnW / 2, muteBtnY - 2);
     }
     this.musicCollectionMuteBtn = { x: bgBtnX, y: muteBtnY, w: bgBtnW, h: bgBtnH };
-    
+
+    let discoSectionEndY = muteBtnY + bgBtnH;
+    this.discoAvatarToggleBtn = null;
+    if (this.discoSpriteUnlocked) {
+      const dividerY = muteBtnY + bgBtnH + 12;
+      ctx.strokeStyle = '#555';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(panelX + 25, dividerY);
+      ctx.lineTo(panelX + panelW - 25, dividerY);
+      ctx.stroke();
+
+      const labelY = dividerY + 18;
+      ctx.font = `10px ${this.retroFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#E8D44D';
+      ctx.fillText('DISCO AVATAR', w / 2, labelY);
+
+      const toggleW = 80;
+      const toggleH = 28;
+      const toggleX = (w - toggleW) / 2;
+      const toggleY = labelY + 10;
+      ctx.fillStyle = this.useDiscoSprite ? 'rgba(46, 204, 113, 0.4)' : 'rgba(255,255,255,0.1)';
+      ctx.beginPath();
+      ctx.roundRect(toggleX, toggleY, toggleW, toggleH, 6);
+      ctx.fill();
+      ctx.strokeStyle = this.useDiscoSprite ? '#2ECC71' : '#666';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.font = `10px ${this.retroFont}`;
+      ctx.fillStyle = this.useDiscoSprite ? '#2ECC71' : '#AAA';
+      ctx.textAlign = 'center';
+      ctx.fillText(this.useDiscoSprite ? 'ON' : 'OFF', toggleX + toggleW / 2, toggleY + toggleH / 2 + 4);
+      this.discoAvatarToggleBtn = { x: toggleX, y: toggleY, w: toggleW, h: toggleH };
+      discoSectionEndY = toggleY + toggleH;
+    }
+
     const closeBtnW = 120;
     const closeBtnH = 32;
     const closeBtnX = (w - closeBtnW) / 2;
@@ -9159,6 +9258,16 @@ export class VillageLedgerGame {
   }
 
   private handleMusicCollectionTouch(x: number, y: number): void {
+    if (this.discoAvatarToggleBtn && this.discoSpriteUnlocked) {
+      if (x >= this.discoAvatarToggleBtn.x && x <= this.discoAvatarToggleBtn.x + this.discoAvatarToggleBtn.w &&
+          y >= this.discoAvatarToggleBtn.y && y <= this.discoAvatarToggleBtn.y + this.discoAvatarToggleBtn.h) {
+        this.useDiscoSprite = !this.useDiscoSprite;
+        localStorage.setItem('makingMoney_useDiscoSprite', String(this.useDiscoSprite));
+        soundManager.play('buttonClick');
+        return;
+      }
+    }
+
     if (this.musicCollectionCloseBtn) {
       const btn = this.musicCollectionCloseBtn;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
@@ -9879,7 +9988,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
   // Map character id to sprite key
   const spriteKeyMap: { [key: string]: string } = {
-    'player': 'player',
+    'player': this.useDiscoSprite ? 'player-disco' : 'player',
     'stoneWorker': 'stone-worker',
     'fisherman': 'fisherman',
     'villageElder': 'village-elder',
@@ -10779,7 +10888,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.font = `16px ${this.retroFont}`;
       ctx.textAlign = 'left';
       ctx.fillStyle = '#C9B896';
-      ctx.fillText(`[${this.state.currentDialogue.speaker}]`, textStartX, y + 36);
+      const displaySpeaker = this.state.currentDialogue.speaker === 'YOU' ? this.playerName : this.state.currentDialogue.speaker;
+      ctx.fillText(`[${displaySpeaker}]`, textStartX, y + 36);
 
       // Dialogue text with typewriter effect - using retro font at 16-18px per guidelines
       const fullText = this.state.currentDialogue.text;
@@ -12296,9 +12406,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             this.lastRecordUnlockTime = Date.now();
             this.showRecordRewardPopup(btn.genre);
           }
-          this.state.showNightTransition = false;
-          this.state.showSuccess = true;
-          this.state.phase = 'complete';
           soundManager.fadeOut('ambientNight', 1000);
           soundManager.loadAndPlayGenre(this.GENRE_AUDIO_MAP[btn.genre]);
           const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
@@ -12315,6 +12422,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           }
           const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
           localStorage.setItem('makingMoney_completionCount', String(count + 1));
+          this.requestReflectionInput((newAnswer) => {
+            if (newAnswer.trim()) {
+              localStorage.setItem('makingMoney_postReflection', newAnswer.trim());
+            }
+            this.state.showNightTransition = false;
+            this.state.showSuccess = true;
+            this.state.phase = 'complete';
+          });
         }
         return;
       }
@@ -12327,9 +12442,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const btn = this.reviewContinueButton;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.state.showQuizReview = false;
-        this.state.showNightTransition = false;
-        this.state.showSuccess = true;
-        this.state.phase = 'complete';
         soundManager.fadeOut('ambientNight', 1000);
         soundManager.fadeOut('backgroundMusicNight', 1000);
         const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
@@ -12346,6 +12458,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         }
         const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
         localStorage.setItem('makingMoney_completionCount', String(count + 1));
+        this.requestReflectionInput((newAnswer) => {
+          if (newAnswer.trim()) {
+            localStorage.setItem('makingMoney_postReflection', newAnswer.trim());
+          }
+          this.state.showNightTransition = false;
+          this.state.showSuccess = true;
+          this.state.phase = 'complete';
+        });
         return;
       }
     }
@@ -12468,7 +12588,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const reflectionAnswer = localStorage.getItem('makingMoney_moneyAnswer');
     const hasReflection = !!reflectionAnswer;
     let baseCardH = hasChampion ? 560 : 530;
-    if (hasReflection) baseCardH += 80;
+    if (hasReflection) baseCardH += 140;
     const cardH = Math.min(baseCardH, h - 30);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
@@ -12524,7 +12644,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         bx = topStartX + i * (badgeSize + gapX);
         by = startY;
       } else {
-        const botRowW = 2 * badgeSize + 1 * gapX;
+        const botRowW = 3 * badgeSize + 2 * gapX;
         const botStartX = (w - botRowW) / 2;
         bx = botStartX + (i - 3) * (badgeSize + gapX);
         by = startY + rowHeight;
@@ -12670,6 +12790,36 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       }
       if (answerLine.trim()) {
         ctx.fillText(answerLine.trim(), reflBoxX + 5, answerLineY);
+      }
+
+      const postReflection = localStorage.getItem('makingMoney_postReflection');
+      if (postReflection) {
+        answerLineY += 16;
+        ctx.font = `8px ${this.uiFont}`;
+        ctx.fillStyle = '#A89070';
+        ctx.fillText('After playing, you now think:', reflBoxX + 5, answerLineY);
+        answerLineY += 15;
+        ctx.font = `9px ${this.uiFont}`;
+        ctx.fillStyle = '#FFD700';
+        let displayPost = postReflection;
+        if (displayPost.length > 80) {
+          displayPost = displayPost.substring(0, 77) + '...';
+        }
+        const postWords = displayPost.split(' ');
+        let postLine = '';
+        for (const word of postWords) {
+          const testLine = postLine + word + ' ';
+          if (ctx.measureText(testLine).width > answerMaxW && postLine !== '') {
+            ctx.fillText(postLine.trim(), reflBoxX + 5, answerLineY);
+            postLine = word + ' ';
+            answerLineY += 13;
+          } else {
+            postLine = testLine;
+          }
+        }
+        if (postLine.trim()) {
+          ctx.fillText(postLine.trim(), reflBoxX + 5, answerLineY);
+        }
       }
     }
 

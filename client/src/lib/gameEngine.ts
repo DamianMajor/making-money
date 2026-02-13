@@ -1224,7 +1224,7 @@ export class VillageLedgerGame {
     const tappedTarget = this.getTappedInteractable(x, y);
     const interactionRange = 25; // Small range for natural proximity-based interactions
     
-    if (tappedTarget && !(this.state.showCelebration && typeof tappedTarget !== 'string')) {
+    if (tappedTarget && !(this.state.showCelebration && typeof tappedTarget !== 'string' && (tappedTarget as Character).id !== 'villageElder')) {
       if (tappedTarget === 'home') {
         const inRange = Math.abs(this.player.x - this.playerHomeX) < interactionRange;
         if (inRange) {
@@ -1307,10 +1307,12 @@ export class VillageLedgerGame {
         'fisherman': [
           { speaker: 'FISHERMAN', text: "Fair trades need proof. The Stone Tablet gives us that!" },
         ],
-        'villageElder': [
-          { speaker: 'VILLAGE ELDER', text: "You've learned well! The ledger brings trust to our village." },
-        ],
+        'villageElder': [],
       };
+      if (npcId === 'villageElder') {
+        this.handleElderInteraction();
+        return;
+      }
       const reviewLines = partyReviewLines[npcId];
       if (reviewLines) {
         this.queueDialogue(reviewLines);
@@ -7766,12 +7768,33 @@ export class VillageLedgerGame {
       ctx.fill();
     }
     
+    const worldXPositions = [
+      this.villageCenterX - 300,
+      this.villageCenterX + 300,
+      this.villageCenterX - 200,
+      this.villageCenterX + 200
+    ];
     for (let i = 0; i < 4; i++) {
       const isRight = (i % 2 === 1);
       const isTop = (i < 2);
-      const cornerX = isRight ? w : 0;
+      const cornerScreenX = worldXPositions[i] - this.cameraX;
       const cornerY = isTop ? 0 : groundY;
-      
+
+      const fixtureW = 20;
+      const fixtureH = 12;
+      const hueBase = (t * 50 + i * 90) % 360;
+      ctx.fillStyle = '#333';
+      ctx.beginPath();
+      ctx.roundRect(cornerScreenX - fixtureW / 2, cornerY - (isTop ? 0 : fixtureH), fixtureW, fixtureH, 3);
+      ctx.fill();
+      ctx.strokeStyle = '#666';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = `hsla(${hueBase}, 100%, 70%, 0.8)`;
+      ctx.beginPath();
+      ctx.arc(cornerScreenX, cornerY - (isTop ? -6 : 6), 4, 0, Math.PI * 2);
+      ctx.fill();
+
       for (let beam = 0; beam < 3; beam++) {
         const sweepAngle = Math.sin(t * 1.8 + i * 1.2 + beam * 0.8) * 0.4;
         let baseAngle: number;
@@ -7782,20 +7805,20 @@ export class VillageLedgerGame {
         
         const angle = baseAngle + sweepAngle;
         const beamLen = 250 + beam * 40;
-        let endX = cornerX + Math.cos(angle) * beamLen;
+        let endX = cornerScreenX + Math.cos(angle) * beamLen;
         let endY = cornerY + Math.sin(angle) * beamLen;
         
         endX = Math.max(0, Math.min(w, endX));
         endY = Math.max(0, Math.min(groundY, endY));
         
         const hue = (t * 50 + i * 90 + beam * 30) % 360;
-        const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
-        cornerGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.5)`);
+        const cornerGrad = ctx.createLinearGradient(cornerScreenX, cornerY, endX, endY);
+        cornerGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.35)`);
         cornerGrad.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
         ctx.strokeStyle = cornerGrad;
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(cornerX, cornerY);
+        ctx.moveTo(cornerScreenX, cornerY);
         ctx.lineTo(endX, endY);
         ctx.stroke();
       }

@@ -5827,7 +5827,7 @@ export class VillageLedgerGame {
         const discoBallWorldX = this.villageElder.x;
         const discoBallScreenX = discoBallWorldX - this.cameraX;
         const discoBallR = 45;
-        const discoBallY = Math.min(groundY * 0.45, this.state.celebrationTimer * 30);
+        const discoBallY = Math.min(groundY * 0.45 - 30, this.state.celebrationTimer * 30);
         const dbDx = proj.x - discoBallScreenX;
         const dbDy = proj.y - discoBallY;
         const dbDist = Math.sqrt(dbDx * dbDx + dbDy * dbDy);
@@ -7465,7 +7465,7 @@ export class VillageLedgerGame {
     }
     
     const discoBallR = 36;
-    const targetY = groundY * 0.45;
+    const targetY = groundY * 0.45 - 30;
     const discoBallDropY = Math.min(targetY, t * 30);
     const discoBallWorldX = this.villageElder.x;
     const discoBallX = discoBallWorldX - this.cameraX;
@@ -7530,7 +7530,7 @@ export class VillageLedgerGame {
       const elderScreenX = this.villageElder.x - this.cameraX;
 
       const discoBallR = 36;
-      const targetFrozenY = groundY * 0.45;
+      const targetFrozenY = groundY * 0.45 - 30;
       const discoBallDropY = targetFrozenY;
       const discoBallWorldX = this.villageElder.x;
       const discoBallX = discoBallWorldX - this.cameraX;
@@ -7810,7 +7810,7 @@ export class VillageLedgerGame {
     }
 
     const discoBallR = 36;
-    const targetY = groundY * 0.45;
+    const targetY = groundY * 0.45 - 30;
     const discoBallDropY = Math.min(targetY, t * 30);
     const discoBallWorldX = this.villageElder.x;
     const discoBallX = discoBallWorldX - this.cameraX;
@@ -12194,7 +12194,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = '#C4A77D';
     ctx.fillText('Pick a genre for your victory remix', w / 2, cardY + 55);
     
-    const genres = Object.keys(this.GENRE_AUDIO_MAP);
+    const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
+    const genres = allGenres.filter(g => g !== this.state.selectedGenre);
     const btnW = 110;
     const btnH = 40;
     const gapX = 15;

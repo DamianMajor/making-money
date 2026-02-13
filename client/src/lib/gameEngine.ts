@@ -117,6 +117,7 @@ interface GameState {
   fishIntroduced: boolean;
   stoneIntroduced: boolean;
   berriesIntroduced: boolean;
+  berryRestockUsed: boolean;
   slingshotIntroduced: boolean;
   ledgerEntries: LedgerEntry[];
   dialogueQueue: DialogueLine[];
@@ -767,6 +768,7 @@ export class VillageLedgerGame {
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,
+      berryRestockUsed: false,
       slingshotIntroduced: true,
       ledgerEntries: [],
       dialogueQueue: [],
@@ -1892,7 +1894,7 @@ export class VillageLedgerGame {
                   
                   // Award Ledger badge 1 second after carving starts (if second entry)
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('WOODCUTTER'));
-                  if (!alreadyRecorded) {
+                  if (!alreadyRecorded && this.state.ledgerEntries.length > 0) {
                     setTimeout(() => {
                       this.awardBadge(
                         'The Ledger',
@@ -2753,7 +2755,7 @@ export class VillageLedgerGame {
                   
                   // Award Ledger badge 1 second after carving starts (if second entry)
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('STONE-WORKER'));
-                  if (!alreadyRecorded) {
+                  if (!alreadyRecorded && this.state.ledgerEntries.length > 0) {
                     setTimeout(() => {
                       this.awardBadge(
                         'The Ledger',
@@ -3314,8 +3316,17 @@ export class VillageLedgerGame {
         }
       ]);
     }
-    // Debts initiated AND has berries - offer trade choices
-    else if (this.state.inventory.berries >= 1) {
+    // Debts initiated but not enough berries
+    else if (this.state.inventory.berries >= 1 && this.state.inventory.berries < 3) {
+      this.queueDialogue([
+        {
+          speaker: 'FISHERMAN',
+          text: "Hmm, that's not enough berries for a trade. I'd need at least 3."
+        }
+      ]);
+    }
+    // Debts initiated AND has enough berries - offer trade choices
+    else if (this.state.inventory.berries >= 3) {
       const berryCount = this.state.inventory.berries;
       this.queueDialogue([
         {
@@ -3433,23 +3444,14 @@ export class VillageLedgerGame {
   // CREDIT-FIRST: Always interactable - allows player to pick up to 3 berries at any time
   // Extra berry spawns after giving in to inflated demand
   private handleBerryBushInteraction(): void {
-    // Trigger shake animation
     this.bushShakeTimer = this.bushShakeDuration;
     
-    // Check if bush is empty FIRST before playing sounds
     const bushIsEmpty = this.state.resourcesDepleted || 
-                        (this.state.inventory.berries >= 3 && !this.state.extraBerryAvailable);
+                        (this.state.berryRestockUsed && this.state.inventory.berries <= 0) ||
+                        (this.state.inventory.berries >= 3 && this.state.berryRestockUsed);
     
-    // Play bush rustling only (no item pickup) when bush is empty
     if (bushIsEmpty) {
       soundManager.playForDurationWithFade('bush', 1500, 300);
-    } else {
-      // Play full bush sequence with item pickup sound when picking berries
-      soundManager.playBushSequence();
-    }
-    
-    // Check if resources are depleted (after paying first inflated demand)
-    if (this.state.resourcesDepleted) {
       this.queueDialogue([
         {
           speaker: 'YOU',
@@ -3459,41 +3461,99 @@ export class VillageLedgerGame {
       return;
     }
     
-    // Check if extra berry is available (after giving in to inflated demand)
     if (this.state.extraBerryAvailable) {
+      soundManager.playBushSequence();
       this.state.inventory.berries++;
-      this.state.extraBerryAvailable = false; // Only one extra berry
-      this.showInventoryPopup(`+1 EXTRA BERRY!`, true); // Skip sound - playBushSequence handles it
+      this.state.extraBerryAvailable = false;
+      this.showInventoryPopup(`+1 EXTRA BERRY!`, true);
       this.setMood('happy');
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "I found one more berry! Maybe I can trade this for another fish..."
+          text: "I found one more berry! Maybe I can use this somehow..."
         }
       ]);
       return;
     }
     
-    // Berry bush is now always available (no gating)
-    if (this.state.inventory.berries < 3) {
-      this.state.inventory.berries++;
-      this.state.berriesIntroduced = true; // Berries now shown in inventory
-      this.showInventoryPopup(`+1 BERRY (${this.state.inventory.berries}/3)`, true); // Skip sound - playBushSequence handles it
-      this.setMood('happy');
-      
-      if (this.state.inventory.berries >= 3) {
+    if (this.state.inventory.berries < 3 && this.state.berriesIntroduced && !this.state.berryRestockUsed) {
+      if (this.state.inventory.berries > 0) {
+        soundManager.playBushSequence();
+        const added = Math.min(3, 3 - this.state.inventory.berries);
+        this.state.inventory.berries += added;
+        this.state.berryRestockUsed = true;
+        this.showInventoryPopup(`+${added} BERRIES!`, true);
+        this.setMood('happy');
         this.queueDialogue([
           {
             speaker: 'YOU',
-            text: "I have 3 berries now! I can trade these with the Fisherman for fish."
+            text: `I found ${added} more berries! I have ${this.state.inventory.berries} now. Better not waste these...`
+          }
+        ]);
+        return;
+      }
+    }
+    
+    if (this.state.inventory.berries < 3) {
+      soundManager.playBushSequence();
+      this.state.inventory.berries++;
+      this.state.berriesIntroduced = true;
+      this.showInventoryPopup(`+1 BERRY (${this.state.inventory.berries}/3)`, true);
+      this.setMood('happy');
+      
+      if (this.state.inventory.berries === 1) {
+        this.queueDialogue([
+          {
+            speaker: 'YOU',
+            text: "These berries look delicious!"
+          }
+        ]);
+      } else if (this.state.inventory.berries >= 3) {
+        this.queueDialogue([
+          {
+            speaker: 'YOU',
+            text: "I've picked 3 berries. They look really good!",
+            onComplete: () => {
+              this.state.showChoice = true;
+              this.state.choiceOptions = [
+                {
+                  text: "Eat some berries - I'm hungry!",
+                  action: () => {
+                    this.state.showChoice = false;
+                    this.state.inventory.berries -= 2;
+                    this.showInventoryPopup(`-2 BERRIES`, false);
+                    this.setMood('happy');
+                    this.queueDialogue([
+                      {
+                        speaker: 'YOU',
+                        text: "Mmm, those were tasty! I only have 1 berry left now..."
+                      }
+                    ]);
+                  }
+                },
+                {
+                  text: "No, I should save them",
+                  action: () => {
+                    this.state.showChoice = false;
+                    this.queueDialogue([
+                      {
+                        speaker: 'YOU',
+                        text: "I'll hold onto these for now. They might come in handy."
+                      }
+                    ]);
+                  }
+                }
+              ];
+            }
           }
         ]);
       }
     } else {
+      soundManager.playForDurationWithFade('bush', 1500, 300);
       this.queueDialogue([
         {
           speaker: 'YOU',
-          text: "There are no more berries on this bush."
+          text: "I already have plenty of berries."
         }
       ]);
     }
@@ -5819,7 +5879,7 @@ export class VillageLedgerGame {
     }
 
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    const elderDanceBob = Math.sin(this.bobTimer * 4) * 3;
+    const elderDanceBob = Math.sin(this.bobTimer * 2) * 3;
     this.villageElder.y = groundY - this.villageElder.height - 10 + elderDanceBob;
     this.villageElder.bobOffset = elderDanceBob;
   }
@@ -7736,11 +7796,6 @@ export class VillageLedgerGame {
       this.badgeDismissCallback = onDismiss || null;
       soundManager.play('badgeReward');
       if (this.badgeAutoTimer) clearTimeout(this.badgeAutoTimer);
-      this.badgeAutoTimer = setTimeout(() => {
-        if (this.state.showBadgePopup) {
-          this.dismissBadgePopup();
-        }
-      }, 2500);
     } else if (onDismiss) {
       // Badge already earned, call callback immediately
       onDismiss();
@@ -11125,6 +11180,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,
+      berryRestockUsed: false,
       slingshotIntroduced: true,
       ledgerEntries: [],
       dialogueQueue: [],
@@ -11284,6 +11340,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       fishIntroduced: false,
       stoneIntroduced: false,
       berriesIntroduced: false,
+      berryRestockUsed: false,
       slingshotIntroduced: true,
       ledgerEntries: [],
       dialogueQueue: [],

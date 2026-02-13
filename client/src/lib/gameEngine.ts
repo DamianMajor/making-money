@@ -1665,25 +1665,41 @@ export class VillageLedgerGame {
                 this.state.showRainfall = false; // Turn off rain
                 soundManager.stop('thunder');
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
-                // Keep night scene visible for 1 extra second, then show DJ Elder intro before quiz
+                // Keep night scene visible for 1 extra second, then show quiz intro
                 setTimeout(() => {
                   this.player.visible = true;
                   this.state.playerEnteredHut = false;
                   this.state.playerAlpha = 1;
-                  this.queueDialogue([
-                    {
-                      speaker: 'VILLAGE ELDER',
-                      text: "Psst... DJ Elder doesn't usually take requests..."
-                    },
-                    {
-                      speaker: 'VILLAGE ELDER',
-                      text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
-                      onComplete: () => {
-                        this.state.showQuiz = true;
-                        this.state.phase = 'quiz';
+                  this.currentQuizQuestion = 0;
+                  this.quizWrongAnswers = [];
+                  this.showQuizFeedback = false;
+                  if (this.state.partyEnded) {
+                    this.queueDialogue([
+                      {
+                        speaker: 'VILLAGE ELDER',
+                        text: "Before you rest... let's review what you learned today!",
+                        onComplete: () => {
+                          this.state.showQuiz = true;
+                          this.state.phase = 'quiz';
+                        }
                       }
-                    }
-                  ]);
+                    ]);
+                  } else {
+                    this.queueDialogue([
+                      {
+                        speaker: 'VILLAGE ELDER',
+                        text: "Psst... DJ Elder doesn't usually take requests..."
+                      },
+                      {
+                        speaker: 'VILLAGE ELDER',
+                        text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                        onComplete: () => {
+                          this.state.showQuiz = true;
+                          this.state.phase = 'quiz';
+                        }
+                      }
+                    ]);
+                  }
                 }, 4000); // 4 seconds delay (1 more than before)
               } catch (e) {
                 console.error('Error in quiz transition:', e);
@@ -1742,25 +1758,41 @@ export class VillageLedgerGame {
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
                 soundManager.fadeOut('ambientNight', 1000); // Fade out ambient night
                 this.state.showNightTransition = false;
-                // Delay DJ Elder intro then quiz by 3 seconds
+                // Delay quiz intro by 3 seconds
                 setTimeout(() => {
                   this.player.visible = true;
                   this.state.playerEnteredHut = false;
                   this.state.playerAlpha = 1;
-                  this.queueDialogue([
-                    {
-                      speaker: 'VILLAGE ELDER',
-                      text: "Psst... DJ Elder doesn't usually take requests..."
-                    },
-                    {
-                      speaker: 'VILLAGE ELDER',
-                      text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
-                      onComplete: () => {
-                        this.state.showQuiz = true;
-                        this.state.phase = 'quiz';
+                  this.currentQuizQuestion = 0;
+                  this.quizWrongAnswers = [];
+                  this.showQuizFeedback = false;
+                  if (this.state.partyEnded) {
+                    this.queueDialogue([
+                      {
+                        speaker: 'VILLAGE ELDER',
+                        text: "Before you rest... let's review what you learned today!",
+                        onComplete: () => {
+                          this.state.showQuiz = true;
+                          this.state.phase = 'quiz';
+                        }
                       }
-                    }
-                  ]);
+                    ]);
+                  } else {
+                    this.queueDialogue([
+                      {
+                        speaker: 'VILLAGE ELDER',
+                        text: "Psst... DJ Elder doesn't usually take requests..."
+                      },
+                      {
+                        speaker: 'VILLAGE ELDER',
+                        text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                        onComplete: () => {
+                          this.state.showQuiz = true;
+                          this.state.phase = 'quiz';
+                        }
+                      }
+                    ]);
+                  }
                 }, 3000);
               } catch (e) {
                 console.error('Error in quiz transition:', e);
@@ -5582,6 +5614,8 @@ export class VillageLedgerGame {
     this.state.phase = 'complete_success';
     this.state.stormCountdownActive = true;
     this.state.stormCountdownTimer = 35;
+    this.rainSoundStarted = false;
+    this.state.showNightTransition = false;
     setTimeout(() => {
       soundManager.play('thunder');
     }, 1000);
@@ -6340,25 +6374,41 @@ export class VillageLedgerGame {
                       soundManager.stop('thunder');
                       soundManager.fadeOut('rain', 6000); // 6 second fade out
                       this.state.showNightTransition = false;
-                      // Delay DJ Elder intro then quiz by 3 seconds
+                      // Delay quiz intro by 3 seconds
                       setTimeout(() => {
                         this.player.visible = true;
                         this.state.playerEnteredHut = false;
                         this.state.playerAlpha = 1;
-                        this.queueDialogue([
-                          {
-                            speaker: 'VILLAGE ELDER',
-                            text: "Psst... DJ Elder doesn't usually take requests..."
-                          },
-                          {
-                            speaker: 'VILLAGE ELDER',
-                            text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
-                            onComplete: () => {
-                              this.state.showQuiz = true;
-                              this.state.phase = 'quiz';
+                        this.currentQuizQuestion = 0;
+                        this.quizWrongAnswers = [];
+                        this.showQuizFeedback = false;
+                        if (this.state.partyEnded) {
+                          this.queueDialogue([
+                            {
+                              speaker: 'VILLAGE ELDER',
+                              text: "Before you rest... let's review what you learned today!",
+                              onComplete: () => {
+                                this.state.showQuiz = true;
+                                this.state.phase = 'quiz';
+                              }
                             }
-                          }
-                        ]);
+                          ]);
+                        } else {
+                          this.queueDialogue([
+                            {
+                              speaker: 'VILLAGE ELDER',
+                              text: "Psst... DJ Elder doesn't usually take requests..."
+                            },
+                            {
+                              speaker: 'VILLAGE ELDER',
+                              text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                              onComplete: () => {
+                                this.state.showQuiz = true;
+                                this.state.phase = 'quiz';
+                              }
+                            }
+                          ]);
+                        }
                       }, 3000);
                     } catch (e) {
                       console.error('Error in quiz transition:', e);

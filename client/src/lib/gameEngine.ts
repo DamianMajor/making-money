@@ -12027,8 +12027,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             onComplete: () => {
               soundManager.playRandomRecordScratch();
               setTimeout(() => {
+                soundManager.playRandomDJTransition();
+              }, 300);
+              setTimeout(() => {
                 soundManager.loadAndPlayGenre(genreUrl);
-              }, 500);
+              }, 800);
               this.partySongEndTime = Date.now() + 240000;
               setTimeout(() => {
                 const dur = soundManager.getGenreRemixDuration();

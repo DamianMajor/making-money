@@ -60,7 +60,12 @@ export type SoundName =
   | 'recordScratch1'
   | 'recordScratch2'
   | 'recordScratch3'
-  | 'recordScratch4';
+  | 'recordScratch4'
+  | 'djTransLaser'
+  | 'djTransAirhorn1'
+  | 'djTransAirhorn2'
+  | 'djTransHorns'
+  | 'djTransScratch';
 
 interface SoundConfig {
   src: string;
@@ -131,6 +136,11 @@ const SOUND_CONFIGS: Partial<Record<SoundName, SoundConfig>> = {
   recordScratch2: { src: '/sounds/record-scratch-2.mp3', volume: 0.5, loop: false },
   recordScratch3: { src: '/sounds/record-scratch-3.mp3', volume: 0.5, loop: false },
   recordScratch4: { src: '/sounds/record-scratch-4.mp3', volume: 0.5, loop: false },
+  djTransLaser: { src: '/sounds/dj-transition-laser.mp3', volume: 0.45, loop: false },
+  djTransAirhorn1: { src: '/sounds/dj-transition-airhorn1.mp3', volume: 0.4, loop: false },
+  djTransAirhorn2: { src: '/sounds/dj-transition-airhorn2.mp3', volume: 0.4, loop: false },
+  djTransHorns: { src: '/sounds/dj-transition-horns.mp3', volume: 0.45, loop: false },
+  djTransScratch: { src: '/sounds/dj-transition-scratch.mp3', volume: 0.5, loop: false },
 };
 
 const FIGHT_ALWAYS_SOUNDS: SoundName[] = [
@@ -332,6 +342,12 @@ export class SoundManager {
   public playRandomRecordScratch(): void {
     const scratches: SoundName[] = ['recordScratch1', 'recordScratch2', 'recordScratch3', 'recordScratch4'];
     const pick = scratches[Math.floor(Math.random() * scratches.length)];
+    this.play(pick);
+  }
+
+  public playRandomDJTransition(): void {
+    const transitions: SoundName[] = ['djTransLaser', 'djTransAirhorn1', 'djTransAirhorn2', 'djTransHorns', 'djTransScratch'];
+    const pick = transitions[Math.floor(Math.random() * transitions.length)];
     this.play(pick);
   }
 

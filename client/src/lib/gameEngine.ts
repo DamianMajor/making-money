@@ -374,6 +374,32 @@ export class VillageLedgerGame {
   private badgeTrayPanelBounds: { x: number; y: number; w: number; h: number } | null = null;
   private songChoiceButtons: { x: number; y: number; w: number; h: number; genre: string }[] = [];
 
+  private readonly GENRE_AUDIO_MAP: Record<string, string> = {
+    'Classic Hip-Hop': '/sounds/money-classic-hip-hop-remix.mp3',
+    'Rock': '/sounds/money-rock-remix.mp3',
+    'K-Pop': '/sounds/money-k-pop-remix.mp3',
+    'Reggae': '/sounds/money-reggae-remix.mp3',
+    'Yacht Rock': '/sounds/money-yacht-rock-remix.mp3',
+    "80's Hairband": '/sounds/money-80s-hair-remix.mp3',
+    'Trap': '/sounds/money-trap-hip-hop-remix.mp3',
+    'Pop': '/sounds/money-pop-remix.mp3',
+    "80's Funk": '/sounds/money-80s-funk-remix.mp3',
+    'Disco': '/sounds/money-disco-remix.mp3',
+  };
+
+  private readonly GENRE_COLORS: Record<string, string> = {
+    'Classic Hip-Hop': '#FF6B6B',
+    'Rock': '#9B59B6',
+    'K-Pop': '#4ECDC4',
+    'Reggae': '#27AE60',
+    'Yacht Rock': '#3498DB',
+    "80's Hairband": '#E91E63',
+    'Trap': '#FF5722',
+    'Pop': '#FF69B4',
+    "80's Funk": '#FFD700',
+    'Disco': '#E040FB',
+  };
+
   private readonly BADGE_EDUCATIONAL_INFO: Record<string, { title: string; lesson: string; realWorld: string }> = {
     'Double Coincidence of Wants': {
       title: 'Double Coincidence of Wants',
@@ -1427,7 +1453,7 @@ export class VillageLedgerGame {
       }
       this.state.stormCountdownActive = false;
       soundManager.fadeOut('partySong', 3000);
-      soundManager.fadeOut('remixSong', 3000);
+      soundManager.fadeOut('genreRemix', 3000);
       
       // If roof needs fixing, fix it first, then trigger storm sequence
       if (!this.state.roofRepaired && hasWood) {
@@ -1597,15 +1623,25 @@ export class VillageLedgerGame {
                 this.state.showRainfall = false; // Turn off rain
                 soundManager.stop('thunder');
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
-                // Keep night scene visible for 1 extra second, then show quiz with night background
+                // Keep night scene visible for 1 extra second, then show DJ Elder intro before quiz
                 setTimeout(() => {
-                  this.state.showQuiz = true;
-                  this.state.phase = 'quiz';
-                  // Keep showNightTransition true so night scene stays in background
-                  // Restore player visibility for quiz
                   this.player.visible = true;
                   this.state.playerEnteredHut = false;
-                  this.state.playerAlpha = 1; // Reset alpha
+                  this.state.playerAlpha = 1;
+                  this.queueDialogue([
+                    {
+                      speaker: 'VILLAGE ELDER',
+                      text: "Psst... DJ Elder doesn't usually take requests..."
+                    },
+                    {
+                      speaker: 'VILLAGE ELDER',
+                      text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                      onComplete: () => {
+                        this.state.showQuiz = true;
+                        this.state.phase = 'quiz';
+                      }
+                    }
+                  ]);
                 }, 4000); // 4 seconds delay (1 more than before)
               } catch (e) {
                 console.error('Error in quiz transition:', e);
@@ -1664,14 +1700,25 @@ export class VillageLedgerGame {
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
                 soundManager.fadeOut('ambientNight', 1000); // Fade out ambient night
                 this.state.showNightTransition = false;
-                // Delay quiz appearance by 3 seconds
+                // Delay DJ Elder intro then quiz by 3 seconds
                 setTimeout(() => {
-                  this.state.showQuiz = true;
-                  this.state.phase = 'quiz';
-                  // Restore player visibility for quiz
                   this.player.visible = true;
                   this.state.playerEnteredHut = false;
-                  this.state.playerAlpha = 1; // Reset alpha
+                  this.state.playerAlpha = 1;
+                  this.queueDialogue([
+                    {
+                      speaker: 'VILLAGE ELDER',
+                      text: "Psst... DJ Elder doesn't usually take requests..."
+                    },
+                    {
+                      speaker: 'VILLAGE ELDER',
+                      text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                      onComplete: () => {
+                        this.state.showQuiz = true;
+                        this.state.phase = 'quiz';
+                      }
+                    }
+                  ]);
                 }, 3000);
               } catch (e) {
                 console.error('Error in quiz transition:', e);
@@ -3636,13 +3683,15 @@ export class VillageLedgerGame {
       });
     }
     soundManager.stopDaytimeMusic();
-    soundManager.play('remixSong');
-    const remixDuration = soundManager.getBufferDuration('remixSong');
-    if (remixDuration > 0) {
-      this.partySongEndTime = Date.now() + remixDuration;
-    } else {
-      this.partySongEndTime = Date.now() + 264000;
-    }
+    const genreUrl = this.GENRE_AUDIO_MAP[this.state.selectedGenre] || '/sounds/money-classic-hip-hop-remix.mp3';
+    soundManager.loadAndPlayGenre(genreUrl);
+    this.partySongEndTime = Date.now() + 240000;
+    setTimeout(() => {
+      const dur = soundManager.getGenreRemixDuration();
+      if (dur > 0) {
+        this.partySongEndTime = Date.now() + dur;
+      }
+    }, 3000);
     this.woodcutter.isWalking = true;
     this.stoneWorker.isWalking = true;
     this.fisherman.isWalking = true;
@@ -5264,7 +5313,7 @@ export class VillageLedgerGame {
     this.state.showCelebration = false;
     this.celebrationEndTime = Date.now();
     soundManager.fadeOut('partySong', 3000);
-    soundManager.fadeOut('remixSong', 3000);
+    soundManager.fadeOut('genreRemix', 3000);
     soundManager.fadeOut('crowdApplause', 1500);
     soundManager.fadeOut('celebration', 1500);
     this.state.partyHintText = '';
@@ -5987,13 +6036,25 @@ export class VillageLedgerGame {
                       soundManager.stop('thunder');
                       soundManager.fadeOut('rain', 6000); // 6 second fade out
                       this.state.showNightTransition = false;
-                      // Delay quiz appearance by 3 seconds
+                      // Delay DJ Elder intro then quiz by 3 seconds
                       setTimeout(() => {
-                        this.state.showQuiz = true;
-                        this.state.phase = 'quiz';
                         this.player.visible = true;
                         this.state.playerEnteredHut = false;
-                        this.state.playerAlpha = 1; // Reset alpha
+                        this.state.playerAlpha = 1;
+                        this.queueDialogue([
+                          {
+                            speaker: 'VILLAGE ELDER',
+                            text: "Psst... DJ Elder doesn't usually take requests..."
+                          },
+                          {
+                            speaker: 'VILLAGE ELDER',
+                            text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                            onComplete: () => {
+                              this.state.showQuiz = true;
+                              this.state.phase = 'quiz';
+                            }
+                          }
+                        ]);
                       }, 3000);
                     } catch (e) {
                       console.error('Error in quiz transition:', e);
@@ -10902,8 +10963,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.fillRect(0, 0, w, h);
     
-    const cardW = Math.min(400, w - 40);
-    const cardH = 320;
+    const cardW = Math.min(500, w - 40);
+    const cardH = 500;
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
     
@@ -10927,14 +10988,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = '#C4A77D';
     ctx.fillText('Pick a genre for your victory remix', w / 2, cardY + 55);
     
-    const genres = ['Hip-Hop', 'Rock', 'K-Pop', 'Funk'];
-    const genreColors = ['#FF6B6B', '#9B59B6', '#4ECDC4', '#FFD700'];
-    const btnW = 140;
-    const btnH = 80;
-    const gapX = 20;
-    const gapY = 20;
+    const genres = Object.keys(this.GENRE_AUDIO_MAP);
+    const btnW = 110;
+    const btnH = 40;
+    const gapX = 15;
+    const gapY = 8;
     const gridStartX = cardX + (cardW - btnW * 2 - gapX) / 2;
-    const gridStartY = cardY + 80;
+    const gridStartY = cardY + 75;
     
     this.songChoiceButtons = [];
     
@@ -10943,28 +11003,25 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const row = Math.floor(i / 2);
       const bx = gridStartX + col * (btnW + gapX);
       const by = gridStartY + row * (btnH + gapY);
+      const color = this.GENRE_COLORS[genre] || '#FFD700';
       
       this.songChoiceButtons.push({ x: bx, y: by, w: btnW, h: btnH, genre });
       
-      ctx.fillStyle = genreColors[i];
+      ctx.fillStyle = color;
       ctx.globalAlpha = 0.3;
       ctx.beginPath();
-      ctx.roundRect(bx, by, btnW, btnH, 12);
+      ctx.roundRect(bx, by, btnW, btnH, 10);
       ctx.fill();
       ctx.globalAlpha = 1;
       
-      ctx.strokeStyle = genreColors[i];
+      ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.stroke();
       
-      ctx.font = `24px ${this.uiFont}`;
-      ctx.fillStyle = genreColors[i];
-      ctx.textAlign = 'center';
-      ctx.fillText('\u266A', bx + btnW / 2, by + 35);
-      
-      ctx.font = `bold 14px ${this.uiFont}`;
+      ctx.font = `bold 12px ${this.uiFont}`;
       ctx.fillStyle = '#F5DEB3';
-      ctx.fillText(genre, bx + btnW / 2, by + 60);
+      ctx.textAlign = 'center';
+      ctx.fillText(genre, bx + btnW / 2, by + btnH / 2 + 4);
     });
   }
 
@@ -10977,7 +11034,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         this.state.showSuccess = true;
         this.state.phase = 'complete';
         soundManager.fadeOut('ambientNight', 1000);
-        soundManager.play('remixSong');
+        soundManager.loadAndPlayGenre(this.GENRE_AUDIO_MAP[btn.genre]);
         soundManager.play('buttonClick');
         return;
       }

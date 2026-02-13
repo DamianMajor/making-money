@@ -55,7 +55,7 @@ export type SoundName =
   | 'basicHit1'
   | 'basicHit2'
   | 'partySong'
-  | 'remixSong'
+  | 'genreRemix'
   | 'reliefTrillSound';
 
 interface SoundConfig {
@@ -65,7 +65,7 @@ interface SoundConfig {
   lowPassFreq?: number;
 }
 
-const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
+const SOUND_CONFIGS: Partial<Record<SoundName, SoundConfig>> = {
   footstepA: { src: '/sounds/footstep_a.mp3', volume: 0.3, loop: false, lowPassFreq: 2500 },
   footstepB: { src: '/sounds/footstep_b.mp3', volume: 0.3, loop: false, lowPassFreq: 2500 },
   itemPickup: { src: '/sounds/item-pickup.mp3', volume: 0.5, loop: false },
@@ -122,7 +122,6 @@ const SOUND_CONFIGS: Record<SoundName, SoundConfig> = {
   basicHit1: { src: '/sounds/basic-hit-1.mp3', volume: 0.5, loop: false },
   basicHit2: { src: '/sounds/basic-hit-2.mp3', volume: 0.5, loop: false },
   partySong: { src: '/sounds/money-yell-open.mp3', volume: 0.5, loop: false },
-  remixSong: { src: '/sounds/money-remix.mp3', volume: 0.5, loop: false },
   reliefTrillSound: { src: '/sounds/sixties-cinema-trills-1.mp3', volume: 0.5, loop: false },
 };
 
@@ -162,6 +161,7 @@ export class SoundManager {
   private rainSources: ActiveSound[] = [];
   private rainCrossfadeInterval: ReturnType<typeof setInterval> | null = null;
   private rainActive: boolean = false;
+  private genreRemixDuration: number = 0;
 
   constructor() {
     this.loadFromStorage();
@@ -268,6 +268,7 @@ export class SoundManager {
     if (!buffer) return null;
     
     const config = SOUND_CONFIGS[name];
+    if (!config) return null;
     const source = this.audioContext.createBufferSource();
     source.buffer = buffer;
     source.loop = loop;
@@ -306,6 +307,7 @@ export class SoundManager {
     }
     
     const config = SOUND_CONFIGS[name];
+    if (!config) return;
     const activeSound = this.createSource(name, config.loop, pitch);
     if (!activeSound) return;
     
@@ -601,6 +603,48 @@ export class SoundManager {
     return buffer ? buffer.duration * 1000 : 1000;
   }
 
+  public async loadAndPlayGenre(url: string): Promise<void> {
+    if (!this.audioContext || !this.masterGain) return;
+    const existing = this.activeSources.get('genreRemix');
+    if (existing) {
+      try { existing.source.stop(); } catch {}
+      this.activeSources.delete('genreRemix');
+    }
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) return;
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+
+      const source = this.audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.loop = false;
+
+      const gainNode = this.audioContext.createGain();
+      gainNode.gain.value = 0.5;
+      source.connect(gainNode);
+      gainNode.connect(this.masterGain);
+
+      const activeSound = { source, gainNode };
+      this.activeSources.set('genreRemix', activeSound);
+
+      source.onended = () => {
+        this.activeSources.delete('genreRemix');
+      };
+
+      source.start(0);
+
+      this.genreRemixDuration = audioBuffer.duration * 1000;
+    } catch (error) {
+      console.warn('[SoundManager] Failed to load genre remix:', url, error);
+    }
+  }
+
+  public getGenreRemixDuration(): number {
+    return this.genreRemixDuration || 240000;
+  }
+
   public fadeOut(name: SoundName, duration: number = 1000): void {
     const activeSound = this.activeSources.get(name);
     if (!activeSound || !this.audioContext) return;
@@ -625,12 +669,14 @@ export class SoundManager {
     if (existing) {
       // Just ensure volume is at target level
       const config = SOUND_CONFIGS[name];
+      if (!config) return;
       const currentTime = this.audioContext.currentTime;
       existing.gainNode.gain.linearRampToValueAtTime(config.volume, currentTime + duration / 1000);
       return;
     }
     
     const config = SOUND_CONFIGS[name];
+    if (!config) return;
     const activeSound = this.createSource(name, config.loop);
     if (!activeSound) return;
     
@@ -647,6 +693,7 @@ export class SoundManager {
     const activeSound = this.activeSources.get(name);
     if (!activeSound || !this.audioContext) return;
     const config = SOUND_CONFIGS[name];
+    if (!config) return;
     const targetVolume = config.volume * Math.max(0, Math.min(1, volume));
     const currentTime = this.audioContext.currentTime;
     activeSound.gainNode.gain.setValueAtTime(activeSound.gainNode.gain.value, currentTime);
@@ -664,7 +711,7 @@ export class SoundManager {
     if (this.rainActive) return; // Already playing
     
     this.rainActive = true;
-    const config = SOUND_CONFIGS.rain;
+    const config = SOUND_CONFIGS.rain!;
     const buffer = this.buffers.get('rain');
     if (!buffer) return;
     

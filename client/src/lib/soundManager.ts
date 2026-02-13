@@ -351,6 +351,18 @@ export class SoundManager {
     this.play(pick);
   }
 
+  public stopAllMusic(): void {
+    const musicNames: SoundName[] = [
+      'backgroundMusicDay', 'backgroundMusicDay2', 'backgroundMusicNight',
+      'partySong', 'genreRemix', 'moneySong'
+    ];
+    for (const name of musicNames) {
+      this.stop(name);
+      this.stopLoop(name);
+    }
+    this.daytimeMusicActive = false;
+  }
+
   public playFootstep(): void {
     const pitch = this.footstepToggle ? 0.95 : 1.0;
     this.footstepToggle = !this.footstepToggle;
@@ -649,10 +661,14 @@ export class SoundManager {
     }
 
     try {
-      const response = await fetch(url);
-      if (!response.ok) return;
-      const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+      let audioBuffer = this.genreBufferCache.get(url);
+      if (!audioBuffer) {
+        const response = await fetch(url);
+        if (!response.ok) return;
+        const arrayBuffer = await response.arrayBuffer();
+        audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+        this.genreBufferCache.set(url, audioBuffer);
+      }
 
       const source = this.audioContext.createBufferSource();
       source.buffer = audioBuffer;

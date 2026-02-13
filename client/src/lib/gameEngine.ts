@@ -8993,7 +8993,7 @@ export class VillageLedgerGame {
       const btn = this.musicCollectionBgMusicBtn;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         soundManager.play('buttonClick');
-        soundManager.fadeOut('genreRemix', 500);
+        soundManager.stopAllMusic();
         this.state.selectedGenre = 'background';
         soundManager.fadeIn('backgroundMusicDay', 1000);
         return;
@@ -9004,12 +9004,10 @@ export class VillageLedgerGame {
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         soundManager.play('buttonClick');
         this.state.selectedGenre = btn.genre;
-        soundManager.fadeOut('genreRemix', 300);
-        soundManager.fadeOut('backgroundMusicDay', 500);
-        soundManager.fadeOut('backgroundMusicNight', 500);
+        soundManager.stopAllMusic();
         const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
         if (genreUrl) {
-          setTimeout(() => soundManager.loadAndPlayGenre(genreUrl), 350);
+          soundManager.loadAndPlayGenre(genreUrl);
         }
         return;
       }
@@ -12024,22 +12022,17 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
             this.lastRecordUnlockTime = Date.now();
           }
-          // Stop current music immediately (not fade)
-          soundManager.stop('genreRemix');
-          soundManager.stop('partySong');
+          soundManager.stopAllMusic();
           soundManager.playRandomRecordScratch();
           const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
+          soundManager.preloadGenre(genreUrl);
           this.queueDialogue([{
             speaker: 'VILLAGE ELDER',
             text: "Give me just one second while I pull this out of my record bag...",
             onComplete: () => {
               soundManager.playRandomRecordScratch();
-              setTimeout(() => {
-                soundManager.playRandomDJTransition();
-              }, 300);
-              setTimeout(() => {
-                soundManager.loadAndPlayGenre(genreUrl);
-              }, 800);
+              soundManager.playRandomDJTransition();
+              soundManager.loadAndPlayGenre(genreUrl);
               this.partySongEndTime = Date.now() + 240000;
               setTimeout(() => {
                 const dur = soundManager.getGenreRemixDuration();

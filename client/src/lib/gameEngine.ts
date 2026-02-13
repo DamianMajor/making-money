@@ -435,11 +435,14 @@ export class VillageLedgerGame {
   private booFailureTriggered: boolean = false;
   private hintPulseTimer: number = 0; // Timer for hint box pulse animation
   private stormTriggered: boolean = false;
+  private stormFailureCount: number = 0;
+  private stormFailureActive: boolean = false;
   private rainSoundStarted: boolean = false;
   private celebrationEndTime: number = 0;
   private frozenCelebrationTimer: number = 0;
   private partySongEndTime: number = 0;
   private slingshotPlatformActive: boolean = false;
+  private readonly SLINGSHOT_TARGET_SCORE = 50;
   private inventoryPanelLeftX: number = 0;
   
   // Auto-walk feature: player walks to clicked target and interacts
@@ -1865,7 +1868,13 @@ export class VillageLedgerGame {
             });
             dialogues.push({
               speaker: 'VILLAGE ELDER',
-              text: "When someone gives you something on credit, we carve the agreement into this stone. That way, no one can deny or forget what was promised."
+              text: "When someone gives you something on credit, we carve the agreement into this stone. That way, no one can deny or forget what was promised.",
+              onComplete: () => {
+                this.awardBadge(
+                  'No Trust, No Trade',
+                  "Without proof, promises can be broken. That's why the village records every agreement - so trust is built on evidence, not just words!"
+                );
+              }
             });
           }
           
@@ -1914,7 +1923,11 @@ export class VillageLedgerGame {
                   this.queueDialogue([
                     {
                       speaker: 'WOODCUTTER',
-                      text: "The debt is now recorded! Here's your Wood.",
+                      text: "The debt is now recorded! Here's your Wood."
+                    },
+                    {
+                      speaker: 'WOODCUTTER',
+                      text: "Huh... seeing it carved in stone makes it feel real. No one can deny this agreement now.",
                       onComplete: () => {
                         // Unblock player movement after receiving item
                         this.state.playerBlockedForCarving = false;
@@ -2445,22 +2458,28 @@ export class VillageLedgerGame {
               speaker: 'WOODCUTTER',
               text: "The Village Elder has a great stone tablet in the center of the village. Let's go talk to him!",
               onComplete: () => {
-                this.state.loop = 2;
-                this.state.smartPathTaken = true;
-                
-                this.state.inventory.wood = 1;
-                this.state.obtainedWood = true;
-                this.state.woodIntroduced = true;
-                this.state.stoneIntroduced = true;
-                this.state.fishIntroduced = true;
-                this.showInventoryPopup('+1 WOOD');
-                this.setMood('happy');
-                
-                this.state.escortingNPC = 'woodcutter';
-                this.state.woodcutterDebtRecorded = true;
-                this.state.phase = 'loop2_escorting_woodcutter';
-                
-                this.woodcutter.targetX = this.villageCenterX - 80;
+                this.awardBadge(
+                  'Debt',
+                  'You took on a debt - a promise to pay someone back later. But can promises always be trusted?',
+                  () => {
+                    this.state.loop = 2;
+                    this.state.smartPathTaken = true;
+                    
+                    this.state.inventory.wood = 1;
+                    this.state.obtainedWood = true;
+                    this.state.woodIntroduced = true;
+                    this.state.stoneIntroduced = true;
+                    this.state.fishIntroduced = true;
+                    this.showInventoryPopup('+1 WOOD');
+                    this.setMood('happy');
+                    
+                    this.state.escortingNPC = 'woodcutter';
+                    this.state.woodcutterDebtRecorded = true;
+                    this.state.phase = 'loop2_escorting_woodcutter';
+                    
+                    this.woodcutter.targetX = this.villageCenterX - 80;
+                  }
+                );
               }
             }
           ]);
@@ -2755,7 +2774,11 @@ export class VillageLedgerGame {
                   this.queueDialogue([
                     {
                       speaker: 'STONE-WORKER',
-                      text: "The debt is now recorded! Here's your Sharp Stone.",
+                      text: "The debt is now recorded! Here's your Sharp Stone."
+                    },
+                    {
+                      speaker: 'STONE-WORKER',
+                      text: "There it is, carved in stone for all to see. I feel better knowing it's written down.",
                       onComplete: () => {
                         // Unblock player movement after receiving item
                         this.state.playerBlockedForCarving = false;
@@ -3053,33 +3076,14 @@ export class VillageLedgerGame {
       this.stoneWorker.targetX = this.villageCenterX - 160;
     };
 
-    // Award badge after DCW line, then show credit offer
     const awardBadgeThenCreditOffer = () => {
-      if (this.state.loop === 1 && !this.state.badges.includes('Double Coincidence of Wants')) {
-        this.awardBadge(
-          'Double Coincidence of Wants',
-          'You discovered that trading directly is hard! For a trade to work, each person must want exactly what the other has at the same time. This is called the "Double Coincidence of Wants" - a problem that money was invented to solve!',
-          () => {
-            // After badge is dismissed, show credit offer dialogue
-            this.queueDialogue([
-              {
-                speaker: 'STONE-WORKER',
-                text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Great Stone.",
-                onComplete: finishGetStone
-              }
-            ]);
-          }
-        );
-      } else {
-        // No badge needed, go straight to credit offer
-        this.queueDialogue([
-          {
-            speaker: 'STONE-WORKER',
-            text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Great Stone.",
-            onComplete: finishGetStone
-          }
-        ]);
-      }
+      this.queueDialogue([
+        {
+          speaker: 'STONE-WORKER',
+          text: "Tell you what - I'll give you the stone, but you'll owe me a debt. Bring me 2 Fish later. I'll meet you at the Great Stone.",
+          onComplete: finishGetStone
+        }
+      ]);
     };
 
     if (offeredItem === null) {
@@ -3306,7 +3310,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "I'd love to trade berries for fish! But I'm still fishing... haven't caught anything yet!"
+          text: "I'm still out fishing... haven't caught anything yet. Come back later!"
         }
       ]);
     }
@@ -3316,67 +3320,81 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "I would love some berries! Do you have any? I'll trade 1 fish for each berry you bring me.",
+          text: "I'm so hungry! I've got plenty of fish today, but nothing else to eat. Do you have anything to trade?",
           onComplete: () => {
-            // Build choice options based on how many berries the player has
-            const choices: { text: string; action: () => void }[] = [];
-            
-            if (berryCount >= 1) {
-              choices.push({
-                text: "1 Fish",
-                action: () => {
-                  this.state.showChoice = false;
-                  this.state.inventory.berries -= 1;
-                  this.state.inventory.fish += 1;
-                  this.state.fishIntroduced = true;
-                  this.showInventoryPopup('+1 FISH (-1 BERRY)');
-                  this.setMood('happy');
-                  this.queueDialogue([{ speaker: 'FISHERMAN', text: "Here's 1 Fish for you!" }]);
-                  this.updatePhaseAfterFishTrade(phase);
-                }
-              });
-            }
-            if (berryCount >= 2) {
-              choices.push({
-                text: "2 Fish",
-                action: () => {
-                  this.state.showChoice = false;
-                  this.state.inventory.berries -= 2;
-                  this.state.inventory.fish += 2;
-                  this.state.fishIntroduced = true;
-                  this.showInventoryPopup('+2 FISH (-2 BERRIES)');
-                  this.setMood('happy');
-                  this.queueDialogue([{ speaker: 'FISHERMAN', text: "Here's 2 Fish for you!" }]);
-                  this.updatePhaseAfterFishTrade(phase);
-                }
-              });
-            }
-            if (berryCount >= 3) {
-              choices.push({
-                text: "3 Fish",
-                action: () => {
-                  this.state.showChoice = false;
-                  this.state.inventory.berries -= 3;
-                  this.state.inventory.fish += 3;
-                  this.state.fishIntroduced = true;
-                  this.showInventoryPopup('+3 FISH (-3 BERRIES)');
-                  this.setMood('happy');
-                  this.queueDialogue([{ speaker: 'FISHERMAN', text: "Here's 3 Fish for you! A fine trade!" }]);
-                  this.updatePhaseAfterFishTrade(phase);
-                }
-              });
-            }
-            
-            choices.push({
-              text: "Cancel",
-              action: () => {
-                this.state.showChoice = false;
-                this.queueDialogue([{ speaker: 'FISHERMAN', text: "No worries! Come back when you're ready to trade." }]);
+            this.showTradeSelection((selectedItem: string | null) => {
+              if (selectedItem === 'berries') {
+                this.awardBadge(
+                  'Double Coincidence of Wants',
+                  "You found it! Both you and the fisherman wanted exactly what the other had - berries for fish! This rare match is called the 'Double Coincidence of Wants'.",
+                  () => {
+                    const currentBerryCount = this.state.inventory.berries;
+                    const choices: { text: string; action: () => void }[] = [];
+                    
+                    if (currentBerryCount >= 1) {
+                      choices.push({
+                        text: "1 Fish",
+                        action: () => {
+                          this.state.showChoice = false;
+                          this.state.inventory.berries -= 1;
+                          this.state.inventory.fish += 1;
+                          this.state.fishIntroduced = true;
+                          this.showInventoryPopup('+1 FISH (-1 BERRY)');
+                          this.setMood('happy');
+                          this.queueDialogue([{ speaker: 'FISHERMAN', text: "Here's 1 Fish for you!" }]);
+                          this.updatePhaseAfterFishTrade(phase);
+                        }
+                      });
+                    }
+                    if (currentBerryCount >= 2) {
+                      choices.push({
+                        text: "2 Fish",
+                        action: () => {
+                          this.state.showChoice = false;
+                          this.state.inventory.berries -= 2;
+                          this.state.inventory.fish += 2;
+                          this.state.fishIntroduced = true;
+                          this.showInventoryPopup('+2 FISH (-2 BERRIES)');
+                          this.setMood('happy');
+                          this.queueDialogue([{ speaker: 'FISHERMAN', text: "Here's 2 Fish for you!" }]);
+                          this.updatePhaseAfterFishTrade(phase);
+                        }
+                      });
+                    }
+                    if (currentBerryCount >= 3) {
+                      choices.push({
+                        text: "3 Fish",
+                        action: () => {
+                          this.state.showChoice = false;
+                          this.state.inventory.berries -= 3;
+                          this.state.inventory.fish += 3;
+                          this.state.fishIntroduced = true;
+                          this.showInventoryPopup('+3 FISH (-3 BERRIES)');
+                          this.setMood('happy');
+                          this.queueDialogue([{ speaker: 'FISHERMAN', text: "Here's 3 Fish for you! A fine trade!" }]);
+                          this.updatePhaseAfterFishTrade(phase);
+                        }
+                      });
+                    }
+                    
+                    choices.push({
+                      text: "Cancel",
+                      action: () => {
+                        this.state.showChoice = false;
+                        this.queueDialogue([{ speaker: 'FISHERMAN', text: "No worries! Come back when you're ready to trade." }]);
+                      }
+                    });
+                    
+                    this.state.showChoice = true;
+                    this.state.choiceOptions = choices;
+                  }
+                );
+              } else if (selectedItem === 'slingshot' || selectedItem === 'wood' || selectedItem === 'stone') {
+                this.queueDialogue([{ speaker: 'FISHERMAN', text: "Thanks, but I can't eat that! I need something to fill my belly." }]);
+              } else {
+                this.queueDialogue([{ speaker: 'FISHERMAN', text: "No worries, come back when you're ready!" }]);
               }
             });
-            
-            this.state.showChoice = true;
-            this.state.choiceOptions = choices;
           }
         }
       ]);
@@ -3396,7 +3414,7 @@ export class VillageLedgerGame {
       this.queueDialogue([
         {
           speaker: 'FISHERMAN',
-          text: "I would love some berries! Do you have any? Find them at the berry bush to the west!"
+          text: "I'm so hungry but I've got nothing to eat! If only someone had something tasty to trade... maybe check around the village?"
         }
       ]);
     }
@@ -4814,15 +4832,17 @@ export class VillageLedgerGame {
 
     if (this.state.stormCountdownActive) {
       this.state.stormCountdownTimer -= dt;
+      const timer = this.state.stormCountdownTimer;
+      const thunderTimes = [25, 15, 10, 7, 5, 3];
+      for (const tt of thunderTimes) {
+        if (timer <= tt && timer > tt - dt) {
+          soundManager.play('thunder');
+          break;
+        }
+      }
       if (this.state.stormCountdownTimer <= 0) {
         this.state.stormCountdownActive = false;
-        this.state.phase = 'complete_success';
-        if (!this.stormTriggered) {
-          this.stormTriggered = true;
-          this.triggerStormClouds();
-        }
-        this.autoWalkTarget = { x: 200, type: 'location' };
-        this.state.forceHutEntry = true;
+        this.triggerStormFailure();
       }
     }
 
@@ -4869,7 +4889,7 @@ export class VillageLedgerGame {
     
     if (this.state.showThunderstorm) {
       this.state.thunderstormTimer += dt;
-      if (this.state.thunderstormTimer > 3.5) {
+      if (this.state.thunderstormTimer > 3.5 && !this.stormFailureActive) {
         this.state.showThunderstorm = false;
         this.state.stormCountdownActive = false;
         this.triggerEnterHutSequence();
@@ -5089,6 +5109,34 @@ export class VillageLedgerGame {
   }
   
   // Storm clouds appear - player must interact with hut to fix roof and enter
+  private triggerStormFailure(): void {
+    this.stormFailureCount++;
+    this.stormFailureActive = true;
+    this.state.showThunderstorm = true;
+    this.state.thunderstormTimer = 0;
+    soundManager.play('thunder');
+
+    setTimeout(() => {
+      this.state.showThunderstorm = false;
+      this.stormFailureActive = false;
+      this.queueDialogue([
+        {
+          speaker: 'YOU',
+          text: "Oh no! The storm hit before I could get home! My hut is flooding!"
+        },
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "Quick! You need to hurry back before the next wave hits! Run!",
+          onComplete: () => {
+            this.state.stormCountdownActive = true;
+            this.state.stormCountdownTimer = 35;
+            this.stormTriggered = false;
+          }
+        }
+      ]);
+    }, 2000);
+  }
+
   private triggerStormClouds(): void {
     // Start clouds animation and thunder
     this.state.showCloudsAnimation = true;
@@ -5616,6 +5664,26 @@ export class VillageLedgerGame {
       ctx.fillText(ft.text, ftScreenX, ft.y);
       ctx.globalAlpha = 1;
     }
+
+    if (this.state.slingshotLocked) {
+      ctx.save();
+      ctx.textAlign = 'right';
+      ctx.font = `bold 14px ${this.uiFont}`;
+      const scoreColor = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE ? '#FFD700' : '#FFFFFF';
+      ctx.fillStyle = scoreColor;
+      ctx.fillText(`Score: ${this.state.slingshotScore}`, w - 20, 30);
+      ctx.font = `10px ${this.uiFont}`;
+      ctx.fillStyle = '#C4A77D';
+      ctx.fillText(`Target: ${this.SLINGSHOT_TARGET_SCORE}`, w - 20, 46);
+      if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE) {
+        ctx.textAlign = 'center';
+        ctx.font = `bold 12px ${this.uiFont}`;
+        const champPulse = 0.7 + 0.3 * Math.sin(Date.now() / 200);
+        ctx.fillStyle = `rgba(255, 215, 0, ${champPulse})`;
+        ctx.fillText('PARTY CHAMPION!', w / 2, 20);
+      }
+      ctx.restore();
+    }
     
     if (t < 4 && platformScreenX > -100 && platformScreenX < w + 100) {
       const alpha = t < 3 ? 1 : 1 - (t - 3);
@@ -5624,7 +5692,7 @@ export class VillageLedgerGame {
       ctx.font = `bold 11px ${this.uiFont}`;
       ctx.fillStyle = '#FFFFFF';
       if (this.slingshotPlatformActive) {
-        ctx.fillText('Pull the slingshot to pop balloons!', platformScreenX, groundY - platformH - 80);
+        ctx.fillText(`Pop balloons to score ${this.SLINGSHOT_TARGET_SCORE} points!`, platformScreenX, groundY - platformH - 80);
       } else {
         ctx.fillText('Walk to the platform to use the slingshot!', platformScreenX, groundY - platformH - 80);
       }
@@ -5997,25 +6065,58 @@ export class VillageLedgerGame {
     }
 
     if (this.state.stormCountdownActive && !this.state.showCelebration) {
-      const countdownText = `STORM APPROACHING: ${Math.ceil(this.state.stormCountdownTimer)}s`;
+      const progress = 1 - (this.state.stormCountdownTimer / 35);
+
       ctx.save();
+      if (this.state.stormCountdownTimer <= 10) {
+        const shakeIntensity = (1 - this.state.stormCountdownTimer / 10) * 3;
+        const shakeX = (Math.random() - 0.5) * shakeIntensity;
+        const shakeY = (Math.random() - 0.5) * shakeIntensity;
+        ctx.translate(shakeX, shakeY);
+      }
+
+      if (progress > 0.1) {
+        const darkProgress = Math.min(1, (progress - 0.1) / 0.9);
+        const overlayHeight = 30 + darkProgress * 40;
+        ctx.globalAlpha = darkProgress * 0.6;
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, this.logicalWidth, overlayHeight);
+        ctx.globalAlpha = 1;
+      }
+
+      const countdownText = `STORM APPROACHING: ${Math.ceil(this.state.stormCountdownTimer)}s`;
       ctx.textAlign = 'center';
-      ctx.font = `bold 16px ${this.uiFont}`;
-      const pulse = 0.6 + 0.4 * Math.sin(Date.now() / 300);
+      const urgency = 1 - (this.state.stormCountdownTimer / 35);
+      const pulseSpeed = 300 - urgency * 200;
+      const pulse = 0.6 + 0.4 * Math.sin(Date.now() / pulseSpeed);
+      const fontSize = this.state.stormCountdownTimer <= 10 ?
+        16 + (1 - this.state.stormCountdownTimer / 10) * 8 : 16;
+      ctx.font = `bold ${fontSize}px ${this.uiFont}`;
       ctx.fillStyle = `rgba(220, 38, 38, ${pulse})`;
       ctx.fillText(countdownText, this.logicalWidth / 2, 80);
       ctx.font = `12px ${this.uiFont}`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
       ctx.fillText('Get back to your hut!', this.logicalWidth / 2, 100);
-      ctx.restore();
-      const progress = 1 - (this.state.stormCountdownTimer / 35);
-      if (progress > 0.3) {
-        ctx.save();
-        ctx.globalAlpha = (progress - 0.3) * 0.5;
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(0, 0, this.logicalWidth, 30);
-        ctx.restore();
+
+      const rainProgress = Math.max(0, progress - 0.3) / 0.7;
+      if (rainProgress > 0) {
+        ctx.strokeStyle = `rgba(180, 200, 255, ${0.3 * rainProgress})`;
+        ctx.lineWidth = 1;
+        const rainCount = Math.floor(50 * rainProgress);
+        const t = Date.now() / 1000;
+        for (let i = 0; i < rainCount; i++) {
+          const seed = i * 1234.5678;
+          const rainX = (seed % this.logicalWidth + t * 80 * ((i % 3) + 1)) % this.logicalWidth;
+          const baseY = ((seed * 7) % this.logicalHeight);
+          const rainY = (baseY + t * 400) % this.logicalHeight;
+          ctx.beginPath();
+          ctx.moveTo(rainX, rainY);
+          ctx.lineTo(rainX - 2, rainY + 12);
+          ctx.stroke();
+        }
       }
+
+      ctx.restore();
     }
     
     // Draw thunderstorm animation if active
@@ -10766,7 +10867,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     // Badge summary card - taller for badge grid
     const cardW = Math.min(520, w - 40);
-    const cardH = Math.min(480, h - 30);
+    const hasChampion = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE;
+    const cardH = Math.min(hasChampion ? 510 : 480, h - 30);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
     
@@ -10795,6 +10897,15 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = '#C4A77D';
     ctx.fillText(`${badgeCount} of ${totalBadges} badges earned`, w / 2, cardY + 58);
     
+    if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE) {
+      ctx.font = `bold 10px ${this.uiFont}`;
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText('Party Champion!', w / 2, cardY + 72);
+      ctx.font = `8px ${this.uiFont}`;
+      ctx.fillStyle = '#C4A77D';
+      ctx.fillText(`Slingshot Score: ${this.state.slingshotScore}`, w / 2, cardY + 85);
+    }
+
     // Badge grid - 3 columns, 2 rows
     const cols = 3;
     const badgeSize = 52;
@@ -10802,7 +10913,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const gapY = 12;
     const gridW = cols * badgeSize + (cols - 1) * gapX;
     const startX = (w - gridW) / 2;
-    const startY = cardY + 75;
+    const hasPartyChampion = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE;
+    const startY = cardY + (hasPartyChampion ? 98 : 75);
     
     this.successBadgeAreas = [];
     this.ALL_BADGES.forEach((badge, i) => {
@@ -11096,6 +11208,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Reset animation/sound flags
     this.booFailureTriggered = false;
     this.stormTriggered = false;
+    this.stormFailureCount = 0;
+    this.stormFailureActive = false;
     this.rainSoundStarted = false;
     this.celebrationEndTime = 0;
     this.smartPathElderIntroShown = false;
@@ -11252,6 +11366,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // Reset animation/sound flags for loop 2
     this.booFailureTriggered = false;
     this.stormTriggered = false;
+    this.stormFailureCount = 0;
+    this.stormFailureActive = false;
     this.rainSoundStarted = false;
     this.celebrationEndTime = 0;
     this.smartPathElderIntroShown = false;

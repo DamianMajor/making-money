@@ -1461,7 +1461,7 @@ export class VillageLedgerGame {
     
     // LOOP 2 SUCCESS: Debts settled, time to return home
     // Player must interact with hut to fix roof and enter - allow interaction even during clouds animation
-    if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && (!this.state.showNightTransition || this.state.showCelebration) && !this.state.showSuccess && !this.state.playerEnteredHut) {
+    if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && (!this.state.showNightTransition || this.state.showCelebration) && !this.state.showSuccess && !this.state.playerEnteredHut && !this.state.playerFading) {
       
       if (this.state.showCelebration) {
         this.queueDialogue([{ 
@@ -1665,26 +1665,18 @@ export class VillageLedgerGame {
                 this.state.showRainfall = false; // Turn off rain
                 soundManager.stop('thunder');
                 soundManager.fadeOut('rain', 6000); // 6 second fade out
-                // Keep night scene visible for 1 extra second, then show quiz intro
+                // Keep night scene visible, then show quiz intro
                 setTimeout(() => {
-                  this.player.visible = true;
-                  this.state.playerEnteredHut = false;
-                  this.state.playerAlpha = 1;
                   this.currentQuizQuestion = 0;
                   this.quizWrongAnswers = [];
                   this.showQuizFeedback = false;
                   if (this.state.partyEnded) {
-                    this.queueDialogue([
-                      {
-                        speaker: 'VILLAGE ELDER',
-                        text: "Before you rest... let's review what you learned today!",
-                        onComplete: () => {
-                          this.state.showQuiz = true;
-                          this.state.phase = 'quiz';
-                        }
-                      }
-                    ]);
+                    this.state.showQuiz = true;
+                    this.state.phase = 'quiz';
                   } else {
+                    this.player.visible = true;
+                    this.state.playerEnteredHut = false;
+                    this.state.playerAlpha = 1;
                     this.queueDialogue([
                       {
                         speaker: 'VILLAGE ELDER',
@@ -1760,24 +1752,16 @@ export class VillageLedgerGame {
                 this.state.showNightTransition = false;
                 // Delay quiz intro by 3 seconds
                 setTimeout(() => {
-                  this.player.visible = true;
-                  this.state.playerEnteredHut = false;
-                  this.state.playerAlpha = 1;
                   this.currentQuizQuestion = 0;
                   this.quizWrongAnswers = [];
                   this.showQuizFeedback = false;
                   if (this.state.partyEnded) {
-                    this.queueDialogue([
-                      {
-                        speaker: 'VILLAGE ELDER',
-                        text: "Before you rest... let's review what you learned today!",
-                        onComplete: () => {
-                          this.state.showQuiz = true;
-                          this.state.phase = 'quiz';
-                        }
-                      }
-                    ]);
+                    this.state.showQuiz = true;
+                    this.state.phase = 'quiz';
                   } else {
+                    this.player.visible = true;
+                    this.state.playerEnteredHut = false;
+                    this.state.playerAlpha = 1;
                     this.queueDialogue([
                       {
                         speaker: 'VILLAGE ELDER',
@@ -5191,10 +5175,11 @@ export class VillageLedgerGame {
     }
 
     // Check if player completed Loop 2 successfully - trigger thunderstorm then night transition
-    // Skip if rain sequence already started or player is fading into hut
+    // Skip if rain sequence already started, player is fading, or dialogue/choice is active
     if (this.state.phase === 'complete_success' && this.player.x <= this.playerHomeX + 50 && 
         !this.state.showThunderstorm && !this.state.showNightTransition && 
-        !this.rainSoundStarted && !this.state.playerFading && !this.state.playerEnteredHut) {
+        !this.rainSoundStarted && !this.state.playerFading && !this.state.playerEnteredHut &&
+        !this.state.currentDialogue && !this.state.showChoice) {
       if (!this.state.roofRepaired) {
         this.state.roofRepaired = true;
       }
@@ -5598,6 +5583,9 @@ export class VillageLedgerGame {
     this.frozenCelebrationTimer = this.state.celebrationTimer;
     this.state.partyEnded = true;
     this.state.showCelebration = false;
+    this.state.showChoice = false;
+    this.state.choiceOptions = [];
+    this.state.currentDialogue = null;
     this.celebrationEndTime = Date.now();
     soundManager.fadeOut('partySong', 3000);
     soundManager.fadeOut('genreRemix', 3000);
@@ -6376,24 +6364,16 @@ export class VillageLedgerGame {
                       this.state.showNightTransition = false;
                       // Delay quiz intro by 3 seconds
                       setTimeout(() => {
-                        this.player.visible = true;
-                        this.state.playerEnteredHut = false;
-                        this.state.playerAlpha = 1;
                         this.currentQuizQuestion = 0;
                         this.quizWrongAnswers = [];
                         this.showQuizFeedback = false;
                         if (this.state.partyEnded) {
-                          this.queueDialogue([
-                            {
-                              speaker: 'VILLAGE ELDER',
-                              text: "Before you rest... let's review what you learned today!",
-                              onComplete: () => {
-                                this.state.showQuiz = true;
-                                this.state.phase = 'quiz';
-                              }
-                            }
-                          ]);
+                          this.state.showQuiz = true;
+                          this.state.phase = 'quiz';
                         } else {
+                          this.player.visible = true;
+                          this.state.playerEnteredHut = false;
+                          this.state.playerAlpha = 1;
                           this.queueDialogue([
                             {
                               speaker: 'VILLAGE ELDER',
@@ -8421,7 +8401,7 @@ export class VillageLedgerGame {
     ctx.font = `bold 9px ${this.uiFont}`;
     ctx.fillStyle = '#FFF';
     ctx.textAlign = 'center';
-    ctx.fillText(`${this.state.badges.length}/6`, x + size / 2, y + size + 14);
+    ctx.fillText(`${this.state.badges.length}/5`, x + size / 2, y + size + 14);
 
     this.badgeTrayButtonArea = { x, y, w: size, h: size + 16 };
 

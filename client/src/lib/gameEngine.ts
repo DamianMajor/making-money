@@ -985,7 +985,11 @@ export class VillageLedgerGame {
 
       // Check badge tray icon tap
       if (this.badgeTrayButtonArea && !this.state.showChoice && !this.state.currentDialogue) {
-        this.handleBadgeTrayTouch(x, y);
+        const bBtn = this.badgeTrayButtonArea;
+        if (x >= bBtn.x && x <= bBtn.x + bBtn.w && y >= bBtn.y && y <= bBtn.y + bBtn.h) {
+          this.handleBadgeTrayTouch(x, y);
+          return;
+        }
       }
       
       // Check if clicking on inventory HUD to open popup (also dismisses hint)
@@ -1385,7 +1389,30 @@ export class VillageLedgerGame {
     if (debtsSettled && this.state.loop === 2 && !this.state.showQuiz && (!this.state.showNightTransition || this.state.showCelebration) && !this.state.showSuccess && !this.state.playerEnteredHut) {
       
       if (this.state.showCelebration) {
-        this.queueDialogue([{ speaker: 'YOU', text: "The party is still going! I should enjoy it while it lasts!" }]);
+        this.queueDialogue([{ 
+          speaker: 'YOU', 
+          text: "The party is still going! I should enjoy it while it lasts!",
+          onComplete: () => {
+            this.state.showChoice = true;
+            this.state.choiceOptions = [
+              { 
+                text: 'Keep partying!', 
+                action: () => {
+                  this.state.showChoice = false;
+                  this.state.choiceOptions = [];
+                }
+              },
+              { 
+                text: 'Fix the roof and go to bed', 
+                action: () => {
+                  this.state.showChoice = false;
+                  this.state.choiceOptions = [];
+                  this.endDiscoParty();
+                }
+              }
+            ];
+          }
+        }]);
         return;
       }
       this.state.stormCountdownActive = false;
@@ -3471,7 +3498,7 @@ export class VillageLedgerGame {
     this.state.slingshotLastSpawnTime = 0;
     this.state.slingshotFloatingTexts = [];
     this.state.slingshotBalloons = [];
-    const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
+    const balloonColors = ['#FF3366', '#3366FF'];
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     for (let i = 0; i < 25; i++) {
       this.state.slingshotBalloons.push({
@@ -5116,7 +5143,7 @@ export class VillageLedgerGame {
     this.state.slingshotLastSpawnTime = 0;
     this.state.slingshotFloatingTexts = [];
     this.state.slingshotBalloons = [];
-    const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
+    const balloonColors = ['#FF3366', '#3366FF'];
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     for (let i = 0; i < 25; i++) {
       this.state.slingshotBalloons.push({
@@ -5158,17 +5185,32 @@ export class VillageLedgerGame {
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
-    const balloonColors = ['#FF3366', '#33FF66', '#3366FF', '#FFCC00', '#FF6600'];
+    const balloonColors = ['#FF3366', '#3366FF'];
     
     const activeBalloons = this.state.slingshotBalloons.filter(b => !b.popped);
-    if (t - this.state.slingshotLastSpawnTime > 1.5 && activeBalloons.length < 25) {
+    if (activeBalloons.length === 0) {
+      this.state.slingshotBalloons = [];
+      for (let i = 0; i < 25; i++) {
+        this.state.slingshotBalloons.push({
+          x: 80 + Math.random() * (this.worldWidth - 160),
+          y: -20 - Math.random() * 200,
+          vx: (Math.random() - 0.5) * 30,
+          vy: 20 + Math.random() * 40,
+          color: balloonColors[Math.floor(Math.random() * balloonColors.length)],
+          radius: 16 + Math.random() * 6,
+          popped: false,
+          popAnim: 0,
+          bobPhase: Math.random() * Math.PI * 2,
+        });
+      }
       this.state.slingshotLastSpawnTime = t;
-      const fromLeft = Math.random() > 0.5;
+    } else if (t - this.state.slingshotLastSpawnTime > 1.5 && activeBalloons.length < 25) {
+      this.state.slingshotLastSpawnTime = t;
       this.state.slingshotBalloons.push({
-        x: fromLeft ? -20 : this.worldWidth + 20,
-        y: 30 + Math.random() * (groundY * 0.55),
-        vx: fromLeft ? (5 + Math.random() * 10) : -(5 + Math.random() * 10),
-        vy: (Math.random() - 0.5) * 16,
+        x: 80 + Math.random() * (this.worldWidth - 160),
+        y: -20 - Math.random() * 50,
+        vx: (Math.random() - 0.5) * 30,
+        vy: 20 + Math.random() * 30,
         color: balloonColors[Math.floor(Math.random() * balloonColors.length)],
         radius: 16 + Math.random() * 6,
         popped: false,
@@ -5370,34 +5412,34 @@ export class VillageLedgerGame {
       ctx.strokeStyle = '#5D4837';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(platformScreenX - platformW / 2, groundY - platformH + 8, platformW, platformH, 3);
+      ctx.roundRect(platformScreenX - platformW / 2, groundY - platformH + 13, platformW, platformH, 3);
       ctx.fill();
       ctx.stroke();
       
       ctx.fillStyle = '#6B3A1F';
-      ctx.fillRect(platformScreenX - platformW / 2 + 4, groundY - platformH + 6 + 8, platformW - 8, 3);
+      ctx.fillRect(platformScreenX - platformW / 2 + 4, groundY - platformH + 6 + 13, platformW - 8, 3);
       
       const signPostX = platformScreenX + platformW / 2 + 35;
       ctx.strokeStyle = '#6B3A1F';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(signPostX, groundY - platformH + 8);
-      ctx.lineTo(signPostX, groundY - platformH - 50 + 8);
+      ctx.moveTo(signPostX, groundY - platformH + 13);
+      ctx.lineTo(signPostX, groundY - platformH - 50 + 13);
       ctx.stroke();
       
       ctx.fillStyle = '#8B6914';
       ctx.strokeStyle = '#5D4837';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect(signPostX - 40, groundY - platformH - 50 + 8, 45, 20, 3);
+      ctx.roundRect(signPostX - 40, groundY - platformH - 50 + 13, 45, 20, 3);
       ctx.fill();
       ctx.stroke();
       
       ctx.font = `bold 7px ${this.uiFont}`;
       ctx.fillStyle = '#FFF';
       ctx.textAlign = 'center';
-      ctx.fillText('TEST YOUR', signPostX - 17, groundY - platformH - 41 + 8);
-      ctx.fillText('AIM!', signPostX - 17, groundY - platformH - 33 + 8);
+      ctx.fillText('TEST YOUR', signPostX - 17, groundY - platformH - 41 + 13);
+      ctx.fillText('AIM!', signPostX - 17, groundY - platformH - 33 + 13);
     }
 
     if (this.state.showCelebration) {
@@ -5560,18 +5602,6 @@ export class VillageLedgerGame {
       ctx.fill();
     }
     
-    if (platformScreenX > -100 && platformScreenX < w + 100) {
-      ctx.textAlign = 'center';
-      ctx.font = `bold 14px ${this.uiFont}`;
-      ctx.fillStyle = '#FFD700';
-      ctx.fillText(`SCORE: ${this.state.slingshotScore}`, platformScreenX, groundY + 28);
-      
-      if (this.state.slingshotCombo >= 2) {
-        ctx.font = `bold 12px ${this.uiFont}`;
-        ctx.fillStyle = '#FF6600';
-        ctx.fillText(`x${this.state.slingshotCombo}`, platformScreenX, groundY + 43);
-      }
-    }
     
     for (const ft of this.state.slingshotFloatingTexts) {
       const ftScreenX = ft.x - this.cameraX;
@@ -5719,7 +5749,7 @@ export class VillageLedgerGame {
     }
 
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    this.villageElder.y = groundY - this.villageElder.height - 5;
+    this.villageElder.y = groundY - this.villageElder.height - 10;
   }
 
   // Storm approaching after celebration - player goes home, fixes roof, enters hut, then rain (legacy)
@@ -6606,7 +6636,7 @@ export class VillageLedgerGame {
     const djBoothW = 120;
     const djBoothH = 75;
     const djBoothX = elderScreenX - djBoothW / 2;
-    const djBoothY = groundY - djBoothH + 27;
+    const djBoothY = groundY - djBoothH + 22;
     
     ctx.fillStyle = '#2D1B0E';
     ctx.strokeStyle = '#8B6914';
@@ -6965,7 +6995,7 @@ export class VillageLedgerGame {
     const glassW = 20;
     const glassH = 7;
     const bridgeY = elderHeadY;
-    const sideOffset = 11;
+    const sideOffset = 12;
 
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#333';
@@ -7258,21 +7288,6 @@ export class VillageLedgerGame {
       ctx.stroke();
     }
     
-    // "STORM!" text with lightning effect
-    if (t > 0.5) {
-      const textAlpha = Math.min(1, (t - 0.5) / 0.5);
-      ctx.save();
-      ctx.globalAlpha = textAlpha;
-      ctx.font = `bold ${Math.min(48, w / 15)}px ${this.retroFont}`;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#FFD700';
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 4;
-      const stormY = 80 + Math.sin(t * 8) * 5;
-      ctx.strokeText('THE STORM!', w / 2, stormY);
-      ctx.fillText('THE STORM!', w / 2, stormY);
-      ctx.restore();
-    }
   }
   
   private drawCloudsAnimation(ctx: CanvasRenderingContext2D): void {
@@ -9333,6 +9348,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     if (!this.state.showCelebration || !this.state.partyHintText) return;
     if (this.state.currentDialogue) return;
     
+    const w = this.logicalWidth;
     const h = this.logicalHeight;
     const boxH = this.dialogueBoxHeight;
     const boxY = h - boxH;
@@ -9346,14 +9362,65 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.save();
     ctx.globalAlpha = alpha;
     
+    const portraitSize = 60;
+    const portraitX = 20;
+    const portraitY = boxY + (boxH - portraitSize) / 2;
+    const textStartX = portraitX + portraitSize + 20;
+    
+    const speakerSpriteIdMap: Record<string, string> = {
+      'YOU': 'player',
+      'WOODCUTTER': 'woodcutter',
+      'STONE-WORKER': 'stone-worker',
+      'FISHERMAN': 'fisherman',
+      'VILLAGE ELDER': 'village-elder',
+    };
+    
+    const speakerColors: Record<string, { bg: string; outline: string }> = {
+      'WOODCUTTER': { bg: '#8B4513', outline: '#5D2E0C' },
+      'STONE-WORKER': { bg: '#6B7280', outline: '#374151' },
+      'FISHERMAN': { bg: '#F97316', outline: '#C2410C' },
+      'VILLAGE ELDER': { bg: '#F8FAFC', outline: '#64748B' },
+      'YOU': { bg: '#3B82F6', outline: '#FFFFFF' },
+    };
+    
+    const colors = speakerColors[this.state.partyHintSpeaker] || { bg: '#6B7280', outline: '#374151' };
+    const spriteId = speakerSpriteIdMap[this.state.partyHintSpeaker];
+    const spriteCanvas = spriteId ? this.processedSprites[spriteId] : null;
+    
+    ctx.fillStyle = colors.bg;
+    ctx.strokeStyle = colors.outline;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(portraitX, portraitY, portraitSize, portraitSize, 8);
+    ctx.fill();
+    ctx.stroke();
+    
+    if (spriteCanvas) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(portraitX + 2, portraitY + 2, portraitSize - 4, portraitSize - 4, 6);
+      ctx.clip();
+      const sW = spriteCanvas.width;
+      const sH = spriteCanvas.height;
+      const scale = Math.max((portraitSize - 4) / sW, (portraitSize - 4) / sH) * 1.69;
+      const drawW = sW * scale;
+      const drawH = sH * scale;
+      const headShift = portraitSize * 0.33;
+      let drawX = portraitX + 2 + (portraitSize - 4 - drawW) / 2;
+      const drawY = portraitY + 2 - headShift;
+      if (spriteId === 'fisherman') drawX += 10;
+      ctx.drawImage(spriteCanvas, drawX, drawY, drawW, drawH);
+      ctx.restore();
+    }
+    
     ctx.font = `bold 11px ${this.retroFont}`;
     ctx.fillStyle = '#FFD700';
     ctx.textAlign = 'left';
-    ctx.fillText(this.state.partyHintSpeaker, 20, boxY + 20);
+    ctx.fillText(`[${this.state.partyHintSpeaker}]`, textStartX, boxY + 20);
     
     ctx.font = `12px ${this.retroFont}`;
     ctx.fillStyle = '#E8DCC8';
-    ctx.fillText(this.state.partyHintText, 20, boxY + 40);
+    ctx.fillText(this.state.partyHintText, textStartX, boxY + 40);
     
     ctx.restore();
   }
@@ -9542,9 +9609,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           hint = 'Settle your debts with the Woodcutter and Stone-worker...';
           break;
         case 'loop2_return':
-          hint = this.state.roofRepaired 
-            ? 'Return home before the storm!' 
-            : 'Return home to fix your roof before the storm!';
+          if (!this.state.showCelebration) {
+            hint = this.state.roofRepaired 
+              ? 'Return home before the storm!' 
+              : 'Return home to fix your roof before the storm!';
+          }
           break;
         case 'confrontation':
         case 'brawl':
@@ -10269,11 +10338,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         soundManager.play('quizCorrect');
         const applauseDuration = soundManager.getBufferDuration('crowdApplause');
         soundManager.playForDuration('crowdApplause', Math.max(1000, applauseDuration * 0.25));
+        this.state.showQuiz = false;
         this.awardBadge(
           'Money Scholar',
           'You understand that money is really just a system for keeping track of who owes what!',
           () => {
-            this.state.showQuiz = false;
             this.state.showQuizReview = true;
             this.quizReviewScrollOffset = 0;
           }
@@ -10350,7 +10419,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     // The question
     ctx.font = `10px ${this.retroFont}`;
     ctx.fillStyle = '#3D2914';
-    const questionLines = this.wrapText(ctx, q.question, maxWidth);
+    const questionLines = this.wrapTextLines(ctx, q.question, maxWidth);
     questionLines.forEach(line => {
       ctx.fillText(line, cardX + 30, yOffset);
       yOffset += 18;
@@ -10381,7 +10450,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     // Explanation with more room
     ctx.font = `italic 10px ${this.retroFont}`;
-    const explanationLines = this.wrapText(ctx, q.explanation, maxWidth);
+    const explanationLines = this.wrapTextLines(ctx, q.explanation, maxWidth);
     explanationLines.forEach(line => {
       ctx.font = `italic 10px ${this.retroFont}`;
       ctx.textAlign = 'left';
@@ -10527,7 +10596,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.font = originalFont;
   }
 
-  private wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  private wrapTextLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
     const words = text.split(' ');
     const lines: string[] = [];
     let currentLine = '';
@@ -11002,6 +11071,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
     this.villageElder.x = 1568;
+    this.villageElder.y = (this.logicalHeight - this.groundHeight - this.dialogueBoxHeight) - this.villageElder.height;
     this.villageElder.targetX = undefined;
     
     // Reset animation/sound flags
@@ -11122,6 +11192,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       slingshotFloatingTexts: [],
       partyDialogueTimer: 0,
       partyDialogueIndex: 0,
+      partyHintText: '',
+      partyHintSpeaker: '',
+      partyHintTimer: 0,
       nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
@@ -11154,6 +11227,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.fisherman.x = this.fisherman.originalX || 3025;
     this.fisherman.targetX = undefined;
     this.villageElder.x = 1568;
+    this.villageElder.y = (this.logicalHeight - this.groundHeight - this.dialogueBoxHeight) - this.villageElder.height;
     this.villageElder.targetX = undefined;
     
     // Reset animation/sound flags for loop 2

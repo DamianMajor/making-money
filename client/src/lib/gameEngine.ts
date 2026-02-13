@@ -1065,9 +1065,14 @@ export class VillageLedgerGame {
         }
       }
 
-      if (this.musicCollectionIconArea && !this.state.showChoice && !this.state.currentDialogue && !this.state.showCelebration) {
+      if (this.musicCollectionIconArea && !this.state.showChoice && !this.state.currentDialogue) {
         const mc = this.musicCollectionIconArea;
         if (x >= mc.x && x <= mc.x + mc.w && y >= mc.y && y <= mc.y + mc.h) {
+          if (this.state.showCelebration || (this.state.partyEnded && !this.state.showQuiz && !this.state.showSuccess)) {
+            this.showInventoryPopup("Enjoy the party! You can browse your records after.");
+            soundManager.play('buttonClick');
+            return;
+          }
           this.state.showMusicCollection = !this.state.showMusicCollection;
           this.state.showBadgeTray = false;
           soundManager.play('buttonClick');
@@ -1734,72 +1739,62 @@ export class VillageLedgerGame {
     soundManager.fadeOut('ambientVillage', 1000);
     soundManager.play('thunder');
     
-    // Sequence: clouds 2.5s → rainfall 17s → night transition 6s → quiz (3s delay)
+    // Sequence: clouds 2.5s → night transition with rain 6s → quiz (3s delay)
     setTimeout(() => {
       try {
         this.state.showCloudsAnimation = false;
-        // Start rainfall animation
+        // Skip standalone rain, go directly to night transition with rain
+        this.state.showNightTransition = true;
+        this.state.nightTransitionTimer = 0;
         this.state.showRainfall = true;
         this.state.rainfallTimer = 0;
         if (!this.rainSoundStarted) {
           this.rainSoundStarted = true;
-          soundManager.fadeIn('rain', 500); // Plays once
-          soundManager.fadeIn('ambientNight', 500); // Start ambient night sounds with storm
-          soundManager.stop('thunder'); // Stop thunder when rain starts
+          soundManager.fadeIn('rain', 500);
+          soundManager.fadeIn('ambientNight', 500);
+          soundManager.stop('thunder');
         }
+        soundManager.fadeIn('ambientVillage', 2000);
+        soundManager.fadeIn('backgroundMusicNight', 2000);
         
         setTimeout(() => {
           try {
-            // Keep rainfall visible during night transition for smooth blend
-            // Start night transition with fade (rain continues)
-            this.state.showNightTransition = true;
-            this.state.nightTransitionTimer = 0;
-            soundManager.fadeIn('ambientVillage', 2000);
-            soundManager.fadeIn('backgroundMusicNight', 2000);
-            
+            this.state.showRainfall = false;
+            soundManager.stop('thunder');
+            soundManager.fadeOut('rain', 6000);
+            soundManager.fadeOut('ambientNight', 1000);
+            this.state.showNightTransition = false;
             setTimeout(() => {
-              try {
-                this.state.showRainfall = false; // Now turn off rain
-                soundManager.stop('thunder');
-                soundManager.fadeOut('rain', 6000); // 6 second fade out
-                soundManager.fadeOut('ambientNight', 1000); // Fade out ambient night
-                this.state.showNightTransition = false;
-                // Delay quiz intro by 3 seconds
-                setTimeout(() => {
-                  this.currentQuizQuestion = 0;
-                  this.quizWrongAnswers = [];
-                  this.showQuizFeedback = false;
-                  if (this.state.partyEnded) {
-                    this.state.showQuiz = true;
-                    this.state.phase = 'quiz';
-                  } else {
-                    this.player.visible = true;
-                    this.state.playerEnteredHut = false;
-                    this.state.playerAlpha = 1;
-                    this.queueDialogue([
-                      {
-                        speaker: 'VILLAGE ELDER',
-                        text: "Psst... DJ Elder doesn't usually take requests..."
-                      },
-                      {
-                        speaker: 'VILLAGE ELDER',
-                        text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
-                        onComplete: () => {
-                          this.state.showQuiz = true;
-                          this.state.phase = 'quiz';
-                        }
-                      }
-                    ]);
+              this.currentQuizQuestion = 0;
+              this.quizWrongAnswers = [];
+              this.showQuizFeedback = false;
+              if (this.state.partyEnded) {
+                this.state.showQuiz = true;
+                this.state.phase = 'quiz';
+              } else {
+                this.player.visible = true;
+                this.state.playerEnteredHut = false;
+                this.state.playerAlpha = 1;
+                this.queueDialogue([
+                  {
+                    speaker: 'VILLAGE ELDER',
+                    text: "Psst... DJ Elder doesn't usually take requests..."
+                  },
+                  {
+                    speaker: 'VILLAGE ELDER',
+                    text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                    onComplete: () => {
+                      this.state.showQuiz = true;
+                      this.state.phase = 'quiz';
+                    }
                   }
-                }, 3000);
-              } catch (e) {
-                console.error('Error in quiz transition:', e);
+                ]);
               }
-            }, 6000); // 6 second fade to night
+            }, 3000);
           } catch (e) {
-            console.error('Error in rainfall transition:', e);
+            console.error('Error in quiz transition:', e);
           }
-        }, 17000); // 17 second rainfall (extended by 11 seconds)
+        }, 6000);
       } catch (e) {
         console.error('Error in clouds transition:', e);
       }
@@ -6336,7 +6331,7 @@ export class VillageLedgerGame {
     const danceSway = 40;
     this.woodcutter.x = (cx - 160) + Math.sin(t * 3.0) * danceSway;
     this.stoneWorker.x = (cx + 120) + Math.sin(t * 2.5 + 2) * danceSway;
-    this.fisherman.x = (cx + 500) + Math.sin(t * 2.8 + 4) * danceSway;
+    this.fisherman.x = (cx + 515) + Math.sin(t * 2.8 + 4) * danceSway;
     
     this.woodcutter.targetX = undefined;
     this.stoneWorker.targetX = undefined;
@@ -6396,66 +6391,57 @@ export class VillageLedgerGame {
               this.state.playerFading = true;
               // Player alpha will decrease in update() until 0, then visible=false and playerEnteredHut=true
               
-              // Start rainfall
+              // Go directly to night transition with rain
+              this.state.showNightTransition = true;
+              this.state.nightTransitionTimer = 0;
               this.state.showRainfall = true;
               this.state.rainfallTimer = 0;
               if (!this.rainSoundStarted) {
                 this.rainSoundStarted = true;
                 soundManager.fadeIn('rain', 500);
                 soundManager.fadeIn('ambientNight', 500);
-                soundManager.stop('thunder'); // Stop thunder when rain starts
+                soundManager.stop('thunder');
               }
+              soundManager.fadeIn('backgroundMusicNight', 2000);
               
-              // Rain for 17 seconds, then night transition
               setTimeout(() => {
                 try {
-                  this.state.showNightTransition = true;
-                  this.state.nightTransitionTimer = 0;
-                  soundManager.fadeIn('backgroundMusicNight', 2000);
-                  
-                  // After 6 second night transition, delay quiz by 3 more seconds
+                  this.state.showRainfall = false;
+                  soundManager.stop('thunder');
+                  soundManager.fadeOut('rain', 6000);
+                  soundManager.fadeOut('ambientNight', 1000);
+                  this.state.showNightTransition = false;
                   setTimeout(() => {
-                    try {
-                      this.state.showRainfall = false;
-                      soundManager.stop('thunder');
-                      soundManager.fadeOut('rain', 6000); // 6 second fade out
-                      this.state.showNightTransition = false;
-                      // Delay quiz intro by 3 seconds
-                      setTimeout(() => {
-                        this.currentQuizQuestion = 0;
-                        this.quizWrongAnswers = [];
-                        this.showQuizFeedback = false;
-                        if (this.state.partyEnded) {
-                          this.state.showQuiz = true;
-                          this.state.phase = 'quiz';
-                        } else {
-                          this.player.visible = true;
-                          this.state.playerEnteredHut = false;
-                          this.state.playerAlpha = 1;
-                          this.queueDialogue([
-                            {
-                              speaker: 'VILLAGE ELDER',
-                              text: "Psst... DJ Elder doesn't usually take requests..."
-                            },
-                            {
-                              speaker: 'VILLAGE ELDER',
-                              text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
-                              onComplete: () => {
-                                this.state.showQuiz = true;
-                                this.state.phase = 'quiz';
-                              }
-                            }
-                          ]);
+                    this.currentQuizQuestion = 0;
+                    this.quizWrongAnswers = [];
+                    this.showQuizFeedback = false;
+                    if (this.state.partyEnded) {
+                      this.state.showQuiz = true;
+                      this.state.phase = 'quiz';
+                    } else {
+                      this.player.visible = true;
+                      this.state.playerEnteredHut = false;
+                      this.state.playerAlpha = 1;
+                      this.queueDialogue([
+                        {
+                          speaker: 'VILLAGE ELDER',
+                          text: "Psst... DJ Elder doesn't usually take requests..."
+                        },
+                        {
+                          speaker: 'VILLAGE ELDER',
+                          text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                          onComplete: () => {
+                            this.state.showQuiz = true;
+                            this.state.phase = 'quiz';
+                          }
                         }
-                      }, 3000);
-                    } catch (e) {
-                      console.error('Error in quiz transition:', e);
+                      ]);
                     }
-                  }, 6000);
+                  }, 3000);
                 } catch (e) {
-                  console.error('Error in night transition:', e);
+                  console.error('Error in quiz transition:', e);
                 }
-              }, 17000); // 17 seconds of rain (extended by 11 seconds)
+              }, 6000);
             } catch (e) {
               console.error('Error in storm sequence:', e);
             }
@@ -7796,7 +7782,7 @@ export class VillageLedgerGame {
       ctx.fill();
     } else {
       const sideOffset = -7;
-      const leftShift = -5;
+      const leftShift = -8;
       ctx.beginPath();
       ctx.roundRect(elderScreenX + leftShift - sideOffset - glassW/2 + 1, bridgeY, glassW/2, glassH, 2);
       ctx.fill();
@@ -8847,6 +8833,11 @@ export class VillageLedgerGame {
     if (this.musicCollectionIconArea) {
       const mc = this.musicCollectionIconArea;
       if (x >= mc.x && x <= mc.x + mc.w && y >= mc.y && y <= mc.y + mc.h) {
+        if (this.state.showCelebration || (this.state.partyEnded && !this.state.showQuiz && !this.state.showSuccess)) {
+          this.showInventoryPopup("Enjoy the party! You can browse your records after.");
+          soundManager.play('buttonClick');
+          return;
+        }
         this.state.showMusicCollection = !this.state.showMusicCollection;
         this.state.showBadgeTray = false;
         soundManager.play('buttonClick');

@@ -1028,6 +1028,7 @@ export class VillageLedgerGame {
         if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
           if (this.state.showInventoryHint) {
             this.state.showInventoryHint = false;
+            this.showInventoryDetailPopup = true;
             if (this.state.pendingChoiceAfterHint) {
               this.state.pendingChoiceAfterHint = false;
               this.showWoodcutterTradeChoice();
@@ -2504,10 +2505,58 @@ export class VillageLedgerGame {
       "What's your idea for solving the trading problem?",
       (answer: string) => {
         const keywords = ['write', 'record', 'ledger', 'tablet', 'stone', 'note', 'track', 'log', 'book', 'carve', 'engrave', 'mark', 'scratch', 'paper', 'list', 'tally'];
+        const workKeywords = ['work', 'labor', 'help you', 'chore', 'job'];
         const lowerAnswer = answer.toLowerCase();
         const matched = keywords.some(kw => lowerAnswer.includes(kw));
+        const matchedWork = workKeywords.some(kw => lowerAnswer.includes(kw));
 
-        if (matched) {
+        if (matchedWork && !matched) {
+          this.queueDialogue([
+            {
+              speaker: 'WOODCUTTER',
+              text: "That's kind of you to offer, but I don't have any work that needs doing right now. I just need fish for my family."
+            },
+            {
+              speaker: 'WOODCUTTER',
+              text: "Think about it differently - what if there was a way to make sure neither of us forgets what we agreed to?",
+              onComplete: () => {
+                this.state.showChoice = true;
+                this.state.choiceOptions = [
+                  {
+                    text: "OK, I'll owe you",
+                    action: () => {
+                      this.state.showChoice = false;
+                      this.queueDialogue([{
+                        speaker: 'WOODCUTTER',
+                        text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
+                        onComplete: () => {
+                          this.awardBadge('Debt', 'You took on a debt - a promise to pay someone back later. But can promises always be trusted?', () => {
+                            this.state.inventory.wood = 1;
+                            this.state.obtainedWood = true;
+                            this.state.woodIntroduced = true;
+                            this.state.stoneIntroduced = true;
+                            this.state.fishIntroduced = true;
+                            this.showInventoryPopup('+1 WOOD');
+                            this.setMood('happy');
+                            this.state.phase = 'got_wood_need_stone';
+                            this.woodcutter.targetX = this.villageCenterX - 160;
+                          });
+                        }
+                      }]);
+                    }
+                  },
+                  {
+                    text: "Let me try again!",
+                    action: () => {
+                      this.state.showChoice = false;
+                      this.showSmartPathInput();
+                    }
+                  }
+                ];
+              }
+            }
+          ]);
+        } else if (matched) {
           this.queueDialogue([
             {
               speaker: 'WOODCUTTER',
@@ -4370,11 +4419,13 @@ export class VillageLedgerGame {
     if (playSound) {
       soundManager.play('dialogueAdvance');
     }
-    if (this.state.currentDialogue?.onComplete) {
+    const onCompleteFn = this.state.currentDialogue?.onComplete;
+    if (onCompleteFn) {
+      this.state.currentDialogue!.onComplete = undefined;
       try {
-        this.state.currentDialogue.onComplete();
+        onCompleteFn();
       } catch (e) {
-        console.error('Error in dialogue onComplete callback:', e, 'Speaker:', this.state.currentDialogue?.speaker, 'Text:', this.state.currentDialogue?.text?.substring(0, 50));
+        console.error('Error in dialogue onComplete callback:', e);
       }
     }
 

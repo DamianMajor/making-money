@@ -2,6 +2,7 @@
 // Touch-only side-scroller optimized for iPad/Tablet
 
 import { soundManager } from './soundManager';
+import { QuizQuestion, getDJQuizQuestions, getBackupDJQuestion, getFinalQuizQuestions } from './quizBank';
 
 // Game State Types
 interface Vector2 {
@@ -61,6 +62,7 @@ interface GameState {
   showBadgePopup: boolean;
   pendingBadge: { name: string; description: string } | null;
   showBadgeTray: boolean;
+  showMusicCollection: boolean;
   badgeTrayAnimTimer: number;
   selectedBadgeIndex: number | null;
   lastBadgeEarnedTime: number;
@@ -209,6 +211,11 @@ interface GameState {
   remixPlayed: boolean;
   songChangeUsed: boolean;
   hutAutoTriggered: boolean;
+  showDJQuiz: boolean;
+  djQuizQuestion: number;
+  djQuizAttempt: number;
+  djQuizFailed: boolean;
+  djQuizPassed: boolean;
   showSongChoice: boolean;
   selectedGenre: string;
 }
@@ -757,6 +764,7 @@ export class VillageLedgerGame {
       showBadgePopup: false,
       pendingBadge: null,
       showBadgeTray: false,
+      showMusicCollection: false,
       badgeTrayAnimTimer: 0,
       selectedBadgeIndex: null,
       lastBadgeEarnedTime: 0,
@@ -864,6 +872,11 @@ export class VillageLedgerGame {
       remixPlayed: false,
       songChangeUsed: false,
       hutAutoTriggered: false,
+      showDJQuiz: false,
+      djQuizQuestion: 0,
+      djQuizAttempt: 0,
+      djQuizFailed: false,
+      djQuizPassed: false,
       showSongChoice: false,
       selectedGenre: ''
     };
@@ -1074,6 +1087,12 @@ export class VillageLedgerGame {
       return;
     }
 
+    // Handle music collection touches
+    if (this.state.showMusicCollection) {
+      this.handleMusicCollectionTouch(x, y);
+      return;
+    }
+
     // Handle badge tray
     if (this.state.showBadgeTray) {
       this.handleBadgeTrayTouch(x, y);
@@ -1137,6 +1156,12 @@ export class VillageLedgerGame {
     // Handle checkpoint quiz touches
     if (this.state.showCheckpointQuiz) {
       this.handleCheckpointQuizTouch(x, y);
+      return;
+    }
+
+    // Handle DJ quiz touches
+    if (this.state.showDJQuiz) {
+      this.handleDJQuizTouch(x, y);
       return;
     }
 
@@ -3815,20 +3840,44 @@ export class VillageLedgerGame {
     const phase = this.state.phase;
 
     if (this.state.showCelebration) {
-      if (this.state.songChangeUsed) {
+      if (this.state.djQuizPassed) {
+        if (this.state.songChangeUsed) {
+          this.queueDialogue([{
+            speaker: 'VILLAGE ELDER',
+            text: "No more requests tonight! Enjoy the music!"
+          }]);
+          return;
+        }
         this.queueDialogue([{
           speaker: 'VILLAGE ELDER',
-          text: "No more requests tonight! Enjoy the music!"
+          text: "Another request? Fine, ONE more! What do you want to hear?",
+          onComplete: () => {
+            this.state.songChangeUsed = true;
+            this.state.showSongChoice = true;
+          }
         }]);
         return;
       }
+      this.queueDialogue([
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "You want me to play YOUR request? Ha!"
+        },
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "Tell you what... answer a question about what you learned today, and I'll spin whatever you want!",
+          onComplete: () => {
+            this.startDJQuiz();
+          }
+        }
+      ]);
+      return;
+    }
+
+    if (this.state.djQuizFailed) {
       this.queueDialogue([{
         speaker: 'VILLAGE ELDER',
-        text: "Another request? Fine, ONE more! What do you want to hear?",
-        onComplete: () => {
-          this.state.songChangeUsed = true;
-          this.state.showSongChoice = true;
-        }
+        text: "The storm is here! Get home quickly!"
       }]);
       return;
     }
@@ -6433,6 +6482,7 @@ export class VillageLedgerGame {
 
     // Draw badge tray icon
     this.drawBadgeTrayIcon(ctx);
+    this.drawMusicCollectionIcon(ctx);
 
     // Draw inventory HUD at top of screen (on top of trees)
     this.drawInventoryHUD(ctx);
@@ -6570,10 +6620,19 @@ export class VillageLedgerGame {
     if (this.state.showBadgeTray) {
       this.drawBadgeTrayPanel(ctx);
     }
+
+    if (this.state.showMusicCollection) {
+      this.drawMusicCollectionPanel(ctx);
+    }
     
     // Draw checkpoint quiz overlay if active
     if (this.state.showCheckpointQuiz) {
       this.drawCheckpointQuiz(ctx);
+    }
+
+    // Draw DJ quiz overlay if active
+    if (this.state.showDJQuiz) {
+      this.drawDJQuiz(ctx);
     }
 
     // Draw quiz overlay if active
@@ -6599,8 +6658,12 @@ export class VillageLedgerGame {
     if (this.state.showSuccess) {
       this.drawSuccessScreen(ctx);
       this.drawBadgeTrayIcon(ctx);
+      this.drawMusicCollectionIcon(ctx);
       if (this.state.showBadgeTray) {
         this.drawBadgeTrayPanel(ctx);
+      }
+      if (this.state.showMusicCollection) {
+        this.drawMusicCollectionPanel(ctx);
       }
     }
   }
@@ -8237,7 +8300,7 @@ export class VillageLedgerGame {
   }
 
   private drawBadgeTrayIcon(ctx: CanvasRenderingContext2D): void {
-    if (this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview) return;
+    if (this.state.showDJQuiz || this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview || this.state.showMusicCollection) return;
 
     const x = this.inventoryPanelLeftX - 44;
     const y = 16;
@@ -8609,6 +8672,228 @@ export class VillageLedgerGame {
         this.state.showBadgeTray = true;
         this.state.selectedBadgeIndex = null;
         soundManager.play('dialogueAdvance');
+      }
+    }
+
+    if (this.musicCollectionIconArea) {
+      const mc = this.musicCollectionIconArea;
+      if (x >= mc.x && x <= mc.x + mc.w && y >= mc.y && y <= mc.y + mc.h) {
+        this.state.showMusicCollection = !this.state.showMusicCollection;
+        this.state.showBadgeTray = false;
+        soundManager.play('buttonClick');
+        return;
+      }
+    }
+  }
+
+  private musicCollectionIconArea: { x: number; y: number; w: number; h: number } | null = null;
+
+  private drawMusicCollectionIcon(ctx: CanvasRenderingContext2D): void {
+    const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+    if (unlocked.length === 0) return;
+
+    const iconSize = 36;
+    const iconX = 15;
+    const iconY = 85;
+    
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(iconX + iconSize/2, iconY + iconSize/2, iconSize/2, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fill();
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.arc(iconX + iconSize/2, iconY + iconSize/2, iconSize/2 - 4, 0, Math.PI * 2);
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.arc(iconX + iconSize/2, iconY + iconSize/2, iconSize/2 - 8, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.arc(iconX + iconSize/2, iconY + iconSize/2, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#E8D44D';
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.arc(iconX + iconSize/2, iconY + iconSize/2, 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fill();
+    
+    ctx.restore();
+    
+    ctx.font = `bold 8px ${this.uiFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${unlocked.length}/10`, iconX + iconSize/2, iconY + iconSize + 10);
+    
+    this.musicCollectionIconArea = { x: iconX, y: iconY, w: iconSize, h: iconSize + 12 };
+  }
+
+  private musicCollectionBtns: { x: number; y: number; w: number; h: number; genre: string }[] = [];
+  private musicCollectionCloseBtn: { x: number; y: number; w: number; h: number } | null = null;
+  private musicCollectionBgMusicBtn: { x: number; y: number; w: number; h: number } | null = null;
+  
+  private drawMusicCollectionPanel(ctx: CanvasRenderingContext2D): void {
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    const unlocked: string[] = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, w, h);
+    
+    const panelW = Math.min(500, w - 40);
+    const panelH = Math.min(480, h - 40);
+    const panelX = (w - panelW) / 2;
+    const panelY = (h - panelH) / 2;
+    
+    ctx.fillStyle = '#1a1a2e';
+    ctx.beginPath();
+    ctx.roundRect(panelX, panelY, panelW, panelH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#E8D44D';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.font = `14px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#E8D44D';
+    ctx.fillText('MUSIC COLLECTION', w / 2, panelY + 30);
+    
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = '#888';
+    ctx.fillText(`${unlocked.length} of 10 songs unlocked`, w / 2, panelY + 48);
+    
+    const genres = Object.keys(this.GENRE_AUDIO_MAP);
+    const btnW = (panelW - 70) / 2;
+    const btnH = 32;
+    const gapX = 10;
+    const gapY = 6;
+    const gridStartX = panelX + 25;
+    const gridStartY = panelY + 65;
+    
+    this.musicCollectionBtns = [];
+    
+    genres.forEach((genre, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const bx = gridStartX + col * (btnW + gapX);
+      const by = gridStartY + row * (btnH + gapY);
+      const isUnlocked = unlocked.includes(genre);
+      const isPlaying = this.state.selectedGenre === genre;
+      const color = this.GENRE_COLORS[genre] || '#FFD700';
+      
+      if (isUnlocked) {
+        ctx.fillStyle = isPlaying ? color : 'rgba(255,255,255,0.1)';
+        ctx.globalAlpha = isPlaying ? 0.5 : 1;
+        ctx.beginPath();
+        ctx.roundRect(bx, by, btnW, btnH, 6);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = isPlaying ? 2 : 1;
+        ctx.stroke();
+        ctx.font = `10px ${this.retroFont}`;
+        ctx.fillStyle = '#F5DEB3';
+        ctx.textAlign = 'center';
+        ctx.fillText(genre, bx + btnW / 2, by + btnH / 2 + 4);
+        if (isPlaying) {
+          ctx.font = `bold 8px ${this.uiFont}`;
+          ctx.fillStyle = '#2ECC71';
+          ctx.fillText('NOW PLAYING', bx + btnW / 2, by - 2);
+        }
+        this.musicCollectionBtns.push({ x: bx, y: by, w: btnW, h: btnH, genre });
+      } else {
+        ctx.fillStyle = 'rgba(50,50,50,0.5)';
+        ctx.beginPath();
+        ctx.roundRect(bx, by, btnW, btnH, 6);
+        ctx.fill();
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.font = `10px ${this.retroFont}`;
+        ctx.fillStyle = '#555';
+        ctx.textAlign = 'center';
+        ctx.fillText('LOCKED', bx + btnW / 2, by + btnH / 2 + 4);
+      }
+    });
+    
+    const bgBtnY = gridStartY + 5 * (btnH + gapY) + 15;
+    const bgBtnW = panelW - 50;
+    const bgBtnX = panelX + 25;
+    const bgBtnH = 34;
+    const isBgPlaying = !this.state.selectedGenre || this.state.selectedGenre === 'background';
+    
+    ctx.fillStyle = isBgPlaying ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.roundRect(bgBtnX, bgBtnY, bgBtnW, bgBtnH, 6);
+    ctx.fill();
+    ctx.strokeStyle = isBgPlaying ? '#2ECC71' : '#666';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = '#F5DEB3';
+    ctx.textAlign = 'center';
+    ctx.fillText('Standard Background Music', bgBtnX + bgBtnW / 2, bgBtnY + bgBtnH / 2 + 4);
+    if (isBgPlaying) {
+      ctx.font = `bold 8px ${this.uiFont}`;
+      ctx.fillStyle = '#2ECC71';
+      ctx.fillText('NOW PLAYING', bgBtnX + bgBtnW / 2, bgBtnY - 2);
+    }
+    this.musicCollectionBgMusicBtn = { x: bgBtnX, y: bgBtnY, w: bgBtnW, h: bgBtnH };
+    
+    const closeBtnW = 120;
+    const closeBtnH = 32;
+    const closeBtnX = (w - closeBtnW) / 2;
+    const closeBtnY = panelY + panelH - 45;
+    ctx.fillStyle = '#E74C3C';
+    ctx.beginPath();
+    ctx.roundRect(closeBtnX, closeBtnY, closeBtnW, closeBtnH, 6);
+    ctx.fill();
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = '#FFF';
+    ctx.fillText('CLOSE', closeBtnX + closeBtnW / 2, closeBtnY + closeBtnH / 2 + 4);
+    this.musicCollectionCloseBtn = { x: closeBtnX, y: closeBtnY, w: closeBtnW, h: closeBtnH };
+  }
+
+  private handleMusicCollectionTouch(x: number, y: number): void {
+    if (this.musicCollectionCloseBtn) {
+      const btn = this.musicCollectionCloseBtn;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.state.showMusicCollection = false;
+        soundManager.play('buttonClick');
+        return;
+      }
+    }
+    
+    if (this.musicCollectionBgMusicBtn) {
+      const btn = this.musicCollectionBgMusicBtn;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.play('buttonClick');
+        soundManager.fadeOut('genreRemix', 500);
+        this.state.selectedGenre = 'background';
+        soundManager.fadeIn('backgroundMusicDay', 1000);
+        return;
+      }
+    }
+    
+    for (const btn of this.musicCollectionBtns) {
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.play('buttonClick');
+        this.state.selectedGenre = btn.genre;
+        soundManager.fadeOut('genreRemix', 300);
+        soundManager.fadeOut('backgroundMusicDay', 500);
+        soundManager.fadeOut('backgroundMusicNight', 500);
+        const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
+        if (genreUrl) {
+          setTimeout(() => soundManager.loadAndPlayGenre(genreUrl), 350);
+        }
+        return;
       }
     }
   }
@@ -10573,39 +10858,303 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
   }
 
+  private djQuizQuestions: QuizQuestion[] = [];
+  private djQuizUsedIds: number[] = [];
+  private djQuizCurrentQ: QuizQuestion | null = null;
+  private djQuizSelected: number = -1;
+  private djQuizShowHint: boolean = false;
+  private djQuizShowResult: boolean = false;
+  private djQuizResultCorrect: boolean = false;
+  private djQuizButtonAreas: { x: number; y: number; w: number; h: number; option: number }[] = [];
+  private djQuizContinueBtn: { x: number; y: number; w: number; h: number } | null = null;
+
+  private startDJQuiz(): void {
+    this.djQuizQuestions = getDJQuizQuestions();
+    this.djQuizUsedIds = this.djQuizQuestions.map(q => q.id);
+    this.djQuizCurrentQ = this.djQuizQuestions[0];
+    this.djQuizSelected = -1;
+    this.djQuizShowHint = false;
+    this.djQuizShowResult = false;
+    this.djQuizResultCorrect = false;
+    this.state.djQuizQuestion = 0;
+    this.state.djQuizAttempt = 0;
+    this.state.showDJQuiz = true;
+  }
+
+  private drawDJQuiz(ctx: CanvasRenderingContext2D): void {
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    const q = this.djQuizCurrentQ;
+    if (!q) return;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(0, 0, w, h);
+
+    const cardW = Math.min(580, w - 40);
+    const cardH = this.djQuizShowResult ? 340 : (this.djQuizShowHint ? 420 : 380);
+    const cardX = (w - cardW) / 2;
+    const cardY = (h - cardH) / 2;
+
+    ctx.fillStyle = '#2D1B4E';
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#9B59B6';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.font = `14px ${this.retroFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#E8D44D';
+    const titleText = this.state.djQuizAttempt === 2 ? "BONUS QUESTION!" : "DJ ELDER'S CHALLENGE";
+    ctx.fillText(titleText, w / 2, cardY + 30);
+
+    if (this.djQuizShowResult) {
+      ctx.font = `16px ${this.retroFont}`;
+      if (this.djQuizResultCorrect) {
+        ctx.fillStyle = '#2ECC71';
+        ctx.fillText("CORRECT!", w / 2, cardY + 80);
+        ctx.font = `11px ${this.retroFont}`;
+        ctx.fillStyle = '#E0E0E0';
+        const expLines = this.wrapTextLines(ctx, q.explanation, cardW - 60);
+        expLines.forEach((line, i) => {
+          ctx.fillText(line, w / 2, cardY + 110 + i * 18);
+        });
+        const btnW = 200;
+        const btnH = 40;
+        const btnX = (w - btnW) / 2;
+        const btnY = cardY + cardH - 65;
+        ctx.fillStyle = '#2ECC71';
+        ctx.beginPath();
+        ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+        ctx.fill();
+        ctx.font = `12px ${this.retroFont}`;
+        ctx.fillStyle = '#FFF';
+        ctx.fillText("PICK YOUR SONG!", btnX + btnW / 2, btnY + btnH / 2 + 4);
+        this.djQuizContinueBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
+      } else {
+        if (this.state.djQuizAttempt === 1) {
+          ctx.fillStyle = '#E74C3C';
+          ctx.fillText("NOT QUITE...", w / 2, cardY + 70);
+          ctx.font = `11px ${this.retroFont}`;
+          ctx.fillStyle = '#E0E0E0';
+          ctx.fillText("The correct answer was:", w / 2, cardY + 100);
+          ctx.fillStyle = '#2ECC71';
+          const correctText = q.options[q.correct];
+          const correctLines = this.wrapTextLines(ctx, correctText, cardW - 60);
+          correctLines.forEach((line, i) => {
+            ctx.fillText(line, w / 2, cardY + 120 + i * 18);
+          });
+          ctx.fillStyle = '#E8D44D';
+          ctx.font = `10px ${this.retroFont}`;
+          ctx.fillText("Let me try a different question...", w / 2, cardY + 170);
+          const btnW = 200;
+          const btnH = 40;
+          const btnX = (w - btnW) / 2;
+          const btnY = cardY + cardH - 65;
+          ctx.fillStyle = '#E8D44D';
+          ctx.beginPath();
+          ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+          ctx.fill();
+          ctx.font = `12px ${this.retroFont}`;
+          ctx.fillStyle = '#2D1B4E';
+          ctx.fillText("TRY AGAIN", btnX + btnW / 2, btnY + btnH / 2 + 4);
+          this.djQuizContinueBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
+        } else {
+          ctx.fillStyle = '#E74C3C';
+          ctx.fillText("OH NO...", w / 2, cardY + 70);
+          ctx.font = `11px ${this.retroFont}`;
+          ctx.fillStyle = '#E0E0E0';
+          const failLines = this.wrapTextLines(ctx, "Looks like you need more practice! The storm is rolling in early...", cardW - 60);
+          failLines.forEach((line, i) => {
+            ctx.fillText(line, w / 2, cardY + 100 + i * 18);
+          });
+          ctx.fillStyle = '#2ECC71';
+          ctx.fillText("The correct answer was:", w / 2, cardY + 155);
+          const correctText = q.options[q.correct];
+          const correctLines2 = this.wrapTextLines(ctx, correctText, cardW - 60);
+          correctLines2.forEach((line, i) => {
+            ctx.fillText(line, w / 2, cardY + 175 + i * 18);
+          });
+          const btnW = 200;
+          const btnH = 40;
+          const btnX = (w - btnW) / 2;
+          const btnY = cardY + cardH - 65;
+          ctx.fillStyle = '#E74C3C';
+          ctx.beginPath();
+          ctx.roundRect(btnX, btnY, btnW, btnH, 8);
+          ctx.fill();
+          ctx.font = `12px ${this.retroFont}`;
+          ctx.fillStyle = '#FFF';
+          ctx.fillText("CONTINUE", btnX + btnW / 2, btnY + btnH / 2 + 4);
+          this.djQuizContinueBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
+        }
+      }
+      return;
+    }
+
+    ctx.font = `11px ${this.retroFont}`;
+    ctx.fillStyle = '#F5DEB3';
+    const qLines = this.wrapTextLines(ctx, q.question, cardW - 50);
+    let qY = cardY + 60;
+    qLines.forEach(line => {
+      ctx.fillText(line, w / 2, qY);
+      qY += 18;
+    });
+
+    if (this.djQuizShowHint) {
+      ctx.font = `italic 10px ${this.uiFont}`;
+      ctx.fillStyle = '#E8D44D';
+      const hintLines = this.wrapTextLines(ctx, "Hint: " + q.hint, cardW - 60);
+      hintLines.forEach(line => {
+        ctx.fillText(line, w / 2, qY + 5);
+        qY += 16;
+      });
+      qY += 5;
+    }
+
+    this.djQuizButtonAreas = [];
+    const btnW = cardW - 60;
+    const btnH = 32;
+    const startY = qY + 12;
+    q.options.forEach((opt, i) => {
+      const btnX = cardX + 30;
+      const btnY = startY + i * (btnH + 8);
+      const isSelected = this.djQuizSelected === i;
+      ctx.fillStyle = isSelected ? '#9B59B6' : '#3D2B5A';
+      ctx.beginPath();
+      ctx.roundRect(btnX, btnY, btnW, btnH, 6);
+      ctx.fill();
+      if (isSelected) {
+        ctx.strokeStyle = '#E8D44D';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.font = `10px ${this.retroFont}`;
+      ctx.fillStyle = '#F5DEB3';
+      ctx.textAlign = 'left';
+      ctx.fillText(opt, btnX + 12, btnY + btnH / 2 + 4);
+      ctx.textAlign = 'center';
+      this.djQuizButtonAreas.push({ x: btnX, y: btnY, w: btnW, h: btnH, option: i });
+    });
+
+    this.djQuizContinueBtn = null;
+    if (this.djQuizSelected >= 0) {
+      const confirmW = 180;
+      const confirmH = 36;
+      const confirmX = (w - confirmW) / 2;
+      const confirmY = cardY + cardH - 55;
+      ctx.fillStyle = '#E8D44D';
+      ctx.beginPath();
+      ctx.roundRect(confirmX, confirmY, confirmW, confirmH, 8);
+      ctx.fill();
+      ctx.font = `12px ${this.retroFont}`;
+      ctx.fillStyle = '#2D1B4E';
+      ctx.fillText("LOCK IN ANSWER", confirmX + confirmW / 2, confirmY + confirmH / 2 + 4);
+      this.djQuizContinueBtn = { x: confirmX, y: confirmY, w: confirmW, h: confirmH };
+    }
+  }
+
+  private handleDJQuizTouch(x: number, y: number): void {
+    if (!this.djQuizCurrentQ) return;
+
+    if (this.djQuizShowResult && this.djQuizContinueBtn) {
+      const btn = this.djQuizContinueBtn;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.play('buttonClick');
+        if (this.djQuizResultCorrect) {
+          this.state.showDJQuiz = false;
+          this.state.djQuizPassed = true;
+          this.state.showSongChoice = true;
+        } else if (this.state.djQuizAttempt === 1) {
+          const backup = getBackupDJQuestion(this.djQuizUsedIds);
+          if (backup) {
+            this.djQuizUsedIds.push(backup.id);
+            this.djQuizCurrentQ = backup;
+            this.state.djQuizAttempt = 2;
+            this.djQuizSelected = -1;
+            this.djQuizShowResult = false;
+            this.djQuizShowHint = false;
+          } else {
+            this.state.showDJQuiz = false;
+            this.state.djQuizFailed = true;
+            this.triggerDJQuizStormFailure();
+          }
+        } else {
+          this.state.showDJQuiz = false;
+          this.state.djQuizFailed = true;
+          this.triggerDJQuizStormFailure();
+        }
+        return;
+      }
+      return;
+    }
+
+    for (const btn of this.djQuizButtonAreas) {
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.djQuizSelected = btn.option;
+        soundManager.play('choiceSelect');
+        return;
+      }
+    }
+
+    if (this.djQuizSelected >= 0 && this.djQuizContinueBtn) {
+      const btn = this.djQuizContinueBtn;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.play('choiceSelect');
+        const correct = this.djQuizSelected === this.djQuizCurrentQ.correct;
+        this.djQuizResultCorrect = correct;
+        
+        if (correct) {
+          soundManager.play('quizCorrect');
+          this.djQuizShowResult = true;
+        } else {
+          soundManager.play('quizWrong');
+          if (this.state.djQuizAttempt === 0) {
+            this.state.djQuizAttempt = 1;
+            this.djQuizShowHint = true;
+            this.djQuizSelected = -1;
+          } else {
+            this.djQuizShowResult = true;
+          }
+        }
+        return;
+      }
+    }
+  }
+
+  private triggerDJQuizStormFailure(): void {
+    this.endDiscoParty();
+    this.queueDialogue([
+      {
+        speaker: 'VILLAGE ELDER',
+        text: "Hmm, looks like you need to think about what you learned a bit more..."
+      },
+      {
+        speaker: 'VILLAGE ELDER',
+        text: "The storm is coming! Get home quickly!",
+        onComplete: () => {
+          this.state.stormCountdownActive = true;
+          this.state.stormCountdownTimer = 35;
+          this.state.phase = 'complete_success';
+        }
+      }
+    ]);
+  }
+
   // Quiz questions - some are single-select, some are multi-select
   private quizQuestions: Array<{
     question: string;
     options: string[];
-    correct: number | number[]; // number for single-select, number[] for multi-select
+    correct: number | number[];
     explanation: string;
     multiSelect?: boolean;
-  }> = [
-    {
-      question: "Why couldn't you trade directly with the Woodcutter?",
-      options: ["A: He was being unfriendly", "B: He wanted fish, but you didn't have fish"],
-      correct: 1,
-      explanation: "You needed wood, but could only offer a slingshot or berries. The Woodcutter wanted fish - a classic Double Coincidence of Wants problem."
-    },
-    {
-      question: "Why is recording debts better than relying on memory?",
-      options: ["A: People can honestly misremember or disagree", "B: Writing is more fun"],
-      correct: 0,
-      explanation: "Without records, people may genuinely believe different things about what was promised. A ledger removes this uncertainty."
-    },
-    {
-      question: "What is Money? (Select all that apply)",
-      options: [
-        "A: A system for tracking debts",
-        "B: Just coins and paper",
-        "C: A way to trade without double coincidence of wants",
-        "D: A shared record of who owes what"
-      ],
-      correct: [0, 2, 3], // A, C, D are correct
-      multiSelect: true,
-      explanation: "Money is fundamentally a system for tracking debts - it lets us trade even when we don't have what someone wants right now. It's a shared record that everyone trusts."
-    }
-  ];
+  }> = getFinalQuizQuestions().map(q => ({
+    question: q.question,
+    options: q.options,
+    correct: q.correct,
+    explanation: q.explanation
+  }));
 
   private currentQuizQuestion: number = 0;
   private quizButtonAreas: { x: number; y: number; w: number; h: number; option: number }[] = [];
@@ -11314,6 +11863,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         soundManager.play('buttonClick');
 
         if (this.state.showCelebration) {
+          const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+          if (!unlocked.includes(btn.genre)) {
+            unlocked.push(btn.genre);
+            localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
+          }
+          soundManager.play('recordScratch');
           soundManager.fadeOut('genreRemix', 500);
           soundManager.fadeOut('partySong', 500);
           const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
@@ -11321,6 +11876,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             speaker: 'VILLAGE ELDER',
             text: "Give me just one second while I pull this out of my record bag...",
             onComplete: () => {
+              soundManager.play('recordScratch');
               soundManager.loadAndPlayGenre(genreUrl);
               this.partySongEndTime = Date.now() + 240000;
               setTimeout(() => {
@@ -11332,6 +11888,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             }
           }]);
         } else {
+          const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+          if (!unlocked.includes(btn.genre)) {
+            unlocked.push(btn.genre);
+            localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
+          }
           this.state.showNightTransition = false;
           this.state.showSuccess = true;
           this.state.phase = 'complete';
@@ -11349,7 +11910,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const btn = this.reviewContinueButton;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.state.showQuizReview = false;
-        this.state.showSongChoice = true;
+        this.state.showNightTransition = false;
+        this.state.showSuccess = true;
+        this.state.phase = 'complete';
+        soundManager.fadeOut('ambientNight', 1000);
+        soundManager.fadeOut('backgroundMusicNight', 1000);
         return;
       }
     }
@@ -11743,6 +12308,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       showBadgePopup: false,
       pendingBadge: null,
       showBadgeTray: false,
+      showMusicCollection: false,
       badgeTrayAnimTimer: 0,
       selectedBadgeIndex: null,
       lastBadgeEarnedTime: 0,
@@ -11850,6 +12416,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       remixPlayed: false,
       songChangeUsed: false,
       hutAutoTriggered: false,
+      showDJQuiz: false,
+      djQuizQuestion: 0,
+      djQuizAttempt: 0,
+      djQuizFailed: false,
+      djQuizPassed: false,
       showSongChoice: false,
       selectedGenre: ''
     };
@@ -11909,6 +12480,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       showBadgePopup: false,
       pendingBadge: null,
       showBadgeTray: false,
+      showMusicCollection: false,
       badgeTrayAnimTimer: 0,
       selectedBadgeIndex: null,
       lastBadgeEarnedTime: 0,
@@ -12016,6 +12588,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       remixPlayed: false,
       songChangeUsed: false,
       hutAutoTriggered: false,
+      showDJQuiz: false,
+      djQuizQuestion: 0,
+      djQuizAttempt: 0,
+      djQuizFailed: false,
+      djQuizPassed: false,
       showSongChoice: false,
       selectedGenre: ''
     };

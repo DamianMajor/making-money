@@ -475,6 +475,7 @@ export class VillageLedgerGame {
   private stormFailureActive: boolean = false;
   private rainSoundStarted: boolean = false;
   private celebrationEndTime: number = 0;
+  private roofRepairedTime: number = 0;
   private frozenCelebrationTimer: number = 0;
   private partySongEndTime: number = 0;
   private slingshotPlatformActive: boolean = false;
@@ -1007,6 +1008,15 @@ export class VillageLedgerGame {
     const x = clientX - rect.left;
     const y = clientY - rect.top;
     
+    if (this.resetRecordsBtn && !this.parallaxLoaded) {
+      if (x >= this.resetRecordsBtn.x && x <= this.resetRecordsBtn.x + this.resetRecordsBtn.w &&
+          y >= this.resetRecordsBtn.y && y <= this.resetRecordsBtn.y + this.resetRecordsBtn.h) {
+        localStorage.removeItem('makingMoney_unlockedGenres');
+        soundManager.play('buttonClick');
+        return;
+      }
+    }
+
     // Handle Stone Tablet popup - click anywhere to close
     if (this.state.showStoneTabletPopup) {
       this.state.showStoneTabletPopup = false;
@@ -1511,6 +1521,7 @@ export class VillageLedgerGame {
               const hammerDuration = Math.max(1000, soundManager.getBufferDuration('roofHammer') - 2000);
               soundManager.playForDuration('roofHammer', hammerDuration);
               this.state.roofRepaired = true;
+              if (this.roofRepairedTime === 0) this.roofRepairedTime = Date.now();
               this.state.inventory.wood = 0;
               this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
               this.setMood('happy');
@@ -1599,6 +1610,7 @@ export class VillageLedgerGame {
           const hammerDuration = Math.max(1000, soundManager.getBufferDuration('roofHammer') - 2000);
           soundManager.playForDuration('roofHammer', hammerDuration);
           this.state.roofRepaired = true;
+          if (this.roofRepairedTime === 0) this.roofRepairedTime = Date.now();
           this.state.inventory.wood = 0;
           this.showInventoryPopup('ROOF FIXED! (-1 WOOD)');
           this.setMood('happy');
@@ -5182,6 +5194,7 @@ export class VillageLedgerGame {
         !this.state.currentDialogue && !this.state.showChoice) {
       if (!this.state.roofRepaired) {
         this.state.roofRepaired = true;
+        if (this.roofRepairedTime === 0) this.roofRepairedTime = Date.now();
       }
       this.setMood('happy');
       this.state.moodTimer = 999;
@@ -6330,6 +6343,7 @@ export class VillageLedgerGame {
                 const hammerDuration = Math.max(1000, soundManager.getBufferDuration('roofHammer') - 2000);
                 soundManager.playForDuration('roofHammer', hammerDuration);
                 this.state.roofRepaired = true;
+                if (this.roofRepairedTime === 0) this.roofRepairedTime = Date.now();
                 this.state.inventory.wood = 0;
                 this.showInventoryPopup('ROOF FIXED!');
               }
@@ -6443,14 +6457,27 @@ export class VillageLedgerGame {
     this.drawLocationMarkers(ctx, groundY);
 
     if (this.state.showCelebration || this.state.partyEnded) {
-      // Draw speakers BEFORE characters so they appear in the background
-      this.drawSpeakers(ctx);
-      if (this.state.showCelebration) {
-        // Draw elder BEFORE DJ booth so he appears behind it (DJing)
-        if (this.villageElder.visible) {
-          this.drawCharacter(ctx, this.villageElder);
+      let shouldDrawParty = true;
+      if (this.state.partyEnded && this.state.roofRepaired && this.roofRepairedTime > 0) {
+        const partyFadeAlpha = Math.max(0, 1 - (Date.now() - this.roofRepairedTime) / 2000);
+        if (partyFadeAlpha <= 0) {
+          shouldDrawParty = false;
+        } else {
+          ctx.save();
+          ctx.globalAlpha = partyFadeAlpha;
         }
-        this.drawCelebrationBackground(ctx);
+      }
+      if (shouldDrawParty) {
+        this.drawSpeakers(ctx);
+        if (this.state.showCelebration) {
+          if (this.villageElder.visible) {
+            this.drawCharacter(ctx, this.villageElder);
+          }
+          this.drawCelebrationBackground(ctx);
+        }
+        if (this.state.partyEnded && this.state.roofRepaired && this.roofRepairedTime > 0) {
+          ctx.restore();
+        }
       }
     }
 
@@ -6557,11 +6584,25 @@ export class VillageLedgerGame {
       this.drawBrawlAnimation(ctx);
     }
     
-    // Draw celebration animation if active
     if (this.state.showCelebration || this.state.partyEnded) {
-      this.drawCelebrationAnimation(ctx);
-      if (this.state.slingshotGameActive) {
-        this.drawSlingshotGame(ctx);
+      let shouldDrawCelebAnim = true;
+      if (this.state.partyEnded && this.state.roofRepaired && this.roofRepairedTime > 0) {
+        const celebFadeAlpha = Math.max(0, 1 - (Date.now() - this.roofRepairedTime) / 2000);
+        if (celebFadeAlpha <= 0) {
+          shouldDrawCelebAnim = false;
+        } else {
+          ctx.save();
+          ctx.globalAlpha = celebFadeAlpha;
+        }
+      }
+      if (shouldDrawCelebAnim) {
+        this.drawCelebrationAnimation(ctx);
+        if (this.state.slingshotGameActive) {
+          this.drawSlingshotGame(ctx);
+        }
+        if (this.state.partyEnded && this.state.roofRepaired && this.roofRepairedTime > 0) {
+          ctx.restore();
+        }
       }
     }
 
@@ -6584,23 +6625,25 @@ export class VillageLedgerGame {
         ctx.globalAlpha = 1;
       }
 
-      const countdownText = `STORM APPROACHING: ${Math.ceil(this.state.stormCountdownTimer)}s`;
-      ctx.textAlign = 'center';
-      const urgency = 1 - (this.state.stormCountdownTimer / 35);
-      const pulseSpeed = 300 - urgency * 200;
-      const pulse = 0.6 + 0.4 * Math.sin(Date.now() / pulseSpeed);
-      const fontSize = this.state.stormCountdownTimer <= 10 ?
-        22 + (1 - this.state.stormCountdownTimer / 10) * 14 : 22;
-      ctx.font = `bold ${fontSize}px ${this.uiFont}`;
-      ctx.shadowColor = 'rgba(220, 38, 38, 0.8)';
-      ctx.shadowBlur = 10 + urgency * 20;
-      ctx.fillStyle = `rgba(220, 38, 38, ${pulse})`;
-      ctx.fillText(countdownText, this.logicalWidth / 2, 80);
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.font = `14px ${this.uiFont}`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      ctx.fillText('Get back to your hut!', this.logicalWidth / 2, 115);
+      if (!this.state.roofRepaired) {
+        const countdownText = `STORM APPROACHING: ${Math.ceil(this.state.stormCountdownTimer)}s`;
+        ctx.textAlign = 'center';
+        const urgency = 1 - (this.state.stormCountdownTimer / 35);
+        const pulseSpeed = 300 - urgency * 200;
+        const pulse = 0.6 + 0.4 * Math.sin(Date.now() / pulseSpeed);
+        const fontSize = this.state.stormCountdownTimer <= 10 ?
+          22 + (1 - this.state.stormCountdownTimer / 10) * 14 : 22;
+        ctx.font = `bold ${fontSize}px ${this.uiFont}`;
+        ctx.shadowColor = 'rgba(220, 38, 38, 0.8)';
+        ctx.shadowBlur = 10 + urgency * 20;
+        ctx.fillStyle = `rgba(220, 38, 38, ${pulse})`;
+        ctx.fillText(countdownText, this.logicalWidth / 2, 80);
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.font = `14px ${this.uiFont}`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.fillText('Get back to your hut!', this.logicalWidth / 2, 115);
+      }
 
       const rainProgress = Math.max(0, progress - 0.3) / 0.7;
       if (rainProgress > 0) {
@@ -7061,12 +7104,6 @@ export class VillageLedgerGame {
       const size = 4 + Math.sin(now * 5 + i * 0.5) * 3;
       const color = sparkleColors[i % 3];
       
-      ctx.fillStyle = color === '#FFD700' ? 'rgba(255,215,0,0.3)' : color === '#FFA500' ? 'rgba(255,165,0,0.3)' : 'rgba(255,255,255,0.3)';
-      ctx.globalAlpha = popupAlpha * 0.3 * sparkleFade;
-      ctx.beginPath();
-      ctx.arc(sparkleX, sparkleY, size * 2.5, 0, Math.PI * 2);
-      ctx.fill();
-      
       ctx.globalAlpha = popupAlpha * sparkleFade;
       ctx.fillStyle = color;
       ctx.beginPath();
@@ -7081,12 +7118,6 @@ export class VillageLedgerGame {
       const sparkleY = h / 2 + Math.sin(angle) * dist;
       const size = 2 + Math.sin(now * 6 + i * 0.7) * 2;
       const color = sparkleColors[i % 3];
-      
-      ctx.globalAlpha = popupAlpha * 0.25 * sparkleFade;
-      ctx.fillStyle = color === '#FFD700' ? 'rgba(255,215,0,0.25)' : color === '#FFA500' ? 'rgba(255,165,0,0.25)' : 'rgba(255,255,255,0.25)';
-      ctx.beginPath();
-      ctx.arc(sparkleX, sparkleY, size * 2.5, 0, Math.PI * 2);
-      ctx.fill();
       
       ctx.globalAlpha = popupAlpha * sparkleFade;
       ctx.fillStyle = color;
@@ -7683,8 +7714,8 @@ export class VillageLedgerGame {
     const elderHeadY = this.villageElder.y + 34 + elderBob;
     const glassW = 20;
     const glassH = 7;
-    const bridgeY = elderHeadY;
-    const sideOffset = 11;
+    const bridgeY = elderHeadY - 1;
+    const sideOffset = 9;
 
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#333';
@@ -8459,20 +8490,26 @@ export class VillageLedgerGame {
     ctx.fillStyle = '#C4A77D';
     ctx.fillText(`${this.state.badges.length} of ${this.ALL_BADGES.length} earned`, w / 2, panelY + 55);
 
-    const cols = 3;
     const badgeSize = 70;
     const gapX = 20;
     const gapY = 20;
-    const gridW = cols * badgeSize + (cols - 1) * gapX;
-    const startX = (w - gridW) / 2;
+    const rowHeight = badgeSize + gapY + 40;
     const startY = panelY + 75;
     this.badgeItemAreas = [];
 
     this.ALL_BADGES.forEach((badge, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const bx = startX + col * (badgeSize + gapX);
-      const by = startY + row * (badgeSize + gapY + 40);
+      let bx: number, by: number;
+      if (i < 3) {
+        const topRowW = 3 * badgeSize + 2 * gapX;
+        const topStartX = (w - topRowW) / 2;
+        bx = topStartX + i * (badgeSize + gapX);
+        by = startY;
+      } else {
+        const botRowW = 2 * badgeSize + 1 * gapX;
+        const botStartX = (w - botRowW) / 2;
+        bx = botStartX + (i - 3) * (badgeSize + gapX);
+        by = startY + rowHeight;
+      }
       const earned = this.state.badges.includes(badge.name);
 
       if (earned) {
@@ -8747,14 +8784,27 @@ export class VillageLedgerGame {
   }
 
   private musicCollectionIconArea: { x: number; y: number; w: number; h: number } | null = null;
+  private lastRecordUnlockTime: number = 0;
+  private resetRecordsBtn: { x: number; y: number; w: number; h: number } | null = null;
 
   private drawMusicCollectionIcon(ctx: CanvasRenderingContext2D): void {
     const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
     if (unlocked.length === 0) return;
 
-    const iconSize = 36;
-    const iconX = 15;
-    const iconY = 85;
+    if (this.state.showDJQuiz || this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview || this.state.showBadgeTray || this.state.showMusicCollection) return;
+
+    const iconSize = 32;
+    const iconX = this.inventoryPanelLeftX - 44 - iconSize - 8;
+    const iconY = 16;
+
+    const timeSinceLastRecord = (Date.now() - this.lastRecordUnlockTime) / 1000;
+    if (timeSinceLastRecord < 3) {
+      const glowAlpha = 0.3 + 0.3 * Math.sin(timeSinceLastRecord * 8);
+      ctx.fillStyle = `rgba(232, 212, 77, ${glowAlpha})`;
+      ctx.beginPath();
+      ctx.arc(iconX + iconSize/2, iconY + iconSize/2, iconSize * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
     
     ctx.save();
     ctx.beginPath();
@@ -8790,7 +8840,7 @@ export class VillageLedgerGame {
     ctx.font = `bold 8px ${this.uiFont}`;
     ctx.fillStyle = '#FFD700';
     ctx.textAlign = 'center';
-    ctx.fillText(`${unlocked.length}/10`, iconX + iconSize/2, iconY + iconSize + 10);
+    ctx.fillText(`${unlocked.length}/10`, iconX + iconSize/2, iconY + iconSize + 14);
     
     this.musicCollectionIconArea = { x: iconX, y: iconY, w: iconSize, h: iconSize + 12 };
   }
@@ -9486,6 +9536,23 @@ export class VillageLedgerGame {
     ctx.font = '20px "Courier New", monospace';
     ctx.fillStyle = '#A88B5A';
     ctx.fillText('Loading' + dots, w / 2, h / 2 + 20);
+
+    const resetBtnW = 160;
+    const resetBtnH = 30;
+    const resetBtnX = (w - resetBtnW) / 2;
+    const resetBtnY = h / 2 + 60;
+    ctx.fillStyle = '#8B4513';
+    ctx.beginPath();
+    ctx.roundRect(resetBtnX, resetBtnY, resetBtnW, resetBtnH, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#D4A574';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.font = '12px "Courier New", monospace';
+    ctx.fillStyle = '#D4A574';
+    ctx.textAlign = 'center';
+    ctx.fillText('Reset Records', resetBtnX + resetBtnW / 2, resetBtnY + resetBtnH / 2 + 4);
+    this.resetRecordsBtn = { x: resetBtnX, y: resetBtnY, w: resetBtnW, h: resetBtnH };
     
     ctx.textAlign = 'left';
   }
@@ -11074,7 +11141,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
     this.djQuizButtonAreas = [];
     const btnW = cardW - 60;
-    const btnH = 32;
+    const btnH = 40;
     const startY = qY + 12;
     q.options.forEach((opt, i) => {
       const btnX = cardX + 30;
@@ -11091,9 +11158,28 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       }
       ctx.font = `10px ${this.retroFont}`;
       ctx.fillStyle = '#F5DEB3';
-      ctx.textAlign = 'left';
-      ctx.fillText(opt, btnX + 12, btnY + btnH / 2 + 4);
       ctx.textAlign = 'center';
+      const optMaxW = btnW - 24;
+      const optWords = opt.split(' ');
+      let optLine = '';
+      const optLines: string[] = [];
+      for (const word of optWords) {
+        const testLine = optLine + word + ' ';
+        if (ctx.measureText(testLine).width > optMaxW && optLine !== '') {
+          optLines.push(optLine.trim());
+          optLine = word + ' ';
+        } else {
+          optLine = testLine;
+        }
+      }
+      optLines.push(optLine.trim());
+      const optLineHeight = 14;
+      const totalTextH = optLines.length * optLineHeight;
+      let optLineY = btnY + (btnH - totalTextH) / 2 + optLineHeight / 2 + 4;
+      for (const line of optLines) {
+        ctx.fillText(line, btnX + btnW / 2, optLineY);
+        optLineY += optLineHeight;
+      }
       this.djQuizButtonAreas.push({ x: btnX, y: btnY, w: btnW, h: btnH, option: i });
     });
 
@@ -11237,7 +11323,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const q = this.quizQuestions[this.currentQuizQuestion];
     const isMoneyQuestion = q.multiSelect === true;
     const reflectionAnswer = isMoneyQuestion ? localStorage.getItem('makingMoney_moneyAnswer') : null;
-    const cardH = (isMoneyQuestion && reflectionAnswer) ? 500 : 400;
+    const optionCount = this.quizQuestions[this.currentQuizQuestion].options.length;
+    const neededH = 165 + optionCount * 58 + 20;
+    const cardH = (isMoneyQuestion && reflectionAnswer) ? Math.max(500, neededH) : Math.max(400, neededH);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
 
@@ -11342,8 +11430,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     this.quizSubmitButton = null;
     const isMultiSelect = q.multiSelect === true;
     const btnW = cardW - 80;
-    const btnH = isMultiSelect ? 40 : 60;
-    const btnSpacing = isMultiSelect ? 48 : 80;
+    const btnH = isMultiSelect ? 40 : 48;
+    const btnSpacing = isMultiSelect ? 48 : 58;
     const btnX = cardX + 40;
 
     q.options.forEach((option, i) => {
@@ -11926,6 +12014,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           if (!unlocked.includes(btn.genre)) {
             unlocked.push(btn.genre);
             localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
+            this.lastRecordUnlockTime = Date.now();
           }
           // Stop current music immediately (not fade)
           soundManager.stop('genreRemix');
@@ -11954,6 +12043,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           if (!unlocked.includes(btn.genre)) {
             unlocked.push(btn.genre);
             localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
+            this.lastRecordUnlockTime = Date.now();
           }
           this.state.showNightTransition = false;
           this.state.showSuccess = true;

@@ -5,7 +5,8 @@ export interface QuizQuestion {
   correct: number;
   explanation: string;
   hint: string;
-  category: 'dcw' | 'debt' | 'ledger';
+  category: 'dcw' | 'debt' | 'ledger' | 'extra_credit';
+  multiSelect?: boolean;
 }
 
 export const ALL_QUESTIONS: QuizQuestion[] = [
@@ -148,6 +149,76 @@ export const ALL_QUESTIONS: QuizQuestion[] = [
     explanation: "When many people can see and verify the records, it's much harder for anyone to cheat. The Stone Tablet works because everyone in the village can see it!",
     hint: "What makes the Stone Tablet in the village center trustworthy?",
     category: 'ledger'
+  },
+  {
+    id: 11,
+    question: "EXTRA CREDIT: What does 'centralized' mean when talking about record-keeping?",
+    options: [
+      "A: Everyone keeps their own copy of the records",
+      "B: One person or group controls all the records",
+      "C: Records are kept in the center of town",
+      "D: Nobody keeps any records"
+    ],
+    correct: 1,
+    explanation: "Centralized means one person or group is in charge of all the records. Like if only the Elder kept the Stone Tablet locked away!",
+    hint: "Think about ONE person being in control of everything...",
+    category: 'extra_credit'
+  },
+  {
+    id: 12,
+    question: "EXTRA CREDIT: What does 'decentralized' mean?",
+    options: [
+      "A: Only one person makes decisions",
+      "B: No one is allowed to keep records",
+      "C: Many people share control and can verify the records",
+      "D: Records are destroyed every day"
+    ],
+    correct: 2,
+    explanation: "Decentralized means no single person is in charge. Many people share the responsibility of keeping and checking the records!",
+    hint: "Think about MANY people sharing the work instead of just one...",
+    category: 'extra_credit'
+  },
+  {
+    id: 13,
+    question: "EXTRA CREDIT: Why might a centralized system be risky?",
+    options: [
+      "A: Because it has too many people checking the records",
+      "B: Because the one person in charge could make mistakes or cheat",
+      "C: Because everyone has a copy",
+      "D: Because it's too slow"
+    ],
+    correct: 1,
+    explanation: "When one person or group controls everything, there's no one else to catch mistakes or stop cheating. That's the risk of centralization!",
+    hint: "What could go wrong if only ONE person has all the power?",
+    category: 'extra_credit'
+  },
+  {
+    id: 14,
+    question: "EXTRA CREDIT: The Stone Tablet in the village center is more like which system?",
+    options: [
+      "A: Centralized - only the Elder can see it",
+      "B: Decentralized - everyone in the village can see and verify it",
+      "C: Neither - it's just a rock",
+      "D: Centralized - only one person can write on it"
+    ],
+    correct: 1,
+    explanation: "The Stone Tablet sits in the village center where EVERYONE can see it and verify the records. That makes it more decentralized and trustworthy!",
+    hint: "Where is the Stone Tablet, and who can look at it?",
+    category: 'extra_credit'
+  },
+  {
+    id: 15,
+    question: "EXTRA CREDIT: What is one advantage of a decentralized system over a centralized one?",
+    options: [
+      "A: It's easier for one person to change the records secretly",
+      "B: It doesn't need any records at all",
+      "C: It's harder to cheat because many people are watching",
+      "D: Only experts can understand it"
+    ],
+    correct: 2,
+    explanation: "When many people can see and check the records, it becomes very hard for anyone to cheat without getting caught. That's the power of decentralization!",
+    hint: "Think about what happens when MANY eyes are watching the records...",
+    category: 'extra_credit'
   }
 ];
 
@@ -169,5 +240,8 @@ export function getBackupDJQuestion(usedIds: number[]): QuizQuestion | null {
 
 export function getFinalQuizQuestions(): QuizQuestion[] {
   const ledgerQuestions = ALL_QUESTIONS.filter(q => q.category === 'ledger');
-  return ledgerQuestions;
+  const extraCreditQuestions = ALL_QUESTIONS.filter(q => q.category === 'extra_credit');
+  const shuffled = extraCreditQuestions.sort(() => Math.random() - 0.5);
+  const bonusQuestion = shuffled[0];
+  return [...ledgerQuestions, bonusQuestion];
 }

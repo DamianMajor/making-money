@@ -2,6 +2,81 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { VillageLedgerGame } from '@/lib/gameEngine';
 import { soundManager } from '@/lib/soundManager';
 
+function useIsPortrait() {
+  const [isPortrait, setIsPortrait] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerHeight > window.innerWidth;
+  });
+
+  useEffect(() => {
+    const check = () => setIsPortrait(window.innerHeight > window.innerWidth);
+    window.addEventListener('resize', check);
+    window.addEventListener('orientationchange', check);
+    const mql = window.matchMedia('(orientation: portrait)');
+    mql.addEventListener('change', check);
+    return () => {
+      window.removeEventListener('resize', check);
+      window.removeEventListener('orientationchange', check);
+      mql.removeEventListener('change', check);
+    };
+  }, []);
+
+  return isPortrait;
+}
+
+function RotateDeviceOverlay() {
+  return (
+    <div
+      className="fixed inset-0 flex flex-col items-center justify-center"
+      style={{
+        zIndex: 9999,
+        background: 'linear-gradient(180deg, #1a1208 0%, #2d1f0e 30%, #3d2b14 60%, #2a1c0a 100%)',
+      }}
+      data-testid="rotate-device-overlay"
+    >
+      <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#C9B896" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '24px' }}>
+        <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+        <line x1="12" y1="18" x2="12" y2="18" strokeWidth="2" />
+        <path d="M17 8l3 3-3 3" stroke="#FFD700" strokeWidth="2" />
+        <path d="M20 11h-4" stroke="#FFD700" strokeWidth="2" />
+      </svg>
+      <style>{`
+        @keyframes rotateHint {
+          0%, 100% { transform: rotate(0deg); }
+          25% { transform: rotate(-15deg); }
+          75% { transform: rotate(15deg); }
+        }
+      `}</style>
+      <h2
+        style={{
+          fontFamily: '"Press Start 2P", monospace',
+          fontSize: 'clamp(12px, 3vw, 18px)',
+          color: '#E8D5A8',
+          textShadow: '2px 2px 0px #5a4a32, 0 0 15px rgba(255,215,100,0.4)',
+          lineHeight: 1.6,
+          textAlign: 'center',
+          padding: '0 24px',
+        }}
+      >
+        Please rotate your device
+      </h2>
+      <p
+        style={{
+          fontFamily: 'Georgia, serif',
+          fontSize: 'clamp(12px, 2.5vw, 16px)',
+          color: '#B8A07A',
+          lineHeight: 1.7,
+          textAlign: 'center',
+          padding: '0 32px',
+          marginTop: '12px',
+        }}
+      >
+        This game is best played in landscape mode
+      </p>
+    </div>
+  );
+}
+
 const MONEY_ICONS = [
   'money-shell', 'money-beads', 'money-goldbar', 'money-coin', 'money-raistone',
   'money-cattle', 'money-salt', 'money-teabrick', 'money-feather', 'money-cocoa',
@@ -819,6 +894,16 @@ export default function Game() {
   const [smartPathPrompt, setSmartPathPrompt] = useState<string | null>(null);
   const smartPathCallbackRef = useRef<((text: string) => void) | null>(null);
   const [smartPathAnswer, setSmartPathAnswer] = useState('');
+  const isPortrait = useIsPortrait();
+
+  useEffect(() => {
+    try {
+      const orient = window.screen?.orientation as any;
+      if (orient?.lock) {
+        orient.lock('landscape').catch(() => {});
+      }
+    } catch {}
+  }, []);
 
   useEffect(() => {
     preloadMoneyIcons().then((images) => {
@@ -906,12 +991,21 @@ export default function Game() {
     }
   }, [initGameEngine, handleResize]);
 
+  useEffect(() => {
+    if (!isPortrait && gameRef.current) {
+      setTimeout(() => {
+        if (gameRef.current) gameRef.current.resize();
+      }, 100);
+    }
+  }, [isPortrait]);
+
   return (
     <div 
       ref={containerRef}
       className="fixed inset-0 w-full h-full overflow-hidden bg-background"
       data-testid="game-container"
     >
+      {isPortrait && <RotateDeviceOverlay />}
       <canvas
         ref={canvasRef}
         className="w-full h-full touch-none select-none"

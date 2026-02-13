@@ -359,6 +359,13 @@ export class SoundManager {
       } catch {}
       this.activeSources.delete(name);
     }
+    const prefix = name + '_';
+    Array.from(this.activeSources.entries()).forEach(([key, sound]) => {
+      if (key.startsWith(prefix)) {
+        try { sound.source.stop(); } catch {}
+        this.activeSources.delete(key);
+      }
+    });
   }
 
   public stop(name: SoundName): void {
@@ -663,19 +670,30 @@ export class SoundManager {
   }
 
   public fadeOut(name: SoundName, duration: number = 1000): void {
+    if (!this.audioContext) return;
     const activeSound = this.activeSources.get(name);
-    if (!activeSound || !this.audioContext) return;
-    
-    const currentTime = this.audioContext.currentTime;
-    activeSound.gainNode.gain.setValueAtTime(activeSound.gainNode.gain.value, currentTime);
-    activeSound.gainNode.gain.linearRampToValueAtTime(0, currentTime + duration / 1000);
-    
-    setTimeout(() => {
-      try {
-        activeSound.source.stop();
-      } catch {}
-      this.activeSources.delete(name);
-    }, duration);
+    if (activeSound) {
+      const currentTime = this.audioContext.currentTime;
+      activeSound.gainNode.gain.setValueAtTime(activeSound.gainNode.gain.value, currentTime);
+      activeSound.gainNode.gain.linearRampToValueAtTime(0, currentTime + duration / 1000);
+      setTimeout(() => {
+        try { activeSound.source.stop(); } catch {}
+        this.activeSources.delete(name);
+      }, duration);
+    }
+    const prefix = name + '_';
+    const ctx = this.audioContext;
+    Array.from(this.activeSources.entries()).forEach(([key, sound]) => {
+      if (key.startsWith(prefix)) {
+        const ct = ctx.currentTime;
+        sound.gainNode.gain.setValueAtTime(sound.gainNode.gain.value, ct);
+        sound.gainNode.gain.linearRampToValueAtTime(0, ct + duration / 1000);
+        setTimeout(() => {
+          try { sound.source.stop(); } catch {}
+          this.activeSources.delete(key);
+        }, duration);
+      }
+    });
   }
 
   public fadeIn(name: SoundName, duration: number = 1000): void {

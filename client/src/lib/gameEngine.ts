@@ -7650,11 +7650,11 @@ export class VillageLedgerGame {
 
     // Draw sunglasses on the Village Elder (adjusted for 3/4 side-facing view)
     const elderBob = this.villageElder.bobOffset || 0;
-    const elderHeadY = this.villageElder.y + 29 + elderBob;
-    const glassW = 18;
+    const elderHeadY = this.villageElder.y + 34 + elderBob;
+    const glassW = 20;
     const glassH = 7;
     const bridgeY = elderHeadY;
-    const sideOffset = 12;
+    const sideOffset = 11;
 
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#333';

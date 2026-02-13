@@ -1664,65 +1664,57 @@ export class VillageLedgerGame {
     // Wait 2.5 seconds before starting rain (after roof hammer sound completes)
     setTimeout(() => {
       try {
-        // Start rainfall (5 seconds overlay on scene)
+        // Start rainfall - go directly to night transition with its built-in rain
         this.state.showRainfall = true;
         this.state.rainfallTimer = 0;
+        this.state.showNightTransition = true;
+        this.state.nightTransitionTimer = 0;
         if (!this.rainSoundStarted) {
           this.rainSoundStarted = true;
-          soundManager.fadeIn('rain', 2000); // 2 second fade in, plays once
-          soundManager.stop('thunder'); // Stop thunder when rain starts
+          soundManager.fadeIn('rain', 2000);
+          soundManager.stop('thunder');
         }
+        soundManager.fadeIn('ambientNight', 1000);
+        soundManager.fadeIn('backgroundMusicNight', 2000);
         
-        // Sequence: rainfall 16s → night transition 6s → quiz (3s delay)
+        // After 10 seconds of rain in night transition, stop rain and show quiz
         setTimeout(() => {
           try {
-            // Start night transition with fade (rain continues and fades)
-            this.state.showNightTransition = true;
-            this.state.nightTransitionTimer = 0;
-            soundManager.fadeIn('ambientNight', 1000);
-            soundManager.fadeIn('backgroundMusicNight', 2000);
-            
+            this.state.showRainfall = false;
+            soundManager.stop('thunder');
+            soundManager.fadeOut('rain', 6000);
+            // Keep night scene visible, then show quiz intro
             setTimeout(() => {
-              try {
-                this.state.showRainfall = false; // Turn off rain
-                soundManager.stop('thunder');
-                soundManager.fadeOut('rain', 6000); // 6 second fade out
-                // Keep night scene visible, then show quiz intro
-                setTimeout(() => {
-                  this.currentQuizQuestion = 0;
-                  this.quizWrongAnswers = [];
-                  this.showQuizFeedback = false;
-                  if (this.state.partyEnded) {
-                    this.state.showQuiz = true;
-                    this.state.phase = 'quiz';
-                  } else {
-                    this.player.visible = true;
-                    this.state.playerEnteredHut = false;
-                    this.state.playerAlpha = 1;
-                    this.queueDialogue([
-                      {
-                        speaker: 'VILLAGE ELDER',
-                        text: "Psst... DJ Elder doesn't usually take requests..."
-                      },
-                      {
-                        speaker: 'VILLAGE ELDER',
-                        text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
-                        onComplete: () => {
-                          this.state.showQuiz = true;
-                          this.state.phase = 'quiz';
-                        }
-                      }
-                    ]);
+              this.currentQuizQuestion = 0;
+              this.quizWrongAnswers = [];
+              this.showQuizFeedback = false;
+              if (this.state.partyEnded) {
+                this.state.showQuiz = true;
+                this.state.phase = 'quiz';
+              } else {
+                this.player.visible = true;
+                this.state.playerEnteredHut = false;
+                this.state.playerAlpha = 1;
+                this.queueDialogue([
+                  {
+                    speaker: 'VILLAGE ELDER',
+                    text: "Psst... DJ Elder doesn't usually take requests..."
+                  },
+                  {
+                    speaker: 'VILLAGE ELDER',
+                    text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                    onComplete: () => {
+                      this.state.showQuiz = true;
+                      this.state.phase = 'quiz';
+                    }
                   }
-                }, 4000); // 4 seconds delay (1 more than before)
-              } catch (e) {
-                console.error('Error in quiz transition:', e);
+                ]);
               }
-            }, 7000); // 7 second fade to night (1s longer for peaceful nighttime)
+            }, 4000);
           } catch (e) {
-            console.error('Error in rainfall transition:', e);
+            console.error('Error in rain/quiz transition:', e);
           }
-        }, 6000); // 6 second rainfall (halved again)
+        }, 10000); // 10 seconds of rain in night transition
       } catch (e) {
         console.error('Error starting rain:', e);
       }
@@ -6968,16 +6960,16 @@ export class VillageLedgerGame {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
     
-    // Animation: scale up from 0.5 and fade in over 0.4 seconds
+    // Animation: scale up from 0.3 and fade in over 1.5 seconds
     const animElapsed = (Date.now() - this.badgePopupStartTime) / 1000;
-    const animProgress = Math.min(1, animElapsed / 0.4);
+    const animProgress = Math.min(1, animElapsed / 1.5);
     const eased = 1 - Math.pow(1 - animProgress, 3);
-    const scale = 0.5 + 0.5 * eased;
+    const scale = 0.3 + 0.7 * eased;
     const popupAlpha = eased;
     
     // Popup dimensions
     const popupWidth = 340;
-    const popupHeight = 280;
+    const popupHeight = 300;
     const popupX = (w - popupWidth) / 2;
     const popupY = (h - popupHeight) / 2;
     
@@ -7014,7 +7006,7 @@ export class VillageLedgerGame {
     
     // Badge icon (star/medal shape)
     const badgeX = popupX + popupWidth / 2;
-    const badgeY = popupY + 70;
+    const badgeY = popupY + 90;
     const badgeSize = 30;
     
     // Draw star shape
@@ -7036,7 +7028,7 @@ export class VillageLedgerGame {
     // Badge name
     ctx.font = `bold 15px ${this.uiFont}`;
     ctx.fillStyle = '#F5DEB3';
-    ctx.fillText(this.state.pendingBadge.name, popupX + popupWidth / 2, popupY + 115);
+    ctx.fillText(this.state.pendingBadge.name, popupX + popupWidth / 2, popupY + 135);
     
     // Badge description (word wrap) - centered between name and Continue button
     ctx.font = `12px ${this.uiFont}`;
@@ -7059,7 +7051,7 @@ export class VillageLedgerGame {
       }
     });
     const descTotalHeight = descLineCount * 20;
-    const nameBottomY = popupY + 125;
+    const nameBottomY = popupY + 145;
     const btnTopY = popupY + popupHeight - 45;
     const descStartY = nameBottomY + (btnTopY - nameBottomY - descTotalHeight) / 2 + 14;
     
@@ -7723,8 +7715,8 @@ export class VillageLedgerGame {
     const elderHeadY = this.villageElder.y + 34 + elderBob;
     const glassW = 20;
     const glassH = 7;
-    const bridgeY = elderHeadY - 1;
-    const sideOffset = 9;
+    const bridgeY = elderHeadY - 2;
+    const sideOffset = 7;
 
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#333';
@@ -12193,7 +12185,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const hasChampion = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE;
     const reflectionAnswer = localStorage.getItem('makingMoney_moneyAnswer');
     const hasReflection = !!reflectionAnswer;
-    let baseCardH = hasChampion ? 510 : 480;
+    let baseCardH = hasChampion ? 560 : 530;
     if (hasReflection) baseCardH += 80;
     const cardH = Math.min(baseCardH, h - 30);
     const cardX = (w - cardW) / 2;
@@ -12233,22 +12225,28 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillText(`Slingshot Score: ${this.state.slingshotScore}`, w / 2, cardY + 85);
     }
 
-    // Badge grid - 3 columns, 2 rows
-    const cols = 3;
-    const badgeSize = 52;
-    const gapX = 16;
-    const gapY = 12;
-    const gridW = cols * badgeSize + (cols - 1) * gapX;
-    const startX = (w - gridW) / 2;
+    // Badge grid - row of 3 + centered row of 2 (matching badge tray panel layout)
+    const badgeSize = 70;
+    const gapX = 20;
+    const gapY = 20;
+    const rowHeight = badgeSize + gapY + 40;
     const hasPartyChampion = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE;
     const startY = cardY + (hasPartyChampion ? 98 : 75);
     
     this.successBadgeAreas = [];
     this.ALL_BADGES.forEach((badge, i) => {
-      const col = i % cols;
-      const row = Math.floor(i / cols);
-      const bx = startX + col * (badgeSize + gapX);
-      const by = startY + row * (badgeSize + gapY + 30);
+      let bx: number, by: number;
+      if (i < 3) {
+        const topRowW = 3 * badgeSize + 2 * gapX;
+        const topStartX = (w - topRowW) / 2;
+        bx = topStartX + i * (badgeSize + gapX);
+        by = startY;
+      } else {
+        const botRowW = 2 * badgeSize + 1 * gapX;
+        const botStartX = (w - botRowW) / 2;
+        bx = botStartX + (i - 3) * (badgeSize + gapX);
+        by = startY + rowHeight;
+      }
       const earned = this.state.badges.includes(badge.name);
       
       this.successBadgeAreas.push({ x: bx, y: by, w: badgeSize, h: badgeSize, index: i });
@@ -12275,8 +12273,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         ctx.beginPath();
         for (let j = 0; j < 5; j++) {
           const angle = (j * 4 * Math.PI / 5) - Math.PI / 2;
-          const px = cx + Math.cos(angle) * 14;
-          const py = cy + Math.sin(angle) * 14;
+          const px = cx + Math.cos(angle) * 18;
+          const py = cy + Math.sin(angle) * 18;
           if (j === 0) ctx.moveTo(px, py);
           else ctx.lineTo(px, py);
         }
@@ -12285,25 +12283,25 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       } else {
         // Lock icon
         ctx.fillStyle = '#555';
-        ctx.font = `bold 20px ${this.uiFont}`;
+        ctx.font = `bold 24px ${this.uiFont}`;
         ctx.textAlign = 'center';
-        ctx.fillText('?', bx + badgeSize / 2, by + badgeSize / 2 + 7);
+        ctx.fillText('?', bx + badgeSize / 2, by + badgeSize / 2 + 8);
       }
       
       // Badge name
-      ctx.font = `bold 8px ${this.uiFont}`;
-      ctx.fillStyle = earned ? '#F5DEB3' : '#555';
+      ctx.font = `bold 10px ${this.uiFont}`;
+      ctx.fillStyle = earned ? '#F5DEB3' : '#666';
       ctx.textAlign = 'center';
       
       const nameWords = badge.name.split(' ');
       let nameLine = '';
-      let nameY = by + badgeSize + 12;
+      let nameY = by + badgeSize + 14;
       for (const word of nameWords) {
         const test = nameLine + word + ' ';
         if (ctx.measureText(test).width > badgeSize + 10 && nameLine !== '') {
           ctx.fillText(nameLine.trim(), bx + badgeSize / 2, nameY);
           nameLine = word + ' ';
-          nameY += 10;
+          nameY += 12;
         } else {
           nameLine = test;
         }
@@ -12314,7 +12312,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     });
     
     // Encouragement message
-    const msgY = startY + 2 * (badgeSize + gapY + 30) + 25;
+    const msgY = startY + 2 * rowHeight + 10;
     ctx.font = `11px ${this.uiFont}`;
     ctx.fillStyle = '#C4A77D';
     ctx.textAlign = 'center';
@@ -12336,7 +12334,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
     
     // Learn More hint
-    const hintY = startY + 2 * (badgeSize + gapY + 30) + 62;
+    const hintY = startY + 2 * rowHeight + 47;
     ctx.font = `9px ${this.uiFont}`;
     ctx.fillStyle = '#A89070';
     ctx.textAlign = 'center';

@@ -352,6 +352,7 @@ export class SoundManager {
   }
 
   public stopAllMusic(): void {
+    this.genreLoadGeneration++;
     const musicNames: SoundName[] = [
       'backgroundMusicDay', 'backgroundMusicDay2', 'backgroundMusicNight',
       'partySong', 'genreRemix', 'moneySong'
@@ -660,15 +661,20 @@ export class SoundManager {
       this.activeSources.delete('genreRemix');
     }
 
+    const thisGeneration = ++this.genreLoadGeneration;
+
     try {
       let audioBuffer = this.genreBufferCache.get(url);
       if (!audioBuffer) {
         const response = await fetch(url);
         if (!response.ok) return;
+        if (thisGeneration !== this.genreLoadGeneration) return;
         const arrayBuffer = await response.arrayBuffer();
         audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
         this.genreBufferCache.set(url, audioBuffer);
       }
+
+      if (thisGeneration !== this.genreLoadGeneration) return;
 
       const source = this.audioContext.createBufferSource();
       source.buffer = audioBuffer;
@@ -699,6 +705,7 @@ export class SoundManager {
   }
 
   private genreBufferCache: Map<string, AudioBuffer> = new Map();
+  private genreLoadGeneration: number = 0;
 
   public async preloadGenre(url: string): Promise<void> {
     if (!this.audioContext || this.genreBufferCache.has(url)) return;

@@ -1062,7 +1062,7 @@ export class VillageLedgerGame {
         }
       }
 
-      if (this.musicCollectionIconArea && !this.state.showChoice && !this.state.currentDialogue) {
+      if (this.musicCollectionIconArea && !this.state.showChoice && !this.state.currentDialogue && !this.state.showCelebration) {
         const mc = this.musicCollectionIconArea;
         if (x >= mc.x && x <= mc.x + mc.w && y >= mc.y && y <= mc.y + mc.h) {
           this.state.showMusicCollection = !this.state.showMusicCollection;
@@ -1667,68 +1667,55 @@ export class VillageLedgerGame {
     this.state.playerFading = true;
     // Player alpha will decrease in update() until 0, then visible=false and playerEnteredHut=true
     
-    // Wait 2.5 seconds before starting rain (after roof hammer sound completes)
+    // Wait 2.5 seconds then go directly to night transition (skip standalone rain)
     setTimeout(() => {
       try {
-        // Start rainfall animation (standalone rain graphic)
-        this.state.showRainfall = true;
-        this.state.rainfallTimer = 0;
+        this.state.showNightTransition = true;
+        this.state.nightTransitionTimer = 0;
         if (!this.rainSoundStarted) {
           this.rainSoundStarted = true;
           soundManager.fadeIn('rain', 2000);
           soundManager.stop('thunder');
         }
+        soundManager.fadeIn('ambientNight', 1000);
+        soundManager.fadeIn('backgroundMusicNight', 2000);
+        soundManager.fadeOut('rain', 6000);
         
-        // After 6 seconds of rain, transition to night (rain stops, night begins)
         setTimeout(() => {
           try {
-            this.state.showRainfall = false;
-            this.state.showNightTransition = true;
-            this.state.nightTransitionTimer = 0;
-            soundManager.fadeIn('ambientNight', 1000);
-            soundManager.fadeIn('backgroundMusicNight', 2000);
-            soundManager.fadeOut('rain', 6000);
-            soundManager.stop('thunder');
-            
-            setTimeout(() => {
-              try {
-                this.currentQuizQuestion = 0;
-                this.quizWrongAnswers = [];
-                this.showQuizFeedback = false;
-                if (this.state.partyEnded) {
-                  this.state.showQuiz = true;
-                  this.state.phase = 'quiz';
-                } else {
-                  this.player.visible = true;
-                  this.state.playerEnteredHut = false;
-                  this.state.playerAlpha = 1;
-                  this.queueDialogue([
-                    {
-                      speaker: 'VILLAGE ELDER',
-                      text: "Psst... DJ Elder doesn't usually take requests..."
-                    },
-                    {
-                      speaker: 'VILLAGE ELDER',
-                      text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
-                      onComplete: () => {
-                        this.state.showQuiz = true;
-                        this.state.phase = 'quiz';
-                      }
-                    }
-                  ]);
+            this.currentQuizQuestion = 0;
+            this.quizWrongAnswers = [];
+            this.showQuizFeedback = false;
+            if (this.state.partyEnded) {
+              this.state.showQuiz = true;
+              this.state.phase = 'quiz';
+            } else {
+              this.player.visible = true;
+              this.state.playerEnteredHut = false;
+              this.state.playerAlpha = 1;
+              this.queueDialogue([
+                {
+                  speaker: 'VILLAGE ELDER',
+                  text: "Psst... DJ Elder doesn't usually take requests..."
+                },
+                {
+                  speaker: 'VILLAGE ELDER',
+                  text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                  onComplete: () => {
+                    this.state.showQuiz = true;
+                    this.state.phase = 'quiz';
+                  }
                 }
-              } catch (e) {
-                console.error('Error in quiz transition:', e);
-              }
-            }, 7000);
+              ]);
+            }
           } catch (e) {
-            console.error('Error in night transition:', e);
+            console.error('Error in quiz transition:', e);
           }
-        }, 6000); // 6 seconds of standalone rain
+        }, 7000);
       } catch (e) {
-        console.error('Error starting rain:', e);
+        console.error('Error in night transition:', e);
       }
-    }, 2500); // Wait 2.5 seconds after entering hut before rain starts
+    }, 2500);
   }
 
   // Trigger the return home sequence with clouds animation (unused - kept for reference)
@@ -3890,10 +3877,16 @@ export class VillageLedgerGame {
     if (this.state.showCelebration) {
       if (this.state.djQuizPassed) {
         if (this.state.songChangeUsed) {
-          this.queueDialogue([{
-            speaker: 'VILLAGE ELDER',
-            text: "No more requests tonight! Enjoy the music!"
-          }]);
+          this.queueDialogue([
+            {
+              speaker: 'VILLAGE ELDER',
+              text: "No more requests tonight! Enjoy the music!"
+            },
+            {
+              speaker: 'VILLAGE ELDER',
+              text: "But hey... play through the game again and you can unlock even more music!"
+            }
+          ]);
           return;
         }
         this.queueDialogue([{
@@ -5534,13 +5527,6 @@ export class VillageLedgerGame {
         'Debt Settled',
         'All debts paid off! When debts are recorded and settled, everyone is happy.'
       );
-      const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
-      if (!unlocked.includes('Funk')) {
-        unlocked.push('Funk');
-        localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
-        this.lastRecordUnlockTime = Date.now();
-        this.showRecordRewardPopup('Funk');
-      }
     }
   }
   
@@ -5645,6 +5631,15 @@ export class VillageLedgerGame {
   private startDiscoParty(): void {
     this.state.phase = 'loop2_return';
     this.state.showCelebration = true;
+    setTimeout(() => {
+      const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+      if (!unlocked.includes('Funk')) {
+        unlocked.push('Funk');
+        localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
+        this.lastRecordUnlockTime = Date.now();
+        this.showRecordRewardPopup('Funk');
+      }
+    }, 5000);
     this.state.celebrationTimer = 0;
     this.state.slingshotGameActive = true;
     this.state.slingshotScore = 0;
@@ -8848,15 +8843,10 @@ export class VillageLedgerGame {
   private drawRecordRewardPopup(ctx: CanvasRenderingContext2D): void {
     if (!this.showRecordReward) return;
     const elapsed = Date.now() - this.recordRewardStartTime;
-    if (elapsed > 3000) {
-      this.showRecordReward = false;
-      return;
-    }
     const w = this.logicalWidth;
     const h = this.logicalHeight;
     const progress = Math.min(elapsed / 300, 1);
-    const fadeOut = elapsed > 2500 ? 1 - (elapsed - 2500) / 500 : 1;
-    const alpha = progress * fadeOut;
+    const alpha = progress;
 
     ctx.save();
     ctx.globalAlpha = alpha * 0.6;
@@ -8880,7 +8870,7 @@ export class VillageLedgerGame {
     const sparkleCount = 8;
     for (let i = 0; i < sparkleCount; i++) {
       const angle = (i / sparkleCount) * Math.PI * 2 + elapsed * 0.003;
-      const dist = 90 + Math.sin(elapsed * 0.005 + i) * 15;
+      const dist = 130 + Math.sin(elapsed * 0.005 + i) * 20;
       const sx = w / 2 + Math.cos(angle) * dist;
       const sy = h / 2 + Math.sin(angle) * dist;
       const sparkleSize = 2 + Math.sin(elapsed * 0.008 + i * 2) * 1.5;
@@ -8935,6 +8925,10 @@ export class VillageLedgerGame {
     ctx.font = `bold 14px ${this.uiFont}`;
     ctx.fillStyle = genreColor;
     ctx.fillText(this.recordRewardGenre, cx, popupY + 178);
+
+    ctx.font = `10px ${this.uiFont}`;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.fillText('Tap to close', cx, popupY + popupH - 10);
 
     ctx.restore();
   }
@@ -9000,6 +8994,7 @@ export class VillageLedgerGame {
   private musicCollectionBtns: { x: number; y: number; w: number; h: number; genre: string }[] = [];
   private musicCollectionCloseBtn: { x: number; y: number; w: number; h: number } | null = null;
   private musicCollectionBgMusicBtn: { x: number; y: number; w: number; h: number } | null = null;
+  private musicCollectionMuteBtn: { x: number; y: number; w: number; h: number } | null = null;
   
   private drawMusicCollectionPanel(ctx: CanvasRenderingContext2D): void {
     const w = this.logicalWidth;
@@ -9010,7 +9005,7 @@ export class VillageLedgerGame {
     ctx.fillRect(0, 0, w, h);
     
     const panelW = Math.min(500, w - 40);
-    const panelH = Math.min(480, h - 40);
+    const panelH = Math.min(560, h - 40);
     const panelX = (w - panelW) / 2;
     const panelY = (h - panelH) / 2;
     
@@ -9029,7 +9024,7 @@ export class VillageLedgerGame {
     
     ctx.font = `10px ${this.retroFont}`;
     ctx.fillStyle = '#888';
-    ctx.fillText(`${unlocked.length} of 10 songs unlocked`, w / 2, panelY + 48);
+    ctx.fillText(`${unlocked.length} of 11 songs unlocked`, w / 2, panelY + 48);
     
     const genres = Object.keys(this.GENRE_AUDIO_MAP);
     const btnW = (panelW - 70) / 2;
@@ -9085,7 +9080,7 @@ export class VillageLedgerGame {
       }
     });
     
-    const bgBtnY = gridStartY + 5 * (btnH + gapY) + 15;
+    const bgBtnY = gridStartY + Math.ceil(genres.length / 2) * (btnH + gapY) + 15;
     const bgBtnW = panelW - 50;
     const bgBtnX = panelX + 25;
     const bgBtnH = 34;
@@ -9101,13 +9096,33 @@ export class VillageLedgerGame {
     ctx.font = `10px ${this.retroFont}`;
     ctx.fillStyle = '#F5DEB3';
     ctx.textAlign = 'center';
-    ctx.fillText('Standard Background Music', bgBtnX + bgBtnW / 2, bgBtnY + bgBtnH / 2 + 4);
+    ctx.fillText('Standard', bgBtnX + bgBtnW / 2, bgBtnY + bgBtnH / 2 + 4);
     if (isBgPlaying) {
       ctx.font = `bold 8px ${this.uiFont}`;
       ctx.fillStyle = '#2ECC71';
       ctx.fillText('NOW PLAYING', bgBtnX + bgBtnW / 2, bgBtnY - 2);
     }
     this.musicCollectionBgMusicBtn = { x: bgBtnX, y: bgBtnY, w: bgBtnW, h: bgBtnH };
+
+    const muteBtnY = bgBtnY + bgBtnH + gapY;
+    const isMuted = this.state.selectedGenre === 'none';
+    ctx.fillStyle = isMuted ? 'rgba(231, 76, 60, 0.3)' : 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.roundRect(bgBtnX, muteBtnY, bgBtnW, bgBtnH, 6);
+    ctx.fill();
+    ctx.strokeStyle = isMuted ? '#E74C3C' : '#666';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = '#F5DEB3';
+    ctx.textAlign = 'center';
+    ctx.fillText('No Background Music', bgBtnX + bgBtnW / 2, muteBtnY + bgBtnH / 2 + 4);
+    if (isMuted) {
+      ctx.font = `bold 8px ${this.uiFont}`;
+      ctx.fillStyle = '#E74C3C';
+      ctx.fillText('MUTED', bgBtnX + bgBtnW / 2, muteBtnY - 2);
+    }
+    this.musicCollectionMuteBtn = { x: bgBtnX, y: muteBtnY, w: bgBtnW, h: bgBtnH };
     
     const closeBtnW = 120;
     const closeBtnH = 32;
@@ -9140,6 +9155,17 @@ export class VillageLedgerGame {
         soundManager.stopAllMusic();
         this.state.selectedGenre = 'background';
         soundManager.fadeIn('backgroundMusicDay', 1000);
+        return;
+      }
+    }
+    
+    if (this.musicCollectionMuteBtn) {
+      const btn = this.musicCollectionMuteBtn;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.play('buttonClick');
+        soundManager.stopAllMusic();
+        soundManager.stopDaytimeMusic();
+        this.state.selectedGenre = 'none';
         return;
       }
     }
@@ -10045,10 +10071,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.globalAlpha = pulseAlpha;
       ctx.fillStyle = '#FFD700';
       ctx.beginPath();
-      const cx = ta.x + ta.w / 2;
-      const cy = ta.y + ta.h / 2;
-      const radius = Math.max(ta.w, ta.h) / 2 + 4;
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      ctx.roundRect(ta.x - 4, ta.y - 4, ta.w + 8, ta.h + 8, 4);
       ctx.fill();
       ctx.restore();
     }
@@ -10069,7 +10092,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     // Popup dimensions - smaller when dialogue is active to leave room for dialogue box
     const isLoop2OrLater = this.state.loop >= 2;
-    const baseWidth = isLoop2OrLater ? 780 : 620;
+    const baseWidth = isLoop2OrLater ? 740 : 560;
     const baseHeight = hasActiveDialogue ? 350 : 550; // Taller to fit Elder's quotes with spacing
     const popupWidth = Math.min(baseWidth, w - 40);
     const popupHeight = Math.min(baseHeight, h - dialogueReserve - 60);
@@ -10094,7 +10117,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const py = popupY;
     ctx.moveTo(px + 20, py);
     ctx.quadraticCurveTo(px + pw * 0.5, py - 6, px + pw - 15, py + 5);
-    ctx.quadraticCurveTo(px + pw + 5, py + ph * 0.3, px + pw - 3, py + ph - 10);
+    ctx.quadraticCurveTo(px + pw, py + ph * 0.3, px + pw - 3, py + ph - 10);
     ctx.quadraticCurveTo(px + pw * 0.5, py + ph + 5, px + 8, py + ph - 5);
     ctx.quadraticCurveTo(px - 5, py + ph * 0.6, px + 5, py + 10);
     ctx.quadraticCurveTo(px + 8, py - 2, px + 20, py);
@@ -11177,7 +11200,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private djQuizContinueBtn: { x: number; y: number; w: number; h: number } | null = null;
 
   private startDJQuiz(): void {
-    this.djQuizQuestions = getDJQuizQuestions();
+    const playCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    this.djQuizQuestions = getDJQuizQuestions(playCount);
     this.djQuizUsedIds = this.djQuizQuestions.map(q => q.id);
     this.djQuizCurrentQ = this.djQuizQuestions[0];
     this.djQuizSelected = -1;
@@ -11476,12 +11500,15 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     correct: number | number[];
     explanation: string;
     multiSelect?: boolean;
-  }> = getFinalQuizQuestions().map(q => ({
-    question: q.question,
-    options: q.options,
-    correct: q.correct,
-    explanation: q.explanation
-  }));
+  }> = (() => {
+    const playCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    return getFinalQuizQuestions(playCount).map(q => ({
+      question: q.question,
+      options: q.options,
+      correct: q.correct,
+      explanation: q.explanation
+    }));
+  })();
 
   private currentQuizQuestion: number = 0;
   private quizButtonAreas: { x: number; y: number; w: number; h: number; option: number }[] = [];
@@ -12201,29 +12228,45 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           }
           const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
           soundManager.preloadGenre(genreUrl);
+          
           this.queueDialogue([{
             speaker: 'VILLAGE ELDER',
-            text: "Give me just one second while I pull this out of my record bag...",
-            onComplete: () => {
-              soundManager.stopAllMusic();
-              soundManager.playRandomRecordScratch();
-              const scratchDur = soundManager.getBufferDuration('recordScratch1');
-              setTimeout(() => {
-                soundManager.playRandomDJTransition();
-                const djTransDur = soundManager.getBufferDuration('djTransLaser');
-                setTimeout(() => {
-                  soundManager.loadAndPlayGenre(genreUrl);
-                  this.partySongEndTime = Date.now() + 240000;
-                  setTimeout(() => {
-                    const dur = soundManager.getGenreRemixDuration();
-                    if (dur > 0) {
-                      this.partySongEndTime = Date.now() + dur;
-                    }
-                  }, 3500);
-                }, djTransDur);
-              }, scratchDur);
-            }
+            text: "Give me just one second while I pull this out of my record bag..."
           }]);
+          
+          const startWait = Date.now();
+          const maxWait = 8000;
+          const playTransition = () => {
+            this.state.currentDialogue = null;
+            this.state.dialogueQueue = [];
+            soundManager.stopAllMusic();
+            soundManager.playRandomRecordScratch();
+            const scratchDur = soundManager.getBufferDuration('recordScratch1');
+            setTimeout(() => {
+              soundManager.playRandomDJTransition();
+              const djTransDur = Math.max(100, soundManager.getBufferDuration('djTransLaser') - 200);
+              setTimeout(() => {
+                soundManager.loadAndPlayGenre(genreUrl);
+                this.partySongEndTime = Date.now() + 240000;
+                setTimeout(() => {
+                  const dur = soundManager.getGenreRemixDuration();
+                  if (dur > 0) {
+                    this.partySongEndTime = Date.now() + dur;
+                  }
+                }, 3500);
+              }, djTransDur);
+            }, scratchDur);
+          };
+          const checkReady = () => {
+            if (!this.state.showCelebration) return;
+            const elapsed = Date.now() - startWait;
+            if ((elapsed >= 2500 && soundManager.isGenrePreloaded(genreUrl)) || elapsed >= maxWait) {
+              playTransition();
+            } else {
+              setTimeout(checkReady, 100);
+            }
+          };
+          setTimeout(checkReady, 100);
         } else {
           const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
           if (!unlocked.includes(btn.genre)) {
@@ -12237,6 +12280,20 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           this.state.phase = 'complete';
           soundManager.fadeOut('ambientNight', 1000);
           soundManager.loadAndPlayGenre(this.GENRE_AUDIO_MAP[btn.genre]);
+          const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
+          const unlockedAll = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+          const unearned = allGenres.filter(g => !unlockedAll.includes(g));
+          if (unearned.length > 0) {
+            const randomGenre = unearned[Math.floor(Math.random() * unearned.length)];
+            unlockedAll.push(randomGenre);
+            localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlockedAll));
+            this.lastRecordUnlockTime = Date.now();
+            setTimeout(() => {
+              this.showRecordRewardPopup(randomGenre);
+            }, 2000);
+          }
+          const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+          localStorage.setItem('makingMoney_completionCount', String(count + 1));
         }
         return;
       }
@@ -12254,6 +12311,20 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         this.state.phase = 'complete';
         soundManager.fadeOut('ambientNight', 1000);
         soundManager.fadeOut('backgroundMusicNight', 1000);
+        const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
+        const unlockedAll = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+        const unearned = allGenres.filter(g => !unlockedAll.includes(g));
+        if (unearned.length > 0) {
+          const randomGenre = unearned[Math.floor(Math.random() * unearned.length)];
+          unlockedAll.push(randomGenre);
+          localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlockedAll));
+          this.lastRecordUnlockTime = Date.now();
+          setTimeout(() => {
+            this.showRecordRewardPopup(randomGenre);
+          }, 2000);
+        }
+        const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+        localStorage.setItem('makingMoney_completionCount', String(count + 1));
         return;
       }
     }

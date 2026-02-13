@@ -222,14 +222,22 @@ export const ALL_QUESTIONS: QuizQuestion[] = [
   }
 ];
 
-export function getDJQuizQuestions(): QuizQuestion[] {
-  const dcwQuestions = ALL_QUESTIONS.filter(q => q.category === 'dcw');
-  const debtQuestions = ALL_QUESTIONS.filter(q => q.category === 'debt');
-  const picked: QuizQuestion[] = [];
-  picked.push(dcwQuestions[Math.floor(Math.random() * dcwQuestions.length)]);
-  let debtQ = debtQuestions[Math.floor(Math.random() * debtQuestions.length)];
-  picked.push(debtQ);
-  return picked;
+export function getDJQuizQuestions(playCount: number = 1): QuizQuestion[] {
+  if (playCount <= 1) {
+    const dcwQuestions = ALL_QUESTIONS.filter(q => q.category === 'dcw');
+    const debtQuestions = ALL_QUESTIONS.filter(q => q.category === 'debt');
+    const picked: QuizQuestion[] = [];
+    picked.push(dcwQuestions[Math.floor(Math.random() * dcwQuestions.length)]);
+    picked.push(debtQuestions[Math.floor(Math.random() * debtQuestions.length)]);
+    return picked;
+  } else {
+    const ledgerQuestions = ALL_QUESTIONS.filter(q => q.category === 'ledger');
+    const dcwDebtQuestions = ALL_QUESTIONS.filter(q => q.category === 'dcw' || q.category === 'debt');
+    const picked: QuizQuestion[] = [];
+    picked.push(ledgerQuestions[Math.floor(Math.random() * ledgerQuestions.length)]);
+    picked.push(dcwDebtQuestions[Math.floor(Math.random() * dcwDebtQuestions.length)]);
+    return picked;
+  }
 }
 
 export function getBackupDJQuestion(usedIds: number[]): QuizQuestion | null {
@@ -238,8 +246,11 @@ export function getBackupDJQuestion(usedIds: number[]): QuizQuestion | null {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-export function getFinalQuizQuestions(): QuizQuestion[] {
-  const ledgerQuestions = ALL_QUESTIONS.filter(q => q.category === 'ledger');
+export function getFinalQuizQuestions(playCount: number = 1): QuizQuestion[] {
+  let ledgerQuestions = ALL_QUESTIONS.filter(q => q.category === 'ledger');
+  if (playCount <= 1) {
+    ledgerQuestions = ledgerQuestions.filter(q => q.id !== 8 && q.id !== 9 && q.id !== 10);
+  }
   const extraCreditQuestions = ALL_QUESTIONS.filter(q => q.category === 'extra_credit');
   const shuffled = extraCreditQuestions.sort(() => Math.random() - 0.5);
   const bonusQuestion = shuffled[0];

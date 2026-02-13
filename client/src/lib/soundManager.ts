@@ -707,6 +707,10 @@ export class SoundManager {
   private genreBufferCache: Map<string, AudioBuffer> = new Map();
   private genreLoadGeneration: number = 0;
 
+  public isGenrePreloaded(url: string): boolean {
+    return this.genreBufferCache.has(url);
+  }
+
   public async preloadGenre(url: string): Promise<void> {
     if (!this.audioContext || this.genreBufferCache.has(url)) return;
     try {

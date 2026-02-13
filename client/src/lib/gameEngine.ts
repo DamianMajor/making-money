@@ -397,6 +397,7 @@ export class VillageLedgerGame {
     'Pop': '/sounds/money-pop-remix.mp3',
     "80's Funk": '/sounds/money-80s-funk-remix.mp3',
     'Disco': '/sounds/money-disco-remix.mp3',
+    'Funk': '/sounds/money-80s-funk-remix.mp3',
   };
 
   private readonly GENRE_COLORS: Record<string, string> = {
@@ -410,6 +411,7 @@ export class VillageLedgerGame {
     'Pop': '#FF69B4',
     "80's Funk": '#FFD700',
     'Disco': '#E040FB',
+    'Funk': '#FF4500',
   };
 
   private readonly BADGE_EDUCATIONAL_INFO: Record<string, { title: string; lesson: string; realWorld: string }> = {
@@ -1015,6 +1017,11 @@ export class VillageLedgerGame {
         soundManager.play('buttonClick');
         return;
       }
+    }
+
+    if (this.showRecordReward) {
+      this.showRecordReward = false;
+      return;
     }
 
     // Handle Stone Tablet popup - click anywhere to close
@@ -3857,6 +3864,7 @@ export class VillageLedgerGame {
         bobPhase: Math.random() * Math.PI * 2,
       });
     }
+    soundManager.stopAllMusic();
     soundManager.stopDaytimeMusic();
     const genreUrl = this.GENRE_AUDIO_MAP[this.state.selectedGenre] || '/sounds/money-classic-hip-hop-remix.mp3';
     soundManager.loadAndPlayGenre(genreUrl);
@@ -5526,6 +5534,13 @@ export class VillageLedgerGame {
         'Debt Settled',
         'All debts paid off! When debts are recorded and settled, everyone is happy.'
       );
+      const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+      if (!unlocked.includes('Funk')) {
+        unlocked.push('Funk');
+        localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
+        this.lastRecordUnlockTime = Date.now();
+        this.showRecordRewardPopup('Funk');
+      }
     }
   }
   
@@ -5660,6 +5675,7 @@ export class VillageLedgerGame {
     this.stormTriggered = false;
     this.celebrationEndTime = 0;
     
+    soundManager.stopAllMusic();
     soundManager.fadeOut('backgroundMusicDay', 500);
     soundManager.fadeOut('backgroundMusicDay2', 500);
     soundManager.stopDaytimeMusic();
@@ -6476,6 +6492,7 @@ export class VillageLedgerGame {
         this.drawSpeakers(ctx);
         if (this.state.showCelebration) {
           if (this.villageElder.visible) {
+            this.villageElder.facingDirection = Math.sin(this.state.celebrationTimer * 0.8) > 0 ? 1 : -1;
             this.drawCharacter(ctx, this.villageElder);
           }
           this.drawCelebrationBackground(ctx);
@@ -6582,6 +6599,10 @@ export class VillageLedgerGame {
     // Draw badge popup if active
     if (this.state.showBadgePopup) {
       this.drawBadgePopup(ctx);
+    }
+
+    if (this.showRecordReward) {
+      this.drawRecordRewardPopup(ctx);
     }
 
     // Draw brawl animation if active
@@ -7713,46 +7734,70 @@ export class VillageLedgerGame {
     
     const elderScreenX = this.villageElder.x - this.cameraX;
 
-    // Draw sunglasses on the Village Elder (adjusted for 3/4 side-facing view)
     const elderBob = this.villageElder.bobOffset || 0;
     const elderHeadY = this.villageElder.y + 34 + elderBob;
     const glassW = 20;
     const glassH = 7;
     const bridgeY = elderHeadY - 2;
-    const sideOffset = 7;
+    const djFacing = this.villageElder.facingDirection || 1;
 
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 1.5;
 
-    ctx.beginPath();
-    ctx.roundRect(elderScreenX - glassW/2 + sideOffset - 1, bridgeY, glassW/2, glassH, 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.roundRect(elderScreenX + sideOffset + 3, bridgeY, glassW/2 - 2, glassH - 1, 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(elderScreenX + sideOffset - 1, bridgeY + glassH/2);
-    ctx.lineTo(elderScreenX + sideOffset + 3, bridgeY + glassH/2);
-    ctx.stroke();
-
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(elderScreenX - glassW/2 + sideOffset - 1, bridgeY + glassH/2);
-    ctx.lineTo(elderScreenX - glassW/2 + sideOffset - 6, bridgeY + glassH/2 + 2);
-    ctx.stroke();
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.beginPath();
-    ctx.arc(elderScreenX - glassW/4 + sideOffset + 1, bridgeY + 3, 1.5, 0, Math.PI * 2);
-    ctx.fill();
+    if (djFacing === 1) {
+      const sideOffset = 7;
+      ctx.beginPath();
+      ctx.roundRect(elderScreenX - glassW/2 + sideOffset - 1, bridgeY, glassW/2, glassH, 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.roundRect(elderScreenX + sideOffset + 3, bridgeY, glassW/2 - 2, glassH - 1, 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(elderScreenX + sideOffset - 1, bridgeY + glassH/2);
+      ctx.lineTo(elderScreenX + sideOffset + 3, bridgeY + glassH/2);
+      ctx.stroke();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(elderScreenX - glassW/2 + sideOffset - 1, bridgeY + glassH/2);
+      ctx.lineTo(elderScreenX - glassW/2 + sideOffset - 6, bridgeY + glassH/2 + 2);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.beginPath();
+      ctx.arc(elderScreenX - glassW/4 + sideOffset + 1, bridgeY + 3, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      const sideOffset = -7;
+      ctx.beginPath();
+      ctx.roundRect(elderScreenX - sideOffset - glassW/2 + 1, bridgeY, glassW/2, glassH, 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.roundRect(elderScreenX + sideOffset - glassW/2 + 3, bridgeY, glassW/2 - 2, glassH - 1, 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(elderScreenX + sideOffset + glassW/2 - 3, bridgeY + glassH/2);
+      ctx.lineTo(elderScreenX - sideOffset - glassW/2 + 1, bridgeY + glassH/2);
+      ctx.stroke();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(elderScreenX - sideOffset + 1, bridgeY + glassH/2);
+      ctx.lineTo(elderScreenX - sideOffset + 6, bridgeY + glassH/2 + 2);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.beginPath();
+      ctx.arc(elderScreenX + glassW/4 + sideOffset - 1, bridgeY + 3, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     const discoBallR = 36;
     const targetY = groundY * 0.45;
@@ -8789,6 +8834,110 @@ export class VillageLedgerGame {
   private musicCollectionIconArea: { x: number; y: number; w: number; h: number } | null = null;
   private lastRecordUnlockTime: number = 0;
   private resetRecordsBtn: { x: number; y: number; w: number; h: number } | null = null;
+  private recordRewardGenre: string = '';
+  private recordRewardStartTime: number = 0;
+  private showRecordReward: boolean = false;
+
+  private showRecordRewardPopup(genre: string): void {
+    this.recordRewardGenre = genre;
+    this.recordRewardStartTime = Date.now();
+    this.showRecordReward = true;
+    soundManager.playRandomDJTransition();
+  }
+
+  private drawRecordRewardPopup(ctx: CanvasRenderingContext2D): void {
+    if (!this.showRecordReward) return;
+    const elapsed = Date.now() - this.recordRewardStartTime;
+    if (elapsed > 3000) {
+      this.showRecordReward = false;
+      return;
+    }
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    const progress = Math.min(elapsed / 300, 1);
+    const fadeOut = elapsed > 2500 ? 1 - (elapsed - 2500) / 500 : 1;
+    const alpha = progress * fadeOut;
+
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, w, h);
+    ctx.globalAlpha = alpha;
+
+    const popupW = 220;
+    const popupH = 200;
+    const popupX = (w - popupW) / 2;
+    const popupY = (h - popupH) / 2;
+
+    ctx.fillStyle = 'rgba(20, 10, 30, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(popupX, popupY, popupW, popupH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const sparkleCount = 8;
+    for (let i = 0; i < sparkleCount; i++) {
+      const angle = (i / sparkleCount) * Math.PI * 2 + elapsed * 0.003;
+      const dist = 90 + Math.sin(elapsed * 0.005 + i) * 15;
+      const sx = w / 2 + Math.cos(angle) * dist;
+      const sy = h / 2 + Math.sin(angle) * dist;
+      const sparkleSize = 2 + Math.sin(elapsed * 0.008 + i * 2) * 1.5;
+      ctx.fillStyle = `rgba(255, 215, 0, ${0.5 + Math.sin(elapsed * 0.006 + i) * 0.3})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, sparkleSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const cx = w / 2;
+    const cy = popupY + 90;
+    const recordR = 45;
+    const genreColor = this.GENRE_COLORS[this.recordRewardGenre] || '#FF6B6B';
+    const spin = elapsed * 0.003;
+
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(cx, cy, recordR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    for (let r = 15; r < recordR; r += 5) {
+      ctx.strokeStyle = `rgba(50, 50, 50, ${0.3 + Math.sin(r + spin) * 0.1})`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = genreColor;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.beginPath();
+    ctx.arc(cx - recordR * 0.3, cy - recordR * 0.3, recordR * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.font = `bold 16px ${this.uiFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText('Record Collected!', cx, popupY + 155);
+
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = genreColor;
+    ctx.fillText(this.recordRewardGenre, cx, popupY + 178);
+
+    ctx.restore();
+  }
 
   private drawMusicCollectionIcon(ctx: CanvasRenderingContext2D): void {
     const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
@@ -8843,7 +8992,7 @@ export class VillageLedgerGame {
     ctx.font = `bold 8px ${this.uiFont}`;
     ctx.fillStyle = '#FFD700';
     ctx.textAlign = 'center';
-    ctx.fillText(`${unlocked.length}/10`, iconX + iconSize/2, iconY + iconSize + 14);
+    ctx.fillText(`${unlocked.length}/11`, iconX + iconSize/2, iconY + iconSize + 14);
     
     this.musicCollectionIconArea = { x: iconX, y: iconY, w: iconSize, h: iconSize + 12 };
   }
@@ -12048,25 +12197,31 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             unlocked.push(btn.genre);
             localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
             this.lastRecordUnlockTime = Date.now();
+            this.showRecordRewardPopup(btn.genre);
           }
-          soundManager.stopAllMusic();
-          soundManager.playRandomRecordScratch();
           const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
           soundManager.preloadGenre(genreUrl);
           this.queueDialogue([{
             speaker: 'VILLAGE ELDER',
             text: "Give me just one second while I pull this out of my record bag...",
             onComplete: () => {
+              soundManager.stopAllMusic();
               soundManager.playRandomRecordScratch();
-              soundManager.playRandomDJTransition();
-              soundManager.loadAndPlayGenre(genreUrl);
-              this.partySongEndTime = Date.now() + 240000;
+              const scratchDur = soundManager.getBufferDuration('recordScratch1');
               setTimeout(() => {
-                const dur = soundManager.getGenreRemixDuration();
-                if (dur > 0) {
-                  this.partySongEndTime = Date.now() + dur;
-                }
-              }, 3500);
+                soundManager.playRandomDJTransition();
+                const djTransDur = soundManager.getBufferDuration('djTransLaser');
+                setTimeout(() => {
+                  soundManager.loadAndPlayGenre(genreUrl);
+                  this.partySongEndTime = Date.now() + 240000;
+                  setTimeout(() => {
+                    const dur = soundManager.getGenreRemixDuration();
+                    if (dur > 0) {
+                      this.partySongEndTime = Date.now() + dur;
+                    }
+                  }, 3500);
+                }, djTransDur);
+              }, scratchDur);
             }
           }]);
         } else {
@@ -12075,6 +12230,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             unlocked.push(btn.genre);
             localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
             this.lastRecordUnlockTime = Date.now();
+            this.showRecordRewardPopup(btn.genre);
           }
           this.state.showNightTransition = false;
           this.state.showSuccess = true;

@@ -181,6 +181,9 @@ interface GameState {
   }>;
   partyDialogueTimer: number;
   partyDialogueIndex: number;
+  partyHintText: string;
+  partyHintSpeaker: string;
+  partyHintTimer: number;
   nightBgCrossfade: number; // 0-1 crossfade progress to night background
   showNightTransition: boolean; // Nighttime transition before quiz
   nightTransitionTimer: number;
@@ -362,6 +365,7 @@ export class VillageLedgerGame {
   ];
 
   private badgeTrayButtonArea: { x: number; y: number; w: number; h: number } | null = null;
+  private successBadgeAreas: { x: number; y: number; w: number; h: number; index: number }[] = [];
   private badgeTrayCloseButton: { x: number; y: number; w: number; h: number } | null = null;
   private badgeItemAreas: { x: number; y: number; w: number; h: number; idx: number }[] = [];
   private badgeDetailBackButton: { x: number; y: number; w: number; h: number } | null = null;
@@ -801,6 +805,9 @@ export class VillageLedgerGame {
       slingshotFloatingTexts: [],
       partyDialogueTimer: 0,
       partyDialogueIndex: 0,
+      partyHintText: '',
+      partyHintSpeaker: '',
+      partyHintTimer: 0,
       nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,
@@ -1157,6 +1164,7 @@ export class VillageLedgerGame {
           return;
         }
       } else if (tappedTarget === 'stoneTablet') {
+        if (this.state.showCelebration) return;
         const inRange = Math.abs(this.player.x - this.villageCenterX) < interactionRange;
         if (inRange) {
           // Open the Stone Tablet popup view (same as clicking the HUD)
@@ -4424,7 +4432,7 @@ export class VillageLedgerGame {
       }
     }
     // Regular player movement (manual touch controls)
-    else if (this.moveDirection !== 0 && !this.state.currentDialogue) {
+    else if (this.moveDirection !== 0 && (!this.state.currentDialogue || this.state.showCelebration)) {
       this.player.x += this.moveDirection * this.playerSpeed * dt;
       const fishBoundary2 = (this.fisherman.originalX || 3025) - 20;
       this.player.x = Math.max(this.player.width / 2, Math.min(fishBoundary2, this.player.x));
@@ -4812,10 +4820,9 @@ export class VillageLedgerGame {
       if (this.state.nightBgCrossfade < 1) {
         this.state.nightBgCrossfade = Math.min(1, this.state.nightBgCrossfade + dt / 6);
       }
-      // Cycle party dialogue one-liners
-      this.state.partyDialogueTimer += dt;
-      if (this.state.partyDialogueTimer > 5 && !this.state.currentDialogue && !this.state.showChoice) {
-        this.state.partyDialogueTimer = 0;
+      this.state.partyHintTimer += dt;
+      if (this.state.partyHintTimer > 5) {
+        this.state.partyHintTimer = 0;
         const partyLines = [
           { speaker: 'WOODCUTTER', text: "When everyone can see the ledger, no one can cheat!" },
           { speaker: 'STONE-WORKER', text: "A written record beats a fuzzy memory every time." },
@@ -4828,7 +4835,8 @@ export class VillageLedgerGame {
         ];
         const line = partyLines[this.state.partyDialogueIndex % partyLines.length];
         this.state.partyDialogueIndex++;
-        this.queueDialogue([{ speaker: line.speaker, text: line.text }]);
+        this.state.partyHintText = line.text;
+        this.state.partyHintSpeaker = line.speaker;
       }
     }
     
@@ -5079,6 +5087,9 @@ export class VillageLedgerGame {
     soundManager.stop('remixSong');
     soundManager.fadeOut('crowdApplause', 1500);
     soundManager.fadeOut('celebration', 1500);
+    this.state.partyHintText = '';
+    this.state.partyHintSpeaker = '';
+    this.state.partyHintTimer = 0;
     this.woodcutter.isWalking = false;
     this.stoneWorker.isWalking = false;
     this.fisherman.isWalking = false;
@@ -5359,34 +5370,34 @@ export class VillageLedgerGame {
       ctx.strokeStyle = '#5D4837';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(platformScreenX - platformW / 2, groundY - platformH, platformW, platformH, 3);
+      ctx.roundRect(platformScreenX - platformW / 2, groundY - platformH + 8, platformW, platformH, 3);
       ctx.fill();
       ctx.stroke();
       
       ctx.fillStyle = '#6B3A1F';
-      ctx.fillRect(platformScreenX - platformW / 2 + 4, groundY - platformH - 2, platformW - 8, 3);
+      ctx.fillRect(platformScreenX - platformW / 2 + 4, groundY - platformH + 6 + 8, platformW - 8, 3);
       
       const signPostX = platformScreenX + platformW / 2 + 35;
       ctx.strokeStyle = '#6B3A1F';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(signPostX, groundY - platformH);
-      ctx.lineTo(signPostX, groundY - platformH - 50);
+      ctx.moveTo(signPostX, groundY - platformH + 8);
+      ctx.lineTo(signPostX, groundY - platformH - 50 + 8);
       ctx.stroke();
       
       ctx.fillStyle = '#8B6914';
       ctx.strokeStyle = '#5D4837';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.roundRect(signPostX - 40, groundY - platformH - 50, 45, 20, 3);
+      ctx.roundRect(signPostX - 40, groundY - platformH - 50 + 8, 45, 20, 3);
       ctx.fill();
       ctx.stroke();
       
       ctx.font = `bold 7px ${this.uiFont}`;
       ctx.fillStyle = '#FFF';
       ctx.textAlign = 'center';
-      ctx.fillText('TEST YOUR', signPostX - 17, groundY - platformH - 40);
-      ctx.fillText('AIM!', signPostX - 17, groundY - platformH - 32);
+      ctx.fillText('TEST YOUR', signPostX - 17, groundY - platformH - 41 + 8);
+      ctx.fillText('AIM!', signPostX - 17, groundY - platformH - 33 + 8);
     }
 
     if (this.state.showCelebration) {
@@ -5395,7 +5406,7 @@ export class VillageLedgerGame {
         const enterBtnW = 70;
         const enterBtnH = 24;
         const enterBtnX = platformScreenX - enterBtnW / 2;
-        const enterBtnY = groundY + 5;
+        const enterBtnY = groundY + 13;
         ctx.fillStyle = '#22C55E';
         ctx.beginPath();
         ctx.roundRect(enterBtnX, enterBtnY, enterBtnW, enterBtnH, 6);
@@ -5412,7 +5423,7 @@ export class VillageLedgerGame {
         const exitBtnW = 60;
         const exitBtnH = 22;
         const exitBtnX = platformScreenX - exitBtnW / 2;
-        const exitBtnY = groundY + 5;
+        const exitBtnY = groundY + 13;
         ctx.fillStyle = '#DC2626';
         ctx.beginPath();
         ctx.roundRect(exitBtnX, exitBtnY, exitBtnW, exitBtnH, 6);
@@ -5701,6 +5712,12 @@ export class VillageLedgerGame {
     this.stoneWorker.walkFrame = (this.stoneWorker.walkFrame || 0) + dt * 10;
     this.fisherman.walkFrame = (this.fisherman.walkFrame || 0) + dt * 11;
 
+    for (const npc of [this.woodcutter, this.stoneWorker, this.fisherman]) {
+      const npcSeed = npc.id === 'woodcutter' ? 0 : npc.id === 'stoneWorker' ? 1 : 2;
+      const flipPhase = Math.sin(t * (1.2 + npcSeed * 0.3) + npcSeed * 7);
+      npc.facingDirection = flipPhase > 0 ? 1 : -1;
+    }
+
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     this.villageElder.y = groundY - this.villageElder.height - 5;
   }
@@ -5914,6 +5931,7 @@ export class VillageLedgerGame {
       this.drawStoneTabletHUD(ctx);
     }
     this.drawDialogueBox(ctx);
+    this.drawPartyHint(ctx);
     this.drawInteractButton(ctx);
 
     // Draw choice dialogue if active
@@ -6550,7 +6568,7 @@ export class VillageLedgerGame {
         ctx.beginPath();
         ctx.arc(coneX, coneY, 15, 0, Math.PI * 2);
         ctx.fill();
-        const tweeterY = cabY - cabH + 50;
+        const tweeterY = cabY - cabH + 54;
         ctx.fillStyle = '#111';
         ctx.beginPath();
         ctx.arc(coneX, tweeterY, 18, 0, Math.PI * 2);
@@ -6833,25 +6851,19 @@ export class VillageLedgerGame {
         ctx.fill();
       }
 
-      const partyLeftWorld = this.villageCenterX - 400;
-      const partyRightWorld = this.villageCenterX + 400;
-      const frozenLeftScreen = partyLeftWorld - this.cameraX;
-      const frozenRightScreen = partyRightWorld - this.cameraX;
       for (let i = 0; i < 4; i++) {
         const isRight = (i % 2 === 1);
         const isTop = (i < 2);
-        const worldCornerX = isRight ? partyRightWorld : partyLeftWorld;
-        const cornerX = worldCornerX - this.cameraX;
+        const cornerX = isRight ? w : 0;
         const cornerY = isTop ? 0 : groundY;
-        if (cornerX < -200 || cornerX > w + 200) continue;
-        const sweepAngle = Math.sin(ft * 1.8 + i * 1.2) * 0.4;
-        const baseAngle = isRight ? (Math.PI + 0.5) : -0.5;
-        const verticalBias = isTop ? 0.4 : -0.4;
+        const sweepAngle = Math.sin(ft * 1.8 + i * 1.2) * 0.5;
+        const baseAngle = isRight ? (Math.PI - 0.3) : 0.3;
+        const verticalBias = isTop ? 0.5 : -0.5;
         const angle = baseAngle + sweepAngle + verticalBias;
-        const beamLen = 350;
+        const beamLen = 300;
         let endX = cornerX + Math.cos(angle) * beamLen;
         let endY = cornerY + Math.sin(angle) * beamLen;
-        endX = Math.max(frozenLeftScreen, Math.min(frozenRightScreen, endX));
+        endX = Math.max(0, Math.min(w, endX));
         endY = Math.max(0, Math.min(groundY, endY));
         const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
         const hue = (ft * 50 + i * 90) % 360;
@@ -6953,7 +6965,7 @@ export class VillageLedgerGame {
     const glassW = 20;
     const glassH = 7;
     const bridgeY = elderHeadY;
-    const sideOffset = 10;
+    const sideOffset = 11;
 
     ctx.fillStyle = '#111';
     ctx.strokeStyle = '#333';
@@ -7074,29 +7086,21 @@ export class VillageLedgerGame {
       ctx.fill();
     }
     
-    // Corner spotlights (world-fixed to party zone edges, contained within play area)
-    const partyLeftWorld = this.villageCenterX - 400;
-    const partyRightWorld = this.villageCenterX + 400;
-    const partyLeftScreen = partyLeftWorld - this.cameraX;
-    const partyRightScreen = partyRightWorld - this.cameraX;
     for (let i = 0; i < 4; i++) {
       const isRight = (i % 2 === 1);
       const isTop = (i < 2);
-      const worldCornerX = isRight ? partyRightWorld : partyLeftWorld;
-      const cornerX = worldCornerX - this.cameraX;
+      const cornerX = isRight ? w : 0;
       const cornerY = isTop ? 0 : groundY;
       
-      if (cornerX < -200 || cornerX > w + 200) continue;
-      
-      const sweepAngle = Math.sin(t * 1.8 + i * 1.2) * 0.4;
-      const baseAngle = isRight ? (Math.PI + 0.5) : -0.5;
-      const verticalBias = isTop ? 0.4 : -0.4;
+      const sweepAngle = Math.sin(t * 1.8 + i * 1.2) * 0.5;
+      const baseAngle = isRight ? (Math.PI - 0.3) : 0.3;
+      const verticalBias = isTop ? 0.5 : -0.5;
       const angle = baseAngle + sweepAngle + verticalBias;
-      const beamLen = 350;
+      const beamLen = 300;
       let endX = cornerX + Math.cos(angle) * beamLen;
       let endY = cornerY + Math.sin(angle) * beamLen;
       
-      endX = Math.max(partyLeftScreen, Math.min(partyRightScreen, endX));
+      endX = Math.max(0, Math.min(w, endX));
       endY = Math.max(0, Math.min(groundY, endY));
       
       const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
@@ -9325,6 +9329,35 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
   }
 
+  private drawPartyHint(ctx: CanvasRenderingContext2D): void {
+    if (!this.state.showCelebration || !this.state.partyHintText) return;
+    if (this.state.currentDialogue) return;
+    
+    const h = this.logicalHeight;
+    const boxH = this.dialogueBoxHeight;
+    const boxY = h - boxH;
+    
+    const t = this.state.partyHintTimer;
+    let alpha = 1;
+    if (t < 0.5) alpha = t / 0.5;
+    else if (t > 4) alpha = (5 - t);
+    alpha = Math.max(0, Math.min(1, alpha)) * 0.8;
+    
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    
+    ctx.font = `bold 11px ${this.retroFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'left';
+    ctx.fillText(this.state.partyHintSpeaker, 20, boxY + 20);
+    
+    ctx.font = `12px ${this.retroFont}`;
+    ctx.fillStyle = '#E8DCC8';
+    ctx.fillText(this.state.partyHintText, 20, boxY + 40);
+    
+    ctx.restore();
+  }
+
   private drawDialogueBox(ctx: CanvasRenderingContext2D): void {
     const x = 0;
     const y = this.logicalHeight - this.dialogueBoxHeight;
@@ -10683,12 +10716,15 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const startX = (w - gridW) / 2;
     const startY = cardY + 75;
     
+    this.successBadgeAreas = [];
     this.ALL_BADGES.forEach((badge, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
       const bx = startX + col * (badgeSize + gapX);
       const by = startY + row * (badgeSize + gapY + 30);
       const earned = this.state.badges.includes(badge.name);
+      
+      this.successBadgeAreas.push({ x: bx, y: by, w: badgeSize, h: badgeSize, index: i });
       
       // Badge circle
       if (earned) {
@@ -10773,7 +10809,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
     
     // Learn More hint
-    const hintY = startY + 2 * (badgeSize + gapY + 30) + 42;
+    const hintY = startY + 2 * (badgeSize + gapY + 30) + 62;
     ctx.font = `9px ${this.uiFont}`;
     ctx.fillStyle = '#A89070';
     ctx.textAlign = 'center';
@@ -10815,6 +10851,19 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const btn = this.badgeTrayButtonArea;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.handleBadgeTrayTouch(x, y);
+        return;
+      }
+    }
+
+    for (const area of this.successBadgeAreas) {
+      const cx = area.x + area.w / 2;
+      const cy = area.y + area.h / 2;
+      const r = area.w / 2 + 5;
+      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+      if (dist <= r) {
+        this.state.showBadgeTray = true;
+        this.state.badgeTrayAnimTimer = 0;
+        this.state.selectedBadgeIndex = area.index;
         return;
       }
     }
@@ -10917,6 +10966,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       slingshotFloatingTexts: [],
       partyDialogueTimer: 0,
       partyDialogueIndex: 0,
+      partyHintText: '',
+      partyHintSpeaker: '',
+      partyHintTimer: 0,
       nightBgCrossfade: 0,
       showNightTransition: false,
       nightTransitionTimer: 0,

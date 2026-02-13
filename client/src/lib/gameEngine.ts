@@ -1495,7 +1495,6 @@ export class VillageLedgerGame {
                 action: () => {
                   this.state.showChoice = false;
                   this.state.choiceOptions = [];
-                  this.state.hutAutoTriggered = false;
                 }
               },
               { 
@@ -1664,57 +1663,61 @@ export class VillageLedgerGame {
     // Wait 2.5 seconds before starting rain (after roof hammer sound completes)
     setTimeout(() => {
       try {
-        // Start rainfall - go directly to night transition with its built-in rain
+        // Start rainfall animation (standalone rain graphic)
         this.state.showRainfall = true;
         this.state.rainfallTimer = 0;
-        this.state.showNightTransition = true;
-        this.state.nightTransitionTimer = 0;
         if (!this.rainSoundStarted) {
           this.rainSoundStarted = true;
           soundManager.fadeIn('rain', 2000);
           soundManager.stop('thunder');
         }
-        soundManager.fadeIn('ambientNight', 1000);
-        soundManager.fadeIn('backgroundMusicNight', 2000);
         
-        // After 10 seconds of rain in night transition, stop rain and show quiz
+        // After 6 seconds of rain, transition to night (rain stops, night begins)
         setTimeout(() => {
           try {
             this.state.showRainfall = false;
-            soundManager.stop('thunder');
+            this.state.showNightTransition = true;
+            this.state.nightTransitionTimer = 0;
+            soundManager.fadeIn('ambientNight', 1000);
+            soundManager.fadeIn('backgroundMusicNight', 2000);
             soundManager.fadeOut('rain', 6000);
-            // Keep night scene visible, then show quiz intro
+            soundManager.stop('thunder');
+            
             setTimeout(() => {
-              this.currentQuizQuestion = 0;
-              this.quizWrongAnswers = [];
-              this.showQuizFeedback = false;
-              if (this.state.partyEnded) {
-                this.state.showQuiz = true;
-                this.state.phase = 'quiz';
-              } else {
-                this.player.visible = true;
-                this.state.playerEnteredHut = false;
-                this.state.playerAlpha = 1;
-                this.queueDialogue([
-                  {
-                    speaker: 'VILLAGE ELDER',
-                    text: "Psst... DJ Elder doesn't usually take requests..."
-                  },
-                  {
-                    speaker: 'VILLAGE ELDER',
-                    text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
-                    onComplete: () => {
-                      this.state.showQuiz = true;
-                      this.state.phase = 'quiz';
+              try {
+                this.currentQuizQuestion = 0;
+                this.quizWrongAnswers = [];
+                this.showQuizFeedback = false;
+                if (this.state.partyEnded) {
+                  this.state.showQuiz = true;
+                  this.state.phase = 'quiz';
+                } else {
+                  this.player.visible = true;
+                  this.state.playerEnteredHut = false;
+                  this.state.playerAlpha = 1;
+                  this.queueDialogue([
+                    {
+                      speaker: 'VILLAGE ELDER',
+                      text: "Psst... DJ Elder doesn't usually take requests..."
+                    },
+                    {
+                      speaker: 'VILLAGE ELDER',
+                      text: "But just this once... answer my questions correctly, and I'll play whatever you want!",
+                      onComplete: () => {
+                        this.state.showQuiz = true;
+                        this.state.phase = 'quiz';
+                      }
                     }
-                  }
-                ]);
+                  ]);
+                }
+              } catch (e) {
+                console.error('Error in quiz transition:', e);
               }
-            }, 4000);
+            }, 7000);
           } catch (e) {
-            console.error('Error in rain/quiz transition:', e);
+            console.error('Error in night transition:', e);
           }
-        }, 10000); // 10 seconds of rain in night transition
+        }, 6000); // 6 seconds of standalone rain
       } catch (e) {
         console.error('Error starting rain:', e);
       }
@@ -7095,7 +7098,7 @@ export class VillageLedgerGame {
     
     const now = Date.now() / 1000;
     const sparkleColors = ['#FFD700', '#FFA500', '#FFFFFF'];
-    const sparkleFade = animElapsed > 2 ? Math.max(0, 1 - (animElapsed - 2) / 1.5) : 1;
+    const sparkleFade = animElapsed > 1 ? Math.max(0, 1 - (animElapsed - 1) / 0.75) : 1;
     // Outer ring
     for (let i = 0; i < 40; i++) {
       const angle = (i / 40) * Math.PI * 2 + now;
@@ -8438,15 +8441,14 @@ export class VillageLedgerGame {
     this.badgeTrayButtonArea = { x, y, w: size, h: size + 16 };
 
     if (this.state.badgeTrayAnimTimer > 0) {
-      const btn = this.badgeTrayButtonArea;
-      const pulseAlpha = 0.4 + 0.4 * Math.sin(this.state.badgeTrayAnimTimer * 6);
+      const pulseAlpha = 0.3 + 0.3 * Math.sin(this.state.badgeTrayAnimTimer * 6);
       ctx.save();
       ctx.shadowColor = '#FFD700';
       ctx.shadowBlur = 15 + 5 * Math.sin(this.state.badgeTrayAnimTimer * 6);
       ctx.globalAlpha = pulseAlpha;
       ctx.fillStyle = '#FFD700';
       ctx.beginPath();
-      ctx.roundRect(btn.x - 4, btn.y - 4, btn.w + 8, btn.h + 8, 8);
+      ctx.arc(x + size / 2, y + size / 2, size * 0.8, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -9822,36 +9824,42 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
 
     const stoneGrad = ctx.createLinearGradient(x, y, x + iconW, y + iconH);
-    stoneGrad.addColorStop(0, '#D4C4A8');
-    stoneGrad.addColorStop(0.5, '#C9B896');
-    stoneGrad.addColorStop(1, '#B8A888');
+    stoneGrad.addColorStop(0, '#9E9E9E');
+    stoneGrad.addColorStop(0.3, '#8A8A8A');
+    stoneGrad.addColorStop(0.7, '#787878');
+    stoneGrad.addColorStop(1, '#6E6E6E');
     ctx.fillStyle = stoneGrad;
     ctx.beginPath();
-    ctx.moveTo(x + 4, y);
-    ctx.lineTo(x + iconW - 4, y);
-    ctx.lineTo(x + iconW, y + 4);
-    ctx.lineTo(x + iconW, y + iconH);
-    ctx.lineTo(x, y + iconH);
-    ctx.lineTo(x, y + 4);
+    ctx.moveTo(x + 8, y);
+    ctx.quadraticCurveTo(x + iconW + 2, y - 2, x + iconW, y + 10);
+    ctx.quadraticCurveTo(x + iconW + 3, y + iconH * 0.6, x + iconW - 2, y + iconH - 4);
+    ctx.quadraticCurveTo(x + iconW / 2, y + iconH + 3, x + 3, y + iconH - 2);
+    ctx.quadraticCurveTo(x - 3, y + iconH * 0.5, x + 2, y + 8);
+    ctx.quadraticCurveTo(x + 3, y - 1, x + 8, y);
     ctx.closePath();
     ctx.fill();
 
-    ctx.strokeStyle = '#8B7355';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#5A5A5A';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
     ctx.shadowBlur = 0;
 
-    ctx.strokeStyle = 'rgba(139, 115, 85, 0.3)';
+    ctx.strokeStyle = 'rgba(100, 100, 100, 0.25)';
     ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x + 8, y + 4);
-    ctx.lineTo(x + 12, y + iconH - 4);
-    ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      const crackX = x + 8 + i * 8 + Math.sin(i * 2.1) * 3;
+      const crackY1 = y + 6 + i * 3;
+      const crackY2 = y + iconH - 8 - i * 2;
+      ctx.beginPath();
+      ctx.moveTo(crackX, crackY1);
+      ctx.lineTo(crackX + Math.sin(i) * 2, crackY2);
+      ctx.stroke();
+    }
 
     const lineCount = this.state.ledgerEntries.length;
     const lineLengths = [22, 18, 26, 20];
-    ctx.strokeStyle = '#6B5344';
+    ctx.strokeStyle = '#D4D0C8';
     ctx.lineWidth = 1.5;
     for (let i = 0; i < Math.min(lineCount, 4); i++) {
       const ly = y + 12 + i * 9;
@@ -9861,7 +9869,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.stroke();
     }
     if (lineCount === 0) {
-      ctx.strokeStyle = 'rgba(139, 115, 85, 0.4)';
+      ctx.strokeStyle = 'rgba(200, 200, 200, 0.35)';
       ctx.lineWidth = 1;
       for (let i = 0; i < 3; i++) {
         const ly = y + 14 + i * 10;
@@ -9874,7 +9882,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
     ctx.font = `bold 8px ${this.uiFont}`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#5D4837';
+    ctx.fillStyle = '#D4D0C8';
     ctx.fillText('TABLET', x + iconW / 2, y + iconH - 4);
 
     this.stoneTabletHudArea = { x, y, w: iconW, h: iconH };
@@ -9888,7 +9896,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.globalAlpha = pulseAlpha;
       ctx.fillStyle = '#FFD700';
       ctx.beginPath();
-      ctx.roundRect(ta.x - 4, ta.y - 4, ta.w + 8, ta.h + 8, 8);
+      const cx = ta.x + ta.w / 2;
+      const cy = ta.y + ta.h / 2;
+      const radius = Math.max(ta.w, ta.h) / 2 + 4;
+      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -9920,29 +9931,51 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ? Math.max(20, (availableHeight - popupHeight) / 2)
       : (h - popupHeight) / 2;
     
-    // Stone texture background
+    // Grey stone texture background
     const stoneGradient = ctx.createLinearGradient(popupX, popupY, popupX + popupWidth, popupY + popupHeight);
-    stoneGradient.addColorStop(0, '#D4C4A8');
-    stoneGradient.addColorStop(0.5, '#C9B896');
-    stoneGradient.addColorStop(1, '#B8A888');
+    stoneGradient.addColorStop(0, '#A0A0A0');
+    stoneGradient.addColorStop(0.3, '#909090');
+    stoneGradient.addColorStop(0.7, '#808080');
+    stoneGradient.addColorStop(1, '#757575');
     ctx.fillStyle = stoneGradient;
     ctx.beginPath();
-    ctx.roundRect(popupX, popupY, popupWidth, popupHeight, 12);
+    const pw = popupWidth;
+    const ph = popupHeight;
+    const px = popupX;
+    const py = popupY;
+    ctx.moveTo(px + 20, py);
+    ctx.quadraticCurveTo(px + pw * 0.5, py - 6, px + pw - 15, py + 5);
+    ctx.quadraticCurveTo(px + pw + 5, py + ph * 0.3, px + pw - 3, py + ph - 10);
+    ctx.quadraticCurveTo(px + pw * 0.5, py + ph + 5, px + 8, py + ph - 5);
+    ctx.quadraticCurveTo(px - 5, py + ph * 0.6, px + 5, py + 10);
+    ctx.quadraticCurveTo(px + 8, py - 2, px + 20, py);
+    ctx.closePath();
     ctx.fill();
     
     // Border
-    ctx.strokeStyle = '#8B7355';
-    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#5A5A5A';
+    ctx.lineWidth = 4;
     ctx.stroke();
+
+    // Subtle cracks on the stone surface
+    ctx.strokeStyle = 'rgba(90, 90, 90, 0.15)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < 6; i++) {
+      const cx = popupX + 30 + i * (popupWidth / 7) + Math.sin(i * 1.7) * 10;
+      ctx.beginPath();
+      ctx.moveTo(cx, popupY + 15 + i * 5);
+      ctx.lineTo(cx + Math.sin(i * 2.3) * 8, popupY + popupHeight - 20 - i * 4);
+      ctx.stroke();
+    }
     
     // Title
     ctx.font = `bold 24px ${this.uiFont}`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#5D4837';
+    ctx.fillStyle = '#E8E4DC';
     ctx.fillText('STONE TABLET', popupX + popupWidth / 2, popupY + 50);
     
     // Divider
-    ctx.strokeStyle = '#8B7355';
+    ctx.strokeStyle = '#B0ACA4';
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(popupX + 30, popupY + 70);
@@ -9955,7 +9988,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       // Display elder wisdom about trustless verification - larger text to match HUD proportions
       ctx.font = `italic 20px ${this.uiFont}`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#5D4837';
+      ctx.fillStyle = '#E8E4DC';
       
       const wisdomLines = [
         '"A promise remembered',
@@ -9973,17 +10006,18 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       
       // Tap to close instruction - below the wisdom quotes
       ctx.font = `12px ${this.uiFont}`;
-      ctx.fillStyle = '#8B7355';
+      ctx.fillStyle = '#C0BDB5';
       ctx.fillText('Tap anywhere to close', popupX + popupWidth / 2, popupY + popupHeight - 25);
     } else {
       // Loop 2+: Show NAME/DEBT columns - 25/75 split for short names and long debt text
       ctx.font = `bold 18px ${this.uiFont}`;
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#6B5344';
+      ctx.fillStyle = '#E8E4DC';
       ctx.fillText('NAME', popupX + 30, popupY + 110);
       ctx.fillText('DEBT', popupX + popupWidth * 0.22, popupY + 110);
       
       // Column divider - positioned at 18% to give debt column most of the space
+      ctx.strokeStyle = '#B0ACA4';
       ctx.beginPath();
       ctx.moveTo(popupX + popupWidth * 0.18, popupY + 85);
       ctx.lineTo(popupX + popupWidth * 0.18, popupY + popupHeight - 60);
@@ -9991,7 +10025,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       
       // Ledger entries - name column is narrow, debt column gets most space
       ctx.font = `16px ${this.uiFont}`;
-      ctx.fillStyle = '#5D4837';
+      ctx.fillStyle = '#E0DDD5';
       
       this.state.ledgerEntries.forEach((entry, i) => {
         const entryY = popupY + 145 + i * 30;
@@ -10006,7 +10040,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       if (this.state.ledgerEntries.length === 0) {
         ctx.font = `italic 16px ${this.uiFont}`;
         ctx.textAlign = 'center';
-        ctx.fillStyle = '#8B7355';
+        ctx.fillStyle = '#C0BDB5';
         ctx.fillText('(No debts recorded)', popupX + popupWidth / 2, popupY + 180);
       }
     }
@@ -10015,7 +10049,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     if (!isLoop1) {
       ctx.font = `12px ${this.uiFont}`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#8B7355';
+      ctx.fillStyle = '#C0BDB5';
       ctx.fillText('Tap anywhere to close', popupX + popupWidth / 2, popupY + popupHeight - 25);
     }
   }

@@ -3498,7 +3498,7 @@ export class VillageLedgerGame {
     this.state.slingshotLastSpawnTime = 0;
     this.state.slingshotFloatingTexts = [];
     this.state.slingshotBalloons = [];
-    const balloonColors = ['#FF3366', '#3366FF'];
+    const balloonColors = ['#FF3366', '#3366FF', '#FF8C00', '#FFD700', '#9B59B6', '#FF69B4'];
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     for (let i = 0; i < 25; i++) {
       this.state.slingshotBalloons.push({
@@ -5110,8 +5110,8 @@ export class VillageLedgerGame {
     this.state.partyEnded = true;
     this.state.showCelebration = false;
     this.celebrationEndTime = Date.now();
-    soundManager.stop('partySong');
-    soundManager.stop('remixSong');
+    soundManager.fadeOut('partySong', 3000);
+    soundManager.fadeOut('remixSong', 3000);
     soundManager.fadeOut('crowdApplause', 1500);
     soundManager.fadeOut('celebration', 1500);
     this.state.partyHintText = '';
@@ -5120,6 +5120,8 @@ export class VillageLedgerGame {
     this.woodcutter.isWalking = false;
     this.stoneWorker.isWalking = false;
     this.fisherman.isWalking = false;
+    this.villageElder.y = (this.logicalHeight - this.groundHeight - this.dialogueBoxHeight) - this.villageElder.height;
+    this.villageElder.bobOffset = 0;
     this.state.phase = 'complete_success';
     this.state.stormCountdownActive = true;
     this.state.stormCountdownTimer = 35;
@@ -5143,7 +5145,7 @@ export class VillageLedgerGame {
     this.state.slingshotLastSpawnTime = 0;
     this.state.slingshotFloatingTexts = [];
     this.state.slingshotBalloons = [];
-    const balloonColors = ['#FF3366', '#3366FF'];
+    const balloonColors = ['#FF3366', '#3366FF', '#FF8C00', '#FFD700', '#9B59B6', '#FF69B4'];
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     for (let i = 0; i < 25; i++) {
       this.state.slingshotBalloons.push({
@@ -5185,7 +5187,7 @@ export class VillageLedgerGame {
     const h = this.logicalHeight;
     const groundY = h - this.groundHeight - this.dialogueBoxHeight;
     const t = this.state.celebrationTimer;
-    const balloonColors = ['#FF3366', '#3366FF'];
+    const balloonColors = ['#FF3366', '#3366FF', '#FF8C00', '#FFD700', '#9B59B6', '#FF69B4'];
     
     const activeBalloons = this.state.slingshotBalloons.filter(b => !b.popped);
     if (activeBalloons.length === 0) {
@@ -5749,7 +5751,9 @@ export class VillageLedgerGame {
     }
 
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    this.villageElder.y = groundY - this.villageElder.height - 10;
+    const elderDanceBob = Math.sin(this.bobTimer * 4) * 3;
+    this.villageElder.y = groundY - this.villageElder.height - 10 + elderDanceBob;
+    this.villageElder.bobOffset = elderDanceBob;
   }
 
   // Storm approaching after celebration - player goes home, fixes roof, enters hut, then rain (legacy)
@@ -6881,30 +6885,41 @@ export class VillageLedgerGame {
         ctx.fill();
       }
 
+      const cornerLaserColors = ['#FF0066', '#00CCFF', '#FF6600', '#CC00FF'];
       for (let i = 0; i < 4; i++) {
         const isRight = (i % 2 === 1);
         const isTop = (i < 2);
         const cornerX = isRight ? w : 0;
         const cornerY = isTop ? 0 : groundY;
-        const sweepAngle = Math.sin(ft * 1.8 + i * 1.2) * 0.5;
-        const baseAngle = isRight ? (Math.PI - 0.3) : 0.3;
-        const verticalBias = isTop ? 0.5 : -0.5;
-        const angle = baseAngle + sweepAngle + verticalBias;
-        const beamLen = 300;
-        let endX = cornerX + Math.cos(angle) * beamLen;
-        let endY = cornerY + Math.sin(angle) * beamLen;
-        endX = Math.max(0, Math.min(w, endX));
-        endY = Math.max(0, Math.min(groundY, endY));
-        const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
-        const hue = (ft * 50 + i * 90) % 360;
-        cornerGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.35)`);
-        cornerGrad.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
-        ctx.strokeStyle = cornerGrad;
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.moveTo(cornerX, cornerY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
+        const color = cornerLaserColors[i];
+        
+        for (let beam = 0; beam < 3; beam++) {
+          const sweepAngle = Math.sin(at * 1.8 + i * 1.2 + beam * 0.8) * 0.4;
+          let baseAngle: number;
+          if (isTop && !isRight) baseAngle = 0.3 + beam * 0.15;
+          else if (isTop && isRight) baseAngle = Math.PI - 0.3 - beam * 0.15;
+          else if (!isTop && !isRight) baseAngle = -0.3 - beam * 0.15;
+          else baseAngle = Math.PI + 0.3 + beam * 0.15;
+          
+          const angle = baseAngle + sweepAngle;
+          const beamLen = 250 + beam * 40;
+          let endX = cornerX + Math.cos(angle) * beamLen;
+          let endY = cornerY + Math.sin(angle) * beamLen;
+          
+          endX = Math.max(0, Math.min(w, endX));
+          endY = Math.max(0, Math.min(groundY, endY));
+          
+          const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
+          cornerGrad.addColorStop(0, color + 'CC');
+          cornerGrad.addColorStop(0.6, color + '44');
+          cornerGrad.addColorStop(1, color + '00');
+          ctx.strokeStyle = cornerGrad;
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(cornerX, cornerY);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+        }
       }
 
       const boothW = 120;
@@ -6992,7 +7007,7 @@ export class VillageLedgerGame {
     // Draw sunglasses on the Village Elder (adjusted for 3/4 side-facing view)
     const elderBob = this.villageElder.bobOffset || 0;
     const elderHeadY = this.villageElder.y + 29 + elderBob;
-    const glassW = 20;
+    const glassW = 18;
     const glassH = 7;
     const bridgeY = elderHeadY;
     const sideOffset = 12;
@@ -7116,33 +7131,41 @@ export class VillageLedgerGame {
       ctx.fill();
     }
     
+    const cornerLaserColors = ['#FF0066', '#00CCFF', '#FF6600', '#CC00FF'];
     for (let i = 0; i < 4; i++) {
       const isRight = (i % 2 === 1);
       const isTop = (i < 2);
       const cornerX = isRight ? w : 0;
       const cornerY = isTop ? 0 : groundY;
+      const color = cornerLaserColors[i];
       
-      const sweepAngle = Math.sin(t * 1.8 + i * 1.2) * 0.5;
-      const baseAngle = isRight ? (Math.PI - 0.3) : 0.3;
-      const verticalBias = isTop ? 0.5 : -0.5;
-      const angle = baseAngle + sweepAngle + verticalBias;
-      const beamLen = 300;
-      let endX = cornerX + Math.cos(angle) * beamLen;
-      let endY = cornerY + Math.sin(angle) * beamLen;
-      
-      endX = Math.max(0, Math.min(w, endX));
-      endY = Math.max(0, Math.min(groundY, endY));
-      
-      const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
-      const hue = (t * 50 + i * 90) % 360;
-      cornerGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.5)`);
-      cornerGrad.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
-      ctx.strokeStyle = cornerGrad;
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.moveTo(cornerX, cornerY);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
+      for (let beam = 0; beam < 3; beam++) {
+        const sweepAngle = Math.sin(t * 1.8 + i * 1.2 + beam * 0.8) * 0.4;
+        let baseAngle: number;
+        if (isTop && !isRight) baseAngle = 0.3 + beam * 0.15;
+        else if (isTop && isRight) baseAngle = Math.PI - 0.3 - beam * 0.15;
+        else if (!isTop && !isRight) baseAngle = -0.3 - beam * 0.15;
+        else baseAngle = Math.PI + 0.3 + beam * 0.15;
+        
+        const angle = baseAngle + sweepAngle;
+        const beamLen = 250 + beam * 40;
+        let endX = cornerX + Math.cos(angle) * beamLen;
+        let endY = cornerY + Math.sin(angle) * beamLen;
+        
+        endX = Math.max(0, Math.min(w, endX));
+        endY = Math.max(0, Math.min(groundY, endY));
+        
+        const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
+        cornerGrad.addColorStop(0, color + 'CC');
+        cornerGrad.addColorStop(0.6, color + '44');
+        cornerGrad.addColorStop(1, color + '00');
+        ctx.strokeStyle = cornerGrad;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(cornerX, cornerY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+      }
     }
     
     // ── CONFETTI (screen-fixed, full width, does NOT track camera) ──
@@ -9357,10 +9380,26 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     let alpha = 1;
     if (t < 0.5) alpha = t / 0.5;
     else if (t > 4) alpha = (5 - t);
-    alpha = Math.max(0, Math.min(1, alpha)) * 0.8;
+    alpha = Math.max(0, Math.min(1, alpha)) * 0.85;
     
     ctx.save();
     ctx.globalAlpha = alpha;
+    
+    ctx.fillStyle = '#2D231C';
+    ctx.fillRect(0, boxY, w, boxH);
+    
+    ctx.strokeStyle = '#8B7355';
+    ctx.lineWidth = 4;
+    ctx.strokeRect(0, boxY, w, boxH);
+    
+    ctx.strokeStyle = 'rgba(139, 115, 85, 0.3)';
+    ctx.lineWidth = 1;
+    for (let px = 10; px < w; px += 40) {
+      ctx.beginPath();
+      ctx.moveTo(px, boxY + 10);
+      ctx.lineTo(px, boxY + boxH - 10);
+      ctx.stroke();
+    }
     
     const portraitSize = 60;
     const portraitX = 20;
@@ -9413,14 +9452,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.restore();
     }
     
-    ctx.font = `bold 11px ${this.retroFont}`;
-    ctx.fillStyle = '#FFD700';
+    ctx.font = `16px ${this.retroFont}`;
     ctx.textAlign = 'left';
-    ctx.fillText(`[${this.state.partyHintSpeaker}]`, textStartX, boxY + 20);
+    ctx.fillStyle = '#C9B896';
+    ctx.fillText(`[${this.state.partyHintSpeaker}]`, textStartX, boxY + 36);
     
-    ctx.font = `12px ${this.retroFont}`;
+    ctx.font = `16px ${this.retroFont}`;
     ctx.fillStyle = '#E8DCC8';
-    ctx.fillText(this.state.partyHintText, textStartX, boxY + 40);
+    ctx.fillText(this.state.partyHintText, textStartX, boxY + 70);
     
     ctx.restore();
   }

@@ -57,7 +57,10 @@ export type SoundName =
   | 'partySong'
   | 'genreRemix'
   | 'reliefTrillSound'
-  | 'recordScratch';
+  | 'recordScratch1'
+  | 'recordScratch2'
+  | 'recordScratch3'
+  | 'recordScratch4';
 
 interface SoundConfig {
   src: string;
@@ -124,7 +127,10 @@ const SOUND_CONFIGS: Partial<Record<SoundName, SoundConfig>> = {
   basicHit2: { src: '/sounds/basic-hit-2.mp3', volume: 0.5, loop: false },
   partySong: { src: '/sounds/money-yell-open.mp3', volume: 0.5, loop: false },
   reliefTrillSound: { src: '/sounds/sixties-cinema-trills-1.mp3', volume: 0.5, loop: false },
-  recordScratch: { src: '/sounds/record-scratch.mp3', volume: 0.5, loop: false },
+  recordScratch1: { src: '/sounds/record-scratch-1.mp3', volume: 0.5, loop: false },
+  recordScratch2: { src: '/sounds/record-scratch-2.mp3', volume: 0.5, loop: false },
+  recordScratch3: { src: '/sounds/record-scratch-3.mp3', volume: 0.5, loop: false },
+  recordScratch4: { src: '/sounds/record-scratch-4.mp3', volume: 0.5, loop: false },
 };
 
 const FIGHT_ALWAYS_SOUNDS: SoundName[] = [
@@ -321,6 +327,12 @@ export class SoundManager {
     };
     
     activeSound.source.start(0);
+  }
+
+  public playRandomRecordScratch(): void {
+    const scratches: SoundName[] = ['recordScratch1', 'recordScratch2', 'recordScratch3', 'recordScratch4'];
+    const pick = scratches[Math.floor(Math.random() * scratches.length)];
+    this.play(pick);
   }
 
   public playFootstep(): void {

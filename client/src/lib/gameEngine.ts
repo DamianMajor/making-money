@@ -12019,13 +12019,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           // Stop current music immediately (not fade)
           soundManager.stop('genreRemix');
           soundManager.stop('partySong');
-          soundManager.play('recordScratch');
+          soundManager.playRandomRecordScratch();
           const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
           this.queueDialogue([{
             speaker: 'VILLAGE ELDER',
             text: "Give me just one second while I pull this out of my record bag...",
             onComplete: () => {
-              soundManager.play('recordScratch');
+              soundManager.playRandomRecordScratch();
               setTimeout(() => {
                 soundManager.loadAndPlayGenre(genreUrl);
               }, 500);

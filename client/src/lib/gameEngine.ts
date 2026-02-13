@@ -6885,13 +6885,11 @@ export class VillageLedgerGame {
         ctx.fill();
       }
 
-      const cornerLaserColors = ['#FF0066', '#00CCFF', '#FF6600', '#CC00FF'];
       for (let i = 0; i < 4; i++) {
         const isRight = (i % 2 === 1);
         const isTop = (i < 2);
         const cornerX = isRight ? w : 0;
         const cornerY = isTop ? 0 : groundY;
-        const color = cornerLaserColors[i];
         
         for (let beam = 0; beam < 3; beam++) {
           const sweepAngle = Math.sin(at * 1.8 + i * 1.2 + beam * 0.8) * 0.4;
@@ -6909,10 +6907,10 @@ export class VillageLedgerGame {
           endX = Math.max(0, Math.min(w, endX));
           endY = Math.max(0, Math.min(groundY, endY));
           
+          const hue = (at * 50 + i * 90 + beam * 30) % 360;
           const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
-          cornerGrad.addColorStop(0, color + 'CC');
-          cornerGrad.addColorStop(0.6, color + '44');
-          cornerGrad.addColorStop(1, color + '00');
+          cornerGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.35)`);
+          cornerGrad.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
           ctx.strokeStyle = cornerGrad;
           ctx.lineWidth = 4;
           ctx.beginPath();
@@ -7131,13 +7129,11 @@ export class VillageLedgerGame {
       ctx.fill();
     }
     
-    const cornerLaserColors = ['#FF0066', '#00CCFF', '#FF6600', '#CC00FF'];
     for (let i = 0; i < 4; i++) {
       const isRight = (i % 2 === 1);
       const isTop = (i < 2);
       const cornerX = isRight ? w : 0;
       const cornerY = isTop ? 0 : groundY;
-      const color = cornerLaserColors[i];
       
       for (let beam = 0; beam < 3; beam++) {
         const sweepAngle = Math.sin(t * 1.8 + i * 1.2 + beam * 0.8) * 0.4;
@@ -7155,10 +7151,10 @@ export class VillageLedgerGame {
         endX = Math.max(0, Math.min(w, endX));
         endY = Math.max(0, Math.min(groundY, endY));
         
+        const hue = (t * 50 + i * 90 + beam * 30) % 360;
         const cornerGrad = ctx.createLinearGradient(cornerX, cornerY, endX, endY);
-        cornerGrad.addColorStop(0, color + 'CC');
-        cornerGrad.addColorStop(0.6, color + '44');
-        cornerGrad.addColorStop(1, color + '00');
+        cornerGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, 0.5)`);
+        cornerGrad.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
         ctx.strokeStyle = cornerGrad;
         ctx.lineWidth = 4;
         ctx.beginPath();
@@ -9384,22 +9380,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     ctx.save();
     ctx.globalAlpha = alpha;
-    
-    ctx.fillStyle = '#2D231C';
-    ctx.fillRect(0, boxY, w, boxH);
-    
-    ctx.strokeStyle = '#8B7355';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(0, boxY, w, boxH);
-    
-    ctx.strokeStyle = 'rgba(139, 115, 85, 0.3)';
-    ctx.lineWidth = 1;
-    for (let px = 10; px < w; px += 40) {
-      ctx.beginPath();
-      ctx.moveTo(px, boxY + 10);
-      ctx.lineTo(px, boxY + boxH - 10);
-      ctx.stroke();
-    }
     
     const portraitSize = 60;
     const portraitX = 20;

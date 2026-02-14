@@ -8304,14 +8304,14 @@ export class VillageLedgerGame {
       }
     }
     
-    // ── "DEBTS SETTLED!" text (world-fixed above party center) ──
+    // ── "DEBTS SETTLED!" text (centered on screen, above midpoint) ──
     if (t <= 5) {
-      const textScreenX = this.villageCenterX - this.cameraX;
+      const textScreenX = this.logicalWidth / 2;
       const textAlpha = t <= 3 ? Math.min(1, t / 0.5) : Math.max(0, 1 - (t - 3) / 2);
       ctx.globalAlpha = introFade * textAlpha;
       ctx.font = `24px ${this.retroFont}`;
       ctx.textAlign = 'center';
-      const celebY = groundY * 0.2 + Math.sin(t * 5) * 8;
+      const celebY = groundY * 0.35 + Math.sin(t * 5) * 8;
       const textHue = (t * 60) % 360;
       ctx.fillStyle = `hsl(${textHue}, 100%, 70%)`;
       ctx.strokeStyle = '#000';

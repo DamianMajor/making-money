@@ -658,14 +658,14 @@ function NameInputScreen({ onContinue }: { onContinue: (name: string) => void })
           }}
           data-testid="text-name-title"
         >
-          What's your name?
+          Choose a name.
         </h2>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) handleContinue(); }}
-          placeholder="Enter your name"
+          placeholder="Choose your character's name"
           maxLength={15}
           autoFocus
           className="w-full mb-6"

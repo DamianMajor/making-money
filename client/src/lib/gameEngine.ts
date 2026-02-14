@@ -441,6 +441,11 @@ export class VillageLedgerGame {
       title: 'Money Scholar',
       lesson: 'Money is really just a system for keeping track of who owes what to whom. It evolved from the need for better record-keeping!',
       realWorld: 'Every dollar bill, bank balance, and digital payment is part of a massive record-keeping system — a modern version of the Stone Tablet!'
+    },
+    'Gold Records': {
+      title: 'Gold Records',
+      lesson: 'You collected every genre in the music collection! A true connoisseur of celebration!',
+      realWorld: 'Music brings people together — and collecting records is a way to celebrate your journey through learning!'
     }
   };
   
@@ -1872,8 +1877,8 @@ export class VillageLedgerGame {
         soundManager.fadeIn('backgroundMusicNight', 2000);
         setTimeout(() => {
           this.state.showRainfall = false;
-          soundManager.fadeOut('rain', 6000);
-        }, 4000);
+          soundManager.fadeOut('rain', 2000);
+        }, 6000);
         
         setTimeout(() => {
           try {

@@ -465,6 +465,13 @@ export class VillageLedgerGame {
   private djSoundboardScrollOffset: number = 0;
   private djModeButtonArea: { x: number; y: number; w: number; h: number } | null = null;
 
+  private djBoothWorldX: number = 0;
+  private djSwapInProgress: boolean = false;
+  private djPreSwapPlayerX: number = 0;
+  private djPreSwapElderX: number = 0;
+  private djPlayerAtBooth: boolean = false;
+  private djElderOnFloor: boolean = false;
+
   private showGoldRecordAward: boolean = false;
   private goldRecordAwardStartTime: number = 0;
   private goldRecordPlaqueArea: { x: number; y: number; w: number; h: number } | null = null;
@@ -4187,6 +4194,10 @@ export class VillageLedgerGame {
     this.state.remixPlayed = true;
     this.state.celebrationTimer = 0;
     this.djSoundboardActive = false;
+    this.djBoothWorldX = this.villageElder.x;
+    this.djSwapInProgress = false;
+    this.djPlayerAtBooth = false;
+    this.djElderOnFloor = false;
     const djModePlayCountRemix = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
     this.state.djModeUnlocked = djModePlayCountRemix >= 1;
     this.state.slingshotGameActive = true;
@@ -5317,7 +5328,7 @@ export class VillageLedgerGame {
       }
     }
     // Regular player movement (manual touch controls)
-    else if (this.moveDirection !== 0 && (!this.state.currentDialogue || this.state.showCelebration)) {
+    else if (this.moveDirection !== 0 && (!this.state.currentDialogue || this.state.showCelebration) && !this.djSwapInProgress) {
       this.player.x += this.moveDirection * this.playerSpeed * dt;
       const fishBoundary2 = (this.fisherman.originalX || 3025) - 20;
       this.player.x = Math.max(this.player.width / 2, Math.min(fishBoundary2, this.player.x));
@@ -5715,6 +5726,7 @@ export class VillageLedgerGame {
         this.endDiscoParty();
       }
       this.updateDancingNPCs(dt);
+      this.updateDJSwapMovement(dt);
       this.updateSlingshotGame(dt);
       // Gradually fade to night during celebration
       if (this.state.nightBgCrossfade < 1) {
@@ -6021,6 +6033,9 @@ export class VillageLedgerGame {
   
   private endDiscoParty(): void {
     this.djSoundboardActive = false;
+    this.djSwapInProgress = false;
+    this.djPlayerAtBooth = false;
+    this.djElderOnFloor = false;
     this.state.slingshotGameActive = false;
     this.state.slingshotLocked = false;
     this.state.playerBlockedForCarving = false;
@@ -6057,6 +6072,10 @@ export class VillageLedgerGame {
     this.state.phase = 'loop2_return';
     this.state.showCelebration = true;
     this.djSoundboardActive = false;
+    this.djBoothWorldX = this.villageElder.x;
+    this.djSwapInProgress = false;
+    this.djPlayerAtBooth = false;
+    this.djElderOnFloor = false;
     const djModePlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
     this.state.djModeUnlocked = djModePlayCount >= 1;
     this.djHintShown = false;
@@ -6302,7 +6321,7 @@ export class VillageLedgerGame {
       }
 
       if (!hit && proj.active) {
-        const discoBallWorldX = this.villageElder.x;
+        const discoBallWorldX = (this.djSoundboardActive || this.djSwapInProgress) ? this.djBoothWorldX : this.villageElder.x;
         const discoBallScreenX = discoBallWorldX - this.cameraX;
         const discoBallR = 45;
         const discoBallY = Math.min(groundY * 0.45 - 30, this.state.celebrationTimer * 30);
@@ -6364,7 +6383,8 @@ export class VillageLedgerGame {
       }
 
       if (!hit && proj.active) {
-        const elderScreenX = this.villageElder.x - this.cameraX;
+        const boothCollisionX = (this.djSoundboardActive || this.djSwapInProgress) ? this.djBoothWorldX : this.villageElder.x;
+        const elderScreenX = boothCollisionX - this.cameraX;
         const boothLeft = elderScreenX - 60;
         const boothTop = groundY - 75 + 27;
         const boothW = 120;
@@ -6378,7 +6398,7 @@ export class VillageLedgerGame {
             this.awardRandomRecord(500);
           }
           this.state.slingshotFloatingTexts.push({
-            x: this.villageElder.x, y: boothTop + boothH / 2,
+            x: boothCollisionX, y: boothTop + boothH / 2,
             text: '+10',
             timer: 0,
           });
@@ -6821,7 +6841,10 @@ export class VillageLedgerGame {
   private updateDancingNPCs(dt: number): void {
     const t = this.state.celebrationTimer;
     const cx = this.villageCenterX;
-    this.villageElder.facingDirection = 1;
+    
+    if (!this.djSoundboardActive && !this.djSwapInProgress) {
+      this.villageElder.facingDirection = 1;
+    }
     
     const danceSway = 40;
     this.woodcutter.x = (cx - 160) + Math.sin(t * 3.0) * danceSway;
@@ -6846,9 +6869,88 @@ export class VillageLedgerGame {
     }
 
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    const elderDanceBob = Math.sin(this.bobTimer * 2) * 3;
-    this.villageElder.y = groundY - this.villageElder.height - 10 + elderDanceBob;
-    this.villageElder.bobOffset = elderDanceBob;
+    
+    if (this.djSoundboardActive && !this.djSwapInProgress) {
+      const elderFlip = Math.sin(t * 1.5);
+      this.villageElder.facingDirection = elderFlip > 0 ? 1 : -1;
+      const elderDanceBobDJ = Math.sin(t * 7) * 4;
+      this.villageElder.bobOffset = elderDanceBobDJ;
+      this.villageElder.y = groundY - this.villageElder.height - 10 + elderDanceBobDJ;
+    } else if (!this.djSwapInProgress) {
+      const elderDanceBob = Math.sin(this.bobTimer * 2) * 3;
+      this.villageElder.y = groundY - this.villageElder.height - 10 + elderDanceBob;
+      this.villageElder.bobOffset = elderDanceBob;
+    }
+  }
+
+  private updateDJSwapMovement(dt: number): void {
+    if (!this.djSwapInProgress) return;
+    
+    const walkSpeed = 150;
+    
+    if (this.djSoundboardActive) {
+      const playerTarget = this.djBoothWorldX;
+      const elderTarget = this.djPreSwapPlayerX;
+      
+      const pDiff = playerTarget - this.player.x;
+      if (Math.abs(pDiff) > 5) {
+        this.player.facingDirection = Math.sign(pDiff);
+        this.player.x += Math.sign(pDiff) * walkSpeed * dt;
+        this.player.isWalking = true;
+        this.player.walkFrame = (this.player.walkFrame || 0) + dt * 8;
+      } else {
+        this.player.x = playerTarget;
+        this.djPlayerAtBooth = true;
+      }
+      
+      const eDiff = elderTarget - this.villageElder.x;
+      if (Math.abs(eDiff) > 5) {
+        this.villageElder.facingDirection = Math.sign(eDiff);
+        this.villageElder.x += Math.sign(eDiff) * walkSpeed * dt;
+        this.villageElder.isWalking = true;
+        this.villageElder.walkFrame = (this.villageElder.walkFrame || 0) + dt * 8;
+      } else {
+        this.villageElder.x = elderTarget;
+        this.djElderOnFloor = true;
+      }
+      
+      if (this.djPlayerAtBooth && this.djElderOnFloor) {
+        this.djSwapInProgress = false;
+        this.player.isWalking = false;
+        this.villageElder.isWalking = false;
+      }
+    } else {
+      const playerTarget = this.djPreSwapPlayerX;
+      const elderTarget = this.djBoothWorldX;
+      
+      const pDiff = playerTarget - this.player.x;
+      if (Math.abs(pDiff) > 5) {
+        this.player.facingDirection = Math.sign(pDiff);
+        this.player.x += Math.sign(pDiff) * walkSpeed * dt;
+        this.player.isWalking = true;
+        this.player.walkFrame = (this.player.walkFrame || 0) + dt * 8;
+      } else {
+        this.player.x = playerTarget;
+        this.djPlayerAtBooth = true;
+      }
+      
+      const eDiff = elderTarget - this.villageElder.x;
+      if (Math.abs(eDiff) > 5) {
+        this.villageElder.facingDirection = Math.sign(eDiff);
+        this.villageElder.x += Math.sign(eDiff) * walkSpeed * dt;
+        this.villageElder.isWalking = true;
+        this.villageElder.walkFrame = (this.villageElder.walkFrame || 0) + dt * 8;
+      } else {
+        this.villageElder.x = elderTarget;
+        this.djElderOnFloor = true;
+      }
+      
+      if (this.djPlayerAtBooth && this.djElderOnFloor) {
+        this.djSwapInProgress = false;
+        this.player.isWalking = false;
+        this.villageElder.isWalking = false;
+      }
+    }
   }
 
   // Storm approaching after celebration - player goes home, fixes roof, enters hut, then rain (legacy)
@@ -6995,9 +7097,13 @@ export class VillageLedgerGame {
       if (shouldDrawParty) {
         this.drawSpeakers(ctx);
         if (this.state.showCelebration) {
-          if (this.villageElder.visible) {
-            this.villageElder.facingDirection = Math.sin(this.state.celebrationTimer * 0.8) > 0 ? 1 : -1;
-            this.drawCharacter(ctx, this.villageElder);
+          if (this.djSoundboardActive || this.djSwapInProgress) {
+            this.drawCharacter(ctx, this.player);
+          } else {
+            if (this.villageElder.visible) {
+              this.villageElder.facingDirection = Math.sin(this.state.celebrationTimer * 0.8) > 0 ? 1 : -1;
+              this.drawCharacter(ctx, this.villageElder);
+            }
           }
           this.drawCelebrationBackground(ctx);
         }
@@ -7015,24 +7121,31 @@ export class VillageLedgerGame {
     // But fisherman is drawn AFTER player if player is in fisherman's area
     // During celebration, skip elder since he's already drawn behind the DJ booth
     this.npcs.forEach(npc => {
-      if (npc.visible && npc.id !== 'fisherman' && !(this.state.showCelebration && npc.id === 'villageElder')) {
-        this.drawCharacter(ctx, npc);
+      if (npc.visible && npc.id !== 'fisherman') {
+        if (this.state.showCelebration && npc.id === 'villageElder') {
+          if (this.djSoundboardActive || this.djSwapInProgress) {
+            this.drawCharacter(ctx, npc);
+          }
+        } else {
+          this.drawCharacter(ctx, npc);
+        }
       }
     });
     
     // If player is near fisherman, draw player BEFORE fisherman
-    if (playerNearFisherman) {
+    if (this.djSoundboardActive || this.djSwapInProgress) {
+      if (this.fisherman.visible) {
+        this.drawCharacter(ctx, this.fisherman);
+      }
+    } else if (playerNearFisherman) {
       this.drawCharacter(ctx, this.player);
-      // Draw fisherman (in front of player)
       if (this.fisherman.visible) {
         this.drawCharacter(ctx, this.fisherman);
       }
     } else {
-      // Draw fisherman
       if (this.fisherman.visible) {
         this.drawCharacter(ctx, this.fisherman);
       }
-      // Draw player (in front of NPCs and markers) with alpha for fade effect
       if (this.state.playerAlpha < 1) {
         ctx.save();
         ctx.globalAlpha = this.state.playerAlpha;
@@ -7783,7 +7896,7 @@ export class VillageLedgerGame {
     const conePump = isAnimated ? Math.sin(t * 8) * 9 : 0;
     const speakerShake = isAnimated ? Math.sin(t * 15) * 3 : 0;
 
-    const djCenterX = this.villageElder.x;
+    const djCenterX = (this.djSoundboardActive || this.djSwapInProgress) ? this.djBoothWorldX : this.villageElder.x;
     const speakerPositions = [
       { worldX: djCenterX - 350, stacked: false },
       { worldX: djCenterX + 350, stacked: false },
@@ -7875,7 +7988,8 @@ export class VillageLedgerGame {
     ctx.save();
     ctx.globalAlpha = introFade;
     
-    const elderScreenX = this.villageElder.x - this.cameraX;
+    const boothAnchorX = (this.djSoundboardActive || this.djSwapInProgress) ? this.djBoothWorldX : this.villageElder.x;
+    const elderScreenX = boothAnchorX - this.cameraX;
     
     const djBoothW = 120;
     const djBoothH = 75;
@@ -7987,7 +8101,7 @@ export class VillageLedgerGame {
     const discoBallR = 36;
     const targetY = groundY * 0.45 - 30;
     const discoBallDropY = Math.min(targetY, t * 30);
-    const discoBallWorldX = this.villageElder.x;
+    const discoBallWorldX = boothAnchorX;
     const discoBallX = discoBallWorldX - this.cameraX;
     const discoBallY = discoBallDropY;
     
@@ -8047,12 +8161,13 @@ export class VillageLedgerGame {
       const ft = this.frozenCelebrationTimer;
       ctx.save();
       
-      const elderScreenX = this.villageElder.x - this.cameraX;
+      const frozenBoothX = this.djBoothWorldX || this.villageElder.x;
+      const elderScreenX = frozenBoothX - this.cameraX;
 
       const discoBallR = 36;
       const targetFrozenY = groundY * 0.45 - 30;
       const discoBallDropY = targetFrozenY;
-      const discoBallWorldX = this.villageElder.x;
+      const discoBallWorldX = frozenBoothX;
       const discoBallX = discoBallWorldX - this.cameraX;
       const discoBallFrozenY = discoBallDropY;
 
@@ -8332,7 +8447,8 @@ export class VillageLedgerGame {
     const discoBallR = 36;
     const targetY = groundY * 0.45 - 30;
     const discoBallDropY = Math.min(targetY, t * 30);
-    const discoBallWorldX = this.villageElder.x;
+    const activeBoothAnchor = (this.djSoundboardActive || this.djSwapInProgress) ? this.djBoothWorldX : this.villageElder.x;
+    const discoBallWorldX = activeBoothAnchor;
     const discoBallX = discoBallWorldX - this.cameraX;
     const discoBallY = discoBallDropY;
     
@@ -10850,9 +10966,38 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       facing = -facing;
     }
 
-    const isDancing = (this.state.showCelebration || this.state.partyEnded) && !this.state.slingshotLocked && char.id === 'player';
+    const isDJing = this.djSoundboardActive && !this.djSwapInProgress && this.djPlayerAtBooth && char.id === 'player' && this.state.showCelebration;
+    const isElderDancing = this.djSoundboardActive && !this.djSwapInProgress && this.djElderOnFloor && char.id === 'villageElder' && this.state.showCelebration;
+    const isDancing = (this.state.showCelebration || this.state.partyEnded) && !this.state.slingshotLocked && char.id === 'player' && !isDJing;
     
-    if (isDancing) {
+    if (isDJing) {
+      const djT = this.state.celebrationTimer;
+      const headBob = Math.sin(djT * 6) * 3;
+      const bodyLean = Math.sin(djT * 2) * 0.04;
+      const armReach = Math.sin(djT * 3) * 0.02;
+      
+      ctx.translate(Math.round(screenX), Math.round(y + spriteH - headBob));
+      if (facing < 0) {
+        ctx.scale(-1, 1);
+      }
+      ctx.rotate(bodyLean + armReach);
+      ctx.drawImage(processedSprite, Math.round(-spriteW / 2), Math.round(-spriteH), Math.round(spriteW), Math.round(spriteH));
+    } else if (isElderDancing) {
+      const danceT = this.state.celebrationTimer * 3.5;
+      const bounce = Math.abs(Math.sin(danceT)) * 10;
+      const sway = Math.sin(danceT * 0.6) * 0.08;
+      const squash = 1 + Math.abs(Math.sin(danceT)) * 0.05;
+      const stretch = 1 - Math.abs(Math.sin(danceT)) * 0.04;
+      
+      ctx.translate(Math.round(screenX), Math.round(y + spriteH - bounce));
+      if (facing < 0) {
+        ctx.scale(-stretch, squash);
+      } else {
+        ctx.scale(stretch, squash);
+      }
+      ctx.rotate(sway);
+      ctx.drawImage(processedSprite, Math.round(-spriteW / 2), Math.round(-spriteH), Math.round(spriteW), Math.round(spriteH));
+    } else if (isDancing) {
       const danceT = this.state.celebrationTimer * 4;
       const bounce = Math.abs(Math.sin(danceT)) * 8;
       const sway = Math.sin(danceT * 0.5) * 0.06;
@@ -12068,6 +12213,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         const btn = this.djModeButtonArea;
         if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
           this.djSoundboardActive = true;
+          this.djPreSwapPlayerX = this.player.x;
+          this.djPreSwapElderX = this.villageElder.x;
+          this.djSwapInProgress = true;
+          this.djPlayerAtBooth = false;
+          this.djElderOnFloor = false;
           soundManager.play('buttonClick');
           return true;
         }
@@ -12079,6 +12229,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const btn = this.djSoundboardCloseBtn;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.djSoundboardActive = false;
+        this.djSwapInProgress = true;
+        this.djPlayerAtBooth = false;
+        this.djElderOnFloor = false;
         soundManager.play('buttonClick');
         return true;
       }

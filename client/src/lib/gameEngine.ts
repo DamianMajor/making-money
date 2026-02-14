@@ -403,7 +403,7 @@ export class VillageLedgerGame {
     'Pop': '/sounds/money-pop-remix.mp3',
     "80's Funk": '/sounds/money-80s-funk-remix.mp3',
     'Disco': '/sounds/money-disco-remix.mp3',
-    'Funk': '/sounds/money-80s-funk-remix.mp3', // TODO: Replace with dedicated Funk audio file when available
+    'Funk': '/sounds/money-yell-open.mp3',
   };
 
   private readonly GENRE_COLORS: Record<string, string> = {
@@ -6041,43 +6041,47 @@ export class VillageLedgerGame {
     this.djHintShown = false;
     this.djHutWarningShown = false;
     this.songChangeCueShown = false;
+    const autoUnlockPlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    const autoUnlockDelay = autoUnlockPlayCount === 0 ? 5000 : 2000;
     setTimeout(() => {
-      const playCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
       const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
       const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
       
-      if (playCount === 0) {
-        // First playthrough: always unlock Funk
+      if (autoUnlockPlayCount === 0) {
         if (!unlocked.includes('Funk')) {
           unlocked.push('Funk');
           localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
           this.lastRecordUnlockTime = Date.now();
           this.showRecordRewardPopup('Funk');
           this.state.selectedGenre = 'Funk';
-          const genreUrl = this.GENRE_AUDIO_MAP['Funk'];
-          if (genreUrl) {
-            soundManager.preloadGenre(genreUrl);
-            setTimeout(() => soundManager.loadAndPlayGenre(genreUrl), 3000);
-          }
         }
       } else {
-        // Repeat playthroughs: unlock a random uncollected genre
         const unearned = allGenres.filter(g => !unlocked.includes(g));
+        let genreToPlay: string;
         if (unearned.length > 0) {
           const randomGenre = unearned[Math.floor(Math.random() * unearned.length)];
           unlocked.push(randomGenre);
           localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
           this.lastRecordUnlockTime = Date.now();
           this.showRecordRewardPopup(randomGenre);
-          this.state.selectedGenre = randomGenre;
-          const genreUrl = this.GENRE_AUDIO_MAP[randomGenre];
-          if (genreUrl) {
-            soundManager.preloadGenre(genreUrl);
-            setTimeout(() => soundManager.loadAndPlayGenre(genreUrl), 3000);
-          }
+          genreToPlay = randomGenre;
+        } else {
+          genreToPlay = allGenres[Math.floor(Math.random() * allGenres.length)];
+        }
+        this.state.selectedGenre = genreToPlay;
+        const genreUrl = this.GENRE_AUDIO_MAP[genreToPlay];
+        if (genreUrl) {
+          soundManager.loadAndPlayGenre(genreUrl);
+          this.partySongEndTime = Date.now() + 240000;
+          setTimeout(() => {
+            const dur = soundManager.getGenreRemixDuration();
+            if (dur > 0) {
+              this.partySongEndTime = Date.now() + dur;
+            }
+          }, 3000);
         }
       }
-    }, 5000);
+    }, autoUnlockDelay);
     this.state.celebrationTimer = 0;
     this.state.slingshotGameActive = true;
     this.state.slingshotScore = 0;
@@ -6118,9 +6122,14 @@ export class VillageLedgerGame {
     soundManager.stopDaytimeMusic();
     soundManager.fadeOut('ambientVillage', 500);
     
-    soundManager.play('partySong');
-    const partySongDuration = soundManager.getBufferDuration('partySong');
-    this.partySongEndTime = Date.now() + partySongDuration;
+    const playCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    if (playCount === 0) {
+      soundManager.play('partySong');
+      const partySongDuration = soundManager.getBufferDuration('partySong');
+      this.partySongEndTime = Date.now() + partySongDuration;
+    } else {
+      this.partySongEndTime = 0;
+    }
     soundManager.play('celebration');
     const fullDuration = soundManager.getBufferDuration('crowdApplause');
     soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 8000));

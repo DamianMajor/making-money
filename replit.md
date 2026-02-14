@@ -24,7 +24,7 @@
 - **Party Flow**: Time-based event with a storm countdown and progressive atmospheric effects, requiring player action (roof repair). Party graphics fade after repair.
 - **Audio System**: Web Audio API with `AudioContext` for dynamic soundscapes, including layered audio, dynamic background music, and independent volume controls persisted to localStorage.
 - **Visual Style**: Painted/illustrated backgrounds, pixel-art character sprites, earth tones, natural materials, and monospace/sans-serif fonts. Responsive canvas design.
-- **Music Strategy**: Dynamic music loading and playback, with a focus on maximizing impact during celebration.
+- **Music Strategy**: Dynamic music loading and playback. Funk genre uses money-yell-open.mp3 (the main party song). First playthrough: Funk plays as the opening party music. Subsequent playthroughs: the auto-unlocked random genre's remix plays as the opening party music instead.
 - **Song Choice Mechanic**: Players select from 11 celebration genres after passing the DJ Quiz, each with a dedicated remix audio file, lazy-loaded on selection. Mid-party song change allowed once.
 - **Music Collection HUD**: Vinyl record icon shows progress (X/11), expands to a panel to view and select unlocked genres. Persistence across sessions via localStorage.
 - **2-Playthrough Gold Record Path**: Designed for collecting all 11 genres in two playthroughs, utilizing various in-game actions and bonus questions.

@@ -9247,7 +9247,7 @@ export class VillageLedgerGame {
     const iconW = 26;
     const iconH = 32;
     const iconX = mcIcon.x - iconW - 6;
-    const iconY = mcIcon.y + (mcIcon.h - iconH) / 2;
+    const iconY = mcIcon.y + (mcIcon.h - iconH) / 2 - 3;
 
     this.goldRecordPlaqueArea = { x: iconX, y: iconY, w: iconW, h: iconH };
 

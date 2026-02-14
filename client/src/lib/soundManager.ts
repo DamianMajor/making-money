@@ -694,6 +694,11 @@ export class SoundManager {
       try { existing.source.stop(); } catch {}
       this.activeSources.delete('genreRemix');
     }
+    const existingParty = this.activeSources.get('partySong');
+    if (existingParty) {
+      try { existingParty.source.stop(); } catch {}
+      this.activeSources.delete('partySong');
+    }
 
     const thisGeneration = ++this.genreLoadGeneration;
 

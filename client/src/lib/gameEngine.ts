@@ -456,6 +456,7 @@ export class VillageLedgerGame {
   
   private discoSpriteUnlocked: boolean = false;
   private useDiscoSprite: boolean = false;
+  private discoAvatarJustUnlocked: boolean = false;
   private discoAvatarToggleBtn: { x: number; y: number; w: number; h: number } | null = null;
 
   private djSoundboardActive: boolean = false;
@@ -953,6 +954,11 @@ export class VillageLedgerGame {
       djModeUnlocked: false
     };
 
+    const savedBadges = JSON.parse(localStorage.getItem('makingMoney_earnedBadges') || '[]');
+    if (savedBadges.length > 0) {
+      this.state.badges = [...savedBadges];
+    }
+
     // Setup event listeners
     this.setupEventListeners();
     this.resize();
@@ -1084,7 +1090,124 @@ export class VillageLedgerGame {
     // Use CSS pixel coordinates (context is scaled for DPR automatically)
     const x = clientX - rect.left;
     const y = clientY - rect.top;
-    
+
+    // Check gear/settings button FIRST so it works on ALL screens/overlays
+    if (this.muteButtonArea) {
+      const btn = this.muteButtonArea;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.showSettingsPanel = !this.showSettingsPanel;
+        this.settingsSubmenu = 'main';
+        this.showResetConfirm = false;
+        this.showGoldRecordAvatarPanel = false;
+        soundManager.play('buttonClick');
+        return;
+      }
+    }
+
+    // Handle settings panel interactions (must be checked early, on all screens)
+    if (this.showSettingsPanel) {
+      if (this.settingsSubmenu === 'sound') {
+        if (this.musicVolumeSliderArea) {
+          const s = this.musicVolumeSliderArea;
+          if (x >= s.x - 10 && x <= s.x + s.w + 10 && y >= s.y - 5 && y <= s.y + s.h + 5) {
+            const val = Math.max(0, Math.min(1, (x - s.x) / s.w));
+            soundManager.setMusicVolume(val);
+            this.isDraggingMusicSlider = true;
+            return;
+          }
+        }
+        if (this.sfxVolumeSliderArea) {
+          const s = this.sfxVolumeSliderArea;
+          if (x >= s.x - 10 && x <= s.x + s.w + 10 && y >= s.y - 5 && y <= s.y + s.h + 5) {
+            const val = Math.max(0, Math.min(1, (x - s.x) / s.w));
+            soundManager.setSfxVolume(val);
+            this.isDraggingSfxSlider = true;
+            return;
+          }
+        }
+      }
+
+      for (const btn of this.settingsPanelButtons) {
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          soundManager.play('buttonClick');
+          switch (btn.action) {
+            case 'close':
+              this.showSettingsPanel = false;
+              this.isDraggingMusicSlider = false;
+              this.isDraggingSfxSlider = false;
+              return;
+            case 'sound':
+              this.settingsSubmenu = 'sound';
+              break;
+            case 'howtoplay':
+              this.settingsSubmenu = 'howtoplay';
+              break;
+            case 'credits':
+              this.settingsSubmenu = 'credits';
+              break;
+            case 'fullscreen':
+              if (document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+              } else {
+                document.documentElement.requestFullscreen().catch(() => {});
+              }
+              break;
+            case 'restart':
+              this.showSettingsPanel = false;
+              this.isDraggingMusicSlider = false;
+              this.isDraggingSfxSlider = false;
+              location.reload();
+              break;
+            case 'reset':
+              this.showResetConfirm = true;
+              break;
+            case 'confirmReset':
+              localStorage.removeItem('makingMoney_unlockedGenres');
+              localStorage.removeItem('makingMoney_completionCount');
+              localStorage.removeItem('makingMoney_earnedBadges');
+              localStorage.removeItem('makingMoney_playerName');
+              localStorage.removeItem('makingMoney_useDiscoSprite');
+              localStorage.removeItem('makingMoney_postReflection');
+              this.showResetConfirm = false;
+              this.showSettingsPanel = false;
+              this.isDraggingMusicSlider = false;
+              this.isDraggingSfxSlider = false;
+              break;
+            case 'cancelReset':
+              this.showResetConfirm = false;
+              break;
+            case 'back':
+              this.settingsSubmenu = 'main';
+              break;
+            case 'toggleMusicMute':
+              soundManager.toggleMusicMute();
+              break;
+            case 'toggleSfxMute':
+              soundManager.toggleSfxMute();
+              break;
+          }
+          return;
+        }
+      }
+
+      // Click outside panel closes it
+      const panelW = Math.min(280, this.logicalWidth * 0.7);
+      let panelH = 310;
+      if (this.settingsSubmenu === 'sound') panelH = 240;
+      else if (this.settingsSubmenu === 'howtoplay') panelH = 220;
+      else if (this.settingsSubmenu === 'credits') panelH = 180;
+      const panelX = (this.logicalWidth - panelW) / 2;
+      const panelY = (this.logicalHeight - panelH) / 2;
+      if (x < panelX || x > panelX + panelW || y < panelY || y > panelY + panelH) {
+        this.showSettingsPanel = false;
+        this.isDraggingMusicSlider = false;
+        this.isDraggingSfxSlider = false;
+        return;
+      }
+
+      return;
+    }
+
     if (this.showRecordReward) {
       this.showRecordReward = false;
       return;
@@ -1119,122 +1242,6 @@ export class VillageLedgerGame {
 
     // Skip HUD checks when quiz is showing - quiz needs full screen interaction
     if (!this.state.showQuiz && !this.state.showQuizReview) {
-      // Check if clicking on gear/settings button
-      if (this.muteButtonArea) {
-        const btn = this.muteButtonArea;
-        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
-          this.showSettingsPanel = !this.showSettingsPanel;
-          this.settingsSubmenu = 'main';
-          this.showResetConfirm = false;
-          this.showGoldRecordAvatarPanel = false;
-          soundManager.play('buttonClick');
-          return;
-        }
-      }
-
-      // Handle settings panel interactions
-      if (this.showSettingsPanel) {
-        if (this.settingsSubmenu === 'sound') {
-          if (this.musicVolumeSliderArea) {
-            const s = this.musicVolumeSliderArea;
-            if (x >= s.x - 10 && x <= s.x + s.w + 10 && y >= s.y - 5 && y <= s.y + s.h + 5) {
-              const val = Math.max(0, Math.min(1, (x - s.x) / s.w));
-              soundManager.setMusicVolume(val);
-              this.isDraggingMusicSlider = true;
-              return;
-            }
-          }
-          if (this.sfxVolumeSliderArea) {
-            const s = this.sfxVolumeSliderArea;
-            if (x >= s.x - 10 && x <= s.x + s.w + 10 && y >= s.y - 5 && y <= s.y + s.h + 5) {
-              const val = Math.max(0, Math.min(1, (x - s.x) / s.w));
-              soundManager.setSfxVolume(val);
-              this.isDraggingSfxSlider = true;
-              return;
-            }
-          }
-        }
-
-        for (const btn of this.settingsPanelButtons) {
-          if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
-            soundManager.play('buttonClick');
-            switch (btn.action) {
-              case 'close':
-                this.showSettingsPanel = false;
-                this.isDraggingMusicSlider = false;
-                this.isDraggingSfxSlider = false;
-                return;
-              case 'sound':
-                this.settingsSubmenu = 'sound';
-                break;
-              case 'howtoplay':
-                this.settingsSubmenu = 'howtoplay';
-                break;
-              case 'credits':
-                this.settingsSubmenu = 'credits';
-                break;
-              case 'fullscreen':
-                if (document.fullscreenElement) {
-                  document.exitFullscreen().catch(() => {});
-                } else {
-                  document.documentElement.requestFullscreen().catch(() => {});
-                }
-                break;
-              case 'restart':
-                this.showSettingsPanel = false;
-                this.isDraggingMusicSlider = false;
-                this.isDraggingSfxSlider = false;
-                location.reload();
-                break;
-              case 'reset':
-                this.showResetConfirm = true;
-                break;
-              case 'confirmReset':
-                localStorage.removeItem('makingMoney_unlockedGenres');
-                localStorage.removeItem('makingMoney_completionCount');
-                localStorage.removeItem('makingMoney_playerName');
-                localStorage.removeItem('makingMoney_useDiscoSprite');
-                localStorage.removeItem('makingMoney_postReflection');
-                this.showResetConfirm = false;
-                this.showSettingsPanel = false;
-                this.isDraggingMusicSlider = false;
-                this.isDraggingSfxSlider = false;
-                break;
-              case 'cancelReset':
-                this.showResetConfirm = false;
-                break;
-              case 'back':
-                this.settingsSubmenu = 'main';
-                break;
-              case 'toggleMusicMute':
-                soundManager.toggleMusicMute();
-                break;
-              case 'toggleSfxMute':
-                soundManager.toggleSfxMute();
-                break;
-            }
-            return;
-          }
-        }
-
-        // Calculate actual panel height based on current submenu
-        const panelW = Math.min(280, this.logicalWidth * 0.7);
-        let panelH = 310;
-        if (this.settingsSubmenu === 'sound') panelH = 240;
-        else if (this.settingsSubmenu === 'howtoplay') panelH = 220;
-        else if (this.settingsSubmenu === 'credits') panelH = 180;
-        const panelX = (this.logicalWidth - panelW) / 2;
-        const panelY = (this.logicalHeight - panelH) / 2;
-        if (x < panelX || x > panelX + panelW || y < panelY || y > panelY + panelH) {
-          this.showSettingsPanel = false;
-          this.isDraggingMusicSlider = false;
-          this.isDraggingSfxSlider = false;
-          return;
-        }
-
-        return;
-      }
-
       // Check badge tray icon tap
       if (this.badgeTrayButtonArea && !this.state.showChoice && !this.state.currentDialogue) {
         const bBtn = this.badgeTrayButtonArea;
@@ -2143,7 +2150,8 @@ export class VillageLedgerGame {
           text: "Sure, I can give you some wood. But I don't give things away for free! Do you have something to trade?",
           onComplete: () => {
             // Show inventory hint on first trade interaction - BEFORE yes/no choice
-            if (!this.state.inventoryHintShown) {
+            const completionCountInv = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+            if (!this.state.inventoryHintShown && completionCountInv === 0) {
               this.state.showInventoryHint = true;
               soundManager.play('choiceSelect');
               this.state.inventoryHintShown = true;
@@ -6713,20 +6721,29 @@ export class VillageLedgerGame {
     if (this.state.slingshotLocked) {
       ctx.save();
       ctx.textAlign = 'right';
-      ctx.font = `bold 14px ${this.uiFont}`;
-      const scoreColor = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE ? '#FFD700' : '#FFFFFF';
-      ctx.fillStyle = scoreColor;
-      ctx.fillText(`Score: ${this.state.slingshotScore}`, w - 20, 30);
-      ctx.font = `10px ${this.uiFont}`;
-      ctx.fillStyle = '#C4A77D';
-      ctx.fillText(`Target: ${this.SLINGSHOT_TARGET_SCORE}`, w - 20, 46);
-      if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE) {
+      
+      if (!this.state.slingshotScoreRecordAwarded) {
+        const pointsLeft = Math.max(0, this.SLINGSHOT_TARGET_SCORE - this.state.slingshotScore);
+        ctx.font = `bold 14px ${this.uiFont}`;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(`Score: ${this.state.slingshotScore}`, w - 20, 30);
+        ctx.font = `bold 12px ${this.uiFont}`;
+        ctx.fillStyle = '#FFD700';
+        ctx.fillText(`${pointsLeft} pts to record!`, w - 20, 48);
+      } else {
+        ctx.font = `bold 14px ${this.uiFont}`;
+        ctx.fillStyle = '#FFD700';
+        ctx.fillText(`Score: ${this.state.slingshotScore}`, w - 20, 30);
+        ctx.font = `bold 12px ${this.uiFont}`;
+        ctx.fillStyle = '#2ECC71';
+        ctx.fillText('Record earned!', w - 20, 48);
         ctx.textAlign = 'center';
         ctx.font = `bold 12px ${this.uiFont}`;
         const champPulse = 0.7 + 0.3 * Math.sin(Date.now() / 200);
         ctx.fillStyle = `rgba(255, 215, 0, ${champPulse})`;
         ctx.fillText('PARTY CHAMPION!', w / 2, 20);
       }
+      
       ctx.restore();
     }
     
@@ -6737,7 +6754,7 @@ export class VillageLedgerGame {
       ctx.font = `bold 11px ${this.uiFont}`;
       ctx.fillStyle = '#FFFFFF';
       if (this.slingshotPlatformActive) {
-        ctx.fillText(`Pop balloons to score ${this.SLINGSHOT_TARGET_SCORE} points!`, platformScreenX, groundY - platformH - 80);
+        ctx.fillText('Pop balloons to earn a record!', platformScreenX, groundY - platformH - 80);
       } else {
         ctx.fillText('Walk to the platform to use the slingshot!', platformScreenX, groundY - platformH - 80);
       }
@@ -7180,13 +7197,6 @@ export class VillageLedgerGame {
       this.drawAtmosphericHaze(ctx, w, h);
     }
 
-    // Draw gear/settings button in upper-right corner (always visible)
-    this.drawGearButton(ctx);
-
-    if (this.showSettingsPanel) {
-      this.drawSettingsPanel(ctx);
-    }
-
     // Draw badge tray icon
     this.drawBadgeTrayIcon(ctx);
     this.drawMusicCollectionIcon(ctx);
@@ -7408,6 +7418,12 @@ export class VillageLedgerGame {
       if (this.showGoldRecordAvatarPanel) {
         this.drawGoldRecordAvatarPanel(ctx);
       }
+    }
+
+    // Draw gear/settings button LAST so it's always on top of all overlays
+    this.drawGearButton(ctx);
+    if (this.showSettingsPanel) {
+      this.drawSettingsPanel(ctx);
     }
   }
 
@@ -7641,10 +7657,6 @@ export class VillageLedgerGame {
     
     if (animElapsed >= 0.4) {
     const popupAlpha = Math.min(1, (animElapsed - 0.4) / 0.3);
-    
-    // Dark overlay with celebration effect
-    ctx.fillStyle = `rgba(0, 0, 0, ${0.8 * popupAlpha})`;
-    ctx.fillRect(0, 0, w, h);
     
     ctx.globalAlpha = popupAlpha;
     
@@ -9051,20 +9063,22 @@ export class VillageLedgerGame {
   private badgePopupStartTime: number = 0;
 
   private awardBadge(name: string, description: string, onDismiss?: () => void): void {
-    // Don't award duplicates
-    if (!this.state.badges.includes(name)) {
-      this.state.pendingBadge = { name, description };
-      this.state.showBadgePopup = true;
-      this.state.lastBadgeEarnedTime = Date.now();
-      this.state.badgeTrayAnimTimer = 3;
-      this.badgePopupStartTime = Date.now();
-      this.badgeDismissCallback = onDismiss || null;
-      soundManager.play('badgeReward');
-      if (this.badgeAutoTimer) clearTimeout(this.badgeAutoTimer);
-    } else if (onDismiss) {
-      // Badge already earned, call callback immediately
-      onDismiss();
+    const savedBadges = JSON.parse(localStorage.getItem('makingMoney_earnedBadges') || '[]');
+    if (this.state.badges.includes(name) || savedBadges.includes(name)) {
+      if (!this.state.badges.includes(name)) {
+        this.state.badges.push(name);
+      }
+      if (onDismiss) onDismiss();
+      return;
     }
+    this.state.pendingBadge = { name, description };
+    this.state.showBadgePopup = true;
+    this.state.lastBadgeEarnedTime = Date.now();
+    this.state.badgeTrayAnimTimer = 3;
+    this.badgePopupStartTime = Date.now();
+    this.badgeDismissCallback = onDismiss || null;
+    soundManager.play('badgeReward');
+    if (this.badgeAutoTimer) clearTimeout(this.badgeAutoTimer);
   }
 
   private dismissBadgePopup(): void {
@@ -9075,6 +9089,7 @@ export class VillageLedgerGame {
     soundManager.play('choiceSelect');
     if (this.state.pendingBadge) {
       this.state.badges.push(this.state.pendingBadge.name);
+      localStorage.setItem('makingMoney_earnedBadges', JSON.stringify(this.state.badges));
     }
     this.state.showBadgePopup = false;
     this.state.pendingBadge = null;
@@ -9860,9 +9875,6 @@ export class VillageLedgerGame {
     const alpha = progress;
 
     ctx.save();
-    ctx.globalAlpha = alpha * 0.85;
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, w, h);
     ctx.globalAlpha = alpha;
 
     const popupW = 220;
@@ -9870,7 +9882,14 @@ export class VillageLedgerGame {
     const popupX = (w - popupW) / 2;
     const popupY = (h - popupH) / 2;
 
-    ctx.fillStyle = '#1a0a1e';
+    const genreColor = this.GENRE_COLORS[this.recordRewardGenre] || '#FF6B6B';
+    const r = parseInt(genreColor.slice(1, 3), 16);
+    const g = parseInt(genreColor.slice(3, 5), 16);
+    const b = parseInt(genreColor.slice(5, 7), 16);
+    const lightR = Math.round(r * 0.3 + 255 * 0.7);
+    const lightG = Math.round(g * 0.3 + 255 * 0.7);
+    const lightB = Math.round(b * 0.3 + 255 * 0.7);
+    ctx.fillStyle = `rgb(${lightR}, ${lightG}, ${lightB})`;
     ctx.beginPath();
     ctx.roundRect(popupX, popupY, popupW, popupH, 16);
     ctx.fill();
@@ -9894,7 +9913,6 @@ export class VillageLedgerGame {
     const cx = w / 2;
     const cy = popupY + 90;
     const recordR = 45;
-    const genreColor = this.GENRE_COLORS[this.recordRewardGenre] || '#FF6B6B';
     const spin = elapsed * 0.003;
 
     ctx.fillStyle = '#111111';
@@ -9929,7 +9947,7 @@ export class VillageLedgerGame {
     ctx.fill();
 
     ctx.font = `bold 16px ${this.uiFont}`;
-    ctx.fillStyle = '#FFD700';
+    ctx.fillStyle = '#3D2914';
     ctx.textAlign = 'center';
     ctx.fillText('Record Collected!', cx, popupY + 155);
 
@@ -9938,7 +9956,7 @@ export class VillageLedgerGame {
     ctx.fillText(this.recordRewardGenre, cx, popupY + 178);
 
     ctx.font = `10px ${this.uiFont}`;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.fillStyle = 'rgba(50, 40, 30, 0.5)';
     ctx.fillText('Tap to close', cx, popupY + popupH - 10);
 
     ctx.restore();
@@ -10976,7 +10994,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const bodyLean = Math.sin(djT * 2) * 0.04;
       const armReach = Math.sin(djT * 3) * 0.02;
       
-      ctx.translate(Math.round(screenX), Math.round(y + spriteH - headBob));
+      ctx.translate(Math.round(screenX), Math.round(y + spriteH - headBob - 10));
       if (facing < 0) {
         ctx.scale(-1, 1);
       }
@@ -12000,7 +12018,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     const elderScreenX = this.villageElder.x - this.cameraX;
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    const bubbleY = groundY - 120;
+    const bubbleY = groundY - 135;
     
     const pulse = 1 + 0.05 * Math.sin(Date.now() / 300);
     
@@ -12183,11 +12201,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     if (!this.state.showCelebration || !this.state.djModeUnlocked || this.djSoundboardActive) return;
     if (this.state.currentDialogue || this.state.showSongChoice || this.state.showQuiz) return;
     
-    const w = this.logicalWidth;
+    const boothWorldX = this.djBoothWorldX || this.villageElder.x;
+    const boothScreenX = boothWorldX - this.cameraX;
+    const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     const btnW = 50;
-    const btnH = 24;
-    const btnX = w - btnW - 10;
-    const btnY = 10;
+    const btnH = 28;
+    const btnX = boothScreenX - btnW / 2;
+    const btnY = groundY + 25;
     
     this.djModeButtonArea = { x: btnX, y: btnY, w: btnW, h: btnH };
     
@@ -12243,6 +12263,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           this.state.selectedGenre = btn.genre;
           const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
           if (genreUrl) {
+            soundManager.fadeOut('partySong', 100);
+            soundManager.fadeOut('genreRemix', 100);
             soundManager.playRandomRecordScratch();
             soundManager.loadAndPlayGenre(genreUrl);
             this.partySongEndTime = Date.now() + 240000;
@@ -12359,7 +12381,21 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     ctx.font = `16px ${this.retroFont}`;
     ctx.fillStyle = '#E8DCC8';
-    ctx.fillText(this.state.partyHintText, textStartX, boxY + 70);
+    const hintMaxWidth = w - textStartX - 20;
+    const hintWords = this.state.partyHintText.split(' ');
+    let hintLine = '';
+    let hintLineY = boxY + 62;
+    for (const word of hintWords) {
+      const testLine = hintLine + word + ' ';
+      if (ctx.measureText(testLine).width > hintMaxWidth && hintLine !== '') {
+        ctx.fillText(hintLine.trim(), textStartX, hintLineY);
+        hintLine = word + ' ';
+        hintLineY += 20;
+      } else {
+        hintLine = testLine;
+      }
+    }
+    ctx.fillText(hintLine.trim(), textStartX, hintLineY);
     
     ctx.restore();
   }
@@ -12928,7 +12964,19 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillRect(0, 0, w, h);
 
     const cardW = Math.min(580, w - 40);
-    const cardH = this.djQuizShowResult ? 340 : (this.djQuizShowHint ? 420 : 380);
+    ctx.font = `11px ${this.retroFont}`;
+    const preWrapLines = this.wrapTextLines(ctx, q.question, cardW - 50);
+    const questionTextHeight = preWrapLines.length * 18;
+    let hintHeight = 0;
+    if (this.djQuizShowHint && !this.djQuizShowResult) {
+      ctx.font = `italic 10px ${this.uiFont}`;
+      const hintLines = this.wrapTextLines(ctx, "Hint: " + q.hint, cardW - 60);
+      hintHeight = hintLines.length * 16 + 10;
+    }
+    const optionCount = q.options.length;
+    const optionHeight = optionCount * 48;
+    const baseCardH = this.djQuizShowResult ? 340 : (60 + questionTextHeight + hintHeight + 12 + optionHeight + 70);
+    const cardH = Math.max(this.djQuizShowResult ? 340 : 300, Math.min(baseCardH, h - 40));
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
 
@@ -13238,8 +13286,15 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const isMoneyQuestion = q.multiSelect === true;
     const reflectionAnswer = isMoneyQuestion ? localStorage.getItem('makingMoney_moneyAnswer') : null;
     const optionCount = this.quizQuestions[this.currentQuizQuestion].options.length;
-    const neededH = 165 + optionCount * 58 + 20;
-    const cardH = (isMoneyQuestion && reflectionAnswer) ? Math.max(500, neededH) : Math.max(400, neededH);
+    ctx.font = `11px ${this.retroFont}`;
+    const preQuizLines = this.wrapTextLines(ctx, q.question, cardW - 60);
+    const questionBlockH = 100 + preQuizLines.length * 20 + 30;
+    const reflectionH = reflectionAnswer ? 80 : 0;
+    const isMultiSelectQ = q.multiSelect === true;
+    const btnSpacingCalc = isMultiSelectQ ? 48 : 58;
+    const submitBtnH = isMultiSelectQ ? 55 : 0;
+    const neededH = questionBlockH + reflectionH + optionCount * btnSpacingCalc + submitBtnH + 20;
+    const cardH = Math.max(400, Math.min(neededH, h - 40));
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
 
@@ -13264,33 +13319,33 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillText(`Question ${this.currentQuizQuestion + 1} of ${this.quizQuestions.length}`, w / 2, cardY + 65);
 
     // Question
-    ctx.font = `12px ${this.retroFont}`;
+    ctx.font = `11px ${this.retroFont}`;
     ctx.fillStyle = '#3D2914';
     
     // Wrap question text
     const words = q.question.split(' ');
     let line = '';
-    let lineY = cardY + 110;
+    let lineY = cardY + 100;
     const maxWidth = cardW - 60;
     
     for (const word of words) {
       const testLine = line + word + ' ';
       if (ctx.measureText(testLine).width > maxWidth && line !== '') {
-        ctx.font = `12px ${this.retroFont}`;
+        ctx.font = `11px ${this.retroFont}`;
         ctx.textAlign = 'center';
         this.drawHighlightedText(ctx, line.trim(), w / 2, lineY, '#3D2914', 'center');
         line = word + ' ';
-        lineY += 28;
+        lineY += 20;
       } else {
         line = testLine;
       }
     }
-    ctx.font = `12px ${this.retroFont}`;
+    ctx.font = `11px ${this.retroFont}`;
     ctx.textAlign = 'center';
     this.drawHighlightedText(ctx, line.trim(), w / 2, lineY, '#3D2914', 'center');
 
     // Show reflection answer for the "What is Money?" question
-    let optionsStartY = cardY + 165;
+    let optionsStartY = lineY + 30;
     if (reflectionAnswer) {
       const reflectY = lineY + 30;
       const reflectBoxW = cardW - 60;
@@ -13661,10 +13716,16 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
       const yourLetters = (wrong.playerAnswer as number[]).map(i => letters[i]).join(', ') || 'None';
       ctx.fillText(`Your answer: ${yourLetters}`, cardX + 30, yOffset);
+      yOffset += 20;
     } else {
-      ctx.fillText(`Your answer: ${q.options[wrong.playerAnswer as number]}`, cardX + 30, yOffset);
+      const yourAnswerText = `Your answer: ${q.options[wrong.playerAnswer as number]}`;
+      const yourLines = this.wrapTextLines(ctx, yourAnswerText, maxWidth);
+      yourLines.forEach(l => {
+        ctx.fillText(l, cardX + 30, yOffset);
+        yOffset += 16;
+      });
+      yOffset += 4;
     }
-    yOffset += 22;
     
     // Correct answer - darker green for readability
     ctx.fillStyle = '#166534';
@@ -13672,10 +13733,16 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
       const correctLetters = (q.correct as number[]).map(i => letters[i]).join(', ');
       ctx.fillText(`Correct: ${correctLetters}`, cardX + 30, yOffset);
+      yOffset += 20;
     } else {
-      ctx.fillText(`Correct: ${q.options[q.correct as number]}`, cardX + 30, yOffset);
+      const correctAnswerText = `Correct: ${q.options[q.correct as number]}`;
+      const correctLines = this.wrapTextLines(ctx, correctAnswerText, maxWidth);
+      correctLines.forEach(l => {
+        ctx.fillText(l, cardX + 30, yOffset);
+        yOffset += 16;
+      });
+      yOffset += 6;
     }
-    yOffset += 25;
     
     // Explanation with more room
     ctx.font = `italic 10px ${this.retroFont}`;
@@ -13870,18 +13937,22 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.lineWidth = 3;
     ctx.stroke();
     
+    const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
+    const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+    const unlockedCount = unlocked.length;
+    const allCollected = unlockedCount >= allGenres.length;
+    const genres = allCollected 
+      ? allGenres 
+      : allGenres.filter(g => g !== this.state.selectedGenre && !unlocked.includes(g));
+
     ctx.font = `bold 18px ${this.uiFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText('Choose Your Celebration Song!', w / 2, cardY + 35);
+    ctx.fillText(allCollected ? 'Pick Any Celebration Song!' : 'Choose Your Celebration Song!', w / 2, cardY + 35);
     
     ctx.font = `12px ${this.uiFont}`;
     ctx.fillStyle = '#C4A77D';
-    ctx.fillText('Pick a genre for your victory remix', w / 2, cardY + 55);
-    
-    const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
-    const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
-    const genres = allGenres.filter(g => g !== this.state.selectedGenre && !unlocked.includes(g));
+    ctx.fillText(allCollected ? 'All records collected! Pick any song!' : 'Pick a genre for your victory remix', w / 2, cardY + 55);
     const btnW = 110;
     const btnH = 40;
     const gapX = 15;
@@ -13999,6 +14070,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             }, 2000);
           }
           const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+          if (count === 0) {
+            this.discoAvatarJustUnlocked = true;
+            this.discoSpriteUnlocked = true;
+          }
           localStorage.setItem('makingMoney_completionCount', String(count + 1));
           this.requestReflectionInput((newAnswer) => {
             if (newAnswer.trim()) {
@@ -14037,6 +14112,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           }, 2000);
         }
         const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+        if (count === 0) {
+          this.discoAvatarJustUnlocked = true;
+          this.discoSpriteUnlocked = true;
+        }
         localStorage.setItem('makingMoney_completionCount', String(count + 1));
         this.requestReflectionInput((newAnswer) => {
           if (newAnswer.trim()) {
@@ -14171,6 +14250,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     if (hasReflection) baseCardH += 140;
     const currentPlayCountForHeight = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
     if (currentPlayCountForHeight === 1) baseCardH += 50;
+    if (this.discoAvatarJustUnlocked) baseCardH += 120;
     const cardH = Math.min(baseCardH, h - 30);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
@@ -14327,9 +14407,90 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillStyle = '#87CEEB';
       ctx.fillText('Next time, you control the music at the party!', w / 2, msgY + 54);
     }
-    
+
+    let discoSectionOffset = 0;
+    if (this.discoAvatarJustUnlocked) {
+      const now = Date.now();
+      const panelW = cardW - 40;
+      const panelH = 100;
+      const panelX = cardX + 20;
+      const panelY = msgY + (currentPlayCount === 1 ? 68 : 28);
+      discoSectionOffset = panelH + 16;
+
+      const pulsePhase = Math.sin(now * 0.004) * 0.5 + 0.5;
+      const glowAlpha = 0.4 + pulsePhase * 0.6;
+
+      ctx.save();
+      ctx.shadowColor = `rgba(255, 215, 0, ${glowAlpha})`;
+      ctx.shadowBlur = 12 + pulsePhase * 8;
+      ctx.fillStyle = '#3A2518';
+      ctx.beginPath();
+      ctx.roundRect(panelX, panelY, panelW, panelH, 10);
+      ctx.fill();
+      const borderGrad = ctx.createLinearGradient(panelX, panelY, panelX + panelW, panelY + panelH);
+      borderGrad.addColorStop(0, '#FFD700');
+      borderGrad.addColorStop(0.5, '#FFA500');
+      borderGrad.addColorStop(1, '#FFD700');
+      ctx.strokeStyle = borderGrad;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.restore();
+
+      const sparkleCount = 8;
+      for (let s = 0; s < sparkleCount; s++) {
+        const angle = (now * 0.001 + s * (Math.PI * 2 / sparkleCount)) % (Math.PI * 2);
+        const sparkleX = panelX + panelW * 0.15 + (panelW * 0.7) * (s / (sparkleCount - 1));
+        const sparkleY = panelY + 10 + Math.sin(angle) * 6;
+        const sparkleAlpha = 0.3 + Math.sin(now * 0.005 + s) * 0.4;
+        const sparkleSize = 2 + Math.sin(now * 0.003 + s * 0.7) * 1.5;
+        ctx.fillStyle = `rgba(255, 215, 0, ${Math.max(0, sparkleAlpha)})`;
+        ctx.beginPath();
+        ctx.moveTo(sparkleX, sparkleY - sparkleSize);
+        ctx.lineTo(sparkleX + sparkleSize * 0.4, sparkleY);
+        ctx.lineTo(sparkleX, sparkleY + sparkleSize);
+        ctx.lineTo(sparkleX - sparkleSize * 0.4, sparkleY);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.font = `bold 13px ${this.uiFont}`;
+      ctx.textAlign = 'center';
+      const textGlow = 0.6 + pulsePhase * 0.4;
+      ctx.save();
+      ctx.shadowColor = `rgba(255, 215, 0, ${textGlow})`;
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText('NEW AVATAR UNLOCKED!', panelX + panelW / 2, panelY + 28);
+      ctx.restore();
+
+      const discoSprite = this.processedSprites['player-disco'];
+      if (discoSprite) {
+        const spriteSize = 50;
+        const spriteX = panelX + 16;
+        const spriteY = panelY + 35;
+        const spriteBob = Math.sin(now * 0.005) * 3;
+        ctx.drawImage(discoSprite, spriteX, spriteY + spriteBob, spriteSize, spriteSize);
+
+        ctx.font = `bold 10px ${this.uiFont}`;
+        ctx.fillStyle = '#E040FB';
+        ctx.textAlign = 'left';
+        ctx.fillText('Disco Avatar earned!', spriteX + spriteSize + 12, panelY + 55);
+        ctx.font = `9px ${this.uiFont}`;
+        ctx.fillStyle = '#C4A77D';
+        ctx.fillText('Use it on your next playthrough!', spriteX + spriteSize + 12, panelY + 72);
+      } else {
+        ctx.font = `bold 10px ${this.uiFont}`;
+        ctx.fillStyle = '#E040FB';
+        ctx.textAlign = 'center';
+        ctx.fillText('Disco Avatar earned!', panelX + panelW / 2, panelY + 58);
+        ctx.font = `9px ${this.uiFont}`;
+        ctx.fillStyle = '#C4A77D';
+        ctx.fillText('Use it on your next playthrough!', panelX + panelW / 2, panelY + 75);
+      }
+    }
+
     // Learn More hint
-    const hintY = startY + 2 * rowHeight + 47;
+    const hintY = startY + 2 * rowHeight + 47 + discoSectionOffset;
     ctx.font = `9px ${this.uiFont}`;
     ctx.fillStyle = '#A89070';
     ctx.textAlign = 'center';

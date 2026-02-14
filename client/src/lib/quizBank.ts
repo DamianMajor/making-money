@@ -14,7 +14,7 @@ export const ALL_QUESTIONS: QuizQuestion[] = [
     id: 1,
     question: 'What does the "double coincidence of wants" mean in barter?',
     options: [
-      "A: Both people must want the same thing at the same time",
+      "A: Both people must want what the other person has at the same time",
       "B: Both people must use the same currency",
       "C: Both people must live in the same town",
       "D: Both people must trade the same amount"

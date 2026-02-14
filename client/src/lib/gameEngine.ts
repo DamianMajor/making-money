@@ -3853,6 +3853,25 @@ export class VillageLedgerGame {
     const bushIsEmpty = this.state.resourcesDepleted || this.state.bushCurrentlyEmpty;
     
     if (bushIsEmpty) {
+      if (this.state.inventory.berries === 0 && this.state.berryRestockUsed) {
+        soundManager.playBushSequence();
+        this.state.bushCurrentlyEmpty = false;
+        this.state.resourcesDepleted = false;
+        this.state.inventory.berries = 1;
+        this.showInventoryPopup(`+1 BERRY!`, true);
+        this.setMood('happy');
+        this.queueDialogue([
+          {
+            speaker: 'YOU',
+            text: "Wait... I think I see one more berry hidden underneath!",
+            onComplete: () => {
+              this.state.resourcesDepleted = true;
+              this.state.bushCurrentlyEmpty = true;
+            }
+          }
+        ]);
+        return;
+      }
       soundManager.playForDurationWithFade('bush', 1500, 300);
       this.queueDialogue([
         {
@@ -6462,6 +6481,7 @@ export class VillageLedgerGame {
       this.state.slingshotAiming = true;
       this.state.slingshotAimStart = { x, y };
       this.state.slingshotAimCurrent = { x, y };
+      soundManager.stop('rubberBandStretch');
       soundManager.play('rubberBandStretch');
     }
   }
@@ -7225,7 +7245,6 @@ export class VillageLedgerGame {
     const animProgress = Math.min(1, animElapsed / 1.5);
     const eased = 1 - Math.pow(1 - animProgress, 3);
     const scale = 0.3 + 0.7 * eased;
-    const popupAlpha = eased;
     
     // Popup dimensions
     const popupWidth = 340;
@@ -7233,15 +7252,19 @@ export class VillageLedgerGame {
     const popupX = (w - popupWidth) / 2;
     const popupY = (h - popupHeight) / 2;
     
-    // Dark overlay with celebration effect
-    ctx.fillStyle = `rgba(0, 0, 0, ${0.8 * popupAlpha})`;
-    ctx.fillRect(0, 0, w, h);
-    
     // Apply scale transform centered on popup
     ctx.save();
     ctx.translate(w / 2, h / 2);
     ctx.scale(scale, scale);
     ctx.translate(-w / 2, -h / 2);
+    
+    if (animElapsed >= 0.4) {
+    const popupAlpha = Math.min(1, (animElapsed - 0.4) / 0.3);
+    
+    // Dark overlay with celebration effect
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.8 * popupAlpha})`;
+    ctx.fillRect(0, 0, w, h);
+    
     ctx.globalAlpha = popupAlpha;
     
     // Popup background with gradient effect
@@ -7352,7 +7375,9 @@ export class VillageLedgerGame {
     ctx.fillText('Continue', btnX + btnWidth / 2, btnY + 23);
     
     this.badgePopupButtonArea = { x: btnX, y: btnY, w: btnWidth, h: btnHeight };
+    }
     
+    ctx.globalAlpha = 1;
     const now = Date.now() / 1000;
     const sparkleColors = ['#FFD700', '#FFA500', '#FFFFFF'];
     const sparkleFade = animElapsed > 1 ? Math.max(0, 1 - (animElapsed - 1) / 0.75) : 1;
@@ -7365,7 +7390,7 @@ export class VillageLedgerGame {
       const size = 4 + Math.sin(now * 5 + i * 0.5) * 3;
       const color = sparkleColors[i % 3];
       
-      ctx.globalAlpha = popupAlpha * sparkleFade;
+      ctx.globalAlpha = eased * sparkleFade;
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
@@ -7380,7 +7405,7 @@ export class VillageLedgerGame {
       const size = 2 + Math.sin(now * 6 + i * 0.7) * 2;
       const color = sparkleColors[i % 3];
       
-      ctx.globalAlpha = popupAlpha * sparkleFade;
+      ctx.globalAlpha = eased * sparkleFade;
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
@@ -11463,7 +11488,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     const portraitSize = 60;
     const portraitX = 20;
-    const portraitY = boxY + (boxH - portraitSize) / 2;
+    const portraitY = boxY + 20;
     const textStartX = portraitX + portraitSize + 20;
     
     const speakerSpriteIdMap: Record<string, string> = {
@@ -11553,7 +11578,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       // Draw speaker portrait on the left
       const portraitSize = 60;
       const portraitX = 20;
-      const portraitY = y + (h - portraitSize) / 2;
+      const portraitY = y + 20;
       const textStartX = portraitX + portraitSize + 20; // Text starts after portrait
       
       // Map speaker names to processed sprite canvases

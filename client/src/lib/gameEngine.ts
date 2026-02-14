@@ -1861,14 +1861,19 @@ export class VillageLedgerGame {
       try {
         this.state.showNightTransition = true;
         this.state.nightTransitionTimer = 0;
+        this.state.showRainfall = true;
+        this.state.rainfallTimer = 0;
         if (!this.rainSoundStarted) {
           this.rainSoundStarted = true;
-          soundManager.fadeIn('rain', 2000);
+          soundManager.fadeIn('rain', 500);
           soundManager.stop('thunder');
         }
         soundManager.fadeIn('ambientNight', 1000);
         soundManager.fadeIn('backgroundMusicNight', 2000);
-        soundManager.fadeOut('rain', 6000);
+        setTimeout(() => {
+          this.state.showRainfall = false;
+          soundManager.fadeOut('rain', 6000);
+        }, 4000);
         
         setTimeout(() => {
           try {
@@ -4082,7 +4087,7 @@ export class VillageLedgerGame {
             },
             {
               speaker: 'VILLAGE ELDER',
-              text: "But hey... play through the game again and you can unlock even more music!"
+              text: "But hey... play through the game again and you can unlock even more music! I heard there's a special outfit for true music collectors..."
             }
           ]);
           return;
@@ -5860,6 +5865,12 @@ export class VillageLedgerGame {
           localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
           this.lastRecordUnlockTime = Date.now();
           this.showRecordRewardPopup('Funk');
+          this.state.selectedGenre = 'Funk';
+          const genreUrl = this.GENRE_AUDIO_MAP['Funk'];
+          if (genreUrl) {
+            soundManager.preloadGenre(genreUrl);
+            setTimeout(() => soundManager.loadAndPlayGenre(genreUrl), 3000);
+          }
         }
       } else {
         // Repeat playthroughs: unlock a random uncollected genre
@@ -5870,6 +5881,12 @@ export class VillageLedgerGame {
           localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
           this.lastRecordUnlockTime = Date.now();
           this.showRecordRewardPopup(randomGenre);
+          this.state.selectedGenre = randomGenre;
+          const genreUrl = this.GENRE_AUDIO_MAP[randomGenre];
+          if (genreUrl) {
+            soundManager.preloadGenre(genreUrl);
+            setTimeout(() => soundManager.loadAndPlayGenre(genreUrl), 3000);
+          }
         }
       }
     }, 5000);
@@ -9109,11 +9126,15 @@ export class VillageLedgerGame {
   private recordRewardGenre: string = '';
   private recordRewardStartTime: number = 0;
   private showRecordReward: boolean = false;
+  private showMusicChangeHint: boolean = false;
+  private musicChangeHintStartTime: number = 0;
 
   private showRecordRewardPopup(genre: string): void {
     this.recordRewardGenre = genre;
     this.recordRewardStartTime = Date.now();
     this.showRecordReward = true;
+    this.showMusicChangeHint = true;
+    this.musicChangeHintStartTime = Date.now();
     soundManager.playRandomDJTransition();
     this.checkMusicScholarBadge();
   }
@@ -9520,6 +9541,26 @@ export class VillageLedgerGame {
       ctx.arc(iconX + iconSize/2, iconY + iconSize/2, iconSize * 0.8, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    if (this.showMusicChangeHint) {
+      const hintElapsed = (Date.now() - this.musicChangeHintStartTime) / 1000;
+      if (hintElapsed > 8) {
+        this.showMusicChangeHint = false;
+      } else {
+        const hintAlpha = hintElapsed < 0.5 ? hintElapsed / 0.5 : (hintElapsed > 7 ? 1 - (hintElapsed - 7) : 1);
+        ctx.save();
+        ctx.globalAlpha = hintAlpha;
+        ctx.font = `bold 9px ${this.uiFont}`;
+        ctx.fillStyle = '#FFD700';
+        ctx.textAlign = 'center';
+        const hintX = iconX + iconSize / 2;
+        const hintY = iconY + iconSize + 14;
+        ctx.fillText('Tap to change music!', hintX, hintY);
+        const arrowY = iconY + iconSize + 2;
+        ctx.fillText('\u25B2', hintX, arrowY);
+        ctx.restore();
+      }
+    }
     
     ctx.save();
     ctx.beginPath();
@@ -9695,6 +9736,28 @@ export class VillageLedgerGame {
 
     let discoSectionEndY = muteBtnY + bgBtnH;
     this.discoAvatarToggleBtn = null;
+    if (!this.discoSpriteUnlocked) {
+      const hintY = muteBtnY + bgBtnH + 15;
+      ctx.save();
+      const silW = 40;
+      const silH = 50;
+      const silX = w / 2 - silW / 2;
+      const silY = hintY;
+      ctx.fillStyle = 'rgba(60, 60, 60, 0.6)';
+      ctx.beginPath();
+      ctx.roundRect(silX, silY, silW, silH, 8);
+      ctx.fill();
+      ctx.font = `bold 24px ${this.uiFont}`;
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.5)';
+      ctx.textAlign = 'center';
+      ctx.fillText('?', silX + silW / 2, silY + silH / 2 + 8);
+      ctx.font = `8px ${this.uiFont}`;
+      ctx.fillStyle = '#666';
+      ctx.fillText('Collect all 11 records', w / 2, silY + silH + 12);
+      ctx.fillText('to unlock a surprise!', w / 2, silY + silH + 22);
+      ctx.restore();
+      discoSectionEndY = silY + silH + 30;
+    }
     if (this.discoSpriteUnlocked) {
       const dividerY = muteBtnY + bgBtnH + 12;
       ctx.strokeStyle = '#555';
@@ -13069,7 +13132,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillText('Pick a genre for your victory remix', w / 2, cardY + 55);
     
     const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
-    const genres = allGenres.filter(g => g !== this.state.selectedGenre);
+    const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+    const genres = allGenres.filter(g => g !== this.state.selectedGenre && !unlocked.includes(g));
     const btnW = 110;
     const btnH = 40;
     const gapX = 15;

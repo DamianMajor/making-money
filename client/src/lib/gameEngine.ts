@@ -9244,52 +9244,85 @@ export class VillageLedgerGame {
     const mcIcon = this.musicCollectionIconArea;
     if (!mcIcon) return;
 
-    const iconW = 28;
-    const iconH = 28;
+    const iconW = 26;
+    const iconH = 32;
     const iconX = mcIcon.x - iconW - 6;
     const iconY = mcIcon.y + (mcIcon.h - iconH) / 2;
 
     this.goldRecordPlaqueArea = { x: iconX, y: iconY, w: iconW, h: iconH };
 
-    ctx.save();
-    ctx.shadowColor = '#FFD700';
-    ctx.shadowBlur = 6 + Math.sin(Date.now() / 500) * 3;
-    ctx.fillStyle = '#8B6914';
-    ctx.beginPath();
-    ctx.arc(iconX + iconW / 2, iconY + iconH / 2, iconW / 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
     const cx = iconX + iconW / 2;
     const cy = iconY + iconH / 2;
 
-    ctx.strokeStyle = '#FFD700';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, iconW / 2 - 2, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = '#3D2817';
-    ctx.beginPath();
-    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 10, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.save();
 
     if (this.showGoldRecordAvatarPanel) {
-      ctx.strokeStyle = '#FFD700';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, iconW / 2 + 2, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.shadowColor = '#FFD700';
+      ctx.shadowBlur = 8;
+    } else {
+      ctx.shadowColor = 'rgba(0,0,0,0.5)';
+      ctx.shadowBlur = 3;
     }
+
+    ctx.fillStyle = '#8B7333';
+    ctx.beginPath();
+    ctx.roundRect(iconX, iconY, iconW, iconH, 2);
+    ctx.fill();
+
+    ctx.restore();
+
+    ctx.fillStyle = '#A8882E';
+    ctx.beginPath();
+    ctx.roundRect(iconX + 1, iconY + 1, iconW - 2, iconH - 2, 1.5);
+    ctx.fill();
+
+    ctx.fillStyle = '#8B7333';
+    ctx.beginPath();
+    ctx.roundRect(iconX + 2.5, iconY + 2.5, iconW - 5, iconH - 5, 1);
+    ctx.fill();
+
+    const matX = iconX + 4;
+    const matY = iconY + 4;
+    const matW = iconW - 8;
+    const matH = iconH - 8;
+    ctx.fillStyle = '#1A1A1A';
+    ctx.fillRect(matX, matY, matW, matH);
+
+    const discRadius = Math.min(matW, matH) * 0.38;
+    const discCx = cx;
+    const discCy = cy - 1;
+
+    ctx.fillStyle = '#C5961E';
+    ctx.beginPath();
+    ctx.arc(discCx, discCy, discRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#DAA520';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.arc(discCx, discCy, discRadius - 1, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(218, 165, 32, 0.4)';
+    ctx.lineWidth = 0.3;
+    ctx.beginPath();
+    ctx.arc(discCx, discCy, discRadius * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(discCx, discCy, discRadius * 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#DAA520';
+    ctx.beginPath();
+    ctx.arc(discCx, discCy, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    const labelY = cy + discRadius + 4;
+    ctx.fillStyle = '#DAA520';
+    ctx.font = `bold 3px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillText('GOLD', cx, labelY);
+    ctx.textAlign = 'left';
   }
 
   private drawGoldRecordAvatarPanel(ctx: CanvasRenderingContext2D): void {

@@ -2,7 +2,7 @@
 // Touch-only side-scroller optimized for iPad/Tablet
 
 import { soundManager } from './soundManager';
-import { QuizQuestion, getDJQuizQuestions, getBackupDJQuestion, getFinalQuizQuestions } from './quizBank';
+import { QuizQuestion, getDJQuizQuestions, getBackupDJQuestion, getFinalQuizQuestions, getNPCBonusQuestion } from './quizBank';
 
 // Game State Types
 interface Vector2 {
@@ -156,6 +156,10 @@ interface GameState {
   celebrationTimer: number;
   slingshotGameActive: boolean;
   slingshotScore: number;
+  slingshotScoreRecordAwarded: boolean;
+  slingshotDiscoBallRecordAwarded: boolean;
+  fishermanBonusQuestionAsked: boolean;
+  woodcutterBonusQuestionAsked: boolean;
   slingshotCombo: number;
   slingshotMaxCombo: number;
   slingshotBalloons: Array<{
@@ -399,7 +403,7 @@ export class VillageLedgerGame {
     'Pop': '/sounds/money-pop-remix.mp3',
     "80's Funk": '/sounds/money-80s-funk-remix.mp3',
     'Disco': '/sounds/money-disco-remix.mp3',
-    'Funk': '/sounds/money-80s-funk-remix.mp3',
+    'Funk': '/sounds/money-80s-funk-remix.mp3', // TODO: Replace with dedicated Funk audio file when available
   };
 
   private readonly GENRE_COLORS: Record<string, string> = {
@@ -458,6 +462,8 @@ export class VillageLedgerGame {
   private goldRecordPlaqueArea: { x: number; y: number; w: number; h: number } | null = null;
   private showGoldRecordAvatarPanel: boolean = false;
   private goldRecordToggleBtn: { x: number; y: number; w: number; h: number } | null = null;
+  private showGoldRecordHintArrow: boolean = false;
+  private goldRecordHintArrowStartTime: number = 0;
 
   private playerName: string = 'YOU';
   private characterSprites: { [key: string]: HTMLImageElement } = {};
@@ -511,6 +517,10 @@ export class VillageLedgerGame {
   private slingshotPlatformActive: boolean = false;
   private readonly SLINGSHOT_TARGET_SCORE = 50;
   private inventoryPanelLeftX: number = 0;
+  private djHintShown: boolean = false;
+  private djHintStartTime: number = 0;
+  private djHutWarningShown: boolean = false;
+  private songChangeCueShown: boolean = false;
   
   // Auto-walk feature: player walks to clicked target and interacts
   private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush' | 'stoneTablet' | 'location'; id?: string } | null = null;
@@ -876,6 +886,10 @@ export class VillageLedgerGame {
       celebrationTimer: 0,
       slingshotGameActive: false,
       slingshotScore: 0,
+      slingshotScoreRecordAwarded: false,
+      slingshotDiscoBallRecordAwarded: false,
+      fishermanBonusQuestionAsked: false,
+      woodcutterBonusQuestionAsked: false,
       slingshotCombo: 0,
       slingshotMaxCombo: 0,
       slingshotBalloons: [],
@@ -1082,6 +1096,8 @@ export class VillageLedgerGame {
       const elapsed = (Date.now() - this.goldRecordAwardStartTime) / 1000;
       if (elapsed > 2) {
         this.showGoldRecordAward = false;
+        this.showGoldRecordHintArrow = true;
+        this.goldRecordHintArrowStartTime = Date.now();
       }
       return;
     }
@@ -1233,6 +1249,7 @@ export class VillageLedgerGame {
         const gr = this.goldRecordPlaqueArea;
         if (x >= gr.x && x <= gr.x + gr.w && y >= gr.y && y <= gr.y + gr.h) {
           this.showGoldRecordAvatarPanel = !this.showGoldRecordAvatarPanel;
+          this.showGoldRecordHintArrow = false;
           this.state.showMusicCollection = false;
           this.state.showBadgeTray = false;
           soundManager.play('buttonClick');
@@ -2255,6 +2272,46 @@ export class VillageLedgerGame {
                         this.state.phase = 'loop2_got_wood';
                         this.state.escortingNPC = null;
                         this.woodcutter.targetX = this.villageCenterX - 160;
+                        const wcPlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+                        if (wcPlayCount >= 1 && !this.state.woodcutterBonusQuestionAsked) {
+                          this.state.woodcutterBonusQuestionAsked = true;
+                          const bonusQ = getNPCBonusQuestion('woodcutter');
+                          if (bonusQ) {
+                            setTimeout(() => {
+                              this.queueDialogue([
+                                {
+                                  speaker: 'WOODCUTTER',
+                                  text: "I remember you! You helped us figure out the ledger last time. Quick question for an old friend...",
+                                  onComplete: () => {
+                                    this.showCheckpointQuiz(
+                                      "WOODCUTTER'S BONUS!",
+                                      bonusQ.question,
+                                      bonusQ.options,
+                                      bonusQ.correct,
+                                      bonusQ.explanation,
+                                      () => {
+                                        if (this.state.checkpointQuizCorrect) {
+                                          this.queueDialogue([{
+                                            speaker: 'WOODCUTTER',
+                                            text: "You really do know your stuff! Take this record as thanks!",
+                                            onComplete: () => {
+                                              this.awardRandomRecord(300);
+                                            }
+                                          }]);
+                                        } else {
+                                          this.queueDialogue([{
+                                            speaker: 'WOODCUTTER',
+                                            text: "Hmm, not quite right. Maybe you'll remember next time!"
+                                          }]);
+                                        }
+                                      }
+                                    );
+                                  }
+                                }
+                              ]);
+                            }, 1500);
+                          }
+                        }
                       }
                     }
                   ]);
@@ -2284,6 +2341,46 @@ export class VillageLedgerGame {
                 this.state.phase = 'loop2_got_wood';
                 this.state.escortingNPC = null;
                 this.woodcutter.targetX = this.villageCenterX - 160;
+                const wcPlayCount2 = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+                if (wcPlayCount2 >= 1 && !this.state.woodcutterBonusQuestionAsked) {
+                  this.state.woodcutterBonusQuestionAsked = true;
+                  const bonusQ2 = getNPCBonusQuestion('woodcutter');
+                  if (bonusQ2) {
+                    setTimeout(() => {
+                      this.queueDialogue([
+                        {
+                          speaker: 'WOODCUTTER',
+                          text: "I remember you! You helped us figure out the ledger last time. Quick question for an old friend...",
+                          onComplete: () => {
+                            this.showCheckpointQuiz(
+                              "WOODCUTTER'S BONUS!",
+                              bonusQ2.question,
+                              bonusQ2.options,
+                              bonusQ2.correct,
+                              bonusQ2.explanation,
+                              () => {
+                                if (this.state.checkpointQuizCorrect) {
+                                  this.queueDialogue([{
+                                    speaker: 'WOODCUTTER',
+                                    text: "You really do know your stuff! Take this record as thanks!",
+                                    onComplete: () => {
+                                      this.awardRandomRecord(300);
+                                    }
+                                  }]);
+                                } else {
+                                  this.queueDialogue([{
+                                    speaker: 'WOODCUTTER',
+                                    text: "Hmm, not quite right. Maybe you'll remember next time!"
+                                  }]);
+                                }
+                              }
+                            );
+                          }
+                        }
+                      ]);
+                    }, 1500);
+                  }
+                }
               }
             }
           ]);
@@ -3847,6 +3944,48 @@ export class VillageLedgerGame {
   
   // Helper to update phase after fish trade
   private updatePhaseAfterFishTrade(phase: string): void {
+    const playCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    
+    if (playCount >= 1 && !this.state.fishermanBonusQuestionAsked) {
+      this.state.fishermanBonusQuestionAsked = true;
+      const bonusQ = getNPCBonusQuestion('fisherman');
+      if (bonusQ) {
+        setTimeout(() => {
+          this.queueDialogue([
+            {
+              speaker: 'FISHERMAN',
+              text: "Hey, since we've traded before... let me test your knowledge! Answer this and I'll share something special.",
+              onComplete: () => {
+                this.showCheckpointQuiz(
+                  "FISHERMAN'S BONUS!",
+                  bonusQ.question,
+                  bonusQ.options,
+                  bonusQ.correct,
+                  bonusQ.explanation,
+                  () => {
+                    if (this.state.checkpointQuizCorrect) {
+                      this.queueDialogue([{
+                        speaker: 'FISHERMAN',
+                        text: "Impressive! Here's a rare record for your collection!",
+                        onComplete: () => {
+                          this.awardRandomRecord(300);
+                        }
+                      }]);
+                    } else {
+                      this.queueDialogue([{
+                        speaker: 'FISHERMAN',
+                        text: "Not quite! Keep learning and try again next time."
+                      }]);
+                    }
+                  }
+                );
+              }
+            }
+          ]);
+        }, 1500);
+      }
+    }
+    
     if (phase === 'got_stone_need_fish') {
       this.state.phase = 'got_fish_ready_settle';
     } else if (phase === 'loop2_got_stone') {
@@ -4035,6 +4174,10 @@ export class VillageLedgerGame {
     this.state.celebrationTimer = 0;
     this.state.slingshotGameActive = true;
     this.state.slingshotScore = 0;
+    this.state.slingshotScoreRecordAwarded = false;
+    this.state.slingshotDiscoBallRecordAwarded = false;
+    this.state.fishermanBonusQuestionAsked = false;
+    this.state.woodcutterBonusQuestionAsked = false;
     this.state.slingshotCombo = 0;
     this.state.slingshotMaxCombo = 0;
     this.state.slingshotProjectiles = [];
@@ -4107,19 +4250,36 @@ export class VillageLedgerGame {
         }]);
         return;
       }
-      this.queueDialogue([
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "You want me to play YOUR request? Ha!"
-        },
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "Tell you what... answer a question about what you learned today, and I'll spin whatever you want!",
-          onComplete: () => {
-            this.startDJQuiz();
+      const playCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+      if (playCount >= 1) {
+        this.queueDialogue([
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "Well well, look who's back! Ready for another spin?"
+          },
+          {
+            speaker: 'VILLAGE ELDER', 
+            text: "You know the drill — answer a question and I'll play your pick!",
+            onComplete: () => {
+              this.startDJQuiz();
+            }
           }
-        }
-      ]);
+        ]);
+      } else {
+        this.queueDialogue([
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "You want me to play YOUR request? Ha!"
+          },
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "Tell you what... answer a question about what you learned today, and I'll spin whatever you want!",
+            onComplete: () => {
+              this.startDJQuiz();
+            }
+          }
+        ]);
+      }
       return;
     }
 
@@ -5510,6 +5670,16 @@ export class VillageLedgerGame {
       this.handleHomeInteraction();
     }
 
+    if (this.state.showCelebration && this.player.x <= this.playerHomeX + 200 &&
+        !this.state.djQuizPassed && !this.djHutWarningShown &&
+        !this.state.currentDialogue && !this.state.showChoice) {
+      this.djHutWarningShown = true;
+      this.queueDialogue([{
+        speaker: 'VILLAGE ELDER',
+        text: "Hey! The party's just getting started! Come talk to me at the DJ booth first!"
+      }]);
+    }
+
     if (this.state.showCelebration && this.player.x <= this.playerHomeX + 80 &&
         !this.state.currentDialogue && !this.state.showChoice && !this.state.playerEnteredHut &&
         !this.state.hutAutoTriggered) {
@@ -5534,6 +5704,16 @@ export class VillageLedgerGame {
         this.state.nightBgCrossfade = Math.min(1, this.state.nightBgCrossfade + dt / 6);
       }
       this.state.partyHintTimer += dt;
+      if (this.state.celebrationTimer > 20 && !this.state.djQuizPassed && !this.state.currentDialogue && !this.djHintShown) {
+        this.djHintShown = true;
+        this.djHintStartTime = Date.now();
+      }
+      if (this.state.djQuizPassed && !this.state.songChangeUsed && !this.songChangeCueShown && this.state.celebrationTimer > 30) {
+        this.songChangeCueShown = true;
+        this.state.partyHintText = "Like the music? Come talk to me again for a different song!";
+        this.state.partyHintSpeaker = "VILLAGE ELDER";
+        this.state.partyHintTimer = 0;
+      }
       if (this.state.partyHintTimer > 5) {
         this.state.partyHintTimer = 0;
         const partyLines = [
@@ -5858,6 +6038,9 @@ export class VillageLedgerGame {
   private startDiscoParty(): void {
     this.state.phase = 'loop2_return';
     this.state.showCelebration = true;
+    this.djHintShown = false;
+    this.djHutWarningShown = false;
+    this.songChangeCueShown = false;
     setTimeout(() => {
       const playCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
       const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
@@ -5898,6 +6081,10 @@ export class VillageLedgerGame {
     this.state.celebrationTimer = 0;
     this.state.slingshotGameActive = true;
     this.state.slingshotScore = 0;
+    this.state.slingshotScoreRecordAwarded = false;
+    this.state.slingshotDiscoBallRecordAwarded = false;
+    this.state.fishermanBonusQuestionAsked = false;
+    this.state.woodcutterBonusQuestionAsked = false;
     this.state.slingshotCombo = 0;
     this.state.slingshotMaxCombo = 0;
     this.state.slingshotProjectiles = [];
@@ -6061,6 +6248,10 @@ export class VillageLedgerGame {
               const chainPopped = this.chainPopBalloons(b);
               const points = chainPopped * 10 + chainPopped * chainPopped * 5;
               this.state.slingshotScore += points;
+              if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE && !this.state.slingshotScoreRecordAwarded) {
+                this.state.slingshotScoreRecordAwarded = true;
+                this.awardRandomRecord(500);
+              }
               this.state.slingshotCombo++;
               if (this.state.slingshotCombo > this.state.slingshotMaxCombo) {
                 this.state.slingshotMaxCombo = this.state.slingshotCombo;
@@ -6100,6 +6291,14 @@ export class VillageLedgerGame {
           });
           proj.active = false;
           hit = true;
+          if (!this.state.slingshotDiscoBallRecordAwarded) {
+            this.state.slingshotDiscoBallRecordAwarded = true;
+            this.awardRandomRecord(800);
+          }
+          if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE && !this.state.slingshotScoreRecordAwarded) {
+            this.state.slingshotScoreRecordAwarded = true;
+            this.awardRandomRecord(500);
+          }
         }
       }
 
@@ -6118,6 +6317,10 @@ export class VillageLedgerGame {
               soundManager.play('npcHit');
             }
             this.state.slingshotScore += 5;
+            if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE && !this.state.slingshotScoreRecordAwarded) {
+              this.state.slingshotScoreRecordAwarded = true;
+              this.awardRandomRecord(500);
+            }
             this.state.slingshotFloatingTexts.push({
               x: npc.x, y: npcCenterY,
               text: 'Oops!',
@@ -6140,6 +6343,10 @@ export class VillageLedgerGame {
             proj.y >= boothTop && proj.y <= boothTop + boothH) {
           soundManager.playRandomRecordScratch();
           this.state.slingshotScore += 10;
+          if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE && !this.state.slingshotScoreRecordAwarded) {
+            this.state.slingshotScoreRecordAwarded = true;
+            this.awardRandomRecord(500);
+          }
           this.state.slingshotFloatingTexts.push({
             x: this.villageElder.x, y: boothTop + boothH / 2,
             text: '+10',
@@ -6841,6 +7048,7 @@ export class VillageLedgerGame {
     this.drawBadgeTrayIcon(ctx);
     this.drawMusicCollectionIcon(ctx);
     this.drawGoldRecordPlaqueIcon(ctx);
+    this.drawGoldRecordHintArrow(ctx);
 
     // Draw inventory HUD at top of screen (on top of trees)
     this.drawInventoryHUD(ctx);
@@ -6856,6 +7064,7 @@ export class VillageLedgerGame {
     }
     this.drawDialogueBox(ctx);
     this.drawPartyHint(ctx);
+    this.drawDJHintBubble(ctx);
     this.drawInteractButton(ctx);
 
     // Draw choice dialogue if active
@@ -7044,6 +7253,7 @@ export class VillageLedgerGame {
       this.drawBadgeTrayIcon(ctx);
       this.drawMusicCollectionIcon(ctx);
       this.drawGoldRecordPlaqueIcon(ctx);
+      this.drawGoldRecordHintArrow(ctx);
       if (this.state.showBadgeTray) {
         this.drawBadgeTrayPanel(ctx);
       }
@@ -9134,6 +9344,21 @@ export class VillageLedgerGame {
   private showMusicChangeHint: boolean = false;
   private musicChangeHintStartTime: number = 0;
 
+  private awardRandomRecord(delay: number = 500): void {
+    const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+    const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
+    const unearned = allGenres.filter(g => !unlocked.includes(g));
+    if (unearned.length > 0) {
+      const randomGenre = unearned[Math.floor(Math.random() * unearned.length)];
+      unlocked.push(randomGenre);
+      localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
+      this.lastRecordUnlockTime = Date.now();
+      setTimeout(() => {
+        this.showRecordRewardPopup(randomGenre);
+      }, delay);
+    }
+  }
+
   private showRecordRewardPopup(genre: string): void {
     this.recordRewardGenre = genre;
     this.recordRewardStartTime = Date.now();
@@ -9281,7 +9506,7 @@ export class VillageLedgerGame {
 
     ctx.font = `9px ${this.uiFont}`;
     ctx.fillStyle = '#D4A574';
-    ctx.fillText('All 11 genres collected!', w / 2, h * 0.73);
+    ctx.fillText(`All ${Object.keys(this.GENRE_AUDIO_MAP).length} genres collected!`, w / 2, h * 0.73);
 
     ctx.font = `8px ${this.uiFont}`;
     ctx.fillStyle = '#A89070';
@@ -9386,6 +9611,51 @@ export class VillageLedgerGame {
     ctx.textAlign = 'center';
     ctx.fillText('GOLD', cx, labelY);
     ctx.textAlign = 'left';
+  }
+
+  private drawGoldRecordHintArrow(ctx: CanvasRenderingContext2D): void {
+    if (!this.showGoldRecordHintArrow || !this.goldRecordPlaqueArea) return;
+    
+    const elapsed = (Date.now() - this.goldRecordHintArrowStartTime) / 1000;
+    if (elapsed > 10) {
+      this.showGoldRecordHintArrow = false;
+      return;
+    }
+    
+    let alpha = 1;
+    if (elapsed < 0.5) alpha = elapsed / 0.5;
+    else if (elapsed > 9) alpha = (10 - elapsed);
+    
+    const gr = this.goldRecordPlaqueArea;
+    const arrowX = gr.x + gr.w / 2;
+    const arrowY = gr.y + gr.h + 8;
+    
+    const bounce = Math.sin(Date.now() / 300) * 6;
+    const pulse = 0.7 + 0.3 * Math.sin(Date.now() / 200);
+    
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, alpha) * pulse;
+    
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.moveTo(arrowX, arrowY + bounce);
+    ctx.lineTo(arrowX - 10, arrowY + 16 + bounce);
+    ctx.lineTo(arrowX + 10, arrowY + 16 + bounce);
+    ctx.closePath();
+    ctx.fill();
+    
+    ctx.shadowColor = '#FFD700';
+    ctx.shadowBlur = 8;
+    ctx.fill();
+    
+    ctx.shadowBlur = 0;
+    ctx.font = `bold 9px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFD700';
+    ctx.globalAlpha = Math.max(0, alpha) * 0.9;
+    ctx.fillText('Tap to equip!', arrowX, arrowY + 32 + bounce);
+    
+    ctx.restore();
   }
 
   private drawGoldRecordAvatarPanel(ctx: CanvasRenderingContext2D): void {
@@ -9601,7 +9871,7 @@ export class VillageLedgerGame {
     ctx.font = `bold 8px ${this.uiFont}`;
     ctx.fillStyle = '#FFD700';
     ctx.textAlign = 'center';
-    ctx.fillText(`${unlocked.length}/11`, iconX + iconSize/2, iconY + iconSize + 14);
+    ctx.fillText(`${unlocked.length}/${Object.keys(this.GENRE_AUDIO_MAP).length}`, iconX + iconSize/2, iconY + iconSize + 14);
     
     this.musicCollectionIconArea = { x: iconX, y: iconY, w: iconSize, h: iconSize + 12 };
   }
@@ -9639,7 +9909,7 @@ export class VillageLedgerGame {
     
     ctx.font = `10px ${this.retroFont}`;
     ctx.fillStyle = '#888';
-    ctx.fillText(`${unlocked.length} of 11 songs unlocked`, w / 2, panelY + 48);
+    ctx.fillText(`${unlocked.length} of ${Object.keys(this.GENRE_AUDIO_MAP).length} songs unlocked`, w / 2, panelY + 48);
     
     const genres = Object.keys(this.GENRE_AUDIO_MAP);
     const btnW = (panelW - 70) / 2;
@@ -9758,7 +10028,7 @@ export class VillageLedgerGame {
       ctx.fillText('?', silX + silW / 2, silY + silH / 2 + 8);
       ctx.font = `8px ${this.uiFont}`;
       ctx.fillStyle = '#666';
-      ctx.fillText('Collect all 11 records', w / 2, silY + silH + 12);
+      ctx.fillText(`Collect all ${Object.keys(this.GENRE_AUDIO_MAP).length} records`, w / 2, silY + silH + 12);
       ctx.fillText('to unlock a surprise!', w / 2, silY + silH + 22);
       ctx.restore();
       discoSectionEndY = silY + silH + 30;
@@ -11538,6 +11808,58 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       }
       currentLineWidth += renderedWidth;
     }
+  }
+
+  private drawDJHintBubble(ctx: CanvasRenderingContext2D): void {
+    if (!this.djHintShown || this.state.djQuizPassed) return;
+    
+    const elapsed = (Date.now() - this.djHintStartTime) / 1000;
+    if (elapsed > 8) {
+      this.djHintShown = false;
+      return;
+    }
+    
+    let alpha = 1;
+    if (elapsed < 0.5) alpha = elapsed / 0.5;
+    else if (elapsed > 7) alpha = (8 - elapsed);
+    
+    const elderScreenX = this.villageElder.x - this.cameraX;
+    const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
+    const bubbleY = groundY - 120;
+    
+    const pulse = 1 + 0.05 * Math.sin(Date.now() / 300);
+    
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, alpha) * 0.95;
+    ctx.translate(elderScreenX, bubbleY);
+    ctx.scale(pulse, pulse);
+    ctx.translate(-elderScreenX, -bubbleY);
+    
+    const text = "Talk to the DJ!";
+    ctx.font = `bold 13px ${this.uiFont}`;
+    const textW = ctx.measureText(text).width;
+    const padX = 16;
+    const boxW = textW + padX * 2;
+    const boxH = 30;
+    const boxX = elderScreenX - boxW / 2;
+    const boxY = bubbleY - boxH / 2;
+    
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.9)';
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxW, boxH, 8);
+    ctx.fill();
+    
+    ctx.beginPath();
+    ctx.moveTo(elderScreenX - 8, boxY + boxH);
+    ctx.lineTo(elderScreenX, boxY + boxH + 12);
+    ctx.lineTo(elderScreenX + 8, boxY + boxH);
+    ctx.fill();
+    
+    ctx.fillStyle = '#2D1B0E';
+    ctx.textAlign = 'center';
+    ctx.fillText(text, elderScreenX, bubbleY + 5);
+    
+    ctx.restore();
   }
 
   private drawPartyHint(ctx: CanvasRenderingContext2D): void {
@@ -13798,6 +14120,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       celebrationTimer: 0,
       slingshotGameActive: false,
       slingshotScore: 0,
+      slingshotScoreRecordAwarded: false,
+      slingshotDiscoBallRecordAwarded: false,
+      fishermanBonusQuestionAsked: false,
+      woodcutterBonusQuestionAsked: false,
       slingshotCombo: 0,
       slingshotMaxCombo: 0,
       slingshotBalloons: [],
@@ -13971,6 +14297,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       celebrationTimer: 0,
       slingshotGameActive: false,
       slingshotScore: 0,
+      slingshotScoreRecordAwarded: false,
+      slingshotDiscoBallRecordAwarded: false,
+      fishermanBonusQuestionAsked: false,
+      woodcutterBonusQuestionAsked: false,
       slingshotCombo: 0,
       slingshotMaxCombo: 0,
       slingshotBalloons: [],

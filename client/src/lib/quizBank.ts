@@ -340,6 +340,17 @@ export function getBackupDJQuestion(usedIds: number[]): QuizQuestion | null {
   return shuffleOptions(pool[Math.floor(Math.random() * pool.length)]);
 }
 
+export function getNPCBonusQuestion(npcType: 'fisherman' | 'woodcutter', usedIds: number[] = []): QuizQuestion | null {
+  let pool: QuizQuestion[];
+  if (npcType === 'fisherman') {
+    pool = ALL_QUESTIONS.filter(q => q.category === 'dcw' && !usedIds.includes(q.id));
+  } else {
+    pool = ALL_QUESTIONS.filter(q => (q.category === 'ledger' || q.category === 'debt') && !usedIds.includes(q.id));
+  }
+  if (pool.length === 0) return null;
+  return shuffleOptions(pool[Math.floor(Math.random() * pool.length)]);
+}
+
 export function getFinalQuizQuestions(playCount: number = 1): QuizQuestion[] {
   const picked: QuizQuestion[] = [];
   

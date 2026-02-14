@@ -1123,6 +1123,11 @@ export class VillageLedgerGame {
           if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
             soundManager.play('buttonClick');
             switch (btn.action) {
+              case 'close':
+                this.showSettingsPanel = false;
+                this.isDraggingMusicSlider = false;
+                this.isDraggingSfxSlider = false;
+                return;
               case 'sound':
                 this.settingsSubmenu = 'sound';
                 break;
@@ -1178,7 +1183,7 @@ export class VillageLedgerGame {
 
         // Calculate actual panel height based on current submenu
         const panelW = Math.min(280, this.logicalWidth * 0.7);
-        let panelH = 280;
+        let panelH = 310;
         if (this.settingsSubmenu === 'sound') panelH = 240;
         else if (this.settingsSubmenu === 'howtoplay') panelH = 220;
         else if (this.settingsSubmenu === 'credits') panelH = 180;
@@ -10916,7 +10921,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillRect(0, 0, w, h);
 
     const panelW = Math.min(280, w * 0.7);
-    let panelH = 280;
+    let panelH = 310;
     if (this.settingsSubmenu === 'sound') panelH = 240;
     else if (this.settingsSubmenu === 'howtoplay') panelH = 220;
     else if (this.settingsSubmenu === 'credits') panelH = 180;
@@ -10950,6 +10955,19 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.textAlign = 'center';
     ctx.fillText('SETTINGS', px + pw / 2, py + 28);
 
+    const closeX = px + pw - 28;
+    const closeY = py + 10;
+    const closeSize = 22;
+    ctx.fillStyle = 'rgba(139, 105, 20, 0.3)';
+    ctx.beginPath();
+    ctx.roundRect(closeX, closeY, closeSize, closeSize, 4);
+    ctx.fill();
+    ctx.font = `bold 12px ${this.uiFont}`;
+    ctx.fillStyle = '#A89070';
+    ctx.textAlign = 'center';
+    ctx.fillText('X', closeX + closeSize / 2, closeY + closeSize / 2 + 4);
+    this.settingsPanelButtons.push({ x: closeX, y: closeY, w: closeSize, h: closeSize, action: 'close' });
+
     const btnW = pw - 40;
     const btnH = 32;
     const btnX = px + 20;
@@ -10966,6 +10984,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ];
 
     for (const item of menuItems) {
+      if (item.action === 'reset') {
+        btnY += 12;
+      }
+
       ctx.fillStyle = item.action === 'reset' ? 'rgba(180, 60, 60, 0.6)' : 'rgba(139, 105, 20, 0.3)';
       ctx.beginPath();
       ctx.roundRect(btnX, btnY, btnW, btnH, 6);

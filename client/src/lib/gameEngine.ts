@@ -448,6 +448,12 @@ export class VillageLedgerGame {
   private useDiscoSprite: boolean = false;
   private discoAvatarToggleBtn: { x: number; y: number; w: number; h: number } | null = null;
 
+  private showGoldRecordAward: boolean = false;
+  private goldRecordAwardStartTime: number = 0;
+  private goldRecordPlaqueArea: { x: number; y: number; w: number; h: number } | null = null;
+  private showGoldRecordAvatarPanel: boolean = false;
+  private goldRecordToggleBtn: { x: number; y: number; w: number; h: number } | null = null;
+
   private playerName: string = 'YOU';
   private characterSprites: { [key: string]: HTMLImageElement } = {};
   private processedSprites: { [key: string]: HTMLCanvasElement } = {};
@@ -459,6 +465,16 @@ export class VillageLedgerGame {
   
   // Sound mute button
   private muteButtonArea: { x: number; y: number; w: number; h: number } | null = null;
+  
+  // Settings panel state
+  private showSettingsPanel: boolean = false;
+  private settingsSubmenu: 'main' | 'sound' | 'howtoplay' | 'credits' = 'main';
+  private showResetConfirm: boolean = false;
+  private settingsPanelButtons: Array<{ x: number; y: number; w: number; h: number; action: string }> = [];
+  private musicVolumeSliderArea: { x: number; y: number; w: number; h: number } | null = null;
+  private sfxVolumeSliderArea: { x: number; y: number; w: number; h: number } | null = null;
+  private isDraggingMusicSlider: boolean = false;
+  private isDraggingSfxSlider: boolean = false;
   
   // Item icons for inventory
   private itemIcons: { [key: string]: HTMLImageElement } = {};
@@ -909,6 +925,9 @@ export class VillageLedgerGame {
   }
 
   private triggerIntro(): void {
+    this.showSettingsPanel = false;
+    this.isDraggingMusicSlider = false;
+    this.isDraggingSfxSlider = false;
     if (this.state.loop === 1) {
       this.queueDialogue([
         {
@@ -1004,6 +1023,9 @@ export class VillageLedgerGame {
   }
 
   private processTouchEnd(): void {
+    this.isDraggingMusicSlider = false;
+    this.isDraggingSfxSlider = false;
+    
     if (this.state.showCelebration && this.state.slingshotAiming) {
       this.handleSlingshotTouchEnd();
       this.touchActive = false;
@@ -1029,19 +1051,6 @@ export class VillageLedgerGame {
     const x = clientX - rect.left;
     const y = clientY - rect.top;
     
-    if (this.resetRecordsBtn && !this.parallaxLoaded) {
-      if (x >= this.resetRecordsBtn.x && x <= this.resetRecordsBtn.x + this.resetRecordsBtn.w &&
-          y >= this.resetRecordsBtn.y && y <= this.resetRecordsBtn.y + this.resetRecordsBtn.h) {
-        localStorage.removeItem('makingMoney_unlockedGenres');
-        localStorage.removeItem('makingMoney_completionCount');
-        localStorage.removeItem('makingMoney_playerName');
-        localStorage.removeItem('makingMoney_useDiscoSprite');
-        localStorage.removeItem('makingMoney_postReflection');
-        soundManager.play('buttonClick');
-        return;
-      }
-    }
-
     if (this.showRecordReward) {
       this.showRecordReward = false;
       return;
@@ -1064,16 +1073,125 @@ export class VillageLedgerGame {
       return;
     }
     
+    if (this.showGoldRecordAward) {
+      const elapsed = (Date.now() - this.goldRecordAwardStartTime) / 1000;
+      if (elapsed > 2) {
+        this.showGoldRecordAward = false;
+      }
+      return;
+    }
+
     // Skip HUD checks when quiz is showing - quiz needs full screen interaction
     if (!this.state.showQuiz && !this.state.showQuizReview) {
-      // Check if clicking on mute button
+      // Check if clicking on gear/settings button
       if (this.muteButtonArea) {
         const btn = this.muteButtonArea;
         if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
-          soundManager.toggleMute();
+          this.showSettingsPanel = !this.showSettingsPanel;
+          this.settingsSubmenu = 'main';
+          this.showResetConfirm = false;
+          this.showGoldRecordAvatarPanel = false;
           soundManager.play('buttonClick');
           return;
         }
+      }
+
+      // Handle settings panel interactions
+      if (this.showSettingsPanel) {
+        if (this.settingsSubmenu === 'sound') {
+          if (this.musicVolumeSliderArea) {
+            const s = this.musicVolumeSliderArea;
+            if (x >= s.x - 10 && x <= s.x + s.w + 10 && y >= s.y - 5 && y <= s.y + s.h + 5) {
+              const val = Math.max(0, Math.min(1, (x - s.x) / s.w));
+              soundManager.setMusicVolume(val);
+              this.isDraggingMusicSlider = true;
+              return;
+            }
+          }
+          if (this.sfxVolumeSliderArea) {
+            const s = this.sfxVolumeSliderArea;
+            if (x >= s.x - 10 && x <= s.x + s.w + 10 && y >= s.y - 5 && y <= s.y + s.h + 5) {
+              const val = Math.max(0, Math.min(1, (x - s.x) / s.w));
+              soundManager.setSfxVolume(val);
+              this.isDraggingSfxSlider = true;
+              return;
+            }
+          }
+        }
+
+        for (const btn of this.settingsPanelButtons) {
+          if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+            soundManager.play('buttonClick');
+            switch (btn.action) {
+              case 'sound':
+                this.settingsSubmenu = 'sound';
+                break;
+              case 'howtoplay':
+                this.settingsSubmenu = 'howtoplay';
+                break;
+              case 'credits':
+                this.settingsSubmenu = 'credits';
+                break;
+              case 'fullscreen':
+                if (document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+                } else {
+                  document.documentElement.requestFullscreen().catch(() => {});
+                }
+                break;
+              case 'restart':
+                this.showSettingsPanel = false;
+                this.isDraggingMusicSlider = false;
+                this.isDraggingSfxSlider = false;
+                location.reload();
+                break;
+              case 'reset':
+                this.showResetConfirm = true;
+                break;
+              case 'confirmReset':
+                localStorage.removeItem('makingMoney_unlockedGenres');
+                localStorage.removeItem('makingMoney_completionCount');
+                localStorage.removeItem('makingMoney_playerName');
+                localStorage.removeItem('makingMoney_useDiscoSprite');
+                localStorage.removeItem('makingMoney_postReflection');
+                this.showResetConfirm = false;
+                this.showSettingsPanel = false;
+                this.isDraggingMusicSlider = false;
+                this.isDraggingSfxSlider = false;
+                break;
+              case 'cancelReset':
+                this.showResetConfirm = false;
+                break;
+              case 'back':
+                this.settingsSubmenu = 'main';
+                break;
+              case 'toggleMusicMute':
+                soundManager.toggleMusicMute();
+                break;
+              case 'toggleSfxMute':
+                soundManager.toggleSfxMute();
+                break;
+            }
+            return;
+          }
+        }
+
+        // Calculate actual panel height based on current submenu
+        const panelW = Math.min(280, this.logicalWidth * 0.7);
+        let panelH = 280;
+        if (this.settingsSubmenu === 'sound') panelH = 240;
+        else if (this.settingsSubmenu === 'howtoplay') panelH = 220;
+        else if (this.settingsSubmenu === 'credits') panelH = 180;
+        const panelX = (this.logicalWidth - panelW) / 2;
+        const panelY = (this.logicalHeight - panelH) / 2;
+        if (x < panelX || x > panelX + panelW || y < panelY || y > panelY + panelH) {
+          this.showSettingsPanel = false;
+          this.isDraggingMusicSlider = false;
+          this.isDraggingSfxSlider = false;
+          return;
+        }
+
+        return;
       }
 
       // Check badge tray icon tap
@@ -1095,11 +1213,33 @@ export class VillageLedgerGame {
           }
           this.state.showMusicCollection = !this.state.showMusicCollection;
           this.state.showBadgeTray = false;
+          this.showGoldRecordAvatarPanel = false;
           soundManager.play('buttonClick');
           return;
         }
       }
-      
+
+      if (this.goldRecordPlaqueArea && this.discoSpriteUnlocked) {
+        const gr = this.goldRecordPlaqueArea;
+        if (x >= gr.x && x <= gr.x + gr.w && y >= gr.y && y <= gr.y + gr.h) {
+          this.showGoldRecordAvatarPanel = !this.showGoldRecordAvatarPanel;
+          this.state.showMusicCollection = false;
+          this.state.showBadgeTray = false;
+          soundManager.play('buttonClick');
+          return;
+        }
+      }
+
+      if (this.showGoldRecordAvatarPanel && this.goldRecordToggleBtn) {
+        const tb = this.goldRecordToggleBtn;
+        if (x >= tb.x && x <= tb.x + tb.w && y >= tb.y && y <= tb.y + tb.h) {
+          this.useDiscoSprite = !this.useDiscoSprite;
+          localStorage.setItem('makingMoney_useDiscoSprite', String(this.useDiscoSprite));
+          soundManager.play('buttonClick');
+          return;
+        }
+      }
+
       // Check if clicking on inventory HUD to open popup (also dismisses hint)
       if (this.inventoryButtonArea) {
         const btn = this.inventoryButtonArea;
@@ -1393,6 +1533,19 @@ export class VillageLedgerGame {
     const rect = this.canvas.getBoundingClientRect();
     const x = clientX - rect.left;
     const y = clientY !== undefined ? clientY - rect.top : 0;
+    
+    if (this.isDraggingMusicSlider && this.musicVolumeSliderArea && this.showSettingsPanel) {
+      const s = this.musicVolumeSliderArea;
+      const val = Math.max(0, Math.min(1, (x - s.x) / s.w));
+      soundManager.setMusicVolume(val);
+      return;
+    }
+    if (this.isDraggingSfxSlider && this.sfxVolumeSliderArea && this.showSettingsPanel) {
+      const s = this.sfxVolumeSliderArea;
+      const val = Math.max(0, Math.min(1, (x - s.x) / s.w));
+      soundManager.setSfxVolume(val);
+      return;
+    }
     
     if (this.state.showCelebration && this.state.slingshotAiming) {
       this.handleSlingshotTouchMove(x, y);
@@ -4826,7 +4979,7 @@ export class VillageLedgerGame {
     soundManager.resumeContext();
     soundManager.playLoop('ambientVillage');
 
-    this.checkMusicScholarBadge();
+    this.silentCheckMusicScholar();
 
     setTimeout(() => this.triggerIntro(), 500);
   }
@@ -6623,12 +6776,17 @@ export class VillageLedgerGame {
       this.drawAtmosphericHaze(ctx, w, h);
     }
 
-    // Draw mute button in upper-right corner (always visible)
-    this.drawMuteButton(ctx);
+    // Draw gear/settings button in upper-right corner (always visible)
+    this.drawGearButton(ctx);
+
+    if (this.showSettingsPanel) {
+      this.drawSettingsPanel(ctx);
+    }
 
     // Draw badge tray icon
     this.drawBadgeTrayIcon(ctx);
     this.drawMusicCollectionIcon(ctx);
+    this.drawGoldRecordPlaqueIcon(ctx);
 
     // Draw inventory HUD at top of screen (on top of trees)
     this.drawInventoryHUD(ctx);
@@ -6664,6 +6822,8 @@ export class VillageLedgerGame {
     if (this.showRecordReward) {
       this.drawRecordRewardPopup(ctx);
     }
+
+    this.drawGoldRecordAward(ctx);
 
     // Draw brawl animation if active
     if (this.state.showBrawl) {
@@ -6790,6 +6950,10 @@ export class VillageLedgerGame {
     if (this.state.showMusicCollection) {
       this.drawMusicCollectionPanel(ctx);
     }
+
+    if (this.showGoldRecordAvatarPanel) {
+      this.drawGoldRecordAvatarPanel(ctx);
+    }
     
     // Draw checkpoint quiz overlay if active
     if (this.state.showCheckpointQuiz) {
@@ -6825,11 +6989,15 @@ export class VillageLedgerGame {
       this.drawSuccessScreen(ctx);
       this.drawBadgeTrayIcon(ctx);
       this.drawMusicCollectionIcon(ctx);
+      this.drawGoldRecordPlaqueIcon(ctx);
       if (this.state.showBadgeTray) {
         this.drawBadgeTrayPanel(ctx);
       }
       if (this.state.showMusicCollection) {
         this.drawMusicCollectionPanel(ctx);
+      }
+      if (this.showGoldRecordAvatarPanel) {
+        this.drawGoldRecordAvatarPanel(ctx);
       }
     }
   }
@@ -8877,6 +9045,7 @@ export class VillageLedgerGame {
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.state.showBadgeTray = true;
         this.state.selectedBadgeIndex = null;
+        this.showGoldRecordAvatarPanel = false;
         soundManager.play('dialogueAdvance');
       }
     }
@@ -8917,10 +9086,257 @@ export class VillageLedgerGame {
     const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
     if (unlocked.length >= allGenres.length && !this.state.badges.includes('Music Scholar')) {
       this.discoSpriteUnlocked = true;
+      this.showGoldRecordAward = true;
+      this.goldRecordAwardStartTime = Date.now();
+      soundManager.play('badgeReward');
       setTimeout(() => {
-        this.awardBadge('Music Scholar', 'You collected every genre in the music collection! A true connoisseur of celebration!');
-      }, 3000);
+        soundManager.playRandomDJTransition();
+      }, 800);
+      if (!this.state.badges.includes('Music Scholar')) {
+        this.state.badges.push('Music Scholar');
+        this.state.lastBadgeEarnedTime = Date.now();
+        this.state.badgeTrayAnimTimer = 3;
+      }
     }
+  }
+
+  private silentCheckMusicScholar(): void {
+    const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+    const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
+    if (unlocked.length >= allGenres.length) {
+      this.discoSpriteUnlocked = true;
+      if (!this.state.badges.includes('Music Scholar')) {
+        this.state.badges.push('Music Scholar');
+      }
+    }
+  }
+
+  private drawGoldRecordAward(ctx: CanvasRenderingContext2D): void {
+    if (!this.showGoldRecordAward) return;
+
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    const elapsed = (Date.now() - this.goldRecordAwardStartTime) / 1000;
+
+    const fadeIn = Math.min(1, elapsed / 0.5);
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.85 * fadeIn})`;
+    ctx.fillRect(0, 0, w, h);
+
+    if (fadeIn < 1) return;
+
+    const contentAlpha = Math.min(1, (elapsed - 0.5) / 0.5);
+    ctx.globalAlpha = contentAlpha;
+
+    ctx.save();
+    ctx.shadowColor = '#FFD700';
+    ctx.shadowBlur = 20;
+    ctx.font = `bold 18px ${this.uiFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText('GOLD RECORD', w / 2, h * 0.15);
+    ctx.restore();
+
+    const discoSprite = this.processedSprites['player-disco'];
+    const avatarCenterX = w / 2;
+    const avatarCenterY = h * 0.42;
+
+    if (discoSprite) {
+      const scale = 3;
+      const spriteW = discoSprite.width * scale * 0.5;
+      const spriteH = discoSprite.height * scale * 0.5;
+
+      ctx.save();
+      ctx.shadowColor = '#FFD700';
+      ctx.shadowBlur = 30 + Math.sin(elapsed * 3) * 10;
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+      ctx.beginPath();
+      ctx.arc(avatarCenterX, avatarCenterY, spriteH * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      const sparkleColors = ['#FFD700', '#FFA500', '#FFFFFF'];
+      const ringRadius = spriteH * 0.6;
+      const sparkleCount = 12;
+      for (let i = 0; i < sparkleCount; i++) {
+        const angle = (i / sparkleCount) * Math.PI * 2 + elapsed * 0.5;
+        const dist = ringRadius + Math.sin(elapsed * 2 + i) * 5;
+        const sx = avatarCenterX + Math.cos(angle) * dist;
+        const sy = avatarCenterY + Math.sin(angle) * dist;
+        const size = 2 + Math.sin(elapsed * 3 + i * 0.5) * 1.5;
+        const color = sparkleColors[i % 3];
+
+        ctx.fillStyle = color;
+        ctx.globalAlpha = contentAlpha * (0.5 + Math.sin(elapsed * 4 + i) * 0.5);
+        ctx.beginPath();
+        ctx.arc(sx, sy, size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const floatingCount = 20;
+      ctx.globalAlpha = contentAlpha;
+      for (let i = 0; i < floatingCount; i++) {
+        const seed = i * 137.5;
+        const fx = avatarCenterX + Math.sin(seed + elapsed * 0.7) * (ringRadius + 15 + (i % 5) * 8);
+        const fy = avatarCenterY + Math.cos(seed * 0.7 + elapsed * 0.5) * (ringRadius + 10 + (i % 4) * 6);
+        const fsize = 1 + Math.sin(elapsed * 5 + seed) * 1;
+        const alpha = 0.3 + Math.sin(elapsed * 3 + seed * 0.3) * 0.3;
+
+        ctx.globalAlpha = contentAlpha * alpha;
+        ctx.fillStyle = '#FFD700';
+
+        ctx.save();
+        ctx.translate(fx, fy);
+        ctx.rotate(elapsed + seed);
+        ctx.beginPath();
+        for (let j = 0; j < 4; j++) {
+          const a = (j / 4) * Math.PI * 2;
+          const a2 = ((j + 0.5) / 4) * Math.PI * 2;
+          ctx.lineTo(Math.cos(a) * (fsize * 2), Math.sin(a) * (fsize * 2));
+          ctx.lineTo(Math.cos(a2) * (fsize * 0.5), Math.sin(a2) * (fsize * 0.5));
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.globalAlpha = contentAlpha;
+
+      ctx.drawImage(
+        discoSprite,
+        avatarCenterX - spriteW / 2,
+        avatarCenterY - spriteH / 2,
+        spriteW,
+        spriteH
+      );
+    }
+
+    ctx.globalAlpha = contentAlpha;
+    ctx.font = `bold 11px ${this.uiFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText("You've earned the Gold Record!", w / 2, h * 0.68);
+
+    ctx.font = `9px ${this.uiFont}`;
+    ctx.fillStyle = '#D4A574';
+    ctx.fillText('All 11 genres collected!', w / 2, h * 0.73);
+
+    ctx.font = `8px ${this.uiFont}`;
+    ctx.fillStyle = '#A89070';
+    ctx.fillText("You've unlocked the Disco Avatar!", w / 2, h * 0.80);
+    ctx.fillText('Toggle it from the Gold Record icon', w / 2, h * 0.84);
+    ctx.fillText('on the HUD.', w / 2, h * 0.88);
+
+    if (elapsed > 2) {
+      const pulse = 0.5 + Math.sin(elapsed * 3) * 0.3;
+      ctx.globalAlpha = pulse;
+      ctx.font = `9px ${this.uiFont}`;
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText('TAP TO CONTINUE', w / 2, h * 0.95);
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
+  }
+
+  private drawGoldRecordPlaqueIcon(ctx: CanvasRenderingContext2D): void {
+    if (!this.discoSpriteUnlocked) return;
+
+    const mcIcon = this.musicCollectionIconArea;
+    if (!mcIcon) return;
+
+    const iconW = 28;
+    const iconH = 28;
+    const iconX = mcIcon.x - iconW - 6;
+    const iconY = mcIcon.y + (mcIcon.h - iconH) / 2;
+
+    this.goldRecordPlaqueArea = { x: iconX, y: iconY, w: iconW, h: iconH };
+
+    ctx.save();
+    ctx.shadowColor = '#FFD700';
+    ctx.shadowBlur = 6 + Math.sin(Date.now() / 500) * 3;
+    ctx.fillStyle = '#8B6914';
+    ctx.beginPath();
+    ctx.arc(iconX + iconW / 2, iconY + iconH / 2, iconW / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    const cx = iconX + iconW / 2;
+    const cy = iconY + iconH / 2;
+
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, iconW / 2 - 2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#3D2817';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 10, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (this.showGoldRecordAvatarPanel) {
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, iconW / 2 + 2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  private drawGoldRecordAvatarPanel(ctx: CanvasRenderingContext2D): void {
+    if (!this.showGoldRecordAvatarPanel || !this.goldRecordPlaqueArea) return;
+
+    const iconArea = this.goldRecordPlaqueArea;
+    const panelW = 160;
+    const panelH = 80;
+    const panelX = iconArea.x + iconArea.w / 2 - panelW / 2;
+    const panelY = iconArea.y + iconArea.h + 8;
+
+    const clampedX = Math.max(8, Math.min(this.logicalWidth - panelW - 8, panelX));
+
+    ctx.fillStyle = 'rgba(61, 40, 23, 0.95)';
+    ctx.beginPath();
+    ctx.roundRect(clampedX, panelY, panelW, panelH, 8);
+    ctx.fill();
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.font = `bold 9px ${this.uiFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText('DISCO AVATAR', clampedX + panelW / 2, panelY + 18);
+
+    const toggleW = 100;
+    const toggleH = 28;
+    const toggleX = clampedX + (panelW - toggleW) / 2;
+    const toggleY = panelY + 30;
+
+    const isActive = this.useDiscoSprite;
+    ctx.fillStyle = isActive ? 'rgba(34, 120, 60, 0.6)' : 'rgba(139, 105, 20, 0.3)';
+    ctx.beginPath();
+    ctx.roundRect(toggleX, toggleY, toggleW, toggleH, 6);
+    ctx.fill();
+    ctx.strokeStyle = isActive ? '#2D8B47' : '#8B6914';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.font = `9px ${this.uiFont}`;
+    ctx.fillStyle = isActive ? '#AAFFAA' : '#D4A574';
+    ctx.fillText(isActive ? 'ON' : 'OFF', clampedX + panelW / 2, toggleY + toggleH / 2 + 3);
+
+    this.goldRecordToggleBtn = { x: toggleX, y: toggleY, w: toggleW, h: toggleH };
+
+    ctx.textAlign = 'left';
   }
 
   private drawRecordRewardPopup(ctx: CanvasRenderingContext2D): void {
@@ -9842,23 +10258,6 @@ export class VillageLedgerGame {
     ctx.fillStyle = '#A88B5A';
     ctx.fillText('Loading' + dots, w / 2, h / 2 + 20);
 
-    const resetBtnW = 160;
-    const resetBtnH = 30;
-    const resetBtnX = (w - resetBtnW) / 2;
-    const resetBtnY = h / 2 + 60;
-    ctx.fillStyle = '#8B4513';
-    ctx.beginPath();
-    ctx.roundRect(resetBtnX, resetBtnY, resetBtnW, resetBtnH, 6);
-    ctx.fill();
-    ctx.strokeStyle = '#D4A574';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.font = '12px "Courier New", monospace';
-    ctx.fillStyle = '#D4A574';
-    ctx.textAlign = 'center';
-    ctx.fillText('Reset Records', resetBtnX + resetBtnW / 2, resetBtnY + resetBtnH / 2 + 4);
-    this.resetRecordsBtn = { x: resetBtnX, y: resetBtnY, w: resetBtnW, h: resetBtnH };
-    
     ctx.textAlign = 'left';
   }
 
@@ -10426,57 +10825,336 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
   }
   
-  private drawMuteButton(ctx: CanvasRenderingContext2D): void {
-    const muteButtonSize = 36;
-    const muteX = this.logicalWidth - muteButtonSize - 12;
-    const muteY = 16;
-    
-    this.muteButtonArea = { x: muteX, y: muteY, w: muteButtonSize, h: muteButtonSize };
-    
-    ctx.fillStyle = soundManager.isMuted() ? 'rgba(220, 38, 38, 0.85)' : 'rgba(34, 197, 94, 0.85)';
+  private drawGearButton(ctx: CanvasRenderingContext2D): void {
+    const size = 36;
+    const gearX = this.logicalWidth - size - 12;
+    const gearY = 16;
+    this.muteButtonArea = { x: gearX, y: gearY, w: size, h: size };
+
+    ctx.fillStyle = this.showSettingsPanel ? 'rgba(139, 105, 20, 0.9)' : 'rgba(93, 72, 55, 0.85)';
     ctx.beginPath();
-    ctx.roundRect(muteX, muteY, muteButtonSize, muteButtonSize, 8);
+    ctx.roundRect(gearX, gearY, size, size, 8);
     ctx.fill();
-    ctx.strokeStyle = '#5D4837';
+    ctx.strokeStyle = '#8B6914';
     ctx.lineWidth = 2;
     ctx.stroke();
-    
-    ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 2;
-    
-    const iconX = muteX + muteButtonSize / 2 - 10;
-    const iconY = muteY + muteButtonSize / 2 - 6;
-    
+
+    const cx = gearX + size / 2;
+    const cy = gearY + size / 2;
+    const outerR = 11;
+    const innerR = 7;
+    const teeth = 8;
+
+    ctx.fillStyle = '#D4A574';
+    ctx.strokeStyle = '#D4A574';
+    ctx.lineWidth = 1.5;
+
     ctx.beginPath();
-    ctx.moveTo(iconX, iconY + 4);
-    ctx.lineTo(iconX + 6, iconY + 4);
-    ctx.lineTo(iconX + 12, iconY);
-    ctx.lineTo(iconX + 12, iconY + 12);
-    ctx.lineTo(iconX + 6, iconY + 8);
-    ctx.lineTo(iconX, iconY + 8);
+    for (let i = 0; i < teeth; i++) {
+      const angle1 = (i / teeth) * Math.PI * 2;
+      const angle2 = ((i + 0.3) / teeth) * Math.PI * 2;
+      const angle4 = ((i + 0.8) / teeth) * Math.PI * 2;
+      if (i === 0) {
+        ctx.moveTo(cx + Math.cos(angle1) * outerR, cy + Math.sin(angle1) * outerR);
+      }
+      ctx.lineTo(cx + Math.cos(angle2) * outerR, cy + Math.sin(angle2) * outerR);
+      ctx.lineTo(cx + Math.cos(angle2) * innerR, cy + Math.sin(angle2) * innerR);
+      ctx.lineTo(cx + Math.cos(angle4) * innerR, cy + Math.sin(angle4) * innerR);
+      ctx.lineTo(cx + Math.cos(angle4) * outerR, cy + Math.sin(angle4) * outerR);
+    }
     ctx.closePath();
     ctx.fill();
-    
-    if (soundManager.isMuted()) {
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(iconX + 14, iconY + 2);
-      ctx.lineTo(iconX + 20, iconY + 10);
-      ctx.moveTo(iconX + 20, iconY + 2);
-      ctx.lineTo(iconX + 14, iconY + 10);
-      ctx.stroke();
+
+    ctx.fillStyle = this.showSettingsPanel ? 'rgba(139, 105, 20, 0.9)' : 'rgba(93, 72, 55, 0.85)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  private drawSettingsPanel(ctx: CanvasRenderingContext2D): void {
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    this.settingsPanelButtons = [];
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(0, 0, w, h);
+
+    const panelW = Math.min(280, w * 0.7);
+    let panelH = 280;
+    if (this.settingsSubmenu === 'sound') panelH = 240;
+    else if (this.settingsSubmenu === 'howtoplay') panelH = 220;
+    else if (this.settingsSubmenu === 'credits') panelH = 180;
+    const panelX = (w - panelW) / 2;
+    const panelY = (h - panelH) / 2;
+
+    ctx.fillStyle = '#3D2817';
+    ctx.beginPath();
+    ctx.roundRect(panelX, panelY, panelW, panelH, 12);
+    ctx.fill();
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    if (this.showResetConfirm) {
+      this.drawResetConfirmDialog(ctx, panelX, panelY, panelW, panelH);
+    } else if (this.settingsSubmenu === 'sound') {
+      this.drawSoundSubmenu(ctx, panelX, panelY, panelW, panelH);
+    } else if (this.settingsSubmenu === 'howtoplay') {
+      this.drawHowToPlay(ctx, panelX, panelY, panelW, panelH);
+    } else if (this.settingsSubmenu === 'credits') {
+      this.drawCredits(ctx, panelX, panelY, panelW, panelH);
     } else {
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(iconX + 14, iconY + 6, 4, -0.5, 0.5);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(iconX + 14, iconY + 6, 8, -0.5, 0.5);
-      ctx.stroke();
+      this.drawMainMenu(ctx, panelX, panelY, panelW, panelH);
     }
+  }
+
+  private drawMainMenu(ctx: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number): void {
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText('SETTINGS', px + pw / 2, py + 28);
+
+    const btnW = pw - 40;
+    const btnH = 32;
+    const btnX = px + 20;
+    let btnY = py + 48;
+    const gap = 8;
+
+    const menuItems = [
+      { label: 'Sound Settings', action: 'sound' },
+      { label: 'How to Play', action: 'howtoplay' },
+      { label: 'Credits', action: 'credits' },
+      { label: 'Fullscreen', action: 'fullscreen' },
+      { label: 'Restart Game', action: 'restart' },
+      { label: 'Reset Records', action: 'reset' },
+    ];
+
+    for (const item of menuItems) {
+      ctx.fillStyle = item.action === 'reset' ? 'rgba(180, 60, 60, 0.6)' : 'rgba(139, 105, 20, 0.3)';
+      ctx.beginPath();
+      ctx.roundRect(btnX, btnY, btnW, btnH, 6);
+      ctx.fill();
+      ctx.strokeStyle = item.action === 'reset' ? '#B43C3C' : '#8B6914';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.font = `11px ${this.uiFont}`;
+      ctx.fillStyle = item.action === 'reset' ? '#FF9999' : '#D4A574';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.label, btnX + btnW / 2, btnY + btnH / 2 + 4);
+
+      if (item.action === 'sound') {
+        ctx.textAlign = 'right';
+        ctx.fillText('>', btnX + btnW - 8, btnY + btnH / 2 + 4);
+      }
+
+      this.settingsPanelButtons.push({ x: btnX, y: btnY, w: btnW, h: btnH, action: item.action });
+      btnY += btnH + gap;
+    }
+
+    ctx.textAlign = 'left';
+  }
+
+  private drawSoundSubmenu(ctx: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number): void {
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = '#D4A574';
+    ctx.textAlign = 'left';
+    ctx.fillText('< Back', px + 15, py + 28);
+    this.settingsPanelButtons.push({ x: px + 8, y: py + 10, w: 80, h: 28, action: 'back' });
+
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText('SOUND', px + pw / 2, py + 28);
+
+    let curY = py + 50;
+    const sliderX = px + 20;
+    const sliderW = pw - 40;
+
+    ctx.font = `10px ${this.uiFont}`;
+    ctx.fillStyle = '#A89070';
+    ctx.textAlign = 'left';
+    ctx.fillText('Music Volume', sliderX, curY);
+    curY += 14;
+    this.drawVolumeSlider(ctx, sliderX, curY, sliderW, 16, soundManager.getMusicVolume(), 'music');
+    this.musicVolumeSliderArea = { x: sliderX, y: curY, w: sliderW, h: 16 };
+    curY += 28;
+
+    this.drawMuteToggle(ctx, sliderX, curY, sliderW, 'Music', soundManager.isMusicMuted(), 'toggleMusicMute');
+    curY += 36;
+
+    ctx.font = `10px ${this.uiFont}`;
+    ctx.fillStyle = '#A89070';
+    ctx.textAlign = 'left';
+    ctx.fillText('SFX Volume', sliderX, curY);
+    curY += 14;
+    this.drawVolumeSlider(ctx, sliderX, curY, sliderW, 16, soundManager.getSfxVolume(), 'sfx');
+    this.sfxVolumeSliderArea = { x: sliderX, y: curY, w: sliderW, h: 16 };
+    curY += 28;
+
+    this.drawMuteToggle(ctx, sliderX, curY, sliderW, 'SFX', soundManager.isSfxMuted(), 'toggleSfxMute');
+
+    ctx.textAlign = 'left';
+  }
+
+  private drawVolumeSlider(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, value: number, type: string): void {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    ctx.beginPath();
+    ctx.roundRect(x, y + h / 2 - 3, w, 6, 3);
+    ctx.fill();
+
+    const fillW = w * value;
+    ctx.fillStyle = '#8B6914';
+    ctx.beginPath();
+    ctx.roundRect(x, y + h / 2 - 3, fillW, 6, 3);
+    ctx.fill();
+
+    const thumbX = x + fillW;
+    const thumbR = 8;
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(thumbX, y + h / 2, thumbR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#5D4837';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.font = `9px ${this.uiFont}`;
+    ctx.fillStyle = '#D4A574';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${Math.round(value * 100)}%`, x + w + 1, y + h / 2 + 3);
+    ctx.textAlign = 'left';
+  }
+
+  private drawMuteToggle(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, label: string, muted: boolean, action: string): void {
+    const toggleW = 40;
+    const toggleH = 20;
+    const toggleX = x + w - toggleW;
+    const toggleY = y;
+
+    ctx.font = `10px ${this.uiFont}`;
+    ctx.fillStyle = '#A89070';
+    ctx.textAlign = 'left';
+    ctx.fillText(`Mute ${label}`, x, y + toggleH / 2 + 3);
+
+    ctx.fillStyle = muted ? 'rgba(180, 60, 60, 0.6)' : 'rgba(34, 120, 60, 0.6)';
+    ctx.beginPath();
+    ctx.roundRect(toggleX, toggleY, toggleW, toggleH, toggleH / 2);
+    ctx.fill();
+    ctx.strokeStyle = muted ? '#B43C3C' : '#2D8B47';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const thumbR = toggleH / 2 - 2;
+    const thumbCX = muted ? toggleX + toggleH / 2 : toggleX + toggleW - toggleH / 2;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(thumbCX, toggleY + toggleH / 2, thumbR, 0, Math.PI * 2);
+    ctx.fill();
+
+    this.settingsPanelButtons.push({ x: toggleX, y: toggleY, w: toggleW, h: toggleH, action });
+  }
+
+  private drawResetConfirmDialog(ctx: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number): void {
+    const cx = px + pw / 2;
+
+    ctx.font = `bold 12px ${this.uiFont}`;
+    ctx.fillStyle = '#FF6666';
+    ctx.textAlign = 'center';
+    ctx.fillText('RESET ALL RECORDS?', cx, py + 40);
+
+    ctx.font = `9px ${this.uiFont}`;
+    ctx.fillStyle = '#D4A574';
+    ctx.fillText('This will erase all unlocked genres,', cx, py + 65);
+    ctx.fillText('badges, your name, and play history.', cx, py + 80);
+    ctx.fillText('This cannot be undone!', cx, py + 100);
+
+    const btnW = 100;
+    const btnH = 32;
+    const confirmX = cx - btnW - 10;
+    const confirmY = py + 120;
+    ctx.fillStyle = 'rgba(180, 60, 60, 0.7)';
+    ctx.beginPath();
+    ctx.roundRect(confirmX, confirmY, btnW, btnH, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#B43C3C';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.font = `11px ${this.uiFont}`;
+    ctx.fillStyle = '#FF9999';
+    ctx.fillText('Yes, Reset', confirmX + btnW / 2, confirmY + btnH / 2 + 4);
+    this.settingsPanelButtons.push({ x: confirmX, y: confirmY, w: btnW, h: btnH, action: 'confirmReset' });
+
+    const cancelX = cx + 10;
+    ctx.fillStyle = 'rgba(139, 105, 20, 0.3)';
+    ctx.beginPath();
+    ctx.roundRect(cancelX, confirmY, btnW, btnH, 6);
+    ctx.fill();
+    ctx.strokeStyle = '#8B6914';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = '#D4A574';
+    ctx.fillText('Cancel', cancelX + btnW / 2, confirmY + btnH / 2 + 4);
+    this.settingsPanelButtons.push({ x: cancelX, y: confirmY, w: btnW, h: btnH, action: 'cancelReset' });
+
+    ctx.textAlign = 'left';
+  }
+
+  private drawHowToPlay(ctx: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number): void {
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = '#D4A574';
+    ctx.textAlign = 'left';
+    ctx.fillText('< Back', px + 15, py + 28);
+    this.settingsPanelButtons.push({ x: px + 8, y: py + 10, w: 80, h: 28, action: 'back' });
+
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText('HOW TO PLAY', px + pw / 2, py + 28);
+
+    ctx.font = `9px ${this.uiFont}`;
+    ctx.fillStyle = '#D4A574';
+    const lines = [
+      'Tap anywhere to walk there.',
+      'Get close to characters to interact.',
+      'Tap the INTERACT button to talk.',
+      'Collect items and trade with villagers.',
+      'Record debts on the Stone Tablet.',
+      'Earn badges by learning key concepts!',
+      'Collect all music genres across plays.',
+    ];
+    let ly = py + 55;
+    for (const line of lines) {
+      ctx.fillText(line, px + pw / 2, ly);
+      ly += 18;
+    }
+
+    ctx.textAlign = 'left';
+  }
+
+  private drawCredits(ctx: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number): void {
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = '#D4A574';
+    ctx.textAlign = 'left';
+    ctx.fillText('< Back', px + 15, py + 28);
+    this.settingsPanelButtons.push({ x: px + 8, y: py + 10, w: 80, h: 28, action: 'back' });
+
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText('CREDITS', px + pw / 2, py + 28);
+
+    ctx.font = `11px ${this.uiFont}`;
+    ctx.fillStyle = '#D4A574';
+    ctx.fillText('Making Money', px + pw / 2, py + 65);
+    ctx.fillText('The Barter System', px + pw / 2, py + 85);
+
+    ctx.font = `9px ${this.uiFont}`;
+    ctx.fillStyle = '#A89070';
+    ctx.fillText('Created by', px + pw / 2, py + 115);
+
+    ctx.font = `bold 12px ${this.uiFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('Shalolly Inc.', px + pw / 2, py + 135);
+
+    ctx.textAlign = 'left';
   }
 
   // Draw inventory hint popup with arrow pointing to inventory box

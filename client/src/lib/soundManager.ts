@@ -143,6 +143,11 @@ const SOUND_CONFIGS: Partial<Record<SoundName, SoundConfig>> = {
   djTransScratch: { src: '/sounds/dj-transition-scratch.mp3', volume: 0.5, loop: false },
 };
 
+const MUSIC_SOUNDS = new Set<SoundName>([
+  'backgroundMusicDay', 'backgroundMusicDay2', 'backgroundMusicNight',
+  'partySong', 'genreRemix', 'moneySong', 'ambientVillage', 'ambientNight'
+] as const);
+
 const FIGHT_ALWAYS_SOUNDS: SoundName[] = [
   'fightCrash', 'fightMartialArts', 'fightCat'
 ];
@@ -162,8 +167,14 @@ export class SoundManager {
   private buffers: Map<SoundName, AudioBuffer> = new Map();
   private activeSources: Map<string, ActiveSound> = new Map();
   private masterGain: GainNode | null = null;
+  private musicGain: GainNode | null = null;
+  private sfxGain: GainNode | null = null;
   private muted: boolean = false;
   private masterVolume: number = 1.0;
+  private musicVolume: number = 1.0;
+  private sfxVolume: number = 1.0;
+  private musicMuted: boolean = false;
+  private sfxMuted: boolean = false;
   private initialized: boolean = false;
   private pendingPlays: Set<SoundName> = new Set();
   private footstepToggle: boolean = false;
@@ -190,8 +201,9 @@ export class SoundManager {
       const stored = localStorage.getItem('villageLedger_soundSettings');
       if (stored) {
         const settings = JSON.parse(stored);
-        // Always start unmuted - don't restore muted state from storage
         this.masterVolume = settings.masterVolume ?? 1.0;
+        this.musicVolume = settings.musicVolume ?? 1.0;
+        this.sfxVolume = settings.sfxVolume ?? 1.0;
       }
     } catch {
       // Use defaults
@@ -203,6 +215,8 @@ export class SoundManager {
       localStorage.setItem('villageLedger_soundSettings', JSON.stringify({
         muted: this.muted,
         masterVolume: this.masterVolume,
+        musicVolume: this.musicVolume,
+        sfxVolume: this.sfxVolume,
       }));
     } catch {
       // Ignore storage errors
@@ -231,6 +245,14 @@ export class SoundManager {
       this.masterGain = this.audioContext.createGain();
       this.masterGain.connect(this.audioContext.destination);
       this.masterGain.gain.value = this.muted ? 0 : this.masterVolume;
+
+      this.musicGain = this.audioContext.createGain();
+      this.musicGain.connect(this.masterGain);
+      this.musicGain.gain.value = this.musicMuted ? 0 : this.musicVolume;
+
+      this.sfxGain = this.audioContext.createGain();
+      this.sfxGain.connect(this.masterGain);
+      this.sfxGain.gain.value = this.sfxMuted ? 0 : this.sfxVolume;
       
       // Load all audio buffers
       let loadedCount = 0;
@@ -307,13 +329,18 @@ export class SoundManager {
     } else {
       source.connect(gainNode);
     }
-    gainNode.connect(this.masterGain);
+    const isMusic = MUSIC_SOUNDS.has(name);
+    const targetGain = isMusic ? (this.musicGain || this.masterGain) : (this.sfxGain || this.masterGain);
+    gainNode.connect(targetGain);
     
     return { source, gainNode, filterNode };
   }
 
   public play(name: SoundName, pitch: number = 1.0): void {
     if (this.muted) return;
+    const isMusic = MUSIC_SOUNDS.has(name);
+    if (isMusic && this.musicMuted) return;
+    if (!isMusic && this.sfxMuted) return;
     
     if (!this.initialized) {
       this.pendingPlays.add(name);
@@ -372,6 +399,9 @@ export class SoundManager {
 
   public playLoop(name: SoundName): void {
     if (this.muted) return;
+    const isMusic = MUSIC_SOUNDS.has(name);
+    if (isMusic && this.musicMuted) return;
+    if (!isMusic && this.sfxMuted) return;
     
     if (!this.initialized) {
       this.pendingLoops.add(name);
@@ -415,6 +445,9 @@ export class SoundManager {
 
   public playForDuration(name: SoundName, durationMs: number, pitch: number = 1.0): void {
     if (this.muted || !this.initialized) return;
+    const isMusic = MUSIC_SOUNDS.has(name);
+    if (isMusic && this.musicMuted) return;
+    if (!isMusic && this.sfxMuted) return;
     
     const activeSound = this.createSource(name, false, pitch);
     if (!activeSound) return;
@@ -433,7 +466,7 @@ export class SoundManager {
   }
 
   public playBrawlWithLayers(durationMs: number): void {
-    if (this.muted || !this.initialized) return;
+    if (this.muted || this.sfxMuted || !this.initialized) return;
     
     // Stop any existing brawl sounds and clear pending timeouts
     this.stopBrawl();
@@ -496,7 +529,7 @@ export class SoundManager {
   }
 
   public startDaytimeMusic(): void {
-    if (this.muted) return;
+    if (this.muted || this.musicMuted) return;
     
     if (!this.initialized) {
       this.pendingDaytimeMusic = true;
@@ -509,7 +542,7 @@ export class SoundManager {
   }
 
   private playNextDaytimeTrack(): void {
-    if (!this.daytimeMusicActive || this.muted) return;
+    if (!this.daytimeMusicActive || this.muted || this.musicMuted) return;
     
     // Alternate back-to-back: day → day2 → day → day2
     const isDay2Turn = this.daytimeMusicLoopCount % 2 === 1;
@@ -545,7 +578,7 @@ export class SoundManager {
       if (hasEnded) return;
       hasEnded = true;
       this.activeSources.delete(trackName);
-      if (this.daytimeMusicActive && !this.muted) {
+      if (this.daytimeMusicActive && !this.muted && !this.musicMuted) {
         this.daytimeMusicLoopCount++;
         this.playNextDaytimeTrack();
       }
@@ -570,7 +603,7 @@ export class SoundManager {
   }
 
   public playFishingSequence(): void {
-    if (this.muted || !this.initialized) return;
+    if (this.muted || this.sfxMuted || !this.initialized) return;
     
     this.play('fishingCast');
     
@@ -585,7 +618,7 @@ export class SoundManager {
   }
 
   public playBushSequence(): void {
-    if (this.muted || !this.initialized) return;
+    if (this.muted || this.sfxMuted || !this.initialized) return;
     
     // Play bush sound for max 1.5 seconds with 0.3s fade out at end, then item pickup after 1 second delay
     this.playForDurationWithFade('bush', 1500, 300);
@@ -601,6 +634,9 @@ export class SoundManager {
   // Play sound for a duration with fade out at the end
   public playForDurationWithFade(name: SoundName, durationMs: number, fadeMs: number, pitch: number = 1.0): void {
     if (this.muted || !this.initialized) return;
+    const isMusic = MUSIC_SOUNDS.has(name);
+    if (isMusic && this.musicMuted) return;
+    if (!isMusic && this.sfxMuted) return;
     
     const activeSound = this.createSource(name, false, pitch);
     if (!activeSound) return;
@@ -630,19 +666,17 @@ export class SoundManager {
   }
 
   public playFailureThenBoo(): void {
-    if (this.muted) return;
+    if (this.muted || this.sfxMuted) return;
     
-    // Play failure sound first
     const failureAudio = new Audio('/sounds/failure.mp3');
-    failureAudio.volume = this.masterVolume * 0.5;
+    failureAudio.volume = this.masterVolume * this.sfxVolume * 0.5;
     failureAudio.playbackRate = 1.0;
     failureAudio.play().catch(() => {});
     
-    // Boo plays 2 seconds after failure sound starts
     setTimeout(() => {
-      if (this.muted) return;
+      if (this.muted || this.sfxMuted) return;
       const booAudio = new Audio('/sounds/crowd-boo.mp3');
-      booAudio.volume = this.masterVolume * 0.5;
+      booAudio.volume = this.masterVolume * this.sfxVolume * 0.5;
       booAudio.playbackRate = 1.0;
       booAudio.play().catch(() => {});
     }, 2000);
@@ -683,7 +717,7 @@ export class SoundManager {
       const gainNode = this.audioContext.createGain();
       gainNode.gain.value = 0.5;
       source.connect(gainNode);
-      gainNode.connect(this.masterGain);
+      gainNode.connect(this.musicGain || this.masterGain);
 
       const activeSound = { source, gainNode };
       this.activeSources.set('genreRemix', activeSound);
@@ -752,7 +786,10 @@ export class SoundManager {
   }
 
   public fadeIn(name: SoundName, duration: number = 1000): void {
+    const isMusic = MUSIC_SOUNDS.has(name);
     if (this.muted || !this.initialized || !this.audioContext) return;
+    if (isMusic && this.musicMuted) return;
+    if (!isMusic && this.sfxMuted) return;
     
     // If sound is already playing, don't restart it (prevents double-triggering)
     const existing = this.activeSources.get(name);
@@ -797,7 +834,7 @@ export class SoundManager {
 
   // Start rain with cross-fade looping to eliminate loop point seam
   public startRainCrossfade(fadeInDuration: number = 2000): void {
-    if (this.muted || !this.initialized || !this.audioContext) return;
+    if (this.muted || this.sfxMuted || !this.initialized || !this.audioContext) return;
     if (this.rainActive) return; // Already playing
     
     this.rainActive = true;
@@ -933,6 +970,64 @@ export class SoundManager {
     return this.masterVolume;
   }
 
+  public setMusicVolume(volume: number): void {
+    this.musicVolume = Math.max(0, Math.min(1, volume));
+    this.saveToStorage();
+    if (this.musicGain && !this.musicMuted) {
+      this.musicGain.gain.value = this.musicVolume;
+    }
+  }
+
+  public getMusicVolume(): number {
+    return this.musicVolume;
+  }
+
+  public setSfxVolume(volume: number): void {
+    this.sfxVolume = Math.max(0, Math.min(1, volume));
+    this.saveToStorage();
+    if (this.sfxGain && !this.sfxMuted) {
+      this.sfxGain.gain.value = this.sfxVolume;
+    }
+  }
+
+  public getSfxVolume(): number {
+    return this.sfxVolume;
+  }
+
+  public setMusicMuted(muted: boolean): void {
+    this.musicMuted = muted;
+    this.saveToStorage();
+    if (this.musicGain) {
+      this.musicGain.gain.value = muted ? 0 : this.musicVolume;
+    }
+  }
+
+  public isMusicMuted(): boolean {
+    return this.musicMuted;
+  }
+
+  public setSfxMuted(muted: boolean): void {
+    this.sfxMuted = muted;
+    this.saveToStorage();
+    if (this.sfxGain) {
+      this.sfxGain.gain.value = muted ? 0 : this.sfxVolume;
+    }
+  }
+
+  public isSfxMuted(): boolean {
+    return this.sfxMuted;
+  }
+
+  public toggleMusicMute(): boolean {
+    this.setMusicMuted(!this.musicMuted);
+    return this.musicMuted;
+  }
+
+  public toggleSfxMute(): boolean {
+    this.setSfxMuted(!this.sfxMuted);
+    return this.sfxMuted;
+  }
+
   public stopAll(): void {
     this.activeSources.forEach((sound, key) => {
       try {
@@ -965,7 +1060,7 @@ export class SoundManager {
   private voiceBlipGain: GainNode | null = null;
 
   public playVoiceBlip(speaker: string, char: string): void {
-    if (this.muted) return;
+    if (this.muted || this.sfxMuted) return;
     if (!this.audioContext || !this.masterGain) return;
     if (char === ' ' || char === '\n' || char === '\t') return;
 
@@ -996,7 +1091,7 @@ export class SoundManager {
       gain.gain.setValueAtTime(profile.vol, this.audioContext.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.10);
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      gain.connect(this.sfxGain || this.masterGain);
       osc.start();
       osc.stop(this.audioContext.currentTime + 0.10);
       this.voiceBlipOsc = osc;

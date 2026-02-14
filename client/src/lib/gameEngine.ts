@@ -377,7 +377,7 @@ export class VillageLedgerGame {
     { id: 'the_ledger', name: 'The Ledger', description: 'A written record that everyone can see! The ledger keeps track of debts so no one can cheat.', icon: 'tablet' },
     { id: 'debt_settled', name: 'Debt Settled', description: 'All debts paid off! When debts are recorded and settled, everyone is happy.', icon: 'check' },
     { id: 'money_scholar', name: 'Money Scholar', description: 'You understand that money is really just a system for keeping track of who owes what!', icon: 'star' },
-    { id: 'music_scholar', name: 'Music Scholar', description: 'You collected every genre in the music collection! A true connoisseur of celebration!', icon: 'music' },
+    { id: 'music_scholar', name: 'Gold Records', description: 'You collected every genre in the music collection! A true connoisseur of celebration!', icon: 'music' },
   ];
 
   private badgeTrayButtonArea: { x: number; y: number; w: number; h: number } | null = null;
@@ -2187,7 +2187,7 @@ export class VillageLedgerGame {
                 // Only play carving sound once per carve (prevent double-trigger)
                 if (!this.state.woodcutterCarvingSoundPlayed) {
                   this.state.woodcutterCarvingSoundPlayed = true;
-                  soundManager.playForDuration('stoneCarve', 2500);
+                  soundManager.playForDuration('stoneCarve', 1875);
                   
                   // Award Ledger badge 1 second after carving starts (if second entry)
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('WOODCUTTER'));
@@ -2248,7 +2248,7 @@ export class VillageLedgerGame {
                       }
                     }
                   ]);
-                }, 2500); // Wait for carving sound to finish
+                }, 1875); // Wait for carving sound to finish
               }
             });
           
@@ -3129,7 +3129,7 @@ export class VillageLedgerGame {
                 // Only play carving sound once per carve (prevent double-trigger)
                 if (!this.state.stoneWorkerCarvingSoundPlayed) {
                   this.state.stoneWorkerCarvingSoundPlayed = true;
-                  soundManager.playForDuration('stoneCarve', 2500);
+                  soundManager.playForDuration('stoneCarve', 1875);
                   
                   // Award Ledger badge 1 second after carving starts (if second entry)
                   const alreadyRecorded = this.state.ledgerEntries.some(e => e.debt.includes('STONE-WORKER'));
@@ -3178,7 +3178,7 @@ export class VillageLedgerGame {
                       }
                     }
                   ]);
-                }, 2500); // Wait for carving sound to finish
+                }, 1875); // Wait for carving sound to finish
               }
             }
           ]);
@@ -5535,6 +5535,10 @@ export class VillageLedgerGame {
           { speaker: 'FISHERMAN', text: "Trust is good, but proof is better!" },
           { speaker: 'STONE-WORKER', text: "With debts recorded, I can trade without worry." },
           { speaker: 'VILLAGE ELDER', text: "Sound money starts with honest records." },
+          { speaker: 'VILLAGE ELDER', text: "Remember the double coincidence of wants? That's why we needed the ledger!" },
+          { speaker: 'FISHERMAN', text: "Without the double coincidence of wants, I couldn't trade my fish for berries!" },
+          { speaker: 'WOODCUTTER', text: "The double coincidence of wants made trading almost impossible without records." },
+          { speaker: 'STONE-WORKER', text: "Now that we have a ledger, we don't need a perfect match to trade!" },
         ];
         const line = partyLines[this.state.partyDialogueIndex % partyLines.length];
         this.state.partyDialogueIndex++;
@@ -9117,7 +9121,7 @@ export class VillageLedgerGame {
   private checkMusicScholarBadge(): void {
     const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
     const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
-    if (unlocked.length >= allGenres.length && !this.state.badges.includes('Music Scholar')) {
+    if (unlocked.length >= allGenres.length && !this.state.badges.includes('Gold Records')) {
       this.discoSpriteUnlocked = true;
       this.showGoldRecordAward = true;
       this.goldRecordAwardStartTime = Date.now();
@@ -9125,8 +9129,8 @@ export class VillageLedgerGame {
       setTimeout(() => {
         soundManager.playRandomDJTransition();
       }, 800);
-      if (!this.state.badges.includes('Music Scholar')) {
-        this.state.badges.push('Music Scholar');
+      if (!this.state.badges.includes('Gold Records')) {
+        this.state.badges.push('Gold Records');
         this.state.lastBadgeEarnedTime = Date.now();
         this.state.badgeTrayAnimTimer = 3;
       }
@@ -9138,8 +9142,8 @@ export class VillageLedgerGame {
     const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
     if (unlocked.length >= allGenres.length) {
       this.discoSpriteUnlocked = true;
-      if (!this.state.badges.includes('Music Scholar')) {
-        this.state.badges.push('Music Scholar');
+      if (!this.state.badges.includes('Gold Records')) {
+        this.state.badges.push('Gold Records');
       }
     }
   }
@@ -9414,7 +9418,7 @@ export class VillageLedgerGame {
     const alpha = progress;
 
     ctx.save();
-    ctx.globalAlpha = alpha * 0.6;
+    ctx.globalAlpha = alpha * 0.85;
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, w, h);
     ctx.globalAlpha = alpha;
@@ -9424,7 +9428,7 @@ export class VillageLedgerGame {
     const popupX = (w - popupW) / 2;
     const popupY = (h - popupH) / 2;
 
-    ctx.fillStyle = 'rgba(20, 10, 30, 0.95)';
+    ctx.fillStyle = '#1a0a1e';
     ctx.beginPath();
     ctx.roundRect(popupX, popupY, popupW, popupH, 16);
     ctx.fill();
@@ -9451,7 +9455,7 @@ export class VillageLedgerGame {
     const genreColor = this.GENRE_COLORS[this.recordRewardGenre] || '#FF6B6B';
     const spin = elapsed * 0.003;
 
-    ctx.fillStyle = '#1a1a1a';
+    ctx.fillStyle = '#111111';
     ctx.beginPath();
     ctx.arc(cx, cy, recordR, 0, Math.PI * 2);
     ctx.fill();
@@ -9460,7 +9464,7 @@ export class VillageLedgerGame {
     ctx.stroke();
 
     for (let r = 15; r < recordR; r += 5) {
-      ctx.strokeStyle = `rgba(50, 50, 50, ${0.3 + Math.sin(r + spin) * 0.1})`;
+      ctx.strokeStyle = `rgba(80, 80, 80, ${0.4 + Math.sin(r + spin) * 0.15})`;
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, Math.PI * 2);

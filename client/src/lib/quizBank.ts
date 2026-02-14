@@ -301,28 +301,43 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
+function shuffleOptions(question: QuizQuestion): QuizQuestion {
+  const indices = question.options.map((_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  const newOptions = indices.map(i => question.options[i]);
+  const newCorrect = indices.indexOf(question.correct);
+  return { ...question, options: newOptions, correct: newCorrect };
+}
+
 export function getDJQuizQuestions(playCount: number = 1): QuizQuestion[] {
   if (playCount <= 1) {
     const dcwQuestions = ALL_QUESTIONS.filter(q => q.category === 'dcw');
     const debtQuestions = ALL_QUESTIONS.filter(q => q.category === 'debt');
     const picked: QuizQuestion[] = [];
-    picked.push(dcwQuestions[Math.floor(Math.random() * dcwQuestions.length)]);
-    picked.push(debtQuestions[Math.floor(Math.random() * debtQuestions.length)]);
-    return picked;
+    const shuffledDcw = shuffleArray(dcwQuestions);
+    const shuffledDebt = shuffleArray(debtQuestions);
+    picked.push(shuffledDcw[0]);
+    picked.push(shuffledDebt[0]);
+    return picked.map(shuffleOptions);
   } else {
     const ledgerQuestions = ALL_QUESTIONS.filter(q => q.category === 'ledger');
     const dcwDebtQuestions = ALL_QUESTIONS.filter(q => q.category === 'dcw' || q.category === 'debt');
     const picked: QuizQuestion[] = [];
-    picked.push(ledgerQuestions[Math.floor(Math.random() * ledgerQuestions.length)]);
-    picked.push(dcwDebtQuestions[Math.floor(Math.random() * dcwDebtQuestions.length)]);
-    return picked;
+    const shuffledLedger = shuffleArray(ledgerQuestions);
+    const shuffledMixed = shuffleArray(dcwDebtQuestions);
+    picked.push(shuffledLedger[0]);
+    picked.push(shuffledMixed[0]);
+    return picked.map(shuffleOptions);
   }
 }
 
 export function getBackupDJQuestion(usedIds: number[]): QuizQuestion | null {
   const pool = ALL_QUESTIONS.filter(q => (q.category === 'dcw' || q.category === 'debt') && !usedIds.includes(q.id));
   if (pool.length === 0) return null;
-  return pool[Math.floor(Math.random() * pool.length)];
+  return shuffleOptions(pool[Math.floor(Math.random() * pool.length)]);
 }
 
 export function getFinalQuizQuestions(playCount: number = 1): QuizQuestion[] {
@@ -347,5 +362,5 @@ export function getFinalQuizQuestions(playCount: number = 1): QuizQuestion[] {
   }
   picked.push(extraCreditQuestions[0]);
   
-  return picked;
+  return picked.map(shuffleOptions);
 }

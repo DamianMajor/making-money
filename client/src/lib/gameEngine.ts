@@ -224,6 +224,7 @@ interface GameState {
   djQuizPassed: boolean;
   showSongChoice: boolean;
   selectedGenre: string;
+  djModeUnlocked: boolean;
 }
 
 // Game Engine Class
@@ -456,6 +457,13 @@ export class VillageLedgerGame {
   private discoSpriteUnlocked: boolean = false;
   private useDiscoSprite: boolean = false;
   private discoAvatarToggleBtn: { x: number; y: number; w: number; h: number } | null = null;
+
+  private djSoundboardActive: boolean = false;
+  private djSoundboardButtons: { x: number; y: number; w: number; h: number; genre: string }[] = [];
+  private djSfxButtons: { x: number; y: number; w: number; h: number; sfxName: string; label: string }[] = [];
+  private djSoundboardCloseBtn: { x: number; y: number; w: number; h: number } | null = null;
+  private djSoundboardScrollOffset: number = 0;
+  private djModeButtonArea: { x: number; y: number; w: number; h: number } | null = null;
 
   private showGoldRecordAward: boolean = false;
   private goldRecordAwardStartTime: number = 0;
@@ -705,9 +713,8 @@ export class VillageLedgerGame {
     const storedName = localStorage.getItem('makingMoney_playerName');
     if (storedName) this.playerName = storedName.toUpperCase();
 
-    const unlockedGenres = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
-    const allGenreCount = Object.keys(this.GENRE_AUDIO_MAP).length;
-    this.discoSpriteUnlocked = unlockedGenres.length >= allGenreCount;
+    const completionCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    this.discoSpriteUnlocked = completionCount >= 1;
     const savedDiscoChoice = localStorage.getItem('makingMoney_useDiscoSprite');
     this.useDiscoSprite = this.discoSpriteUnlocked && savedDiscoChoice === 'true';
 
@@ -935,7 +942,8 @@ export class VillageLedgerGame {
       djQuizFailed: false,
       djQuizPassed: false,
       showSongChoice: false,
-      selectedGenre: ''
+      selectedGenre: '',
+      djModeUnlocked: false
     };
 
     // Setup event listeners
@@ -1400,6 +1408,12 @@ export class VillageLedgerGame {
     if (this.state.showSongChoice) {
       this.handleSongChoiceTouch(x, y);
       return;
+    }
+
+    if (this.state.showCelebration && this.state.djModeUnlocked) {
+      if (this.handleDJSoundboardTouch(x, y)) {
+        return;
+      }
     }
 
     // Handle quiz review touches (check before night transition block)
@@ -4172,6 +4186,9 @@ export class VillageLedgerGame {
     this.state.showCelebration = true;
     this.state.remixPlayed = true;
     this.state.celebrationTimer = 0;
+    this.djSoundboardActive = false;
+    const djModePlayCountRemix = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    this.state.djModeUnlocked = djModePlayCountRemix >= 1;
     this.state.slingshotGameActive = true;
     this.state.slingshotScore = 0;
     this.state.slingshotScoreRecordAwarded = false;
@@ -5714,7 +5731,7 @@ export class VillageLedgerGame {
         this.state.partyHintSpeaker = "VILLAGE ELDER";
         this.state.partyHintTimer = 0;
       }
-      if (this.state.partyHintTimer > 5) {
+      if (this.state.partyHintTimer > 5 && !this.djSoundboardActive) {
         this.state.partyHintTimer = 0;
         const partyLines = [
           { speaker: 'WOODCUTTER', text: "When everyone can see the ledger, no one can cheat!" },
@@ -6003,6 +6020,7 @@ export class VillageLedgerGame {
   }
   
   private endDiscoParty(): void {
+    this.djSoundboardActive = false;
     this.state.slingshotGameActive = false;
     this.state.slingshotLocked = false;
     this.state.playerBlockedForCarving = false;
@@ -6038,6 +6056,9 @@ export class VillageLedgerGame {
   private startDiscoParty(): void {
     this.state.phase = 'loop2_return';
     this.state.showCelebration = true;
+    this.djSoundboardActive = false;
+    const djModePlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    this.state.djModeUnlocked = djModePlayCount >= 1;
     this.djHintShown = false;
     this.djHutWarningShown = false;
     this.songChangeCueShown = false;
@@ -7073,6 +7094,8 @@ export class VillageLedgerGame {
     }
     this.drawDialogueBox(ctx);
     this.drawPartyHint(ctx);
+    this.drawDJSoundboard(ctx);
+    this.drawDJModeButton(ctx);
     this.drawDJHintBubble(ctx);
     this.drawInteractButton(ctx);
 
@@ -9382,7 +9405,6 @@ export class VillageLedgerGame {
     const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
     const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
     if (unlocked.length >= allGenres.length && !this.state.badges.includes('Gold Records')) {
-      this.discoSpriteUnlocked = true;
       this.showGoldRecordAward = true;
       this.goldRecordAwardStartTime = Date.now();
       soundManager.play('badgeReward');
@@ -9401,7 +9423,6 @@ export class VillageLedgerGame {
     const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
     const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
     if (unlocked.length >= allGenres.length) {
-      this.discoSpriteUnlocked = true;
       if (!this.state.badges.includes('Gold Records')) {
         this.state.badges.push('Gold Records');
       }
@@ -11871,7 +11892,245 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.restore();
   }
 
+  private drawDJSoundboard(ctx: CanvasRenderingContext2D): void {
+    if (!this.state.showCelebration || !this.djSoundboardActive || !this.state.djModeUnlocked) return;
+    if (this.state.currentDialogue) return;
+    
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    const boxH = this.dialogueBoxHeight;
+    const boxY = h - boxH;
+    
+    ctx.fillStyle = '#2D231C';
+    ctx.fillRect(0, boxY, w, boxH);
+    
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, boxY);
+    ctx.lineTo(w, boxY);
+    ctx.stroke();
+    
+    ctx.font = `bold 12px ${this.uiFont}`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('DJ SOUNDBOARD', w / 2, boxY + 16);
+    
+    const closeBtnSize = 24;
+    const closeBtnX = w - closeBtnSize - 8;
+    const closeBtnY = boxY + 4;
+    this.djSoundboardCloseBtn = { x: closeBtnX, y: closeBtnY, w: closeBtnSize, h: closeBtnSize };
+    
+    ctx.fillStyle = 'rgba(255, 100, 100, 0.3)';
+    ctx.beginPath();
+    ctx.roundRect(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize, 4);
+    ctx.fill();
+    ctx.strokeStyle = '#FF6666';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = '#FF6666';
+    ctx.textAlign = 'center';
+    ctx.fillText('X', closeBtnX + closeBtnSize / 2, closeBtnY + closeBtnSize / 2 + 5);
+    
+    const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]') as string[];
+    const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
+    const availableGenres = allGenres.filter(g => unlocked.includes(g));
+    
+    const btnW = 90;
+    const btnH = 26;
+    const gapX = 8;
+    const gapY = 4;
+    const gridStartX = 12;
+    const gridStartY = boxY + 26;
+    const maxRows = Math.floor((boxH - 56) / (btnH + gapY));
+    
+    this.djSoundboardButtons = [];
+    
+    availableGenres.forEach((genre, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      if (row >= maxRows) return;
+      const bx = gridStartX + col * (btnW + gapX);
+      const by = gridStartY + row * (btnH + gapY);
+      const color = this.GENRE_COLORS[genre] || '#FFD700';
+      const isPlaying = genre === this.state.selectedGenre;
+      
+      this.djSoundboardButtons.push({ x: bx, y: by, w: btnW, h: btnH, genre });
+      
+      ctx.fillStyle = color;
+      ctx.globalAlpha = isPlaying ? 0.5 : 0.2;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, btnW, btnH, 6);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      
+      ctx.strokeStyle = isPlaying ? '#FFFFFF' : color;
+      ctx.lineWidth = isPlaying ? 2 : 1;
+      ctx.stroke();
+      
+      if (isPlaying) {
+        ctx.font = `bold 9px ${this.uiFont}`;
+        ctx.fillStyle = '#FFFFFF';
+      } else {
+        ctx.font = `9px ${this.uiFont}`;
+        ctx.fillStyle = '#D4C4A8';
+      }
+      ctx.textAlign = 'center';
+      ctx.fillText(genre, bx + btnW / 2, by + btnH / 2 + 3);
+      
+      if (isPlaying) {
+        ctx.font = `7px ${this.uiFont}`;
+        ctx.fillStyle = '#FFD700';
+        ctx.fillText('NOW PLAYING', bx + btnW / 2, by - 2);
+      }
+    });
+    
+    const sfxList = [
+      { sfxName: 'recordScratch', label: 'Scratch' },
+      { sfxName: 'djTransAirhorn', label: 'Air Horn' },
+      { sfxName: 'djTransLaser', label: 'Laser' },
+      { sfxName: 'djTransHorns', label: 'Horns' },
+    ];
+    
+    const sfxBtnW = 62;
+    const sfxBtnH = 28;
+    const sfxGap = 6;
+    const sfxStartX = gridStartX + 2 * (btnW + gapX) + 12;
+    const sfxStartY = gridStartY;
+    
+    this.djSfxButtons = [];
+    
+    ctx.font = `bold 9px ${this.uiFont}`;
+    ctx.fillStyle = '#C4A77D';
+    ctx.textAlign = 'center';
+    ctx.fillText('SOUND FX', sfxStartX + sfxBtnW / 2 + sfxBtnW / 2 + sfxGap / 2, boxY + 16);
+    
+    sfxList.forEach((sfx, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const sx = sfxStartX + col * (sfxBtnW + sfxGap);
+      const sy = sfxStartY + row * (sfxBtnH + sfxGap);
+      
+      this.djSfxButtons.push({ x: sx, y: sy, w: sfxBtnW, h: sfxBtnH, sfxName: sfx.sfxName, label: sfx.label });
+      
+      ctx.fillStyle = 'rgba(0, 191, 255, 0.2)';
+      ctx.beginPath();
+      ctx.roundRect(sx, sy, sfxBtnW, sfxBtnH, 6);
+      ctx.fill();
+      ctx.strokeStyle = '#00BFFF';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      ctx.font = `bold 9px ${this.uiFont}`;
+      ctx.fillStyle = '#87CEEB';
+      ctx.textAlign = 'center';
+      ctx.fillText(sfx.label, sx + sfxBtnW / 2, sy + sfxBtnH / 2 + 3);
+    });
+    
+    ctx.font = `8px ${this.uiFont}`;
+    ctx.fillStyle = '#666';
+    ctx.textAlign = 'center';
+    ctx.fillText('Tap a song to switch, or hit a sound effect!', w / 2, h - 6);
+  }
+
+  private drawDJModeButton(ctx: CanvasRenderingContext2D): void {
+    if (!this.state.showCelebration || !this.state.djModeUnlocked || this.djSoundboardActive) return;
+    if (this.state.currentDialogue || this.state.showSongChoice || this.state.showQuiz) return;
+    
+    const w = this.logicalWidth;
+    const btnW = 50;
+    const btnH = 24;
+    const btnX = w - btnW - 10;
+    const btnY = 10;
+    
+    this.djModeButtonArea = { x: btnX, y: btnY, w: btnW, h: btnH };
+    
+    const pulse = Math.sin(Date.now() / 500) * 0.15 + 0.85;
+    
+    ctx.fillStyle = `rgba(0, 191, 255, ${0.3 * pulse})`;
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 6);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(0, 191, 255, ${pulse})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.font = `bold 11px ${this.uiFont}`;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.fillText('DJ', btnX + btnW / 2, btnY + btnH / 2 + 4);
+  }
+
+  private handleDJSoundboardTouch(x: number, y: number): boolean {
+    if (!this.djSoundboardActive) {
+      if (this.djModeButtonArea) {
+        const btn = this.djModeButtonArea;
+        if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          this.djSoundboardActive = true;
+          soundManager.play('buttonClick');
+          return true;
+        }
+      }
+      return false;
+    }
+    
+    if (this.djSoundboardCloseBtn) {
+      const btn = this.djSoundboardCloseBtn;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.djSoundboardActive = false;
+        soundManager.play('buttonClick');
+        return true;
+      }
+    }
+    
+    for (const btn of this.djSoundboardButtons) {
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        if (btn.genre !== this.state.selectedGenre) {
+          this.state.selectedGenre = btn.genre;
+          const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
+          if (genreUrl) {
+            soundManager.playRandomRecordScratch();
+            soundManager.loadAndPlayGenre(genreUrl);
+            this.partySongEndTime = Date.now() + 240000;
+            setTimeout(() => {
+              const dur = soundManager.getGenreRemixDuration();
+              if (dur > 0) {
+                this.partySongEndTime = Date.now() + dur;
+              }
+            }, 3000);
+          }
+        }
+        soundManager.play('buttonClick');
+        return true;
+      }
+    }
+    
+    for (const btn of this.djSfxButtons) {
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        switch (btn.sfxName) {
+          case 'recordScratch':
+            soundManager.playRandomRecordScratch();
+            break;
+          case 'djTransAirhorn':
+            soundManager.play('djTransAirhorn1');
+            break;
+          case 'djTransLaser':
+            soundManager.play('djTransLaser');
+            break;
+          case 'djTransHorns':
+            soundManager.play('djTransHorns');
+            break;
+        }
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
   private drawPartyHint(ctx: CanvasRenderingContext2D): void {
+    if (this.djSoundboardActive) return;
     if (!this.state.showCelebration || !this.state.partyHintText) return;
     if (this.state.currentDialogue) return;
     
@@ -13576,12 +13835,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           const unlockedAll = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
           const unearned = allGenres.filter(g => !unlockedAll.includes(g));
           if (unearned.length > 0) {
-            const randomGenre = unearned[Math.floor(Math.random() * unearned.length)];
-            unlockedAll.push(randomGenre);
+            for (const genre of unearned) {
+              unlockedAll.push(genre);
+            }
             localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlockedAll));
             this.lastRecordUnlockTime = Date.now();
             setTimeout(() => {
-              this.showRecordRewardPopup(randomGenre);
+              this.showRecordRewardPopup(unearned[0]);
+              this.checkMusicScholarBadge();
             }, 2000);
           }
           const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
@@ -13612,12 +13873,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         const unlockedAll = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
         const unearned = allGenres.filter(g => !unlockedAll.includes(g));
         if (unearned.length > 0) {
-          const randomGenre = unearned[Math.floor(Math.random() * unearned.length)];
-          unlockedAll.push(randomGenre);
+          for (const genre of unearned) {
+            unlockedAll.push(genre);
+          }
           localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlockedAll));
           this.lastRecordUnlockTime = Date.now();
           setTimeout(() => {
-            this.showRecordRewardPopup(randomGenre);
+            this.showRecordRewardPopup(unearned[0]);
+            this.checkMusicScholarBadge();
           }, 2000);
         }
         const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
@@ -13753,6 +14016,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const hasReflection = !!reflectionAnswer;
     let baseCardH = hasChampion ? 560 : 530;
     if (hasReflection) baseCardH += 140;
+    const currentPlayCountForHeight = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    if (currentPlayCountForHeight === 1) baseCardH += 50;
     const cardH = Math.min(baseCardH, h - 30);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
@@ -13897,6 +14162,17 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillText(`${totalBadges - badgeCount} badges still locked!`, w / 2, msgY);
       ctx.font = `9px ${this.uiFont}`;
       ctx.fillText('Play again to discover more concepts!', w / 2, msgY + 18);
+    }
+
+    const currentPlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    if (currentPlayCount === 1) {
+      ctx.font = `bold 11px ${this.uiFont}`;
+      ctx.fillStyle = '#00BFFF';
+      ctx.textAlign = 'center';
+      ctx.fillText('Come back and YOU can be the DJ!', w / 2, msgY + 38);
+      ctx.font = `9px ${this.uiFont}`;
+      ctx.fillStyle = '#87CEEB';
+      ctx.fillText('Next time, you control the music at the party!', w / 2, msgY + 54);
     }
     
     // Learn More hint
@@ -14178,7 +14454,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       djQuizFailed: false,
       djQuizPassed: false,
       showSongChoice: false,
-      selectedGenre: ''
+      selectedGenre: '',
+      djModeUnlocked: false
     };
     this.currentQuizQuestion = 0;
     this.playAgainButton = null;
@@ -14355,7 +14632,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       djQuizFailed: false,
       djQuizPassed: false,
       showSongChoice: false,
-      selectedGenre: ''
+      selectedGenre: '',
+      djModeUnlocked: false
     };
     this.state.badges = savedBadges;
     this.state.lastBadgeEarnedTime = savedLastBadgeTime;

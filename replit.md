@@ -29,7 +29,10 @@
 - **Music Collection HUD**: Vinyl record icon shows progress (X/11), expands to a panel to view and select unlocked genres. Persistence across sessions via localStorage.
 - **2-Playthrough Gold Record Path**: Designed for collecting all 11 genres in two playthroughs, utilizing various in-game actions and bonus questions.
 - **Record Rewards**: Slingshot score, disco ball hit, and NPC bonus knowledge checks award random uncollected genre records.
-- **Player Customization**: Player name input for dialogue and ledger entries. Music Scholar badge unlocks a toggleable disco avatar sprite.
+- **DJ Soundboard Mode**: Unlocked after first playthrough completion. On 2nd+ playthroughs during the party, a pulsing "DJ" button appears in the top-right corner. Tapping it opens a soundboard in the dialogue box area with a 2-column grid of unlocked genres (tap to switch songs instantly with scratch transition) and 4 SFX buttons (Scratch, Air Horn, Laser, Horns). Unlimited song switching when DJ mode is active. Close button (X) exits the soundboard. Party educational hints are suppressed while soundboard is open.
+- **DJ Teaser**: First playthrough success screen shows "Come back and YOU can be the DJ!" message to encourage replay.
+- **2nd Playthrough Auto-Unlock**: At end of 2nd playthrough, ALL remaining uncollected genres are unlocked at once, triggering the Gold Record badge and award if applicable.
+- **Player Customization**: Player name input for dialogue and ledger entries. Disco avatar sprite unlocks after first playthrough completion (decoupled from genre collection). Music Scholar/Gold Records badge still requires all genres collected.
 - **Settings Menu**: Provides access to sound settings, game instructions, credits, fullscreen toggle, and game restart/reset options.
 - **End-of-Game Reflection**: Players can provide and revise their definition of money, which is displayed on the success screen.
 - **Screen Flow**: Phased loading and asset optimization for smooth transitions from loading to gameplay.

@@ -1236,6 +1236,7 @@ export class VillageLedgerGame {
           this.useDiscoSprite = !this.useDiscoSprite;
           localStorage.setItem('makingMoney_useDiscoSprite', String(this.useDiscoSprite));
           soundManager.play('buttonClick');
+          this.showGoldRecordAvatarPanel = false;
           return;
         }
       }
@@ -1683,6 +1684,8 @@ export class VillageLedgerGame {
                 action: () => {
                   this.state.showChoice = false;
                   this.state.choiceOptions = [];
+                  this.state.currentDialogue = null;
+                  this.dialogueQueue = [];
                 }
               },
               { 
@@ -11147,8 +11150,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = '#D4A574';
     const lines = [
       'Tap anywhere to walk there.',
-      'Get close to characters to interact.',
-      'Tap the INTERACT button to talk.',
+      'Get close to characters to talk.',
       'Collect items and trade with villagers.',
       'Record debts on the Stone Tablet.',
       'Earn badges by learning key concepts!',

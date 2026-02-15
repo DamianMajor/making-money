@@ -388,32 +388,189 @@ function MoneyRainCanvas({ preloadedImages }: { preloadedImages: HTMLImageElemen
 
 function GearSettingsButton() {
   const [open, setOpen] = useState(false);
-  const [muted, setMuted] = useState(() => {
-    try {
-      const stored = localStorage.getItem('villageLedger_soundSettings');
-      if (stored) return JSON.parse(stored).muted ?? false;
-    } catch {}
-    return false;
-  });
-  const [musicVol, setMusicVol] = useState(() => soundManager.getMusicVolume?.() ?? 0.4);
-  const [sfxVol, setSfxVol] = useState(() => soundManager.getSfxVolume?.() ?? 0.7);
+  const [submenu, setSubmenu] = useState<'main' | 'sound' | 'howtoplay' | 'credits' | 'resetConfirm'>('main');
+  const [musicMuted, setMusicMuted] = useState(() => soundManager.isMusicMuted());
+  const [sfxMuted, setSfxMuted] = useState(() => soundManager.isSfxMuted());
+  const [musicVol, setMusicVol] = useState(() => soundManager.getMusicVolume());
+  const [sfxVol, setSfxVol] = useState(() => soundManager.getSfxVolume());
 
-  const toggleMute = () => {
-    const newMuted = !muted;
-    setMuted(newMuted);
-    soundManager.setMuted(newMuted);
-    try {
-      const stored = localStorage.getItem('villageLedger_soundSettings');
-      const settings = stored ? JSON.parse(stored) : {};
-      settings.muted = newMuted;
-      localStorage.setItem('villageLedger_soundSettings', JSON.stringify(settings));
-    } catch {}
+  const handleOpen = () => {
+    if (!open) setSubmenu('main');
+    setOpen(!open);
   };
+
+  const btnStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 16px',
+    marginBottom: '6px',
+    background: 'rgba(139, 105, 20, 0.3)',
+    border: '1px solid #8B6914',
+    borderRadius: '6px',
+    color: '#D4A574',
+    fontFamily: 'Georgia, serif',
+    fontSize: '12px',
+    textAlign: 'center',
+    cursor: 'pointer',
+  };
+
+  const dangerBtnStyle: React.CSSProperties = {
+    ...btnStyle,
+    background: 'rgba(180, 60, 60, 0.6)',
+    border: '1px solid #B43C3C',
+    color: '#FF9999',
+    marginTop: '10px',
+  };
+
+  const renderMain = () => (
+    <>
+      <div style={{ textAlign: 'center', marginBottom: '14px' }}>
+        <span style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '11px', color: '#FFD700' }}>SETTINGS</span>
+      </div>
+      <button onClick={() => setSubmenu('sound')} className="cursor-pointer" style={btnStyle} data-testid="button-menu-sound">
+        Sound Settings &gt;
+      </button>
+      <button onClick={() => setSubmenu('howtoplay')} className="cursor-pointer" style={btnStyle} data-testid="button-menu-howtoplay">
+        How to Play
+      </button>
+      <button onClick={() => setSubmenu('credits')} className="cursor-pointer" style={btnStyle} data-testid="button-menu-credits">
+        Credits
+      </button>
+      <button
+        onClick={() => {
+          if (document.fullscreenElement) {
+            document.exitFullscreen();
+          } else {
+            document.documentElement.requestFullscreen().catch(() => {});
+          }
+        }}
+        className="cursor-pointer"
+        style={btnStyle}
+        data-testid="button-menu-fullscreen"
+      >
+        Fullscreen
+      </button>
+      <button onClick={() => setSubmenu('resetConfirm')} className="cursor-pointer" style={dangerBtnStyle} data-testid="button-menu-reset">
+        Reset Records
+      </button>
+    </>
+  );
+
+  const renderSound = () => (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '14px', gap: '8px' }}>
+        <button onClick={() => setSubmenu('main')} className="cursor-pointer" style={{ background: 'none', border: 'none', color: '#D4A574', fontFamily: '"Press Start 2P", monospace', fontSize: '11px', cursor: 'pointer', padding: 0 }} data-testid="button-sound-back">
+          &lt; Back
+        </button>
+        <span style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '11px', color: '#FFD700', flex: 1, textAlign: 'center' }}>SOUND</span>
+      </div>
+      <div style={{ marginBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <label style={{ fontFamily: 'Georgia, serif', fontSize: '11px', color: '#A89070' }}>Music Volume</label>
+          <span style={{ fontFamily: 'Georgia, serif', fontSize: '10px', color: '#D4A574' }}>{Math.round(musicVol * 100)}%</span>
+        </div>
+        <input type="range" min="0" max="1" step="0.05" value={musicVol}
+          onChange={(e) => { const v = parseFloat(e.target.value); setMusicVol(v); soundManager.setMusicVolume(v); }}
+          style={{ width: '100%', accentColor: '#8B6914' }} data-testid="slider-music-volume" />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+          <span style={{ fontFamily: 'Georgia, serif', fontSize: '10px', color: '#A89070' }}>Mute Music</span>
+          <button onClick={() => { soundManager.toggleMusicMute(); setMusicMuted(soundManager.isMusicMuted()); }} className="cursor-pointer"
+            style={{ width: '40px', height: '20px', borderRadius: '10px', border: `1px solid ${musicMuted ? '#B43C3C' : '#2D8B47'}`, background: musicMuted ? 'rgba(180,60,60,0.6)' : 'rgba(34,120,60,0.6)', position: 'relative', cursor: 'pointer', padding: 0 }}
+            data-testid="button-mute-music">
+            <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: musicMuted ? '3px' : '21px', transition: 'left 0.15s' }} />
+          </button>
+        </div>
+      </div>
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <label style={{ fontFamily: 'Georgia, serif', fontSize: '11px', color: '#A89070' }}>SFX Volume</label>
+          <span style={{ fontFamily: 'Georgia, serif', fontSize: '10px', color: '#D4A574' }}>{Math.round(sfxVol * 100)}%</span>
+        </div>
+        <input type="range" min="0" max="1" step="0.05" value={sfxVol}
+          onChange={(e) => { const v = parseFloat(e.target.value); setSfxVol(v); soundManager.setSfxVolume(v); }}
+          style={{ width: '100%', accentColor: '#8B6914' }} data-testid="slider-sfx-volume" />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px' }}>
+          <span style={{ fontFamily: 'Georgia, serif', fontSize: '10px', color: '#A89070' }}>Mute SFX</span>
+          <button onClick={() => { soundManager.toggleSfxMute(); setSfxMuted(soundManager.isSfxMuted()); }} className="cursor-pointer"
+            style={{ width: '40px', height: '20px', borderRadius: '10px', border: `1px solid ${sfxMuted ? '#B43C3C' : '#2D8B47'}`, background: sfxMuted ? 'rgba(180,60,60,0.6)' : 'rgba(34,120,60,0.6)', position: 'relative', cursor: 'pointer', padding: 0 }}
+            data-testid="button-mute-sfx">
+            <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: '#fff', position: 'absolute', top: '2px', left: sfxMuted ? '3px' : '21px', transition: 'left 0.15s' }} />
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
+  const renderHowToPlay = () => (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '14px', gap: '8px' }}>
+        <button onClick={() => setSubmenu('main')} className="cursor-pointer" style={{ background: 'none', border: 'none', color: '#D4A574', fontFamily: '"Press Start 2P", monospace', fontSize: '11px', cursor: 'pointer', padding: 0 }} data-testid="button-howtoplay-back">
+          &lt; Back
+        </button>
+        <span style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '11px', color: '#FFD700', flex: 1, textAlign: 'center' }}>HOW TO PLAY</span>
+      </div>
+      {[
+        'Tap anywhere to walk there.',
+        'Get close to characters to talk.',
+        'Collect items and trade with villagers.',
+        'Record debts on the Stone Tablet.',
+        'Earn badges by learning key concepts!',
+        'Collect all music genres across plays.',
+      ].map((line, i) => (
+        <p key={i} style={{ fontFamily: 'Georgia, serif', fontSize: '11px', color: '#D4A574', textAlign: 'center', marginBottom: '8px', lineHeight: 1.4 }}>{line}</p>
+      ))}
+    </>
+  );
+
+  const renderCredits = () => (
+    <>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '14px', gap: '8px' }}>
+        <button onClick={() => setSubmenu('main')} className="cursor-pointer" style={{ background: 'none', border: 'none', color: '#D4A574', fontFamily: '"Press Start 2P", monospace', fontSize: '11px', cursor: 'pointer', padding: 0 }} data-testid="button-credits-back">
+          &lt; Back
+        </button>
+        <span style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '11px', color: '#FFD700', flex: 1, textAlign: 'center' }}>CREDITS</span>
+      </div>
+      <div style={{ textAlign: 'center' }}>
+        <p style={{ fontFamily: 'Georgia, serif', fontSize: '13px', color: '#D4A574', marginBottom: '4px' }}>Making Money</p>
+        <p style={{ fontFamily: 'Georgia, serif', fontSize: '13px', color: '#D4A574', marginBottom: '16px' }}>The Barter System</p>
+        <p style={{ fontFamily: 'Georgia, serif', fontSize: '10px', color: '#A89070', marginBottom: '6px' }}>Created by</p>
+        <p style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '12px', color: '#FFD700' }}>Shalolly Inc.</p>
+      </div>
+    </>
+  );
+
+  const renderResetConfirm = () => (
+    <>
+      <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+        <span style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '10px', color: '#FF6666' }}>RESET ALL RECORDS?</span>
+      </div>
+      <p style={{ fontFamily: 'Georgia, serif', fontSize: '11px', color: '#D4A574', textAlign: 'center', marginBottom: '4px' }}>This will erase all unlocked genres,</p>
+      <p style={{ fontFamily: 'Georgia, serif', fontSize: '11px', color: '#D4A574', textAlign: 'center', marginBottom: '4px' }}>badges, your name, and play history.</p>
+      <p style={{ fontFamily: 'Georgia, serif', fontSize: '11px', color: '#D4A574', textAlign: 'center', marginBottom: '16px' }}>This cannot be undone!</p>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button onClick={() => {
+          localStorage.removeItem('makingMoney_unlockedGenres');
+          localStorage.removeItem('makingMoney_earnedBadges');
+          localStorage.removeItem('makingMoney_completionCount');
+          localStorage.removeItem('makingMoney_playerName');
+          localStorage.removeItem('makingMoney_useDiscoSprite');
+          localStorage.removeItem('makingMoney_discoUnlocked');
+          setSubmenu('main');
+          setOpen(false);
+          window.location.reload();
+        }} className="cursor-pointer" style={{ ...dangerBtnStyle, flex: 1, marginTop: 0 }} data-testid="button-confirm-reset">
+          Yes, Reset
+        </button>
+        <button onClick={() => setSubmenu('main')} className="cursor-pointer" style={{ ...btnStyle, flex: 1, marginBottom: 0 }} data-testid="button-cancel-reset">
+          Cancel
+        </button>
+      </div>
+    </>
+  );
 
   return (
     <>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={handleOpen}
         className="cursor-pointer"
         style={{
           position: 'absolute',
@@ -440,85 +597,57 @@ function GearSettingsButton() {
       {open && (
         <div
           style={{
-            position: 'absolute',
-            top: '60px',
-            right: '16px',
-            zIndex: 60,
-            background: 'rgba(45, 31, 14, 0.95)',
-            border: '2px solid #8B6914',
-            borderRadius: '10px',
-            padding: '16px',
-            minWidth: '200px',
+            position: 'fixed',
+            inset: 0,
+            zIndex: 59,
+            background: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
-          data-testid="gear-settings-panel"
+          onClick={(e) => { if (e.target === e.currentTarget) { setOpen(false); } }}
+          data-testid="gear-settings-overlay"
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <span style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '10px', color: '#D4A574' }}>Sound</span>
+          <div
+            style={{
+              background: '#3D2817',
+              border: '2px solid #8B6914',
+              borderRadius: '12px',
+              padding: '20px',
+              width: 'min(280px, 80vw)',
+              position: 'relative',
+            }}
+            data-testid="gear-settings-panel"
+          >
             <button
               onClick={() => setOpen(false)}
               className="cursor-pointer"
-              style={{ background: 'none', border: 'none', color: '#888', fontSize: '16px', padding: '4px' }}
+              style={{
+                position: 'absolute',
+                top: '10px',
+                right: '12px',
+                background: 'rgba(139, 105, 20, 0.3)',
+                border: 'none',
+                borderRadius: '4px',
+                width: '22px',
+                height: '22px',
+                color: '#A89070',
+                fontFamily: '"Press Start 2P", monospace',
+                fontSize: '10px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
               data-testid="button-close-settings"
             >
               X
             </button>
-          </div>
-          <button
-            onClick={toggleMute}
-            className="cursor-pointer"
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              marginBottom: '8px',
-              background: muted ? 'rgba(231, 76, 60, 0.3)' : 'rgba(46, 204, 113, 0.2)',
-              border: `1px solid ${muted ? '#E74C3C' : '#2ECC71'}`,
-              borderRadius: '6px',
-              color: muted ? '#E74C3C' : '#2ECC71',
-              fontFamily: 'Georgia, serif',
-              fontSize: '12px',
-              textAlign: 'center' as const,
-            }}
-            data-testid="button-toggle-mute"
-          >
-            {muted ? 'Sound OFF' : 'Sound ON'}
-          </button>
-          <div style={{ marginTop: '8px' }}>
-            <label style={{ fontFamily: 'Georgia, serif', fontSize: '10px', color: '#A88B5A', display: 'block', marginBottom: '4px' }}>
-              Music
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={musicVol}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                setMusicVol(v);
-                soundManager.setMusicVolume(v);
-              }}
-              style={{ width: '100%', accentColor: '#D4A574' }}
-              data-testid="slider-music-volume"
-            />
-          </div>
-          <div style={{ marginTop: '8px' }}>
-            <label style={{ fontFamily: 'Georgia, serif', fontSize: '10px', color: '#A88B5A', display: 'block', marginBottom: '4px' }}>
-              SFX
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={sfxVol}
-              onChange={(e) => {
-                const v = parseFloat(e.target.value);
-                setSfxVol(v);
-                soundManager.setSfxVolume(v);
-              }}
-              style={{ width: '100%', accentColor: '#D4A574' }}
-              data-testid="slider-sfx-volume"
-            />
+            {submenu === 'main' && renderMain()}
+            {submenu === 'sound' && renderSound()}
+            {submenu === 'howtoplay' && renderHowToPlay()}
+            {submenu === 'credits' && renderCredits()}
+            {submenu === 'resetConfirm' && renderResetConfirm()}
           </div>
         </div>
       )}

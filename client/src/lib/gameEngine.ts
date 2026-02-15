@@ -477,6 +477,8 @@ export class VillageLedgerGame {
   private discoClassicBtn: { x: number; y: number; w: number; h: number } | null = null;
   private discoDiscoBtn: { x: number; y: number; w: number; h: number } | null = null;
 
+  private debugSkipBtn: { x: number; y: number; w: number; h: number } | null = null;
+
   private djSoundboardActive: boolean = false;
   private djSoundboardButtons: { x: number; y: number; w: number; h: number; genre: string }[] = [];
   private djSfxButtons: { x: number; y: number; w: number; h: number; sfxName: string; label: string }[] = [];
@@ -1224,6 +1226,14 @@ export class VillageLedgerGame {
       }
 
       return;
+    }
+
+    if (this.debugSkipBtn) {
+      const btn = this.debugSkipBtn;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        this.debugSkipToParty();
+        return;
+      }
     }
 
     if (this.showDiscoAvatarCelebration) {
@@ -5983,6 +5993,64 @@ export class VillageLedgerGame {
     this.queueDialogue(dialogueLines);
   }
 
+  private debugSkipToParty(): void {
+    this.state.phase = 'loop2_verify_at_tablet';
+    this.state.loop = 2;
+    this.state.showHUD = true;
+    this.state.obtainedWood = true;
+    this.state.obtainedStone = true;
+    this.state.inventory = { stone: 0, fish: 0, wood: 0, berries: 0, slingshot: 1 };
+    this.state.woodcutterDebtRecorded = true;
+    this.state.stoneWorkerDebtRecorded = true;
+    this.state.woodcutterSettled = true;
+    this.state.stoneWorkerSettled = true;
+    this.state.elderVerified = true;
+    this.state.woodcutterDisputed = false;
+    this.state.stoneworkerDisputed = false;
+    this.state.ledgerEntries = [
+      { name: this.playerName || 'Player', debt: '1 Fish | SETTLED WITH WOODCUTTER' },
+      { name: this.playerName || 'Player', debt: '1 Berries | SETTLED WITH STONE-WORKER' }
+    ];
+    this.state.badges = ['Double Coincidence of Wants', 'Debt', 'The Ledger', 'Debt Settled'];
+    this.hudGlow = 1;
+    this.setMood('happy');
+    this.state.currentDialogue = null;
+    this.state.dialogueQueue = [];
+    this.state.showChoice = false;
+    this.state.choiceOptions = [];
+    this.villageElder.x = this.player.x + 60;
+    this.villageElder.targetX = this.player.x + 60;
+    this.presentFirstRecordAndStartParty();
+  }
+
+  private drawDebugSkipButton(ctx: CanvasRenderingContext2D): void {
+    if (this.state.showCelebration || this.state.showSuccess || this.state.showFail || this.state.showBrawl) {
+      this.debugSkipBtn = null;
+      return;
+    }
+    if (this.state.currentDialogue || this.state.showChoice) {
+      this.debugSkipBtn = null;
+      return;
+    }
+    const btnW = 90;
+    const btnH = 22;
+    const btnX = 8;
+    const btnY = this.logicalHeight - this.dialogueBoxHeight - btnH - 8;
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = '#FF4500';
+    ctx.beginPath();
+    ctx.roundRect(btnX, btnY, btnW, btnH, 4);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.font = `bold 9px ${this.uiFont}`;
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.fillText('Skip to Party', btnX + btnW / 2, btnY + btnH / 2 + 3);
+    ctx.restore();
+    this.debugSkipBtn = { x: btnX, y: btnY, w: btnW, h: btnH };
+  }
+
   // Check if all debts have been settled directly with NPCs
   private checkAllDebtsSettled(): void {
     if (this.state.woodcutterSettled && this.state.stoneWorkerSettled) {
@@ -7496,6 +7564,8 @@ export class VillageLedgerGame {
     }
 
     this.drawDiscoAvatarCelebration(ctx);
+
+    this.drawDebugSkipButton(ctx);
 
     // Draw gear/settings button LAST so it's always on top of all overlays
     this.drawGearButton(ctx);

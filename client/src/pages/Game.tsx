@@ -386,8 +386,8 @@ function MoneyRainCanvas({ preloadedImages }: { preloadedImages: HTMLImageElemen
   );
 }
 
-function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void }) {
-  const [answer, setAnswer] = useState('');
+function GearSettingsButton() {
+  const [open, setOpen] = useState(false);
   const [muted, setMuted] = useState(() => {
     try {
       const stored = localStorage.getItem('villageLedger_soundSettings');
@@ -395,16 +395,8 @@ function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void
     } catch {}
     return false;
   });
-  const musicStartedRef = useRef(false);
-
-  const startMusicOnInteraction = useCallback(() => {
-    if (musicStartedRef.current) return;
-    musicStartedRef.current = true;
-    soundManager.init().then(() => {
-      soundManager.resumeContext();
-      soundManager.startDaytimeMusic();
-    });
-  }, []);
+  const [musicVol, setMusicVol] = useState(() => soundManager.getMusicVolume?.() ?? 0.4);
+  const [sfxVol, setSfxVol] = useState(() => soundManager.getSfxVolume?.() ?? 0.7);
 
   const toggleMute = () => {
     const newMuted = !muted;
@@ -417,6 +409,135 @@ function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void
       localStorage.setItem('villageLedger_soundSettings', JSON.stringify(settings));
     } catch {}
   };
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(!open)}
+        className="cursor-pointer"
+        style={{
+          position: 'absolute',
+          top: '16px',
+          right: '16px',
+          zIndex: 60,
+          width: '36px',
+          height: '36px',
+          background: open ? 'rgba(139, 105, 20, 0.9)' : 'rgba(93, 72, 55, 0.85)',
+          border: '2px solid #8B6914',
+          borderRadius: '8px',
+          padding: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        data-testid="button-gear-settings"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" fill="rgba(93,72,55,0.85)" stroke="#D4A574" strokeWidth="1.5"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="#D4A574" strokeWidth="1.5" fill="none"/>
+        </svg>
+      </button>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '60px',
+            right: '16px',
+            zIndex: 60,
+            background: 'rgba(45, 31, 14, 0.95)',
+            border: '2px solid #8B6914',
+            borderRadius: '10px',
+            padding: '16px',
+            minWidth: '200px',
+          }}
+          data-testid="gear-settings-panel"
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <span style={{ fontFamily: '"Press Start 2P", monospace', fontSize: '10px', color: '#D4A574' }}>Sound</span>
+            <button
+              onClick={() => setOpen(false)}
+              className="cursor-pointer"
+              style={{ background: 'none', border: 'none', color: '#888', fontSize: '16px', padding: '4px' }}
+              data-testid="button-close-settings"
+            >
+              X
+            </button>
+          </div>
+          <button
+            onClick={toggleMute}
+            className="cursor-pointer"
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              marginBottom: '8px',
+              background: muted ? 'rgba(231, 76, 60, 0.3)' : 'rgba(46, 204, 113, 0.2)',
+              border: `1px solid ${muted ? '#E74C3C' : '#2ECC71'}`,
+              borderRadius: '6px',
+              color: muted ? '#E74C3C' : '#2ECC71',
+              fontFamily: 'Georgia, serif',
+              fontSize: '12px',
+              textAlign: 'center' as const,
+            }}
+            data-testid="button-toggle-mute"
+          >
+            {muted ? 'Sound OFF' : 'Sound ON'}
+          </button>
+          <div style={{ marginTop: '8px' }}>
+            <label style={{ fontFamily: 'Georgia, serif', fontSize: '10px', color: '#A88B5A', display: 'block', marginBottom: '4px' }}>
+              Music
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={musicVol}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                setMusicVol(v);
+                soundManager.setMusicVolume(v);
+              }}
+              style={{ width: '100%', accentColor: '#D4A574' }}
+              data-testid="slider-music-volume"
+            />
+          </div>
+          <div style={{ marginTop: '8px' }}>
+            <label style={{ fontFamily: 'Georgia, serif', fontSize: '10px', color: '#A88B5A', display: 'block', marginBottom: '4px' }}>
+              SFX
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={sfxVol}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                setSfxVol(v);
+                soundManager.setSfxVolume(v);
+              }}
+              style={{ width: '100%', accentColor: '#D4A574' }}
+              data-testid="slider-sfx-volume"
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void }) {
+  const [answer, setAnswer] = useState('');
+  const musicStartedRef = useRef(false);
+
+  const startMusicOnInteraction = useCallback(() => {
+    if (musicStartedRef.current) return;
+    musicStartedRef.current = true;
+    soundManager.init().then(() => {
+      soundManager.resumeContext();
+      soundManager.startDaytimeMusic();
+    });
+  }, []);
 
   useEffect(() => {
     soundManager.prefetch();
@@ -444,40 +565,7 @@ function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void
       }}
       data-testid="reflection-screen"
     >
-      <button
-        onClick={toggleMute}
-        className="cursor-pointer"
-        style={{
-          position: 'absolute',
-          top: '16px',
-          right: '16px',
-          zIndex: 10,
-          background: 'none',
-          border: 'none',
-          padding: '8px',
-          opacity: 0.4,
-          transition: 'opacity 0.2s',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4'; }}
-        data-testid="button-mute-reflection"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {muted ? (
-            <>
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#888888" />
-              <line x1="23" y1="9" x2="17" y2="15" />
-              <line x1="17" y1="9" x2="23" y2="15" />
-            </>
-          ) : (
-            <>
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#888888" />
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-            </>
-          )}
-        </svg>
-      </button>
+      <GearSettingsButton />
       <div className="flex flex-col items-center max-w-lg w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
         <h2
           className="text-center mb-6"
@@ -572,25 +660,6 @@ function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void
 
 function NameInputScreen({ onContinue }: { onContinue: (name: string) => void }) {
   const [name, setName] = useState('');
-  const [muted, setMuted] = useState(() => {
-    try {
-      const stored = localStorage.getItem('villageLedger_soundSettings');
-      if (stored) return JSON.parse(stored).muted ?? false;
-    } catch {}
-    return false;
-  });
-
-  const toggleMute = () => {
-    const newMuted = !muted;
-    setMuted(newMuted);
-    soundManager.setMuted(newMuted);
-    try {
-      const stored = localStorage.getItem('villageLedger_soundSettings');
-      const settings = stored ? JSON.parse(stored) : {};
-      settings.muted = newMuted;
-      localStorage.setItem('villageLedger_soundSettings', JSON.stringify(settings));
-    } catch {}
-  };
 
   const handleContinue = () => {
     if (name.trim()) {
@@ -612,40 +681,7 @@ function NameInputScreen({ onContinue }: { onContinue: (name: string) => void })
       }}
       data-testid="name-input-screen"
     >
-      <button
-        onClick={toggleMute}
-        className="cursor-pointer"
-        style={{
-          position: 'absolute',
-          top: '16px',
-          right: '16px',
-          zIndex: 10,
-          background: 'none',
-          border: 'none',
-          padding: '8px',
-          opacity: 0.4,
-          transition: 'opacity 0.2s',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4'; }}
-        data-testid="button-mute-name"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {muted ? (
-            <>
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#888888" />
-              <line x1="23" y1="9" x2="17" y2="15" />
-              <line x1="17" y1="9" x2="23" y2="15" />
-            </>
-          ) : (
-            <>
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#888888" />
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-            </>
-          )}
-        </svg>
-      </button>
+      <GearSettingsButton />
       <div className="flex flex-col items-center max-w-lg w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
         <h2
           className="text-center mb-6"
@@ -739,29 +775,9 @@ function NameInputScreen({ onContinue }: { onContinue: (name: string) => void })
 }
 
 function IntroScreen({ onStart, onMount, preloadedImages }: { onStart: () => void; onMount?: () => void; preloadedImages: HTMLImageElement[] }) {
-  const [muted, setMuted] = useState(() => {
-    try {
-      const stored = localStorage.getItem('villageLedger_soundSettings');
-      if (stored) return JSON.parse(stored).muted ?? false;
-    } catch {}
-    return false;
-  });
-
   useEffect(() => {
     if (onMount) onMount();
   }, [onMount]);
-
-  const toggleMute = () => {
-    const newMuted = !muted;
-    setMuted(newMuted);
-    soundManager.setMuted(newMuted);
-    try {
-      const stored = localStorage.getItem('villageLedger_soundSettings');
-      const settings = stored ? JSON.parse(stored) : {};
-      settings.muted = newMuted;
-      localStorage.setItem('villageLedger_soundSettings', JSON.stringify(settings));
-    } catch {}
-  };
 
   const startedRef = useRef(false);
   const [starting, setStarting] = useState(false);
@@ -782,40 +798,7 @@ function IntroScreen({ onStart, onMount, preloadedImages }: { onStart: () => voi
       }}
       data-testid="intro-screen"
     >
-      <button
-        onClick={toggleMute}
-        className="cursor-pointer"
-        style={{
-          position: 'absolute',
-          top: '16px',
-          right: '16px',
-          zIndex: 10,
-          background: 'none',
-          border: 'none',
-          padding: '8px',
-          opacity: 0.4,
-          transition: 'opacity 0.2s',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.4'; }}
-        data-testid="button-mute"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#888888" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {muted ? (
-            <>
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#888888" />
-              <line x1="23" y1="9" x2="17" y2="15" />
-              <line x1="17" y1="9" x2="23" y2="15" />
-            </>
-          ) : (
-            <>
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="#888888" />
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-            </>
-          )}
-        </svg>
-      </button>
+      <GearSettingsButton />
       <MoneyRainCanvas preloadedImages={preloadedImages} />
       <div className="flex flex-col items-center max-w-xl w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
         <div className="relative text-center mb-8" data-testid="text-title">

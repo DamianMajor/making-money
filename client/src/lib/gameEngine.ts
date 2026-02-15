@@ -391,6 +391,8 @@ export class VillageLedgerGame {
   private badgeItemAreas: { x: number; y: number; w: number; h: number; idx: number }[] = [];
   private badgeDetailBackButton: { x: number; y: number; w: number; h: number } | null = null;
   private badgeTrayPanelBounds: { x: number; y: number; w: number; h: number } | null = null;
+  private musicPanelBounds: { x: number; y: number; w: number; h: number } | null = null;
+  private goldRecordAvatarPanelBounds: { x: number; y: number; w: number; h: number } | null = null;
   private songChoiceButtons: { x: number; y: number; w: number; h: number; genre: string }[] = [];
 
   private readonly GENRE_AUDIO_MAP: Record<string, string> = {
@@ -503,6 +505,10 @@ export class VillageLedgerGame {
   private showGoldRecordHintArrow: boolean = false;
   private goldRecordHintArrowStartTime: number = 0;
 
+  private pendingSuccessAfterPopups: boolean = false;
+  private partyChampionStartTime: number = 0;
+  private discoDestroyerShownStartTime: number = 0;
+
   private playerName: string = 'YOU';
   private characterSprites: { [key: string]: HTMLImageElement } = {};
   private processedSprites: { [key: string]: HTMLCanvasElement } = {};
@@ -552,6 +558,10 @@ export class VillageLedgerGame {
   private roofRepairedTime: number = 0;
   private frozenCelebrationTimer: number = 0;
   private partySongEndTime: number = 0;
+  private playerManuallySelectedGenre: boolean = false;
+  private shufflePlaylistActive: boolean = false;
+  private shuffleQueue: string[] = [];
+  private shuffleQueueIndex: number = 0;
   private slingshotPlatformActive: boolean = false;
   private readonly SLINGSHOT_TARGET_SCORE = 50;
   private inventoryPanelLeftX: number = 0;
@@ -1240,13 +1250,14 @@ export class VillageLedgerGame {
 
     if (this.showDiscoAvatarCelebration) {
       this.showDiscoAvatarCelebration = false;
-      this.state.showSuccess = true;
+      this.advanceEndGameSequence();
       return;
     }
 
     if (this.showRecordReward) {
       this.showRecordReward = false;
       this.showDiscoDestroyer = false;
+      this.advanceEndGameSequence();
       return;
     }
 
@@ -1273,6 +1284,7 @@ export class VillageLedgerGame {
         this.showGoldRecordAward = false;
         this.showGoldRecordHintArrow = true;
         this.goldRecordHintArrowStartTime = Date.now();
+        this.advanceEndGameSequence();
       }
       return;
     }
@@ -1316,14 +1328,14 @@ export class VillageLedgerGame {
         }
       }
 
-      if (this.showGoldRecordAvatarPanel && this.goldRecordToggleBtn) {
-        const tb = this.goldRecordToggleBtn;
-        if (x >= tb.x && x <= tb.x + tb.w && y >= tb.y && y <= tb.y + tb.h) {
-          this.useDiscoSprite = !this.useDiscoSprite;
-          localStorage.setItem('makingMoney_useDiscoSprite', String(this.useDiscoSprite));
-          soundManager.play('buttonClick');
-          this.showGoldRecordAvatarPanel = false;
-          return;
+      if (this.showGoldRecordAvatarPanel) {
+        if (this.goldRecordAvatarPanelBounds) {
+          const gp = this.goldRecordAvatarPanelBounds;
+          if (x < gp.x || x > gp.x + gp.w || y < gp.y || y > gp.y + gp.h) {
+            this.showGoldRecordAvatarPanel = false;
+            soundManager.play('buttonClick');
+            return;
+          }
         }
       }
 
@@ -1373,6 +1385,14 @@ export class VillageLedgerGame {
 
     // Handle music collection touches
     if (this.state.showMusicCollection) {
+      if (this.musicPanelBounds) {
+        const mp = this.musicPanelBounds;
+        if (x < mp.x || x > mp.x + mp.w || y < mp.y || y > mp.y + mp.h) {
+          this.state.showMusicCollection = false;
+          soundManager.play('buttonClick');
+          return;
+        }
+      }
       this.handleMusicCollectionTouch(x, y);
       return;
     }
@@ -5649,8 +5669,8 @@ export class VillageLedgerGame {
     // Check if player completed Loop 2 successfully - trigger thunderstorm then night transition
     // Skip if rain sequence already started, player is fading, or dialogue/choice is active
     if (this.state.phase === 'complete_success' && this.player.x <= this.playerHomeX + 50 && 
-        !this.state.showThunderstorm && !this.state.showNightTransition && 
-        !this.rainSoundStarted && !this.state.playerFading && !this.state.playerEnteredHut &&
+        !this.state.showNightTransition && 
+        !this.state.playerFading && !this.state.playerEnteredHut &&
         !this.state.currentDialogue && !this.state.showChoice) {
       if (!this.state.roofRepaired) {
         this.state.roofRepaired = true;
@@ -5771,8 +5791,27 @@ export class VillageLedgerGame {
     if (this.state.showCelebration) {
       this.state.celebrationTimer += dt;
       if (this.partySongEndTime > 0 && Date.now() >= this.partySongEndTime && this.state.showCelebration) {
-        this.partySongEndTime = 0;
-        this.endDiscoParty();
+        if (this.shufflePlaylistActive) {
+          this.playNextShuffledSong();
+        } else if (this.playerManuallySelectedGenre && this.state.selectedGenre && this.state.selectedGenre !== 'background' && this.state.selectedGenre !== 'none') {
+          const genreUrl = this.GENRE_AUDIO_MAP[this.state.selectedGenre];
+          if (genreUrl) {
+            soundManager.loadAndPlayGenre(genreUrl);
+            this.partySongEndTime = Date.now() + 240000;
+            setTimeout(() => {
+              const dur = soundManager.getGenreRemixDuration();
+              if (dur > 0) {
+                this.partySongEndTime = Date.now() + dur;
+              }
+            }, 3000);
+          } else {
+            this.partySongEndTime = 0;
+            this.endDiscoParty();
+          }
+        } else {
+          this.partySongEndTime = 0;
+          this.endDiscoParty();
+        }
       }
       this.updateDancingNPCs(dt);
       this.updateDJSwapMovement(dt);
@@ -5782,7 +5821,8 @@ export class VillageLedgerGame {
         this.state.nightBgCrossfade = Math.min(1, this.state.nightBgCrossfade + dt / 6);
       }
       this.state.partyHintTimer += dt;
-      if (this.state.celebrationTimer > 20 && !this.state.djQuizPassed && !this.state.currentDialogue && !this.djHintShown) {
+      const djHintPlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+      if (djHintPlayCount === 0 && this.state.celebrationTimer > 20 && !this.state.djQuizPassed && !this.state.currentDialogue && !this.djHintShown) {
         this.djHintShown = true;
         this.djHintStartTime = Date.now();
       }
@@ -6210,7 +6250,15 @@ export class VillageLedgerGame {
         }
       ]);
     } else {
-      this.startDiscoParty();
+      this.queueDialogue([
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "You know the drill — let's party!",
+          onComplete: () => {
+            this.startDiscoParty();
+          }
+        }
+      ]);
     }
   }
 
@@ -6227,6 +6275,13 @@ export class VillageLedgerGame {
     this.djHintShown = false;
     this.djHutWarningShown = false;
     this.songChangeCueShown = false;
+    soundManager.stopAllMusic();
+    soundManager.stopDaytimeMusic();
+    const hintPlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    if (hintPlayCount >= 1) {
+      this.showMusicChangeHint = true;
+      this.musicChangeHintStartTime = Date.now();
+    }
     const autoUnlockPlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
     const autoUnlockDelay = autoUnlockPlayCount === 0 ? 1000 : 2000;
     setTimeout(() => {
@@ -6492,13 +6547,14 @@ export class VillageLedgerGame {
           hit = true;
           if (!this.state.slingshotDiscoBallRecordAwarded) {
             this.state.slingshotDiscoBallRecordAwarded = true;
-            this.awardRandomRecord(800);
             this.showDiscoDestroyer = true;
-            this.discoDestroyerStartTime = Date.now();
+            this.discoDestroyerShownStartTime = Date.now();
+            this.awardRandomRecord(3000);
           }
           if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE && !this.state.slingshotScoreRecordAwarded) {
             this.state.slingshotScoreRecordAwarded = true;
-            this.awardRandomRecord(500);
+            this.partyChampionStartTime = Date.now();
+            this.awardRandomRecord(3000);
           }
         }
       }
@@ -6881,29 +6937,43 @@ export class VillageLedgerGame {
         ctx.font = `bold 16px ${this.uiFont}`;
         ctx.fillStyle = '#2ECC71';
         ctx.fillText('Record earned!', w - 20, groundY - 14);
-        if (this.showRecordReward) {
-          ctx.textAlign = 'center';
-          const champT = this.state.celebrationTimer;
-          const champHue = (champT * 60) % 360;
-          const champPulse = Math.sin(champT * 5) * 8;
-          ctx.font = `24px ${this.retroFont}`;
-          ctx.strokeStyle = '#000';
-          ctx.lineWidth = 3;
-          ctx.fillStyle = `hsl(${champHue}, 100%, 70%)`;
-          ctx.strokeText('PARTY CHAMPION!', w / 2, groundY - 225 + champPulse);
-          ctx.fillText('PARTY CHAMPION!', w / 2, groundY - 225 + champPulse);
+        if (this.partyChampionStartTime > 0) {
+          const champElapsed = (Date.now() - this.partyChampionStartTime) / 1000;
+          if (champElapsed < 2.5) {
+            const champAlpha = champElapsed < 2 ? 1 : 1 - (champElapsed - 2) / 0.5;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, champAlpha);
+            ctx.textAlign = 'center';
+            const champT = this.state.celebrationTimer;
+            const champHue = (champT * 60) % 360;
+            const champPulse = Math.sin(champT * 5) * 8;
+            ctx.font = `24px ${this.retroFont}`;
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
+            ctx.fillStyle = `hsl(${champHue}, 100%, 70%)`;
+            ctx.strokeText('PARTY CHAMPION!', w / 2, groundY - 225 + champPulse);
+            ctx.fillText('PARTY CHAMPION!', w / 2, groundY - 225 + champPulse);
+            ctx.restore();
+          }
         }
-        if (this.showDiscoDestroyer && this.showRecordReward) {
-          ctx.textAlign = 'center';
-          const ddT = this.state.celebrationTimer;
-          const ddHue = (ddT * 80 + 180) % 360;
-          const ddPulse = Math.sin(ddT * 5) * 8;
-          ctx.font = `24px ${this.retroFont}`;
-          ctx.strokeStyle = '#000';
-          ctx.lineWidth = 3;
-          ctx.fillStyle = `hsl(${ddHue}, 100%, 70%)`;
-          ctx.strokeText('DISCO DESTROYER!', w / 2, groundY - 260 + ddPulse);
-          ctx.fillText('DISCO DESTROYER!', w / 2, groundY - 260 + ddPulse);
+        if (this.showDiscoDestroyer && this.discoDestroyerShownStartTime > 0) {
+          const ddElapsed = (Date.now() - this.discoDestroyerShownStartTime) / 1000;
+          if (ddElapsed < 2.5) {
+            const ddAlpha = ddElapsed < 2 ? 1 : 1 - (ddElapsed - 2) / 0.5;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, ddAlpha);
+            ctx.textAlign = 'center';
+            const ddT = this.state.celebrationTimer;
+            const ddHue = (ddT * 80 + 180) % 360;
+            const ddPulse = Math.sin(ddT * 5) * 8;
+            ctx.font = `24px ${this.retroFont}`;
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 3;
+            ctx.fillStyle = `hsl(${ddHue}, 100%, 70%)`;
+            ctx.strokeText('DISCO DESTROYER!', w / 2, groundY - 260 + ddPulse);
+            ctx.fillText('DISCO DESTROYER!', w / 2, groundY - 260 + ddPulse);
+            ctx.restore();
+          }
         }
       }
       
@@ -7066,6 +7136,7 @@ export class VillageLedgerGame {
   private updateDJSwapMovement(dt: number): void {
     if (!this.djSwapInProgress) return;
     
+    const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
     const walkSpeed = 150;
     
     if (this.djSoundboardActive) {
@@ -7084,6 +7155,7 @@ export class VillageLedgerGame {
       }
       
       const eDiff = elderTarget - this.villageElder.x;
+      this.villageElder.y = groundY - this.villageElder.height - 10;
       if (Math.abs(eDiff) > 5) {
         this.villageElder.facingDirection = Math.sign(eDiff);
         this.villageElder.x += Math.sign(eDiff) * walkSpeed * dt;
@@ -7115,6 +7187,7 @@ export class VillageLedgerGame {
       }
       
       const eDiff = elderTarget - this.villageElder.x;
+      this.villageElder.y = groundY - this.villageElder.height - 10;
       if (Math.abs(eDiff) > 5) {
         this.villageElder.facingDirection = Math.sign(eDiff);
         this.villageElder.x += Math.sign(eDiff) * walkSpeed * dt;
@@ -8417,10 +8490,10 @@ export class VillageLedgerGame {
       }
 
       const worldXPositions = [
-        this.villageCenterX - 520,
-        this.villageCenterX + 520,
-        this.villageCenterX - 440,
-        this.villageCenterX + 440
+        this.villageCenterX - 550,
+        this.villageCenterX + 550,
+        this.villageCenterX - 350,
+        this.villageCenterX + 350
       ];
       for (let i = 0; i < 4; i++) {
         const isRight = (i % 2 === 1);
@@ -8708,10 +8781,10 @@ export class VillageLedgerGame {
     }
     
     const worldXPositions = [
-      this.villageCenterX - 520,
-      this.villageCenterX + 520,
-      this.villageCenterX - 440,
-      this.villageCenterX + 440
+      this.villageCenterX - 550,
+      this.villageCenterX + 550,
+      this.villageCenterX - 350,
+      this.villageCenterX + 350
     ];
     for (let i = 0; i < 4; i++) {
       const isRight = (i % 2 === 1);
@@ -9269,7 +9342,7 @@ export class VillageLedgerGame {
   }
 
   private drawBadgeTrayIcon(ctx: CanvasRenderingContext2D): void {
-    if (this.state.showDJQuiz || this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview || this.state.showMusicCollection || this.state.showSuccess) return;
+    if (this.state.showDJQuiz || this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview || this.state.showSuccess) return;
 
     const x = this.inventoryPanelLeftX - 44;
     const y = 16;
@@ -9694,8 +9767,6 @@ export class VillageLedgerGame {
     this.recordRewardGenre = genre;
     this.recordRewardStartTime = Date.now();
     this.showRecordReward = true;
-    this.showMusicChangeHint = true;
-    this.musicChangeHintStartTime = Date.now();
     soundManager.playRandomDJTransition();
     this.checkMusicScholarBadge();
   }
@@ -9908,7 +9979,7 @@ export class VillageLedgerGame {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFD700';
     ctx.globalAlpha = Math.max(0, alpha) * 0.9;
-    ctx.fillText('Tap to equip!', arrowX, arrowY + 32 + bounce);
+    ctx.fillText('Tap for info!', arrowX, arrowY + 32 + bounce);
     
     ctx.restore();
   }
@@ -9917,11 +9988,10 @@ export class VillageLedgerGame {
     if (!this.showGoldRecordAvatarPanel || !this.goldRecordPlaqueArea) return;
 
     const iconArea = this.goldRecordPlaqueArea;
-    const panelW = 160;
-    const panelH = 80;
+    const panelW = 180;
+    const panelH = 60;
     const panelX = iconArea.x + iconArea.w / 2 - panelW / 2;
     const panelY = iconArea.y + iconArea.h + 8;
-
     const clampedX = Math.max(8, Math.min(this.logicalWidth - panelW - 8, panelX));
 
     ctx.fillStyle = 'rgba(61, 40, 23, 0.95)';
@@ -9935,28 +10005,13 @@ export class VillageLedgerGame {
     ctx.font = `bold 9px ${this.uiFont}`;
     ctx.fillStyle = '#FFD700';
     ctx.textAlign = 'center';
-    ctx.fillText('DISCO AVATAR', clampedX + panelW / 2, panelY + 18);
+    ctx.fillText('GOLD RECORDS', clampedX + panelW / 2, panelY + 20);
 
-    const toggleW = 100;
-    const toggleH = 28;
-    const toggleX = clampedX + (panelW - toggleW) / 2;
-    const toggleY = panelY + 30;
+    ctx.font = `8px ${this.uiFont}`;
+    ctx.fillStyle = '#C4A77D';
+    ctx.fillText('All songs collected!', clampedX + panelW / 2, panelY + 38);
 
-    const isActive = this.useDiscoSprite;
-    ctx.fillStyle = isActive ? 'rgba(34, 120, 60, 0.6)' : 'rgba(139, 105, 20, 0.3)';
-    ctx.beginPath();
-    ctx.roundRect(toggleX, toggleY, toggleW, toggleH, 6);
-    ctx.fill();
-    ctx.strokeStyle = isActive ? '#2D8B47' : '#8B6914';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-
-    ctx.font = `9px ${this.uiFont}`;
-    ctx.fillStyle = isActive ? '#AAFFAA' : '#D4A574';
-    ctx.fillText(isActive ? 'ON' : 'OFF', clampedX + panelW / 2, toggleY + toggleH / 2 + 3);
-
-    this.goldRecordToggleBtn = { x: toggleX, y: toggleY, w: toggleW, h: toggleH };
-
+    this.goldRecordAvatarPanelBounds = { x: clampedX, y: panelY, w: panelW, h: panelH };
     ctx.textAlign = 'left';
   }
 
@@ -9975,7 +10030,7 @@ export class VillageLedgerGame {
     const popupH = 200;
     const playAreaH = h - this.dialogueBoxHeight;
     const popupX = (w - popupW) / 2;
-    const popupY = (playAreaH - popupH) / 2;
+    const popupY = (playAreaH - popupH) / 2 - 15;
 
     const genreColor = this.GENRE_COLORS[this.recordRewardGenre] || '#FF6B6B';
     const r = parseInt(genreColor.slice(1, 3), 16);
@@ -9997,7 +10052,7 @@ export class VillageLedgerGame {
       const angle = (i / sparkleCount) * Math.PI * 2 + elapsed * 0.003;
       const dist = 130 + Math.sin(elapsed * 0.005 + i) * 20;
       const sx = w / 2 + Math.cos(angle) * dist;
-      const sy = h / 2 + Math.sin(angle) * dist;
+      const sy = popupY + popupH / 2 + Math.sin(angle) * dist;
       const sparkleSize = 2 + Math.sin(elapsed * 0.008 + i * 2) * 1.5;
       ctx.fillStyle = `rgba(255, 215, 0, ${0.5 + Math.sin(elapsed * 0.006 + i) * 0.3})`;
       ctx.beginPath();
@@ -10061,7 +10116,7 @@ export class VillageLedgerGame {
     const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
     if (unlocked.length === 0) return;
 
-    if (this.state.showDJQuiz || this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview || this.state.showBadgeTray || this.state.showMusicCollection || this.state.showSuccess) return;
+    if (this.state.showDJQuiz || this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview || this.state.showSuccess) return;
 
     const iconSize = 32;
     const iconX = this.inventoryPanelLeftX - 44 - iconSize - 8;
@@ -10139,6 +10194,7 @@ export class VillageLedgerGame {
   private musicCollectionCloseBtn: { x: number; y: number; w: number; h: number } | null = null;
   private musicCollectionBgMusicBtn: { x: number; y: number; w: number; h: number } | null = null;
   private musicCollectionMuteBtn: { x: number; y: number; w: number; h: number } | null = null;
+  private musicCollectionShuffleBtn: { x: number; y: number; w: number; h: number } | null = null;
   
   private drawMusicCollectionPanel(ctx: CanvasRenderingContext2D): void {
     const w = this.logicalWidth;
@@ -10152,7 +10208,7 @@ export class VillageLedgerGame {
     const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
     const uncollectedGenres = allGenres.filter(g => !unlocked.includes(g));
     const hintsExtraHeight = uncollectedGenres.length > 0 ? 30 + uncollectedGenres.length * 14 + 10 : 0;
-    const panelH = Math.min(560 + hintsExtraHeight, h - 40);
+    const panelH = Math.min(600 + hintsExtraHeight, h - 40);
     const panelX = (w - panelW) / 2;
     const panelY = (h - panelH) / 2;
     
@@ -10163,6 +10219,8 @@ export class VillageLedgerGame {
     ctx.strokeStyle = '#E8D44D';
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    this.musicPanelBounds = { x: panelX, y: panelY, w: panelW, h: panelH };
     
     ctx.font = `14px ${this.retroFont}`;
     ctx.textAlign = 'center';
@@ -10206,11 +10264,6 @@ export class VillageLedgerGame {
         ctx.fillStyle = '#F5DEB3';
         ctx.textAlign = 'center';
         ctx.fillText(genre, bx + btnW / 2, by + btnH / 2 + 4);
-        if (isPlaying) {
-          ctx.font = `bold 8px ${this.uiFont}`;
-          ctx.fillStyle = '#2ECC71';
-          ctx.fillText('NOW PLAYING', bx + btnW / 2, by - 2);
-        }
         this.musicCollectionBtns.push({ x: bx, y: by, w: btnW, h: btnH, genre });
       } else {
         ctx.fillStyle = 'rgba(50,50,50,0.5)';
@@ -10244,11 +10297,6 @@ export class VillageLedgerGame {
     ctx.fillStyle = '#F5DEB3';
     ctx.textAlign = 'center';
     ctx.fillText('Standard', bgBtnX + bgBtnW / 2, bgBtnY + bgBtnH / 2 + 4);
-    if (isBgPlaying) {
-      ctx.font = `bold 8px ${this.uiFont}`;
-      ctx.fillStyle = '#2ECC71';
-      ctx.fillText('NOW PLAYING', bgBtnX + bgBtnW / 2, bgBtnY - 2);
-    }
     this.musicCollectionBgMusicBtn = { x: bgBtnX, y: bgBtnY, w: bgBtnW, h: bgBtnH };
 
     const muteBtnY = bgBtnY + bgBtnH + gapY;
@@ -10271,10 +10319,30 @@ export class VillageLedgerGame {
     }
     this.musicCollectionMuteBtn = { x: bgBtnX, y: muteBtnY, w: bgBtnW, h: bgBtnH };
 
-    let discoSectionEndY = muteBtnY + bgBtnH;
+    const shuffleBtnY = muteBtnY + bgBtnH + gapY;
+    const isShuffleActive = this.shufflePlaylistActive;
+    ctx.fillStyle = isShuffleActive ? 'rgba(155, 89, 182, 0.4)' : 'rgba(255,255,255,0.05)';
+    ctx.beginPath();
+    ctx.roundRect(bgBtnX, shuffleBtnY, bgBtnW, bgBtnH, 6);
+    ctx.fill();
+    ctx.strokeStyle = isShuffleActive ? '#9B59B6' : '#666';
+    ctx.lineWidth = isShuffleActive ? 2 : 1;
+    ctx.stroke();
+    ctx.font = `10px ${this.retroFont}`;
+    ctx.fillStyle = isShuffleActive ? '#D7BDE2' : '#F5DEB3';
+    ctx.textAlign = 'center';
+    ctx.fillText('Shuffle All', bgBtnX + bgBtnW / 2, shuffleBtnY + bgBtnH / 2 + 4);
+    if (isShuffleActive) {
+      ctx.font = `bold 8px ${this.uiFont}`;
+      ctx.fillStyle = '#9B59B6';
+      ctx.fillText('SHUFFLING', bgBtnX + bgBtnW / 2, shuffleBtnY - 2);
+    }
+    this.musicCollectionShuffleBtn = { x: bgBtnX, y: shuffleBtnY, w: bgBtnW, h: bgBtnH };
+
+    let discoSectionEndY = shuffleBtnY + bgBtnH;
     this.discoAvatarToggleBtn = null;
     if (!this.discoSpriteUnlocked) {
-      const hintY = muteBtnY + bgBtnH + 15;
+      const hintY = shuffleBtnY + bgBtnH + 15;
       ctx.save();
       const silW = 40;
       const silH = 50;
@@ -10296,7 +10364,7 @@ export class VillageLedgerGame {
       discoSectionEndY = silY + silH + 30;
     }
     if (this.discoSpriteUnlocked) {
-      const dividerY = muteBtnY + bgBtnH + 12;
+      const dividerY = shuffleBtnY + bgBtnH + 12;
       ctx.strokeStyle = '#555';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -10309,6 +10377,24 @@ export class VillageLedgerGame {
       ctx.textAlign = 'center';
       ctx.fillStyle = '#E8D44D';
       ctx.fillText('DISCO AVATAR', w / 2, labelY);
+
+      const discoBallSize = 8;
+      const discoBallX = w / 2 - 60;
+      const discoBallY = labelY - 4;
+      ctx.fillStyle = '#C0C0C0';
+      ctx.beginPath();
+      ctx.arc(discoBallX, discoBallY, discoBallSize, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(discoBallX - discoBallSize, discoBallY);
+      ctx.lineTo(discoBallX + discoBallSize, discoBallY);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(discoBallX, discoBallY - discoBallSize);
+      ctx.lineTo(discoBallX, discoBallY + discoBallSize);
+      ctx.stroke();
 
       const btnW = 70;
       const btnH = 28;
@@ -10419,6 +10505,8 @@ export class VillageLedgerGame {
       const btn = this.musicCollectionBgMusicBtn;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         soundManager.play('buttonClick');
+        this.playerManuallySelectedGenre = false;
+        this.shufflePlaylistActive = false;
         soundManager.stopAllMusic();
         this.state.selectedGenre = 'background';
         soundManager.fadeIn('backgroundMusicDay', 1000);
@@ -10430,6 +10518,9 @@ export class VillageLedgerGame {
       const btn = this.musicCollectionMuteBtn;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         soundManager.play('buttonClick');
+        this.playerManuallySelectedGenre = false;
+        this.shufflePlaylistActive = false;
+        this.partySongEndTime = 0;
         soundManager.stopAllMusic();
         soundManager.stopDaytimeMusic();
         this.state.selectedGenre = 'none';
@@ -10437,17 +10528,95 @@ export class VillageLedgerGame {
       }
     }
     
+    if (this.musicCollectionShuffleBtn) {
+      const btn = this.musicCollectionShuffleBtn;
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.play('buttonClick');
+        if (this.shufflePlaylistActive) {
+          this.shufflePlaylistActive = false;
+          this.partySongEndTime = 0;
+          soundManager.stopAllMusic();
+          this.state.selectedGenre = '';
+        } else {
+          this.startShufflePlaylist();
+        }
+        return;
+      }
+    }
+
     for (const btn of this.musicCollectionBtns) {
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         soundManager.play('buttonClick');
         this.state.selectedGenre = btn.genre;
+        this.playerManuallySelectedGenre = true;
+        this.shufflePlaylistActive = false;
         soundManager.stopAllMusic();
         const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
         if (genreUrl) {
           soundManager.loadAndPlayGenre(genreUrl);
+          this.partySongEndTime = Date.now() + 240000;
+          setTimeout(() => {
+            const dur = soundManager.getGenreRemixDuration();
+            if (dur > 0) {
+              this.partySongEndTime = Date.now() + dur;
+            }
+          }, 3000);
         }
         return;
       }
+    }
+  }
+
+  private startShufflePlaylist(): void {
+    const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]') as string[];
+    if (unlocked.length === 0) return;
+    
+    this.shuffleQueue = [...unlocked];
+    for (let i = this.shuffleQueue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.shuffleQueue[i], this.shuffleQueue[j]] = [this.shuffleQueue[j], this.shuffleQueue[i]];
+    }
+    this.shuffleQueueIndex = 0;
+    this.shufflePlaylistActive = true;
+    this.playerManuallySelectedGenre = false;
+    
+    const genre = this.shuffleQueue[0];
+    this.state.selectedGenre = genre;
+    soundManager.stopAllMusic();
+    const genreUrl = this.GENRE_AUDIO_MAP[genre];
+    if (genreUrl) {
+      soundManager.loadAndPlayGenre(genreUrl);
+      this.partySongEndTime = Date.now() + 240000;
+      setTimeout(() => {
+        const dur = soundManager.getGenreRemixDuration();
+        if (dur > 0) {
+          this.partySongEndTime = Date.now() + dur;
+        }
+      }, 3000);
+    }
+  }
+
+  private playNextShuffledSong(): void {
+    this.shuffleQueueIndex++;
+    if (this.shuffleQueueIndex >= this.shuffleQueue.length) {
+      for (let i = this.shuffleQueue.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [this.shuffleQueue[i], this.shuffleQueue[j]] = [this.shuffleQueue[j], this.shuffleQueue[i]];
+      }
+      this.shuffleQueueIndex = 0;
+    }
+    const genre = this.shuffleQueue[this.shuffleQueueIndex];
+    this.state.selectedGenre = genre;
+    const genreUrl = this.GENRE_AUDIO_MAP[genre];
+    if (genreUrl) {
+      soundManager.loadAndPlayGenre(genreUrl);
+      this.partySongEndTime = Date.now() + 240000;
+      setTimeout(() => {
+        const dur = soundManager.getGenreRemixDuration();
+        if (dur > 0) {
+          this.partySongEndTime = Date.now() + dur;
+        }
+      }, 3000);
     }
   }
 
@@ -12168,7 +12337,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     const elderScreenX = this.villageElder.x - this.cameraX;
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    const bubbleY = groundY - 155;
+    const bubbleY = groundY - 170;
     
     const pulse = 1 + 0.05 * Math.sin(Date.now() / 300);
     
@@ -12292,11 +12461,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.textAlign = 'center';
       ctx.fillText(genre, bx + btnW / 2, by + btnH / 2 + 3);
       
-      if (isPlaying) {
-        ctx.font = `7px ${this.uiFont}`;
-        ctx.fillStyle = '#FFD700';
-        ctx.fillText('NOW PLAYING', bx + btnW / 2, by - 2);
-      }
     });
     
     const sfxList = [
@@ -12413,8 +12577,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           this.state.selectedGenre = btn.genre;
           const genreUrl = this.GENRE_AUDIO_MAP[btn.genre];
           if (genreUrl) {
-            soundManager.fadeOut('partySong', 100);
-            soundManager.fadeOut('genreRemix', 100);
+            soundManager.stopAllMusic();
             soundManager.playRandomRecordScratch();
             soundManager.loadAndPlayGenre(genreUrl);
             this.partySongEndTime = Date.now() + 240000;
@@ -12896,7 +13059,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillRect(0, 0, w, h);
     
     const cardW = Math.min(480, w - 50);
-    const cardH = 340;
+    const numOptions = data.options.length;
+    const estimatedContentH = 65 + (numOptions * 56) + 80;
+    const cardH = Math.max(340, estimatedContentH);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
     
@@ -13028,7 +13193,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const btnW = 140;
       const btnH = 34;
       const btnX = (w - btnW) / 2;
-      const btnY = cardY + cardH - 48;
+      const btnY = Math.max(cardY + cardH - 48, explLineY + 18);
       
       ctx.fillStyle = this.state.checkpointQuizCorrect ? '#22C55E' : '#D97706';
       ctx.beginPath();
@@ -14214,10 +14379,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             }
             localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlockedAll));
             this.lastRecordUnlockTime = Date.now();
-            setTimeout(() => {
-              this.showRecordRewardPopup(unearned[0]);
-              this.checkMusicScholarBadge();
-            }, 2000);
           }
           const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
           if (count === 0) {
@@ -14230,8 +14391,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
               localStorage.setItem('makingMoney_postReflection', newAnswer.trim());
             }
             this.state.showNightTransition = false;
-            this.state.showSuccess = true;
-            this.state.phase = 'complete';
+            if (unearned.length > 0) {
+              this.showRecordRewardPopup(unearned[0]);
+              this.checkMusicScholarBadge();
+            }
+            this.pendingSuccessAfterPopups = true;
+            this.advanceEndGameSequence();
           });
         }
         return;
@@ -14256,10 +14421,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           }
           localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlockedAll));
           this.lastRecordUnlockTime = Date.now();
-          setTimeout(() => {
-            this.showRecordRewardPopup(unearned[0]);
-            this.checkMusicScholarBadge();
-          }, 2000);
         }
         const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
         if (count === 0) {
@@ -14272,8 +14433,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             localStorage.setItem('makingMoney_postReflection', newAnswer.trim());
           }
           this.state.showNightTransition = false;
-          this.state.showSuccess = true;
-          this.state.phase = 'complete';
+          if (unearned.length > 0) {
+            this.showRecordRewardPopup(unearned[0]);
+            this.checkMusicScholarBadge();
+          }
+          this.pendingSuccessAfterPopups = true;
+          this.advanceEndGameSequence();
         });
         return;
       }
@@ -14569,6 +14734,22 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
     
     ctx.globalAlpha = 1;
+  }
+
+  private advanceEndGameSequence(): void {
+    if (!this.pendingSuccessAfterPopups) return;
+    if (this.showRecordReward) return;
+    if (this.showGoldRecordAward) return;
+    if (this.discoAvatarJustUnlocked && !this.showDiscoAvatarCelebration) {
+      this.showDiscoAvatarCelebration = true;
+      this.discoAvatarCelebrationStartTime = Date.now();
+      soundManager.play('djTransAirhorn1');
+      return;
+    }
+    if (this.showDiscoAvatarCelebration) return;
+    this.pendingSuccessAfterPopups = false;
+    this.state.showSuccess = true;
+    this.state.phase = 'complete';
   }
 
   private drawSuccessScreen(ctx: CanvasRenderingContext2D): void {

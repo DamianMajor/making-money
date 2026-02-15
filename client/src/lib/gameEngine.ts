@@ -1,7 +1,7 @@
 // The Barter System Educational Game Engine
 // Touch-only side-scroller optimized for iPad/Tablet
 
-import { soundManager } from './soundManager';
+import { soundManager, type SoundName } from './soundManager';
 import { QuizQuestion, getDJQuizQuestions, getBackupDJQuestion, getFinalQuizQuestions, getNPCBonusQuestion } from './quizBank';
 
 // Game State Types
@@ -480,6 +480,16 @@ export class VillageLedgerGame {
   private discoDiscoBtn: { x: number; y: number; w: number; h: number } | null = null;
 
   private debugSkipBtn: { x: number; y: number; w: number; h: number } | null = null;
+
+  private djStrobeActive: boolean = false;
+  private djStrobeStartTime: number = 0;
+  private djSpotlightActive: boolean = false;
+  private djSpotlightStartTime: number = 0;
+  private djSmokeActive: boolean = false;
+  private djSmokeStartTime: number = 0;
+  private djLasersActive: boolean = false;
+  private djLasersStartTime: number = 0;
+  private djEffectButtons: { x: number; y: number; w: number; h: number; effect: string; label: string }[] = [];
 
   private djSoundboardActive: boolean = false;
   private djSoundboardButtons: { x: number; y: number; w: number; h: number; genre: string }[] = [];
@@ -1249,8 +1259,11 @@ export class VillageLedgerGame {
     }
 
     if (this.showDiscoAvatarCelebration) {
-      this.showDiscoAvatarCelebration = false;
-      this.advanceEndGameSequence();
+      const celebElapsed = (Date.now() - this.discoAvatarCelebrationStartTime) / 1000;
+      if (celebElapsed > 2.5) {
+        this.showDiscoAvatarCelebration = false;
+        this.advanceEndGameSequence();
+      }
       return;
     }
 
@@ -4257,6 +4270,10 @@ export class VillageLedgerGame {
     this.state.remixPlayed = true;
     this.state.celebrationTimer = 0;
     this.djSoundboardActive = false;
+    this.djStrobeActive = false;
+    this.djSpotlightActive = false;
+    this.djSmokeActive = false;
+    this.djLasersActive = false;
     this.djBoothWorldX = this.villageElder.x;
     this.djSwapInProgress = false;
     this.djPlayerAtBooth = false;
@@ -5856,6 +5873,15 @@ export class VillageLedgerGame {
       }
     }
     
+    // Auto-dismiss disco avatar celebration after 8 seconds (fallback timeout)
+    if (this.showDiscoAvatarCelebration) {
+      const celebElapsed = (Date.now() - this.discoAvatarCelebrationStartTime) / 1000;
+      if (celebElapsed > 8) {
+        this.showDiscoAvatarCelebration = false;
+        this.advanceEndGameSequence();
+      }
+    }
+    
     if (this.state.showThunderstorm) {
       this.state.thunderstormTimer += dt;
       if (this.state.thunderstormTimer > 3.5 && !this.stormFailureActive) {
@@ -6179,6 +6205,10 @@ export class VillageLedgerGame {
   
   private endDiscoParty(): void {
     this.djSoundboardActive = false;
+    this.djStrobeActive = false;
+    this.djSpotlightActive = false;
+    this.djSmokeActive = false;
+    this.djLasersActive = false;
     this.djSwapInProgress = false;
     this.djPlayerAtBooth = false;
     this.djElderOnFloor = false;
@@ -6267,6 +6297,10 @@ export class VillageLedgerGame {
     this.state.phase = 'loop2_return';
     this.state.showCelebration = true;
     this.djSoundboardActive = false;
+    this.djStrobeActive = false;
+    this.djSpotlightActive = false;
+    this.djSmokeActive = false;
+    this.djLasersActive = false;
     this.djBoothWorldX = this.villageElder.x;
     this.djSwapInProgress = false;
     this.djPlayerAtBooth = false;
@@ -7447,6 +7481,7 @@ export class VillageLedgerGame {
     }
     this.drawDialogueBox(ctx);
     this.drawPartyHint(ctx);
+    this.drawDJEffects(ctx);
     this.drawDJSoundboard(ctx);
     this.drawDJModeButton(ctx);
     this.drawDJHintBubble(ctx);
@@ -12375,6 +12410,90 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.restore();
   }
 
+  private drawDJEffects(ctx: CanvasRenderingContext2D): void {
+    if (!this.state.showCelebration || !this.djSoundboardActive) return;
+
+    const w = this.logicalWidth;
+    const playAreaH = this.logicalHeight - this.dialogueBoxHeight;
+    const now = Date.now();
+
+    if (this.djStrobeActive) {
+      const strobePhase = Math.floor(now / 80) % 3;
+      if (strobePhase === 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, w, playAreaH);
+        ctx.restore();
+      }
+    }
+
+    if (this.djSpotlightActive) {
+      ctx.save();
+      const beamColors = ['rgba(255,0,0,0.12)', 'rgba(0,255,0,0.12)', 'rgba(0,100,255,0.12)', 'rgba(255,0,255,0.12)'];
+      for (let i = 0; i < 4; i++) {
+        const angle = (now * 0.001 + i * Math.PI / 2) % (Math.PI * 2);
+        const beamX = w / 2 + Math.cos(angle) * w * 0.4;
+        const grad = ctx.createRadialGradient(w / 2, 0, 0, beamX, playAreaH, w * 0.3);
+        grad.addColorStop(0, beamColors[i]);
+        grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, w, playAreaH);
+      }
+      ctx.restore();
+    }
+
+    if (this.djSmokeActive) {
+      ctx.save();
+      const smokeElapsed = (now - this.djSmokeStartTime) / 1000;
+      const smokeHeight = Math.min(playAreaH * 0.4, smokeElapsed * 30);
+      const grad = ctx.createLinearGradient(0, playAreaH, 0, playAreaH - smokeHeight);
+      const smokeAlpha = 0.15 + 0.05 * Math.sin(now * 0.002);
+      grad.addColorStop(0, `rgba(200, 200, 220, ${smokeAlpha})`);
+      grad.addColorStop(0.5, `rgba(180, 180, 200, ${smokeAlpha * 0.6})`);
+      grad.addColorStop(1, 'transparent');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, playAreaH - smokeHeight, w, smokeHeight);
+      
+      for (let i = 0; i < 8; i++) {
+        const px = (w * 0.1) + (i * w * 0.1) + Math.sin(now * 0.0008 + i * 2) * 30;
+        const py = playAreaH - (smokeHeight * 0.3) - Math.sin(now * 0.001 + i) * 20;
+        const pAlpha = 0.08 + 0.04 * Math.sin(now * 0.002 + i * 1.5);
+        ctx.fillStyle = `rgba(220, 220, 240, ${pAlpha})`;
+        ctx.beginPath();
+        ctx.arc(px, py, 15 + Math.sin(now * 0.003 + i) * 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    if (this.djLasersActive) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const laserColors = ['#FF0040', '#00FF80', '#0080FF', '#FF00FF', '#FFFF00'];
+      for (let i = 0; i < 5; i++) {
+        const startX = w * (0.2 + i * 0.15);
+        const endX = startX + Math.sin(now * 0.003 + i) * w * 0.3;
+        
+        ctx.strokeStyle = laserColors[i];
+        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 0.4 + 0.2 * Math.sin(now * 0.005 + i * 0.8);
+        ctx.beginPath();
+        ctx.moveTo(startX, 0);
+        ctx.lineTo(endX, playAreaH);
+        ctx.stroke();
+        
+        ctx.lineWidth = 4;
+        ctx.globalAlpha = 0.1 + 0.05 * Math.sin(now * 0.005 + i * 0.8);
+        ctx.beginPath();
+        ctx.moveTo(startX, 0);
+        ctx.lineTo(endX, playAreaH);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
   private drawDJSoundboard(ctx: CanvasRenderingContext2D): void {
     if (!this.state.showCelebration || !this.djSoundboardActive || !this.state.djModeUnlocked) return;
     if (this.state.currentDialogue) return;
@@ -12465,15 +12584,19 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     });
     
     const sfxList = [
-      { sfxName: 'recordScratch', label: 'Scratch' },
-      { sfxName: 'djTransAirhorn', label: 'Air Horn' },
+      { sfxName: 'recordScratch1', label: 'Scratch' },
+      { sfxName: 'djTransAirhorn1', label: 'Air Horn' },
       { sfxName: 'djTransLaser', label: 'Laser' },
       { sfxName: 'djTransHorns', label: 'Horns' },
+      { sfxName: 'djTransScratch', label: 'DJ Scratch' },
+      { sfxName: 'djTransAirhorn2', label: 'Horn 2' },
+      { sfxName: 'discoBallHit1', label: 'Disco Hit' },
+      { sfxName: 'discoBallHit2', label: 'Disco Hit 2' },
     ];
     
     const sfxBtnW = 62;
-    const sfxBtnH = 28;
-    const sfxGap = 6;
+    const sfxBtnH = 24;
+    const sfxGap = 4;
     const sfxStartX = gridStartX + 2 * (btnW + gapX) + 12;
     const sfxStartY = gridStartY;
     
@@ -12504,6 +12627,61 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillStyle = '#87CEEB';
       ctx.textAlign = 'center';
       ctx.fillText(sfx.label, sx + sfxBtnW / 2, sy + sfxBtnH / 2 + 3);
+    });
+    
+    const effectsList = [
+      { effect: 'strobe', label: 'STROBE' },
+      { effect: 'spotlight', label: 'LIGHTS' },
+      { effect: 'smoke', label: 'SMOKE' },
+      { effect: 'lasers', label: 'LASERS' },
+    ];
+
+    const effectBtnW = 56;
+    const effectBtnH = 24;
+    const effectGap = 4;
+
+    let effectStartX: number, effectStartY: number;
+    const afterSfxX = sfxStartX + 2 * (sfxBtnW + sfxGap) + 12;
+    if (afterSfxX + 2 * (effectBtnW + effectGap) < w - 10) {
+      effectStartX = afterSfxX;
+      effectStartY = gridStartY;
+    } else {
+      effectStartX = sfxStartX;
+      effectStartY = sfxStartY + 4 * (sfxBtnH + sfxGap) + 14;
+    }
+
+    ctx.font = `bold 9px ${this.uiFont}`;
+    ctx.fillStyle = '#C4A77D';
+    ctx.textAlign = 'center';
+    ctx.fillText('EFFECTS', effectStartX + effectBtnW / 2 + effectBtnW / 2 + effectGap / 2, boxY + 16);
+
+    this.djEffectButtons = [];
+
+    effectsList.forEach((eff, i) => {
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+      const ex = effectStartX + col * (effectBtnW + effectGap);
+      const ey = effectStartY + row * (effectBtnH + effectGap);
+
+      const isActive = (eff.effect === 'strobe' && this.djStrobeActive) ||
+                       (eff.effect === 'spotlight' && this.djSpotlightActive) ||
+                       (eff.effect === 'smoke' && this.djSmokeActive) ||
+                       (eff.effect === 'lasers' && this.djLasersActive);
+
+      this.djEffectButtons.push({ x: ex, y: ey, w: effectBtnW, h: effectBtnH, effect: eff.effect, label: eff.label });
+
+      ctx.fillStyle = isActive ? 'rgba(255, 0, 200, 0.4)' : 'rgba(200, 0, 255, 0.15)';
+      ctx.beginPath();
+      ctx.roundRect(ex, ey, effectBtnW, effectBtnH, 6);
+      ctx.fill();
+      ctx.strokeStyle = isActive ? '#FF00C8' : '#9933FF';
+      ctx.lineWidth = isActive ? 2 : 1;
+      ctx.stroke();
+
+      ctx.font = `bold 8px ${this.uiFont}`;
+      ctx.fillStyle = isActive ? '#FFAAEE' : '#CC99FF';
+      ctx.textAlign = 'center';
+      ctx.fillText(eff.label, ex + effectBtnW / 2, ey + effectBtnH / 2 + 3);
     });
     
     ctx.font = `8px ${this.uiFont}`;
@@ -12564,6 +12742,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       const btn = this.djSoundboardCloseBtn;
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
         this.djSoundboardActive = false;
+        this.djStrobeActive = false;
+        this.djSpotlightActive = false;
+        this.djSmokeActive = false;
+        this.djLasersActive = false;
         this.djSwapInProgress = true;
         this.djPlayerAtBooth = false;
         this.djElderOnFloor = false;
@@ -12597,19 +12779,31 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     for (const btn of this.djSfxButtons) {
       if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
-        switch (btn.sfxName) {
-          case 'recordScratch':
-            soundManager.playRandomRecordScratch();
-            break;
-          case 'djTransAirhorn':
-            soundManager.play('djTransAirhorn1');
-            break;
-          case 'djTransLaser':
-            soundManager.play('djTransLaser');
-            break;
-          case 'djTransHorns':
-            soundManager.play('djTransHorns');
-            break;
+        if (btn.sfxName === 'recordScratch1') {
+          soundManager.playRandomRecordScratch();
+        } else {
+          soundManager.play(btn.sfxName as SoundName);
+        }
+        return true;
+      }
+    }
+    
+    for (const btn of this.djEffectButtons) {
+      if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+        soundManager.play('buttonClick');
+        const now = Date.now();
+        if (btn.effect === 'strobe') {
+          this.djStrobeActive = !this.djStrobeActive;
+          this.djStrobeStartTime = now;
+        } else if (btn.effect === 'spotlight') {
+          this.djSpotlightActive = !this.djSpotlightActive;
+          this.djSpotlightStartTime = now;
+        } else if (btn.effect === 'smoke') {
+          this.djSmokeActive = !this.djSmokeActive;
+          this.djSmokeStartTime = now;
+        } else if (btn.effect === 'lasers') {
+          this.djLasersActive = !this.djLasersActive;
+          this.djLasersStartTime = now;
         }
         return true;
       }
@@ -14563,7 +14757,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.92)';
     ctx.fillRect(0, 0, w, h);
     
-    if (elapsed < 3) {
+    {
       const discoSprite = this.processedSprites['player-disco'];
       const bigSize = Math.min(h / 3, w / 3);
       const bigX = (w - bigSize) / 2;
@@ -14640,98 +14834,23 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         ctx.fillText('NEW AVATAR UNLOCKED!', w / 2, bigY + bigSize + 40);
         ctx.globalAlpha = fadeIn;
       }
-      
-    } else {
-      const phase2Elapsed = elapsed - 3;
-      const phase2FadeIn = Math.min(1, phase2Elapsed / 0.5);
-      ctx.globalAlpha = fadeIn * phase2FadeIn;
-      
-      const cardW = 300;
-      const cardH = 260;
-      const cardX = (w - cardW) / 2;
-      const cardY = (h - cardH) / 2;
-      
-      const pulsePhase = Math.sin(now * 0.004) * 0.5 + 0.5;
-      const glowAlpha = 0.4 + pulsePhase * 0.6;
-      
-      ctx.save();
-      ctx.shadowColor = `rgba(255, 215, 0, ${glowAlpha})`;
-      ctx.shadowBlur = 20 + pulsePhase * 15;
-      
-      const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
-      gradient.addColorStop(0, '#4A3728');
-      gradient.addColorStop(1, '#2D1B0E');
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.roundRect(cardX, cardY, cardW, cardH, 16);
-      ctx.fill();
-      
-      const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
-      borderGrad.addColorStop(0, '#FFD700');
-      borderGrad.addColorStop(0.5, '#FFA500');
-      borderGrad.addColorStop(1, '#FFD700');
-      ctx.strokeStyle = borderGrad;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.restore();
-      
-      const sparkleCount = 12;
-      for (let s = 0; s < sparkleCount; s++) {
-        const angle = (now * 0.001 + s * (Math.PI * 2 / sparkleCount)) % (Math.PI * 2);
-        const radius = Math.max(cardW, cardH) / 2 + 20;
-        const sparkleX = w / 2 + Math.cos(angle) * radius;
-        const sparkleY = h / 2 + Math.sin(angle) * radius * 0.7;
-        const sparkleAlpha = 0.3 + Math.sin(now * 0.005 + s) * 0.4;
-        const sparkleSize = 3 + Math.sin(now * 0.003 + s * 0.7) * 2;
-        ctx.fillStyle = `rgba(255, 215, 0, ${Math.max(0, sparkleAlpha)})`;
-        ctx.beginPath();
-        ctx.moveTo(sparkleX, sparkleY - sparkleSize);
-        ctx.lineTo(sparkleX + sparkleSize * 0.4, sparkleY);
-        ctx.lineTo(sparkleX, sparkleY + sparkleSize);
-        ctx.lineTo(sparkleX - sparkleSize * 0.4, sparkleY);
-        ctx.closePath();
-        ctx.fill();
+
+      if (elapsed > 1.5) {
+        const msgAlpha = Math.min(1, (elapsed - 1.5) / 0.5);
+        ctx.globalAlpha = fadeIn * msgAlpha;
+        ctx.font = `11px ${this.uiFont}`;
+        ctx.fillStyle = '#E8D5A8';
+        ctx.fillText('Want to try on your new outfit now?', w / 2, bigY + bigSize + 62);
+        ctx.fillText("Maybe you'll get to DJ next time!", w / 2, bigY + bigSize + 80);
+        ctx.globalAlpha = fadeIn;
       }
-      
-      ctx.save();
-      ctx.shadowColor = `rgba(255, 215, 0, ${0.6 + pulsePhase * 0.4})`;
-      ctx.shadowBlur = 10;
-      ctx.font = `bold 18px ${this.uiFont}`;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#FFD700';
-      ctx.fillText('NEW AVATAR UNLOCKED!', w / 2, cardY + 40);
-      ctx.restore();
-      
-      const discoSprite = this.processedSprites['player-disco'];
-      const baseSize = 64;
-      const breathe = Math.sin(now * 0.004) * 2;
-      const spriteSize = baseSize + breathe;
-      const spriteX = (w - spriteSize) / 2;
-      const spriteBaseY = cardY + 55 + (baseSize - spriteSize) / 2;
-      
-      if (discoSprite) {
-        ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
-        ctx.beginPath();
-        ctx.arc(w / 2, cardY + 55 + baseSize / 2, baseSize * 0.6, 0, Math.PI * 2);
-        ctx.fill();
-        
-        ctx.drawImage(discoSprite, spriteX, spriteBaseY, spriteSize, spriteSize);
+
+      if (elapsed > 2.5) {
+        const tapAlpha = 0.5 + 0.3 * Math.sin(now * 0.003);
+        ctx.font = `10px ${this.uiFont}`;
+        ctx.fillStyle = `rgba(196, 167, 125, ${tapAlpha})`;
+        ctx.fillText('Tap to continue', w / 2, bigY + bigSize + 105);
       }
-      
-      ctx.font = `bold 14px ${this.uiFont}`;
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#E040FB';
-      ctx.fillText('Disco Avatar Earned!', w / 2, cardY + 145);
-      
-      ctx.font = `11px ${this.uiFont}`;
-      ctx.fillStyle = '#C4A77D';
-      ctx.fillText('Play again to use your new look!', w / 2, cardY + 170);
-      ctx.fillText('Find it in Settings to turn it on.', w / 2, cardY + 188);
-      
-      const tapAlpha = 0.5 + 0.3 * Math.sin(now * 0.003);
-      ctx.font = `10px ${this.uiFont}`;
-      ctx.fillStyle = `rgba(196, 167, 125, ${tapAlpha})`;
-      ctx.fillText('Tap to continue', w / 2, cardY + cardH - 20);
     }
     
     ctx.globalAlpha = 1;
@@ -14761,16 +14880,14 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
     ctx.fillRect(0, 0, w, h);
     
-    // Badge summary card - taller for badge grid
     const cardW = Math.min(520, w - 40);
-    const hasChampion = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE;
     const reflectionAnswer = localStorage.getItem('makingMoney_moneyAnswer');
     const hasReflection = !!reflectionAnswer;
-    let baseCardH = hasChampion ? 440 : 420;
+    let baseCardH = 200;
     if (hasReflection) baseCardH += 100;
     const currentPlayCountForHeight = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
     if (currentPlayCountForHeight === 1) baseCardH += 20;
-    if (this.discoAvatarJustUnlocked) baseCardH += 30;
+    if (this.discoAvatarJustUnlocked) baseCardH += 20;
     const cardH = Math.min(baseCardH, h - 30);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
@@ -14793,147 +14910,31 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = '#FFD700';
     ctx.fillText('LESSON COMPLETE!', w / 2, cardY + 35);
     
-    // Badge count
-    const badgeCount = this.state.badges.length;
-    const totalBadges = this.ALL_BADGES.length;
+    // Player name
     ctx.font = `12px ${this.uiFont}`;
     ctx.fillStyle = '#C4A77D';
-    ctx.fillText(`${badgeCount} of ${totalBadges} badges earned`, w / 2, cardY + 58);
-    
-    if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE) {
-      ctx.font = `bold 10px ${this.uiFont}`;
-      ctx.fillStyle = '#FFD700';
-      ctx.fillText('Party Champion!', w / 2, cardY + 72);
-      ctx.font = `8px ${this.uiFont}`;
-      ctx.fillStyle = '#C4A77D';
-      ctx.fillText(`Slingshot Score: ${this.state.slingshotScore}`, w / 2, cardY + 85);
-    }
-
-    // Badge grid - row of 3 + centered row of 2 (matching badge tray panel layout)
-    const badgeSize = 55;
-    const gapX = 16;
-    const gapY = 14;
-    const rowHeight = badgeSize + gapY + 32;
-    const hasPartyChampion = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE;
-    const startY = cardY + (hasPartyChampion ? 98 : 75);
-    
-    this.successBadgeAreas = [];
-    this.ALL_BADGES.forEach((badge, i) => {
-      let bx: number, by: number;
-      if (i < 3) {
-        const topRowW = 3 * badgeSize + 2 * gapX;
-        const topStartX = (w - topRowW) / 2;
-        bx = topStartX + i * (badgeSize + gapX);
-        by = startY;
-      } else {
-        const botRowW = 3 * badgeSize + 2 * gapX;
-        const botStartX = (w - botRowW) / 2;
-        bx = botStartX + (i - 3) * (badgeSize + gapX);
-        by = startY + rowHeight;
-      }
-      const earned = this.state.badges.includes(badge.name);
-      
-      this.successBadgeAreas.push({ x: bx, y: by, w: badgeSize, h: badgeSize, index: i });
-      
-      // Badge circle
-      if (earned) {
-        ctx.fillStyle = '#4A3728';
-        ctx.strokeStyle = '#FFD700';
-      } else {
-        ctx.fillStyle = '#2A1A0E';
-        ctx.strokeStyle = '#444';
-      }
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(bx + badgeSize / 2, by + badgeSize / 2, badgeSize / 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      
-      if (earned) {
-        // Gold star
-        const cx = bx + badgeSize / 2;
-        const cy = by + badgeSize / 2;
-        ctx.fillStyle = '#FFD700';
-        ctx.beginPath();
-        for (let j = 0; j < 5; j++) {
-          const angle = (j * 4 * Math.PI / 5) - Math.PI / 2;
-          const px = cx + Math.cos(angle) * 14;
-          const py = cy + Math.sin(angle) * 14;
-          if (j === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.fill();
-      } else {
-        // Lock icon
-        ctx.fillStyle = '#555';
-        ctx.font = `bold 18px ${this.uiFont}`;
-        ctx.textAlign = 'center';
-        ctx.fillText('?', bx + badgeSize / 2, by + badgeSize / 2 + 8);
-      }
-      
-      // Badge name
-      ctx.font = `bold 10px ${this.uiFont}`;
-      ctx.fillStyle = earned ? '#F5DEB3' : '#666';
-      ctx.textAlign = 'center';
-      
-      const nameWords = badge.name.split(' ');
-      let nameLine = '';
-      let nameY = by + badgeSize + 14;
-      for (const word of nameWords) {
-        const test = nameLine + word + ' ';
-        if (ctx.measureText(test).width > badgeSize + 10 && nameLine !== '') {
-          ctx.fillText(nameLine.trim(), bx + badgeSize / 2, nameY);
-          nameLine = word + ' ';
-          nameY += 12;
-        } else {
-          nameLine = test;
-        }
-      }
-      if (nameLine.trim()) {
-        ctx.fillText(nameLine.trim(), bx + badgeSize / 2, nameY);
-      }
-    });
-    
-    // Encouragement message
-    const msgY = startY + 2 * rowHeight + 10;
-    ctx.font = `11px ${this.uiFont}`;
-    ctx.fillStyle = '#C4A77D';
-    ctx.textAlign = 'center';
-    
-    if (badgeCount >= totalBadges) {
-      ctx.fillStyle = '#FFD700';
-      ctx.fillText('Amazing! You collected every badge!', w / 2, msgY);
-      ctx.font = `9px ${this.uiFont}`;
-      ctx.fillStyle = '#C4A77D';
-      ctx.fillText('You are a true Money Scholar!', w / 2, msgY + 18);
-    } else if (badgeCount >= 4) {
-      ctx.fillText('Great job! Can you earn them all?', w / 2, msgY);
-      ctx.font = `9px ${this.uiFont}`;
-      ctx.fillText('Play again to collect the missing badges!', w / 2, msgY + 18);
-    } else {
-      ctx.fillText(`${totalBadges - badgeCount} badges still locked!`, w / 2, msgY);
-      ctx.font = `9px ${this.uiFont}`;
-      ctx.fillText('Play again to discover more concepts!', w / 2, msgY + 18);
-    }
+    ctx.fillText(this.playerName, w / 2, cardY + 58);
 
     const currentPlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    let msgY = cardY + 75;
+
     if (currentPlayCount === 1) {
       ctx.font = `bold 10px ${this.uiFont}`;
       ctx.fillStyle = '#00BFFF';
       ctx.textAlign = 'center';
-      ctx.fillText('Play again to be the DJ!', w / 2, msgY + 32);
+      ctx.fillText('Play again to be the DJ!', w / 2, msgY);
+      msgY += 18;
     }
 
     if (this.discoAvatarJustUnlocked) {
-      const avatarMsgY = currentPlayCount === 1 ? msgY + 48 : msgY + 32;
       ctx.font = `bold 10px ${this.uiFont}`;
       ctx.fillStyle = '#E040FB';
       ctx.textAlign = 'center';
-      ctx.fillText('Disco Avatar unlocked! Enable in Settings.', w / 2, avatarMsgY);
+      ctx.fillText('Disco Avatar unlocked! Enable in Settings.', w / 2, msgY);
+      msgY += 18;
     }
 
-    const hintY = msgY + 55;
+    const hintY = msgY + 10;
 
     // Reflection comparison - "Your Journey"
     if (hasReflection) {

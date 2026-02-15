@@ -6018,8 +6018,10 @@ export class VillageLedgerGame {
     this.state.dialogueQueue = [];
     this.state.showChoice = false;
     this.state.choiceOptions = [];
-    this.villageElder.x = this.player.x + 60;
-    this.villageElder.targetX = this.player.x + 60;
+    this.player.x = this.villageCenterX;
+    this.player.targetX = this.villageCenterX;
+    this.villageElder.x = this.villageCenterX + 60;
+    this.villageElder.targetX = this.villageCenterX + 60;
     this.presentFirstRecordAndStartParty();
   }
 

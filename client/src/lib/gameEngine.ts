@@ -5806,11 +5806,12 @@ export class VillageLedgerGame {
             }, 3000);
           } else {
             this.partySongEndTime = 0;
-            this.endDiscoParty();
           }
-        } else {
+        } else if (!this.playerManuallySelectedGenre && !this.shufflePlaylistActive) {
           this.partySongEndTime = 0;
           this.endDiscoParty();
+        } else {
+          this.partySongEndTime = 0;
         }
       }
       this.updateDancingNPCs(dt);

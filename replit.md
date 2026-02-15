@@ -19,7 +19,7 @@
 - **Core Mechanics**: Dialogue system, NPC interaction, "Stone Tablet" HUD for debt tracking, item gifting on credit, brawl triggers, mood system, environmental transitions, "Double Coincidence of Wants" demonstration, and a badge system.
 - **Game Progression**: Features a two-loop system (Failure Path with verbal promises, Success Path with Stone Tablet for recording debts), including "NPC-First" and "Elder-First" settlement approaches and escort mechanics. A "Smart Path" allows players to suggest a recording system via keyword matching, skipping the initial failure loop.
 - **Badge System**: 5 collectible badges (Double Coincidence of Wants, Debt, The Ledger, Debt Settled, Gold Records) with persistent HUD and tap-to-expand panel.
-- **Quiz System**: Two types: DJ Quiz (1-2 questions, gated, leads to song choice) and Final Quiz (5 review questions, non-gated). Questions are sourced from a centralized `quizBank.ts`. Includes "Quick Check!" pop-ups. Quiz retry only repeats wrong questions. Options use dynamic A/B/C/D labels after randomization.
+- **Quiz System**: Two types: DJ Quiz (1-2 questions, gated, leads to song choice) and Final Quiz (5 review questions, non-gated). Questions are sourced from a centralized `quizBank.ts`. Includes "Quick Check!" pop-ups. Quiz retry only repeats wrong questions. Options use dynamic A/B/C/D labels after randomization. Age-based difficulty: players under 10 get simpler wrong answers, players 10+ get longer/more plausible wrong answers to prevent guessing by length.
 - **Slingshot Balloon-Pop Mini-Game**: An "Angry Birds"-style physics-based mini-game during the party, with score tracking and collision detection for various world elements.
 - **Party Flow**: Time-based event with a storm countdown and progressive atmospheric effects, requiring player action (roof repair). Party graphics fade after repair.
 - **Audio System**: Web Audio API with `AudioContext` for dynamic soundscapes, including layered audio, dynamic background music, and independent volume controls persisted to localStorage.
@@ -32,10 +32,10 @@
 - **DJ Soundboard Mode**: Unlocked after first playthrough completion. On 2nd+ playthroughs during the party, a pulsing "DJ" button appears in the top-right corner. Tapping it opens a soundboard in the dialogue box area with a 2-column grid of unlocked genres (tap to switch songs instantly with scratch transition) and 8 SFX buttons (Scratch, Air Horn, Laser, Horns, DJ Scratch, Horn 2, Disco Hit 1 & 2) and 4 visual effect buttons (STROBE, LIGHTS, SMOKE, LASERS) with canvas-based effects. Unlimited song switching when DJ mode is active. Close button (X) exits the soundboard. Party educational hints are suppressed while soundboard is open.
 - **DJ Teaser**: First playthrough success screen shows "Come back and YOU can be the DJ!" message to encourage replay.
 - **2nd Playthrough Auto-Unlock**: At end of 2nd playthrough, ALL remaining uncollected genres are unlocked at once, triggering the Gold Record badge and award if applicable.
-- **Player Customization**: Player name input for dialogue and ledger entries. Disco avatar sprite unlocks after first playthrough completion (decoupled from genre collection). Music Scholar/Gold Records badge still requires all genres collected.
+- **Player Customization**: Player name and age input on setup screen for dialogue, ledger entries, and quiz difficulty. Disco avatar sprite unlocks after first playthrough completion (decoupled from genre collection). Gold Records badge still requires all genres collected.
 - **Settings Menu**: Provides access to sound settings, game instructions, credits, fullscreen toggle, and game restart/reset options.
 - **End-of-Game Reflection**: Players can provide and revise their definition of money, which is displayed on the success screen.
-- **Screen Flow**: Phased loading and asset optimization for smooth transitions from loading to gameplay.
+- **Screen Flow**: Loading screen → Title screen ("MAKING MONEY" with Play button) → Player setup (name + age) → Gameplay. Reflection question is end-of-game only.
 
 ### Backend
 - **Server**: Express.js with TypeScript for API routes and static asset serving.

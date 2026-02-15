@@ -1202,6 +1202,7 @@ export class VillageLedgerGame {
               localStorage.removeItem('makingMoney_completionCount');
               localStorage.removeItem('makingMoney_earnedBadges');
               localStorage.removeItem('makingMoney_playerName');
+              localStorage.removeItem('makingMoney_playerAge');
               localStorage.removeItem('makingMoney_useDiscoSprite');
               localStorage.removeItem('makingMoney_postReflection');
               this.showResetConfirm = false;

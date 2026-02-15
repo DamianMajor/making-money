@@ -552,6 +552,7 @@ function GearSettingsButton() {
           localStorage.removeItem('makingMoney_earnedBadges');
           localStorage.removeItem('makingMoney_completionCount');
           localStorage.removeItem('makingMoney_playerName');
+          localStorage.removeItem('makingMoney_playerAge');
           localStorage.removeItem('makingMoney_useDiscoSprite');
           localStorage.removeItem('makingMoney_discoUnlocked');
           setSubmenu('main');
@@ -655,8 +656,9 @@ function GearSettingsButton() {
   );
 }
 
-function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void }) {
-  const [answer, setAnswer] = useState('');
+function PlayerSetupScreen({ onContinue }: { onContinue: (name: string, age: number | null) => void }) {
+  const [name, setName] = useState('');
+  const [age, setAge] = useState('');
   const musicStartedRef = useRef(false);
 
   const startMusicOnInteraction = useCallback(() => {
@@ -669,8 +671,6 @@ function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void
   }, []);
 
   useEffect(() => {
-    soundManager.prefetch();
-
     const handler = () => startMusicOnInteraction();
     document.addEventListener('click', handler, { once: true });
     document.addEventListener('touchstart', handler, { once: true });
@@ -682,7 +682,8 @@ function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void
 
   const handleContinue = () => {
     startMusicOnInteraction();
-    onContinue(answer);
+    const parsedAge = age.trim() ? parseInt(age.trim(), 10) : null;
+    onContinue(name, (parsedAge && !isNaN(parsedAge) && parsedAge > 0 && parsedAge < 120) ? parsedAge : null);
   };
 
   return (
@@ -692,145 +693,41 @@ function ReflectionScreen({ onContinue }: { onContinue: (answer: string) => void
         background: 'linear-gradient(180deg, #1a1208 0%, #2d1f0e 30%, #3d2b14 60%, #2a1c0a 100%)',
         zIndex: 50
       }}
-      data-testid="reflection-screen"
+      data-testid="setup-screen"
     >
       <GearSettingsButton />
       <div className="flex flex-col items-center max-w-lg w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
         <h2
-          className="text-center mb-6"
-          style={{
-            fontFamily: '"Press Start 2P", monospace',
-            fontSize: 'clamp(16px, 4vw, 28px)',
-            color: '#E8D5A8',
-            textShadow: '2px 2px 0px #5a4a32, 0 0 15px rgba(255,215,100,0.4)',
-            lineHeight: 1.4
-          }}
-          data-testid="text-reflection-title"
-        >
-          What is Money?
-        </h2>
-        <p
           className="text-center mb-8"
           style={{
-            fontFamily: 'Georgia, serif',
-            fontSize: 'clamp(12px, 2.5vw, 16px)',
-            color: '#B8A07A',
-            lineHeight: 1.7
-          }}
-          data-testid="text-reflection-description"
-        >
-        </p>
-        <label
-          className="w-full mb-2 text-center"
-          style={{
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: 'clamp(8px, 1.5vw, 10px)',
-            color: '#9B8A6A',
-            display: 'block'
-          }}
-          data-testid="text-reflection-label"
-        >
-        </label>
-        <textarea
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Type your answer here."
-          className="w-full mb-6"
-          style={{
-            fontFamily: 'Georgia, serif',
-            fontSize: 'clamp(12px, 2vw, 15px)',
-            textAlign: 'center',
-            color: '#E8D5A8',
-            background: 'rgba(30, 22, 12, 0.8)',
-            border: '2px solid #5a4a32',
-            borderRadius: '8px',
-            padding: 'calc((80px - 1.5em) / 2) 14px',
-            minHeight: '80px',
-            resize: 'none',
-            outline: 'none',
-          }}
-          data-testid="input-reflection-answer"
-        />
-        <button
-          onClick={handleContinue}
-          className="cursor-pointer"
-          style={{
-            fontFamily: '"Press Start 2P", monospace',
-            fontSize: 'clamp(10px, 2.5vw, 14px)',
-            color: '#1a1208',
-            background: 'linear-gradient(180deg, #C9B896 0%, #a89478 100%)',
-            border: '2px solid #8B7355',
-            borderRadius: '8px',
-            padding: '14px 32px',
-            textShadow: '0 1px 0 rgba(255,255,255,0.2)',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
-            transition: 'transform 0.1s, box-shadow 0.1s',
-          }}
-          onMouseDown={(e) => {
-            e.currentTarget.style.transform = 'scale(0.97)';
-            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
-          }}
-          data-testid="button-continue"
-        >
-          Continue
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function NameInputScreen({ onContinue }: { onContinue: (name: string) => void }) {
-  const [name, setName] = useState('');
-
-  const handleContinue = () => {
-    if (name.trim()) {
-      localStorage.setItem('makingMoney_playerName', name.trim());
-    }
-    onContinue(name);
-  };
-
-  const handleSkip = () => {
-    onContinue('');
-  };
-
-  return (
-    <div
-      className="fixed inset-0 w-full h-full flex items-center justify-center"
-      style={{
-        background: 'linear-gradient(180deg, #1a1208 0%, #2d1f0e 30%, #3d2b14 60%, #2a1c0a 100%)',
-        zIndex: 50
-      }}
-      data-testid="name-input-screen"
-    >
-      <GearSettingsButton />
-      <div className="flex flex-col items-center max-w-lg w-full px-6 py-8" style={{ position: 'relative', zIndex: 1 }}>
-        <h2
-          className="text-center mb-6"
-          style={{
-            fontFamily: '"Press Start 2P", monospace',
-            fontSize: 'clamp(16px, 4vw, 28px)',
+            fontSize: 'clamp(14px, 3.5vw, 22px)',
             color: '#E8D5A8',
             textShadow: '2px 2px 0px #5a4a32, 0 0 15px rgba(255,215,100,0.4)',
             lineHeight: 1.4
           }}
-          data-testid="text-name-title"
+          data-testid="text-setup-title"
         >
-          Choose a name.
+          Before We Begin...
         </h2>
+
+        <label
+          className="w-full mb-2"
+          style={{
+            fontFamily: '"Press Start 2P", monospace',
+            fontSize: 'clamp(7px, 1.2vw, 9px)',
+            color: '#9B8A6A',
+            display: 'block',
+            textAlign: 'center'
+          }}
+        >
+          YOUR NAME
+        </label>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) handleContinue(); }}
-          placeholder="Choose your character's name"
+          placeholder="Enter your name"
           maxLength={15}
           autoFocus
           className="w-full mb-6"
@@ -848,6 +745,43 @@ function NameInputScreen({ onContinue }: { onContinue: (name: string) => void })
           }}
           data-testid="input-player-name"
         />
+
+        <label
+          className="w-full mb-2"
+          style={{
+            fontFamily: '"Press Start 2P", monospace',
+            fontSize: 'clamp(7px, 1.2vw, 9px)',
+            color: '#9B8A6A',
+            display: 'block',
+            textAlign: 'center'
+          }}
+        >
+          YOUR AGE
+        </label>
+        <input
+          type="number"
+          value={age}
+          onChange={(e) => setAge(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleContinue(); }}
+          placeholder="Enter your age"
+          min={1}
+          max={120}
+          className="w-full mb-8"
+          style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 'clamp(12px, 2vw, 15px)',
+            textAlign: 'center',
+            color: '#E8D5A8',
+            background: 'rgba(30, 22, 12, 0.8)',
+            border: '2px solid #5a4a32',
+            borderRadius: '8px',
+            padding: '14px',
+            height: '50px',
+            outline: 'none',
+          }}
+          data-testid="input-player-age"
+        />
+
         <button
           onClick={handleContinue}
           className="cursor-pointer"
@@ -875,12 +809,12 @@ function NameInputScreen({ onContinue }: { onContinue: (name: string) => void })
             e.currentTarget.style.transform = 'scale(1)';
             e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.2)';
           }}
-          data-testid="button-name-continue"
+          data-testid="button-setup-continue"
         >
-          Continue
+          Let's Go!
         </button>
         <button
-          onClick={handleSkip}
+          onClick={() => onContinue('', null)}
           className="cursor-pointer"
           style={{
             fontFamily: 'Georgia, serif',
@@ -894,7 +828,7 @@ function NameInputScreen({ onContinue }: { onContinue: (name: string) => void })
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = '#B8A07A'; }}
           onMouseLeave={(e) => { e.currentTarget.style.color = '#9B8A6A'; }}
-          data-testid="button-name-skip"
+          data-testid="button-setup-skip"
         >
           Skip
         </button>
@@ -1168,7 +1102,7 @@ export default function Game() {
   const gameRef = useRef<VillageLedgerGame | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const preloadedImagesRef = useRef<HTMLImageElement[]>([]);
-  const [screen, setScreen] = useState<'loading' | 'reflection' | 'name' | 'intro' | 'game'>('loading');
+  const [screen, setScreen] = useState<'loading' | 'intro' | 'setup' | 'game'>('loading');
   const [iconsPreloaded, setIconsPreloaded] = useState(false);
   const gameInitialized = useRef(false);
   const [smartPathPrompt, setSmartPathPrompt] = useState<string | null>(null);
@@ -1266,31 +1200,18 @@ export default function Game() {
       setTimeout(handleLoadingComplete, 100);
       return;
     }
-    setScreen('reflection');
+    setScreen('intro');
   }, [iconsPreloaded]);
 
-  const handleReflectionContinue = useCallback((answer: string) => {
-    if (answer.trim()) {
-      localStorage.setItem('makingMoney_moneyAnswer', answer.trim());
-    }
-    setScreen('name');
-  }, []);
-
-  const handleNameContinue = useCallback((name: string) => {
+  const handleSetupContinue = useCallback(async (name: string, age: number | null) => {
     if (name.trim()) {
       localStorage.setItem('makingMoney_playerName', name.trim());
     } else {
       localStorage.removeItem('makingMoney_playerName');
     }
-    setScreen('intro');
-  }, []);
-
-  const handleIntroMount = useCallback(() => {
-    initGameEngine();
-    soundManager.prefetch();
-  }, [initGameEngine]);
-
-  const handleGameStart = useCallback(async () => {
+    if (age !== null) {
+      localStorage.setItem('makingMoney_playerAge', String(age));
+    }
     if (!gameInitialized.current) {
       initGameEngine();
     }
@@ -1303,6 +1224,14 @@ export default function Game() {
       gameRef.current.beginGameplay();
     }
   }, [initGameEngine, handleResize]);
+
+  const handleIntroMount = useCallback(() => {
+    soundManager.prefetch();
+  }, []);
+
+  const handleGameStart = useCallback(() => {
+    setScreen('setup');
+  }, []);
 
   useEffect(() => {
     if (!isPortrait && gameRef.current) {
@@ -1559,9 +1488,8 @@ export default function Game() {
         </div>
       )}
       {screen === 'loading' && <LoadingScreen onLoaded={handleLoadingComplete} />}
-      {screen === 'reflection' && <ReflectionScreen onContinue={handleReflectionContinue} />}
-      {screen === 'name' && <NameInputScreen onContinue={handleNameContinue} />}
       {screen === 'intro' && <IntroScreen onStart={handleGameStart} onMount={handleIntroMount} preloadedImages={preloadedImagesRef.current} />}
+      {screen === 'setup' && <PlayerSetupScreen onContinue={handleSetupContinue} />}
     </div>
   );
 }

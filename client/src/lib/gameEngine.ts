@@ -1955,9 +1955,8 @@ export class VillageLedgerGame {
         soundManager.fadeIn('ambientNight', 1000);
         soundManager.fadeIn('backgroundMusicNight', 2000);
         setTimeout(() => {
-          this.state.showRainfall = false;
-          soundManager.fadeOut('rain', 2000);
-        }, 6000);
+          soundManager.fadeOut('rain', 3000);
+        }, 8000);
         
         setTimeout(() => {
           try {
@@ -2029,7 +2028,6 @@ export class VillageLedgerGame {
         
         setTimeout(() => {
           try {
-            this.state.showRainfall = false;
             soundManager.stop('thunder');
             soundManager.fadeOut('rain', 6000);
             soundManager.fadeOut('ambientNight', 1000);
@@ -6861,28 +6859,33 @@ export class VillageLedgerGame {
 
     if (this.state.slingshotLocked) {
       ctx.save();
-      ctx.textAlign = 'left';
+      ctx.textAlign = 'right';
       
       if (!this.state.slingshotScoreRecordAwarded) {
         const pointsLeft = Math.max(0, this.SLINGSHOT_TARGET_SCORE - this.state.slingshotScore);
-        ctx.font = `bold 14px ${this.uiFont}`;
+        ctx.font = `bold 18px ${this.uiFont}`;
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(`Score: ${this.state.slingshotScore}`, 20, groundY - 30);
-        ctx.font = `bold 12px ${this.uiFont}`;
+        ctx.fillText(`Score: ${this.state.slingshotScore}`, w - 20, groundY - 30);
+        ctx.font = `bold 16px ${this.uiFont}`;
         ctx.fillStyle = '#FFD700';
-        ctx.fillText(`${pointsLeft} pts to record!`, 20, groundY - 14);
+        ctx.fillText(`${pointsLeft} pts to record!`, w - 20, groundY - 14);
       } else {
-        ctx.font = `bold 14px ${this.uiFont}`;
+        ctx.font = `bold 18px ${this.uiFont}`;
         ctx.fillStyle = '#FFD700';
-        ctx.fillText(`Score: ${this.state.slingshotScore}`, 20, groundY - 30);
-        ctx.font = `bold 12px ${this.uiFont}`;
+        ctx.fillText(`Score: ${this.state.slingshotScore}`, w - 20, groundY - 30);
+        ctx.font = `bold 16px ${this.uiFont}`;
         ctx.fillStyle = '#2ECC71';
-        ctx.fillText('Record earned!', 20, groundY - 14);
+        ctx.fillText('Record earned!', w - 20, groundY - 14);
         ctx.textAlign = 'center';
-        ctx.font = `bold 12px ${this.uiFont}`;
-        const champPulse = 0.7 + 0.3 * Math.sin(Date.now() / 200);
-        ctx.fillStyle = `rgba(255, 215, 0, ${champPulse})`;
-        ctx.fillText('PARTY CHAMPION!', w / 2, groundY - 50);
+        const champT = this.state.celebrationTimer;
+        const champHue = (champT * 60) % 360;
+        const champPulse = Math.sin(champT * 5) * 8;
+        ctx.font = `24px ${this.retroFont}`;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.fillStyle = `hsl(${champHue}, 100%, 70%)`;
+        ctx.strokeText('PARTY CHAMPION!', w / 2, groundY - 50 + champPulse);
+        ctx.fillText('PARTY CHAMPION!', w / 2, groundY - 50 + champPulse);
       }
       
       ctx.restore();
@@ -7161,7 +7164,6 @@ export class VillageLedgerGame {
               
               setTimeout(() => {
                 try {
-                  this.state.showRainfall = false;
                   soundManager.stop('thunder');
                   soundManager.fadeOut('rain', 6000);
                   soundManager.fadeOut('ambientNight', 1000);
@@ -7372,12 +7374,6 @@ export class VillageLedgerGame {
       this.drawBadgePopup(ctx);
     }
 
-    if (this.showRecordReward) {
-      this.drawRecordRewardPopup(ctx);
-    }
-
-    this.drawGoldRecordAward(ctx);
-
     // Draw brawl animation if active
     if (this.state.showBrawl) {
       this.drawBrawlAnimation(ctx);
@@ -7561,6 +7557,10 @@ export class VillageLedgerGame {
       }
     }
 
+    if (this.showRecordReward) {
+      this.drawRecordRewardPopup(ctx);
+    }
+    this.drawGoldRecordAward(ctx);
     this.drawDiscoAvatarCelebration(ctx);
 
     this.drawDebugSkipButton(ctx);
@@ -8397,11 +8397,12 @@ export class VillageLedgerGame {
         ctx.fill();
       }
 
+      const laserOffset = 340;
       const worldXPositions = [
-        this.villageCenterX - 300,
-        this.villageCenterX + 300,
-        this.villageCenterX - 200,
-        this.villageCenterX + 200
+        this.villageCenterX - laserOffset,
+        this.villageCenterX + laserOffset,
+        this.villageCenterX - laserOffset,
+        this.villageCenterX + laserOffset
       ];
       for (let i = 0; i < 4; i++) {
         const isRight = (i % 2 === 1);
@@ -9048,6 +9049,10 @@ export class VillageLedgerGame {
         ctx.lineTo(x - 2, y + 15);
         ctx.stroke();
       }
+    }
+
+    if (this.state.showRainfall && t >= 4) {
+      this.state.showRainfall = false;
     }
     
     // No overlay after roof is fixed - the night background layers handle the visual
@@ -14461,91 +14466,176 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = 'rgba(0, 0, 0, 0.92)';
     ctx.fillRect(0, 0, w, h);
     
-    const cardW = 300;
-    const cardH = 260;
-    const cardX = (w - cardW) / 2;
-    const cardY = (h - cardH) / 2;
-    
-    const pulsePhase = Math.sin(now * 0.004) * 0.5 + 0.5;
-    const glowAlpha = 0.4 + pulsePhase * 0.6;
-    
-    ctx.save();
-    ctx.shadowColor = `rgba(255, 215, 0, ${glowAlpha})`;
-    ctx.shadowBlur = 20 + pulsePhase * 15;
-    
-    const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
-    gradient.addColorStop(0, '#4A3728');
-    gradient.addColorStop(1, '#2D1B0E');
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
-    ctx.fill();
-    
-    const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
-    borderGrad.addColorStop(0, '#FFD700');
-    borderGrad.addColorStop(0.5, '#FFA500');
-    borderGrad.addColorStop(1, '#FFD700');
-    ctx.strokeStyle = borderGrad;
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    ctx.restore();
-    
-    const sparkleCount = 12;
-    for (let s = 0; s < sparkleCount; s++) {
-      const angle = (now * 0.001 + s * (Math.PI * 2 / sparkleCount)) % (Math.PI * 2);
-      const radius = Math.max(cardW, cardH) / 2 + 20;
-      const sparkleX = w / 2 + Math.cos(angle) * radius;
-      const sparkleY = h / 2 + Math.sin(angle) * radius * 0.7;
-      const sparkleAlpha = 0.3 + Math.sin(now * 0.005 + s) * 0.4;
-      const sparkleSize = 3 + Math.sin(now * 0.003 + s * 0.7) * 2;
-      ctx.fillStyle = `rgba(255, 215, 0, ${Math.max(0, sparkleAlpha)})`;
+    if (elapsed < 3) {
+      const discoSprite = this.processedSprites['player-disco'];
+      const bigSize = Math.min(h / 3, w / 3);
+      const bigX = (w - bigSize) / 2;
+      const bigY = (h - bigSize) / 2 - 20;
+      const cx = w / 2;
+      const cy = bigY + bigSize / 2;
+      
+      const glowPulse = 0.5 + 0.5 * Math.sin(now * 0.004);
+      const glowSize = bigSize * 0.6 + glowPulse * 10;
+      ctx.save();
+      ctx.shadowColor = `rgba(224, 64, 251, ${0.6 + glowPulse * 0.4})`;
+      ctx.shadowBlur = 30 + glowPulse * 20;
+      ctx.fillStyle = `rgba(224, 64, 251, ${0.1 + glowPulse * 0.1})`;
       ctx.beginPath();
-      ctx.moveTo(sparkleX, sparkleY - sparkleSize);
-      ctx.lineTo(sparkleX + sparkleSize * 0.4, sparkleY);
-      ctx.lineTo(sparkleX, sparkleY + sparkleSize);
-      ctx.lineTo(sparkleX - sparkleSize * 0.4, sparkleY);
-      ctx.closePath();
+      ctx.arc(cx, cy, glowSize, 0, Math.PI * 2);
       ctx.fill();
-    }
-    
-    ctx.save();
-    ctx.shadowColor = `rgba(255, 215, 0, ${0.6 + pulsePhase * 0.4})`;
-    ctx.shadowBlur = 10;
-    ctx.font = `bold 18px ${this.uiFont}`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#FFD700';
-    ctx.fillText('NEW AVATAR UNLOCKED!', w / 2, cardY + 40);
-    ctx.restore();
-    
-    const discoSprite = this.processedSprites['player-disco'];
-    const spriteSize = 64;
-    const spriteX = (w - spriteSize) / 2;
-    const spriteBaseY = cardY + 55;
-    const spriteBob = Math.sin(now * 0.005) * 4;
-    
-    if (discoSprite) {
-      ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+      ctx.restore();
+      
+      ctx.save();
+      ctx.shadowColor = `rgba(255, 215, 0, ${0.4 + glowPulse * 0.3})`;
+      ctx.shadowBlur = 20 + glowPulse * 15;
+      ctx.fillStyle = `rgba(255, 215, 0, ${0.05 + glowPulse * 0.05})`;
       ctx.beginPath();
-      ctx.arc(w / 2, spriteBaseY + spriteSize / 2, spriteSize * 0.6, 0, Math.PI * 2);
+      ctx.arc(cx, cy, glowSize - 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      
+      const sparkleCount = 16;
+      for (let s = 0; s < sparkleCount; s++) {
+        const angle = (now * 0.002 + s * (Math.PI * 2 / sparkleCount)) % (Math.PI * 2);
+        const sparkleRadius = bigSize * 0.55 + Math.sin(now * 0.003 + s * 2) * 15;
+        const sx = cx + Math.cos(angle) * sparkleRadius;
+        const sy = cy + Math.sin(angle) * sparkleRadius;
+        const sparkleAlpha = 0.4 + 0.4 * Math.sin(now * 0.005 + s * 1.3);
+        const sparkleSize = 3 + Math.sin(now * 0.004 + s * 0.9) * 2;
+        
+        ctx.fillStyle = `rgba(255, 215, 0, ${Math.max(0, sparkleAlpha)})`;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - sparkleSize);
+        ctx.lineTo(sx + sparkleSize * 0.4, sy);
+        ctx.lineTo(sx, sy + sparkleSize);
+        ctx.lineTo(sx - sparkleSize * 0.4, sy);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      for (let c = 0; c < 8; c++) {
+        const cAngle = (c / 8) * Math.PI * 2 + Math.PI / 8;
+        const cDist = bigSize * 0.5 + 5;
+        const csx = cx + Math.cos(cAngle) * cDist;
+        const csy = cy + Math.sin(cAngle) * cDist;
+        const cAlpha = 0.3 + 0.5 * Math.sin(now * 0.006 + c * 1.5);
+        const cSize = 2 + Math.sin(now * 0.005 + c) * 1.5;
+        ctx.fillStyle = `rgba(224, 64, 251, ${Math.max(0, cAlpha)})`;
+        ctx.beginPath();
+        ctx.arc(csx, csy, cSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      
+      if (discoSprite) {
+        const scaleIn = Math.min(1, elapsed / 0.8);
+        const drawSize = bigSize * scaleIn;
+        const drawX = (w - drawSize) / 2;
+        const drawY = (h - drawSize) / 2 - 20;
+        ctx.drawImage(discoSprite, drawX, drawY, drawSize, drawSize);
+      }
+      
+      if (elapsed > 1) {
+        const textAlpha = Math.min(1, (elapsed - 1) / 0.5);
+        ctx.globalAlpha = fadeIn * textAlpha;
+        ctx.font = `bold 18px ${this.uiFont}`;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#FFD700';
+        ctx.fillText('NEW AVATAR UNLOCKED!', w / 2, bigY + bigSize + 40);
+        ctx.globalAlpha = fadeIn;
+      }
+      
+    } else {
+      const phase2Elapsed = elapsed - 3;
+      const phase2FadeIn = Math.min(1, phase2Elapsed / 0.5);
+      ctx.globalAlpha = fadeIn * phase2FadeIn;
+      
+      const cardW = 300;
+      const cardH = 260;
+      const cardX = (w - cardW) / 2;
+      const cardY = (h - cardH) / 2;
+      
+      const pulsePhase = Math.sin(now * 0.004) * 0.5 + 0.5;
+      const glowAlpha = 0.4 + pulsePhase * 0.6;
+      
+      ctx.save();
+      ctx.shadowColor = `rgba(255, 215, 0, ${glowAlpha})`;
+      ctx.shadowBlur = 20 + pulsePhase * 15;
+      
+      const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
+      gradient.addColorStop(0, '#4A3728');
+      gradient.addColorStop(1, '#2D1B0E');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.roundRect(cardX, cardY, cardW, cardH, 16);
       ctx.fill();
       
-      ctx.drawImage(discoSprite, spriteX, spriteBaseY + spriteBob, spriteSize, spriteSize);
+      const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+      borderGrad.addColorStop(0, '#FFD700');
+      borderGrad.addColorStop(0.5, '#FFA500');
+      borderGrad.addColorStop(1, '#FFD700');
+      ctx.strokeStyle = borderGrad;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+      
+      const sparkleCount = 12;
+      for (let s = 0; s < sparkleCount; s++) {
+        const angle = (now * 0.001 + s * (Math.PI * 2 / sparkleCount)) % (Math.PI * 2);
+        const radius = Math.max(cardW, cardH) / 2 + 20;
+        const sparkleX = w / 2 + Math.cos(angle) * radius;
+        const sparkleY = h / 2 + Math.sin(angle) * radius * 0.7;
+        const sparkleAlpha = 0.3 + Math.sin(now * 0.005 + s) * 0.4;
+        const sparkleSize = 3 + Math.sin(now * 0.003 + s * 0.7) * 2;
+        ctx.fillStyle = `rgba(255, 215, 0, ${Math.max(0, sparkleAlpha)})`;
+        ctx.beginPath();
+        ctx.moveTo(sparkleX, sparkleY - sparkleSize);
+        ctx.lineTo(sparkleX + sparkleSize * 0.4, sparkleY);
+        ctx.lineTo(sparkleX, sparkleY + sparkleSize);
+        ctx.lineTo(sparkleX - sparkleSize * 0.4, sparkleY);
+        ctx.closePath();
+        ctx.fill();
+      }
+      
+      ctx.save();
+      ctx.shadowColor = `rgba(255, 215, 0, ${0.6 + pulsePhase * 0.4})`;
+      ctx.shadowBlur = 10;
+      ctx.font = `bold 18px ${this.uiFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText('NEW AVATAR UNLOCKED!', w / 2, cardY + 40);
+      ctx.restore();
+      
+      const discoSprite = this.processedSprites['player-disco'];
+      const baseSize = 64;
+      const breathe = Math.sin(now * 0.004) * 2;
+      const spriteSize = baseSize + breathe;
+      const spriteX = (w - spriteSize) / 2;
+      const spriteBaseY = cardY + 55 + (baseSize - spriteSize) / 2;
+      
+      if (discoSprite) {
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
+        ctx.beginPath();
+        ctx.arc(w / 2, cardY + 55 + baseSize / 2, baseSize * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.drawImage(discoSprite, spriteX, spriteBaseY, spriteSize, spriteSize);
+      }
+      
+      ctx.font = `bold 14px ${this.uiFont}`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#E040FB';
+      ctx.fillText('Disco Avatar Earned!', w / 2, cardY + 145);
+      
+      ctx.font = `11px ${this.uiFont}`;
+      ctx.fillStyle = '#C4A77D';
+      ctx.fillText('Play again to use your new look!', w / 2, cardY + 170);
+      ctx.fillText('Find it in Settings to turn it on.', w / 2, cardY + 188);
+      
+      const tapAlpha = 0.5 + 0.3 * Math.sin(now * 0.003);
+      ctx.font = `10px ${this.uiFont}`;
+      ctx.fillStyle = `rgba(196, 167, 125, ${tapAlpha})`;
+      ctx.fillText('Tap to continue', w / 2, cardY + cardH - 20);
     }
-    
-    ctx.font = `bold 14px ${this.uiFont}`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#E040FB';
-    ctx.fillText('Disco Avatar Earned!', w / 2, cardY + 145);
-    
-    ctx.font = `11px ${this.uiFont}`;
-    ctx.fillStyle = '#C4A77D';
-    ctx.fillText('Play again to use your new look!', w / 2, cardY + 170);
-    ctx.fillText('Find it in Settings to turn it on.', w / 2, cardY + 188);
-    
-    const tapAlpha = 0.5 + 0.3 * Math.sin(now * 0.003);
-    ctx.font = `10px ${this.uiFont}`;
-    ctx.fillStyle = `rgba(196, 167, 125, ${tapAlpha})`;
-    ctx.fillText('Tap to continue', w / 2, cardY + cardH - 20);
     
     ctx.globalAlpha = 1;
   }

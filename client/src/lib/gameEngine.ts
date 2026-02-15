@@ -580,6 +580,8 @@ export class VillageLedgerGame {
   private djHintStartTime: number = 0;
   private djHutWarningShown: boolean = false;
   private songChangeCueShown: boolean = false;
+  private partyHintPaused: boolean = false;
+  private partyHintPauseUntil: number = 0;
   
   // Auto-walk feature: player walks to clicked target and interacts
   private autoWalkTarget: { x: number; type: 'npc' | 'home' | 'berryBush' | 'stoneTablet' | 'location'; id?: string } | null = null;
@@ -1274,10 +1276,16 @@ export class VillageLedgerGame {
           this.useDiscoSprite = true;
           localStorage.setItem('makingMoney_useDiscoSprite', 'true');
           soundManager.play('buttonClick');
+          this.showDiscoAvatarCelebration = false;
+          this.discoAvatarJustUnlocked = false;
+          this.advanceEndGameSequence();
+        } else if (this.discoContinueBtn && x >= this.discoContinueBtn.x && x <= this.discoContinueBtn.x + this.discoContinueBtn.w &&
+            y >= this.discoContinueBtn.y && y <= this.discoContinueBtn.y + this.discoContinueBtn.h) {
+          soundManager.play('buttonClick');
+          this.showDiscoAvatarCelebration = false;
+          this.discoAvatarJustUnlocked = false;
+          this.advanceEndGameSequence();
         }
-        this.showDiscoAvatarCelebration = false;
-        this.discoAvatarJustUnlocked = false;
-        this.advanceEndGameSequence();
       }
       return;
     }
@@ -1443,12 +1451,22 @@ export class VillageLedgerGame {
       if (this.slingshotEnterButton && !this.state.slingshotLocked) {
         const btn = this.slingshotEnterButton;
         if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
-          this.state.slingshotLocked = true;
-          this.state.slingshotTutorialTimer = 4;
           const platformWorldX = this.villageCenterX + 400;
-          this.player.x = platformWorldX;
-          this.state.playerBlockedForCarving = true;
+          this.autoWalkTarget = { x: platformWorldX, type: 'location' };
+          this.player.facingDirection = platformWorldX > this.player.x ? 1 : -1;
           this.slingshotEnterButton = null;
+          const checkArrival = () => {
+            if (Math.abs(this.player.x - platformWorldX) < 20) {
+              this.player.x = platformWorldX;
+              this.autoWalkTarget = null;
+              this.state.slingshotLocked = true;
+              this.state.playerBlockedForCarving = true;
+              this.state.slingshotTutorialTimer = 4;
+            } else {
+              setTimeout(checkArrival, 100);
+            }
+          };
+          setTimeout(checkArrival, 100);
           return;
         }
       }
@@ -2021,6 +2039,8 @@ export class VillageLedgerGame {
             this.currentQuizQuestion = 0;
             this.quizWrongAnswers = [];
             this.showQuizFeedback = false;
+            this.state.showRainfall = false;
+            this.state.showCloudsAnimation = false;
             if (this.state.partyEnded) {
               this.state.showQuiz = true;
               this.state.phase = 'quiz';
@@ -4319,12 +4339,12 @@ export class VillageLedgerGame {
     this.state.slingshotBalloons = [];
     const balloonColors = ['#FF3366', '#3366FF', '#FF8C00', '#FFD700', '#9B59B6', '#FF69B4'];
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 38; i++) {
       this.state.slingshotBalloons.push({
         x: 80 + Math.random() * (this.worldWidth - 160),
-        y: groundY + 20 + Math.random() * 200,
+        y: -20 - Math.random() * 300,
         vx: (Math.random() - 0.5) * 30,
-        vy: -(30 + Math.random() * 50),
+        vy: (30 + Math.random() * 50),
         color: balloonColors[Math.floor(Math.random() * balloonColors.length)],
         radius: 16 + Math.random() * 6,
         popped: false,
@@ -5873,25 +5893,30 @@ export class VillageLedgerGame {
         this.state.partyHintTimer = 0;
       }
       if (this.state.partyHintTimer > 5 && !this.djSoundboardActive) {
-        this.state.partyHintTimer = 0;
-        const partyLines = [
-          { speaker: 'WOODCUTTER', text: "When everyone can see the ledger, no one can cheat!" },
-          { speaker: 'STONE-WORKER', text: "A written record beats a fuzzy memory every time." },
-          { speaker: 'FISHERMAN', text: "Fair trades make happy neighbors!" },
-          { speaker: 'VILLAGE ELDER', text: "The Stone Tablet preserves the truth for all to see." },
-          { speaker: 'WOODCUTTER', text: "Imagine if we could carry the ledger everywhere we go..." },
-          { speaker: 'FISHERMAN', text: "Trust is good, but proof is better!" },
-          { speaker: 'STONE-WORKER', text: "With debts recorded, I can trade without worry." },
-          { speaker: 'VILLAGE ELDER', text: "Sound money starts with honest records." },
-          { speaker: 'VILLAGE ELDER', text: "Remember the double coincidence of wants? That's why we needed the ledger!" },
-          { speaker: 'FISHERMAN', text: "Without the double coincidence of wants, I couldn't trade my fish for berries!" },
-          { speaker: 'WOODCUTTER', text: "The double coincidence of wants made trading almost impossible without records." },
-          { speaker: 'STONE-WORKER', text: "Now that we have a ledger, we don't need a perfect match to trade!" },
-        ];
-        const line = partyLines[this.state.partyDialogueIndex % partyLines.length];
-        this.state.partyDialogueIndex++;
-        this.state.partyHintText = line.text;
-        this.state.partyHintSpeaker = line.speaker;
+        if (this.partyHintPaused && Date.now() < this.partyHintPauseUntil) {
+          // Don't rotate hints while paused
+        } else {
+          this.partyHintPaused = false;
+          this.state.partyHintTimer = 0;
+          const partyLines = [
+            { speaker: 'WOODCUTTER', text: "When everyone can see the ledger, no one can cheat!" },
+            { speaker: 'STONE-WORKER', text: "A written record beats a fuzzy memory every time." },
+            { speaker: 'FISHERMAN', text: "Fair trades make happy neighbors!" },
+            { speaker: 'VILLAGE ELDER', text: "The Stone Tablet preserves the truth for all to see." },
+            { speaker: 'WOODCUTTER', text: "Imagine if we could carry the ledger everywhere we go..." },
+            { speaker: 'FISHERMAN', text: "Trust is good, but proof is better!" },
+            { speaker: 'STONE-WORKER', text: "With debts recorded, I can trade without worry." },
+            { speaker: 'VILLAGE ELDER', text: "Sound money starts with honest records." },
+            { speaker: 'VILLAGE ELDER', text: "Remember the double coincidence of wants? That's why we needed the ledger!" },
+            { speaker: 'FISHERMAN', text: "Without the double coincidence of wants, I couldn't trade my fish for berries!" },
+            { speaker: 'WOODCUTTER', text: "The double coincidence of wants made trading almost impossible without records." },
+            { speaker: 'STONE-WORKER', text: "Now that we have a ledger, we don't need a perfect match to trade!" },
+          ];
+          const line = partyLines[this.state.partyDialogueIndex % partyLines.length];
+          this.state.partyDialogueIndex++;
+          this.state.partyHintText = line.text;
+          this.state.partyHintSpeaker = line.speaker;
+        }
       }
     }
     
@@ -6424,12 +6449,12 @@ export class VillageLedgerGame {
     this.state.slingshotBalloons = [];
     const balloonColors = ['#FF3366', '#3366FF', '#FF8C00', '#FFD700', '#9B59B6', '#FF69B4'];
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 38; i++) {
       this.state.slingshotBalloons.push({
         x: 80 + Math.random() * (this.worldWidth - 160),
-        y: groundY + 20 + Math.random() * 200,
+        y: -20 - Math.random() * 300,
         vx: (Math.random() - 0.5) * 30,
-        vy: -(30 + Math.random() * 50),
+        vy: (30 + Math.random() * 50),
         color: balloonColors[Math.floor(Math.random() * balloonColors.length)],
         radius: 16 + Math.random() * 6,
         popped: false,
@@ -6451,6 +6476,9 @@ export class VillageLedgerGame {
       this.partySongEndTime = 0;
     }
     soundManager.play('celebration');
+    this.partyHintPaused = true;
+    this.partyHintPauseUntil = Date.now() + 8000;
+    this.state.partyHintTimer = 0;
     const fullDuration = soundManager.getBufferDuration('crowdApplause');
     soundManager.playForDuration('crowdApplause', Math.max(2000, fullDuration - 8000));
     
@@ -6480,7 +6508,7 @@ export class VillageLedgerGame {
     const activeBalloons = this.state.slingshotBalloons.filter(b => !b.popped);
     if (activeBalloons.length === 0) {
       this.state.slingshotBalloons = [];
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i < 38; i++) {
         this.state.slingshotBalloons.push({
           x: 80 + Math.random() * (this.worldWidth - 160),
           y: -20 - Math.random() * 200,
@@ -6494,7 +6522,7 @@ export class VillageLedgerGame {
         });
       }
       this.state.slingshotLastSpawnTime = t;
-    } else if (t - this.state.slingshotLastSpawnTime > 1.5 && activeBalloons.length < 50) {
+    } else if (t - this.state.slingshotLastSpawnTime > 1.5 && activeBalloons.length < 38) {
       this.state.slingshotLastSpawnTime = t;
       this.state.slingshotBalloons.push({
         x: 80 + Math.random() * (this.worldWidth - 160),
@@ -6579,6 +6607,7 @@ export class VillageLedgerGame {
               this.state.slingshotScore += points;
               if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE && !this.state.slingshotScoreRecordAwarded) {
                 this.state.slingshotScoreRecordAwarded = true;
+                this.partyChampionStartTime = Date.now();
                 this.awardRandomRecord(500);
               }
               this.state.slingshotCombo++;
@@ -6651,6 +6680,7 @@ export class VillageLedgerGame {
             this.state.slingshotScore += 5;
             if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE && !this.state.slingshotScoreRecordAwarded) {
               this.state.slingshotScoreRecordAwarded = true;
+              this.partyChampionStartTime = Date.now();
               this.awardRandomRecord(500);
             }
             this.state.slingshotFloatingTexts.push({
@@ -7607,7 +7637,7 @@ export class VillageLedgerGame {
         const pulseSpeed = 300 - urgency * 200;
         const pulse = 0.6 + 0.4 * Math.sin(Date.now() / pulseSpeed);
         const fontSize = this.state.stormCountdownTimer <= 10 ?
-          22 + (1 - this.state.stormCountdownTimer / 10) * 14 : 22;
+          28 + (1 - this.state.stormCountdownTimer / 10) * 18 : 28;
         ctx.font = `bold ${fontSize}px ${this.uiFont}`;
         ctx.shadowColor = 'rgba(220, 38, 38, 0.8)';
         ctx.shadowBlur = 10 + urgency * 20;
@@ -9081,13 +9111,13 @@ export class VillageLedgerGame {
       if (textAlpha > 0) {
         ctx.save();
         ctx.globalAlpha = textAlpha;
-        ctx.font = `bold 24px ${this.retroFont}`;
+        ctx.font = `bold 36px ${this.retroFont}`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#FFFFFF';
         ctx.strokeStyle = '#000';
         ctx.lineWidth = 3;
-        ctx.strokeText('A storm approaches...', w / 2, h / 2 - 250);
-        ctx.fillText('A storm approaches...', w / 2, h / 2 - 250);
+        ctx.strokeText('A storm approaches...', w / 2, h / 2 - 80);
+        ctx.fillText('A storm approaches...', w / 2, h / 2 - 80);
         ctx.restore();
       }
     }
@@ -9140,13 +9170,13 @@ export class VillageLedgerGame {
         if (textAlpha > 0) {
           ctx.save();
           ctx.globalAlpha = textAlpha;
-          ctx.font = `bold 24px ${this.retroFont}`;
+          ctx.font = `bold 36px ${this.retroFont}`;
           ctx.textAlign = 'center';
           ctx.fillStyle = '#FFFFFF';
           ctx.strokeStyle = '#000';
           ctx.lineWidth = 3;
-          ctx.strokeText('A storm approaches...', w / 2, h / 2 - 250);
-          ctx.fillText('A storm approaches...', w / 2, h / 2 - 250);
+          ctx.strokeText('A storm approaches...', w / 2, h / 2 - 80);
+          ctx.fillText('A storm approaches...', w / 2, h / 2 - 80);
           ctx.restore();
         }
       }
@@ -9829,6 +9859,8 @@ export class VillageLedgerGame {
 
   private showRecordRewardPopup(genre: string): void {
     this.recordRewardGenre = genre;
+    this.showRecordReward = true;
+    this.recordRewardStartTime = Date.now();
     this.checkMusicScholarBadge();
   }
 
@@ -14739,6 +14771,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             speaker: 'VILLAGE ELDER',
             text: "Give me just one second while I pull this out of my record bag..."
           }]);
+          this.partyHintPaused = true;
+          this.partyHintPauseUntil = Date.now() + 12000;
+          this.state.partyHintTimer = 0;
           
           const startWait = Date.now();
           const maxWait = 8000;
@@ -14747,21 +14782,15 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             this.state.dialogueQueue = [];
             soundManager.stopAllMusic();
             soundManager.playRandomRecordScratch();
-            const scratchDur = soundManager.getBufferDuration('recordScratch1');
+            soundManager.playRandomDJTransition();
+            soundManager.loadAndPlayGenre(genreUrl);
+            this.partySongEndTime = Date.now() + 240000;
             setTimeout(() => {
-              soundManager.playRandomDJTransition();
-              const djTransDur = Math.max(100, soundManager.getBufferDuration('djTransLaser') - 200);
-              setTimeout(() => {
-                soundManager.loadAndPlayGenre(genreUrl);
-                this.partySongEndTime = Date.now() + 240000;
-                setTimeout(() => {
-                  const dur = soundManager.getGenreRemixDuration();
-                  if (dur > 0) {
-                    this.partySongEndTime = Date.now() + dur;
-                  }
-                }, 3500);
-              }, djTransDur);
-            }, scratchDur);
+              const dur = soundManager.getGenreRemixDuration();
+              if (dur > 0) {
+                this.partySongEndTime = Date.now() + dur;
+              }
+            }, 3500);
           };
           const checkReady = () => {
             if (!this.state.showCelebration) return;
@@ -15092,44 +15121,18 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
     
-    // Dark overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.fillRect(0, 0, w, h);
     
-    const cardW = Math.min(520, w - 40);
-    let baseCardH = 180;
-    const cardH = Math.min(baseCardH, h - 30);
-    const cardX = (w - cardW) / 2;
-    const cardY = (h - cardH) / 2;
-    
-    // Card background
-    const gradient = ctx.createLinearGradient(cardX, cardY, cardX, cardY + cardH);
-    gradient.addColorStop(0, '#4A3728');
-    gradient.addColorStop(1, '#2D1B0E');
-    ctx.fillStyle = gradient;
-    ctx.beginPath();
-    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
-    ctx.fill();
-    ctx.strokeStyle = '#FFD700';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-    
-    // Title
-    ctx.font = `bold 18px ${this.uiFont}`;
+    ctx.font = `bold 16px ${this.uiFont}`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#FFD700';
-    ctx.fillText('GREAT JOB!', w / 2, cardY + 35);
-    
-    // Player name
-    ctx.font = `12px ${this.uiFont}`;
     ctx.fillStyle = '#C4A77D';
-    ctx.fillText(this.playerName, w / 2, cardY + 58);
-
-    // Play Again button
-    const btnW = 180;
-    const btnH = 42;
+    ctx.fillText(this.playerName, w / 2, h / 2 - 20);
+    
+    const btnW = 160;
+    const btnH = 40;
     const btnX = (w - btnW) / 2;
-    const btnY = cardY + cardH - 55;
+    const btnY = h / 2 + 10;
     
     ctx.fillStyle = '#22C55E';
     ctx.beginPath();

@@ -381,7 +381,6 @@ export class VillageLedgerGame {
     { id: 'debt', name: 'Debt', description: 'You took on a debt — a promise to pay someone back later. But can promises always be trusted?', icon: 'scroll' },
     { id: 'the_ledger', name: 'The Ledger', description: 'A written record that everyone can see! The ledger keeps track of debts so no one can cheat.', icon: 'tablet' },
     { id: 'debt_settled', name: 'Debt Settled', description: 'All debts paid off! When debts are recorded and settled, everyone is happy.', icon: 'check' },
-    { id: 'money_scholar', name: 'Money Scholar', description: 'You understand that money is really just a system for keeping track of who owes what!', icon: 'star' },
     { id: 'music_scholar', name: 'Gold Records', description: 'You collected every genre in the music collection! A true connoisseur of celebration!', icon: 'music' },
   ];
 
@@ -457,11 +456,6 @@ export class VillageLedgerGame {
       title: 'Debt Settled',
       lesson: 'When a debt is paid off and recorded as settled, both sides are happy. The ledger proves the deal is done.',
       realWorld: 'When you pay off a loan, the bank updates their records. The debt is settled and you\'re free — just like crossing it off the Stone Tablet!'
-    },
-    'Money Scholar': {
-      title: 'Money Scholar',
-      lesson: 'Money is really just a system for keeping track of who owes what to whom. It evolved from the need for better record-keeping!',
-      realWorld: 'Every dollar bill, bank balance, and digital payment is part of a massive record-keeping system — a modern version of the Stone Tablet!'
     },
     'Gold Records': {
       title: 'Gold Records',
@@ -1262,6 +1256,7 @@ export class VillageLedgerGame {
       const celebElapsed = (Date.now() - this.discoAvatarCelebrationStartTime) / 1000;
       if (celebElapsed > 2.5) {
         this.showDiscoAvatarCelebration = false;
+        this.discoAvatarJustUnlocked = false;
         this.advanceEndGameSequence();
       }
       return;
@@ -1291,17 +1286,6 @@ export class VillageLedgerGame {
       return;
     }
     
-    if (this.showGoldRecordAward) {
-      const elapsed = (Date.now() - this.goldRecordAwardStartTime) / 1000;
-      if (elapsed > 2) {
-        this.showGoldRecordAward = false;
-        this.showGoldRecordHintArrow = true;
-        this.goldRecordHintArrowStartTime = Date.now();
-        this.advanceEndGameSequence();
-      }
-      return;
-    }
-
     // Skip HUD checks when quiz is showing - quiz needs full screen interaction
     if (!this.state.showQuiz && !this.state.showQuizReview) {
       // Check badge tray icon tap
@@ -1974,6 +1958,12 @@ export class VillageLedgerGame {
     
     // Start player fade animation
     this.state.playerFading = true;
+    this.state.showRainfall = true;
+    this.state.rainfallTimer = 0;
+    if (!this.rainSoundStarted) {
+      this.rainSoundStarted = true;
+      soundManager.fadeIn('rain', 500);
+    }
     // Player alpha will decrease in update() until 0, then visible=false and playerEnteredHut=true
     
     // Wait 2.5 seconds then go directly to night transition (skip standalone rain)
@@ -1981,13 +1971,7 @@ export class VillageLedgerGame {
       try {
         this.state.showNightTransition = true;
         this.state.nightTransitionTimer = 0;
-        this.state.showRainfall = true;
-        this.state.rainfallTimer = 0;
-        if (!this.rainSoundStarted) {
-          this.rainSoundStarted = true;
-          soundManager.fadeIn('rain', 500);
-          soundManager.stop('thunder');
-        }
+        soundManager.stop('thunder');
         soundManager.fadeIn('ambientNight', 1000);
         soundManager.fadeIn('backgroundMusicNight', 2000);
         setTimeout(() => {
@@ -5878,6 +5862,7 @@ export class VillageLedgerGame {
       const celebElapsed = (Date.now() - this.discoAvatarCelebrationStartTime) / 1000;
       if (celebElapsed > 8) {
         this.showDiscoAvatarCelebration = false;
+        this.discoAvatarJustUnlocked = false;
         this.advanceEndGameSequence();
       }
     }
@@ -6403,11 +6388,7 @@ export class VillageLedgerGame {
     soundManager.fadeOut('ambientVillage', 500);
     
     const playCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
-    if (playCount === 0) {
-      soundManager.play('partySong');
-      const partySongDuration = soundManager.getBufferDuration('partySong');
-      this.partySongEndTime = Date.now() + partySongDuration;
-    } else {
+    if (playCount !== 0) {
       this.partySongEndTime = 0;
     }
     soundManager.play('celebration');
@@ -7251,6 +7232,12 @@ export class VillageLedgerGame {
           // Start clouds animation immediately
           this.state.showCloudsAnimation = true;
           this.state.cloudsAnimationTimer = 0;
+          this.state.showRainfall = true;
+          this.state.rainfallTimer = 0;
+          if (!this.rainSoundStarted) {
+            this.rainSoundStarted = true;
+            soundManager.fadeIn('rain', 500);
+          }
           soundManager.fadeOut('backgroundMusicDay', 1000);
           soundManager.fadeOut('backgroundMusicDay2', 1000);
           soundManager.stopDaytimeMusic();
@@ -7574,24 +7561,6 @@ export class VillageLedgerGame {
         ctx.fillText('Get back to your hut!', this.logicalWidth / 2, 115);
       }
 
-      const rainProgress = Math.max(0, progress - 0.3) / 0.7;
-      if (rainProgress > 0) {
-        ctx.strokeStyle = `rgba(180, 200, 255, ${0.3 * rainProgress})`;
-        ctx.lineWidth = 1;
-        const rainCount = Math.floor(120 * rainProgress);
-        const t = Date.now() / 1000;
-        for (let i = 0; i < rainCount; i++) {
-          const seed = i * 1234.5678;
-          const rainX = (seed % this.logicalWidth + t * 80 * ((i % 3) + 1)) % this.logicalWidth;
-          const baseY = ((seed * 7) % this.logicalHeight);
-          const rainY = (baseY + t * 400) % this.logicalHeight;
-          ctx.beginPath();
-          ctx.moveTo(rainX, rainY);
-          ctx.lineTo(rainX - 2, rainY + 12);
-          ctx.stroke();
-        }
-      }
-
       ctx.restore();
     }
     
@@ -7688,7 +7657,6 @@ export class VillageLedgerGame {
     if (this.showRecordReward) {
       this.drawRecordRewardPopup(ctx);
     }
-    this.drawGoldRecordAward(ctx);
     this.drawDiscoAvatarCelebration(ctx);
 
     this.drawDebugSkipButton(ctx);
@@ -9811,17 +9779,10 @@ export class VillageLedgerGame {
     const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
     const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
     if (unlocked.length >= allGenres.length && !this.state.badges.includes('Gold Records')) {
-      this.showGoldRecordAward = true;
-      this.goldRecordAwardStartTime = Date.now();
+      this.state.badges.push('Gold Records');
+      this.state.lastBadgeEarnedTime = Date.now();
+      this.state.badgeTrayAnimTimer = 3;
       soundManager.play('badgeReward');
-      setTimeout(() => {
-        soundManager.playRandomDJTransition();
-      }, 800);
-      if (!this.state.badges.includes('Gold Records')) {
-        this.state.badges.push('Gold Records');
-        this.state.lastBadgeEarnedTime = Date.now();
-        this.state.badgeTrayAnimTimer = 3;
-      }
     }
   }
 
@@ -13629,7 +13590,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillStyle = '#F5DEB3';
       ctx.textAlign = 'center';
       const optMaxW = btnW - 24;
-      const optWords = opt.split(' ');
+      const djLabel = String.fromCharCode(65 + i);
+      const djDisplayText = `${djLabel}: ${opt}`;
+      const optWords = djDisplayText.split(' ');
       let optLine = '';
       const optLines: string[] = [];
       for (const word of optWords) {
@@ -13960,7 +13923,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       // Wrap option text to fit button width (account for checkbox in multi-select)
       const optMaxWidth = isMultiSelect ? btnW - 50 : btnW - 30;
       const textCenterX = isMultiSelect ? btnX + 30 + (btnW - 30) / 2 : btnX + btnW / 2;
-      const optWords = option.split(' ');
+      const label = String.fromCharCode(65 + i);
+      const displayText = `${label}: ${option}`;
+      const optWords = displayText.split(' ');
       let optLine = '';
       const optLines: string[] = [];
       
@@ -14031,10 +13996,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
           // Reset quiz for retry
           this.showQuizFeedback = false;
+          const wrongQuestionIndices = this.quizWrongAnswers.map(w => w.questionIndex);
+          const wrongQuestions = wrongQuestionIndices.map(i => this.quizQuestions[i]);
+          this.quizQuestions = wrongQuestions;
           this.quizWrongAnswers = [];
           this.currentQuizQuestion = 0;
           this.state.quizAnswers = [];
-          this.multiSelectAnswers = []; // Reset multi-select selections
+          this.multiSelectAnswers = [];
           this.quizFeedbackScrollOffset = 0;
           return;
         }
@@ -14133,14 +14101,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         const applauseDuration = soundManager.getBufferDuration('crowdApplause');
         soundManager.playForDuration('crowdApplause', Math.max(1000, applauseDuration * 0.25));
         this.state.showQuiz = false;
-        this.awardBadge(
-          'Money Scholar',
-          'You understand that money is really just a system for keeping track of who owes what!',
-          () => {
-            this.state.showQuizReview = true;
-            this.quizReviewScrollOffset = 0;
-          }
-        );
+        this.state.showQuizReview = true;
+        this.quizReviewScrollOffset = 0;
       }
     }
   }
@@ -14228,7 +14190,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillText(`Your answer: ${yourLetters}`, cardX + 30, yOffset);
       yOffset += 20;
     } else {
-      const yourAnswerText = `Your answer: ${q.options[wrong.playerAnswer as number]}`;
+      const wrongLabel = String.fromCharCode(65 + (wrong.playerAnswer as number));
+      const yourAnswerText = `Your answer: ${wrongLabel}: ${q.options[wrong.playerAnswer as number]}`;
       const yourLines = this.wrapTextLines(ctx, yourAnswerText, maxWidth);
       yourLines.forEach(l => {
         ctx.fillText(l, cardX + 30, yOffset);
@@ -14245,7 +14208,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.fillText(`Correct: ${correctLetters}`, cardX + 30, yOffset);
       yOffset += 20;
     } else {
-      const correctAnswerText = `Correct: ${q.options[q.correct as number]}`;
+      const correctLabel = String.fromCharCode(65 + (q.correct as number));
+      const correctAnswerText = `Correct: ${correctLabel}: ${q.options[q.correct as number]}`;
       const correctLines = this.wrapTextLines(ctx, correctAnswerText, maxWidth);
       correctLines.forEach(l => {
         ctx.fillText(l, cardX + 30, yOffset);
@@ -14859,7 +14823,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private advanceEndGameSequence(): void {
     if (!this.pendingSuccessAfterPopups) return;
     if (this.showRecordReward) return;
-    if (this.showGoldRecordAward) return;
     if (this.discoAvatarJustUnlocked && !this.showDiscoAvatarCelebration) {
       this.showDiscoAvatarCelebration = true;
       this.discoAvatarCelebrationStartTime = Date.now();

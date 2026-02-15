@@ -18,8 +18,8 @@
 - **Game Engine**: Custom HTML5 Canvas-based JavaScript engine (60fps, click-to-walk).
 - **Core Mechanics**: Dialogue system, NPC interaction, "Stone Tablet" HUD for debt tracking, item gifting on credit, brawl triggers, mood system, environmental transitions, "Double Coincidence of Wants" demonstration, and a badge system.
 - **Game Progression**: Features a two-loop system (Failure Path with verbal promises, Success Path with Stone Tablet for recording debts), including "NPC-First" and "Elder-First" settlement approaches and escort mechanics. A "Smart Path" allows players to suggest a recording system via keyword matching, skipping the initial failure loop.
-- **Badge System**: 6 collectible badges (Double Coincidence of Wants, Debt, The Ledger, Debt Settled, Money Scholar, Music Scholar) with persistent HUD and tap-to-expand panel.
-- **Quiz System**: Two types: DJ Quiz (1-2 questions, gated, leads to song choice) and Final Quiz (5 review questions, non-gated). Questions are sourced from a centralized `quizBank.ts`. Includes "Quick Check!" pop-ups.
+- **Badge System**: 5 collectible badges (Double Coincidence of Wants, Debt, The Ledger, Debt Settled, Gold Records) with persistent HUD and tap-to-expand panel.
+- **Quiz System**: Two types: DJ Quiz (1-2 questions, gated, leads to song choice) and Final Quiz (5 review questions, non-gated). Questions are sourced from a centralized `quizBank.ts`. Includes "Quick Check!" pop-ups. Quiz retry only repeats wrong questions. Options use dynamic A/B/C/D labels after randomization.
 - **Slingshot Balloon-Pop Mini-Game**: An "Angry Birds"-style physics-based mini-game during the party, with score tracking and collision detection for various world elements.
 - **Party Flow**: Time-based event with a storm countdown and progressive atmospheric effects, requiring player action (roof repair). Party graphics fade after repair.
 - **Audio System**: Web Audio API with `AudioContext` for dynamic soundscapes, including layered audio, dynamic background music, and independent volume controls persisted to localStorage.

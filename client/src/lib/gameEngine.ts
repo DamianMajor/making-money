@@ -6028,10 +6028,6 @@ export class VillageLedgerGame {
       this.debugSkipBtn = null;
       return;
     }
-    if (this.state.currentDialogue || this.state.showChoice) {
-      this.debugSkipBtn = null;
-      return;
-    }
     const btnW = 90;
     const btnH = 22;
     const btnX = 8;

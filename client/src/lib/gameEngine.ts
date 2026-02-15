@@ -469,6 +469,8 @@ export class VillageLedgerGame {
   private discoAvatarJustUnlocked: boolean = false;
   private showDiscoAvatarCelebration: boolean = false;
   private discoAvatarCelebrationStartTime: number = 0;
+  private discoEquipBtn: { x: number; y: number; w: number; h: number } | null = null;
+  private discoContinueBtn: { x: number; y: number; w: number; h: number } | null = null;
   private discoAvatarToggleBtn: { x: number; y: number; w: number; h: number } | null = null;
   private discoClassicBtn: { x: number; y: number; w: number; h: number } | null = null;
   private discoDiscoBtn: { x: number; y: number; w: number; h: number } | null = null;
@@ -1256,6 +1258,12 @@ export class VillageLedgerGame {
     if (this.showDiscoAvatarCelebration) {
       const celebElapsed = (Date.now() - this.discoAvatarCelebrationStartTime) / 1000;
       if (celebElapsed > 2.5) {
+        if (this.discoEquipBtn && x >= this.discoEquipBtn.x && x <= this.discoEquipBtn.x + this.discoEquipBtn.w &&
+            y >= this.discoEquipBtn.y && y <= this.discoEquipBtn.y + this.discoEquipBtn.h) {
+          this.useDiscoSprite = true;
+          localStorage.setItem('makingMoney_useDiscoSprite', 'true');
+          soundManager.play('buttonClick');
+        }
         this.showDiscoAvatarCelebration = false;
         this.discoAvatarJustUnlocked = false;
         this.advanceEndGameSequence();
@@ -1953,7 +1961,7 @@ export class VillageLedgerGame {
   // Trigger the enter hut sequence - player fades into hut, then rain starts
   private triggerEnterHutSequence(): void {
     // Prevent multiple calls - only trigger once per game
-    if (this.rainSoundStarted || this.state.playerFading) {
+    if (this.rainSoundStarted) {
       return;
     }
     
@@ -6973,24 +6981,24 @@ export class VillageLedgerGame {
             ctx.restore();
           }
         }
-        if (this.showDiscoDestroyer && this.discoDestroyerShownStartTime > 0) {
-          const ddElapsed = (Date.now() - this.discoDestroyerShownStartTime) / 1000;
-          if (ddElapsed < 2.5) {
-            const ddAlpha = ddElapsed < 2 ? 1 : 1 - (ddElapsed - 2) / 0.5;
-            ctx.save();
-            ctx.globalAlpha = Math.max(0, ddAlpha);
-            ctx.textAlign = 'center';
-            const ddT = this.state.celebrationTimer;
-            const ddHue = (ddT * 80 + 180) % 360;
-            const ddPulse = Math.sin(ddT * 5) * 8;
-            ctx.font = `24px ${this.retroFont}`;
-            ctx.strokeStyle = '#000';
-            ctx.lineWidth = 3;
-            ctx.fillStyle = `hsl(${ddHue}, 100%, 70%)`;
-            ctx.strokeText('DISCO DESTROYER!', w / 2, groundY - 260 + ddPulse);
-            ctx.fillText('DISCO DESTROYER!', w / 2, groundY - 260 + ddPulse);
-            ctx.restore();
-          }
+      }
+      if (this.showDiscoDestroyer && this.discoDestroyerShownStartTime > 0) {
+        const ddElapsed = (Date.now() - this.discoDestroyerShownStartTime) / 1000;
+        if (ddElapsed < 2.5) {
+          const ddAlpha = ddElapsed < 2 ? 1 : 1 - (ddElapsed - 2) / 0.5;
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, ddAlpha);
+          ctx.textAlign = 'center';
+          const ddT = this.state.celebrationTimer;
+          const ddHue = (ddT * 80 + 180) % 360;
+          const ddPulse = Math.sin(ddT * 5) * 8;
+          ctx.font = `24px ${this.retroFont}`;
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 3;
+          ctx.fillStyle = `hsl(${ddHue}, 100%, 70%)`;
+          ctx.strokeText('DISCO DESTROYER!', w / 2, groundY - 260 + ddPulse);
+          ctx.fillText('DISCO DESTROYER!', w / 2, groundY - 260 + ddPulse);
+          ctx.restore();
         }
       }
       
@@ -10374,24 +10382,61 @@ export class VillageLedgerGame {
       ctx.font = `10px ${this.retroFont}`;
       ctx.textAlign = 'center';
       ctx.fillStyle = '#E8D44D';
-      ctx.fillText('DISCO AVATAR', w / 2, labelY);
+      ctx.fillText('DISCO AVATAR', w / 2 + 2, labelY);
 
-      const discoBallSize = 8;
-      const discoBallX = w / 2 - 60;
-      const discoBallY = labelY - 4;
-      ctx.fillStyle = '#C0C0C0';
+      const discoBallSize = 10;
+      const discoBallX = w / 2 - 65;
+      const discoBallY = labelY - 5;
+      const dbGrad = ctx.createRadialGradient(discoBallX - 2, discoBallY - 2, 1, discoBallX, discoBallY, discoBallSize);
+      dbGrad.addColorStop(0, '#FFFFFF');
+      dbGrad.addColorStop(0.3, '#E8E8E8');
+      dbGrad.addColorStop(0.7, '#B0B0B0');
+      dbGrad.addColorStop(1, '#808080');
+      ctx.fillStyle = dbGrad;
       ctx.beginPath();
       ctx.arc(discoBallX, discoBallY, discoBallSize, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
       ctx.lineWidth = 0.5;
+      for (let i = -2; i <= 2; i++) {
+        const yOff = i * (discoBallSize * 0.4);
+        const xSpan = Math.sqrt(Math.max(0, discoBallSize * discoBallSize - yOff * yOff));
+        ctx.beginPath();
+        ctx.moveTo(discoBallX - xSpan, discoBallY + yOff);
+        ctx.lineTo(discoBallX + xSpan, discoBallY + yOff);
+        ctx.stroke();
+      }
+      for (let i = -2; i <= 2; i++) {
+        const xOff = i * (discoBallSize * 0.4);
+        const ySpan = Math.sqrt(Math.max(0, discoBallSize * discoBallSize - xOff * xOff));
+        ctx.beginPath();
+        ctx.moveTo(discoBallX + xOff, discoBallY - ySpan);
+        ctx.lineTo(discoBallX + xOff, discoBallY + ySpan);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+      ctx.lineWidth = 0.3;
       ctx.beginPath();
-      ctx.moveTo(discoBallX - discoBallSize, discoBallY);
-      ctx.lineTo(discoBallX + discoBallSize, discoBallY);
+      ctx.arc(discoBallX, discoBallY, discoBallSize, 0, Math.PI * 2);
       ctx.stroke();
+      const sparkT = Date.now() / 1000;
+      for (let s = 0; s < 3; s++) {
+        const sa = sparkT * 2 + s * 2.1;
+        const sx = discoBallX + Math.cos(sa) * (discoBallSize + 3);
+        const sy = discoBallY + Math.sin(sa) * (discoBallSize + 3);
+        const sAlpha = 0.4 + 0.4 * Math.sin(sparkT * 4 + s);
+        ctx.fillStyle = `rgba(255, 255, 200, ${sAlpha})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const stemX = discoBallX;
+      const stemTopY = discoBallY - discoBallSize;
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(discoBallX, discoBallY - discoBallSize);
-      ctx.lineTo(discoBallX, discoBallY + discoBallSize);
+      ctx.moveTo(stemX, stemTopY);
+      ctx.lineTo(stemX, stemTopY - 5);
       ctx.stroke();
 
       const btnW = 70;
@@ -14546,18 +14591,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             this.discoSpriteUnlocked = true;
           }
           localStorage.setItem('makingMoney_completionCount', String(count + 1));
-          this.requestReflectionInput((newAnswer) => {
-            if (newAnswer.trim()) {
-              localStorage.setItem('makingMoney_postReflection', newAnswer.trim());
-            }
-            this.state.showNightTransition = false;
-            if (unearned.length > 0) {
-              this.showRecordRewardPopup(unearned[0]);
-              this.checkMusicScholarBadge();
-            }
-            this.pendingSuccessAfterPopups = true;
-            this.advanceEndGameSequence();
-          });
+          this.state.showNightTransition = false;
+          if (unearned.length > 0) {
+            this.showRecordRewardPopup(unearned[0]);
+            this.checkMusicScholarBadge();
+          }
+          this.pendingSuccessAfterPopups = true;
+          this.advanceEndGameSequence();
         }
         return;
       }
@@ -14588,18 +14628,13 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           this.discoSpriteUnlocked = true;
         }
         localStorage.setItem('makingMoney_completionCount', String(count + 1));
-        this.requestReflectionInput((newAnswer) => {
-          if (newAnswer.trim()) {
-            localStorage.setItem('makingMoney_postReflection', newAnswer.trim());
-          }
-          this.state.showNightTransition = false;
-          if (unearned.length > 0) {
-            this.showRecordRewardPopup(unearned[0]);
-            this.checkMusicScholarBadge();
-          }
-          this.pendingSuccessAfterPopups = true;
-          this.advanceEndGameSequence();
-        });
+        this.state.showNightTransition = false;
+        if (unearned.length > 0) {
+          this.showRecordRewardPopup(unearned[0]);
+          this.checkMusicScholarBadge();
+        }
+        this.pendingSuccessAfterPopups = true;
+        this.advanceEndGameSequence();
         return;
       }
     }
@@ -14804,17 +14839,54 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         const msgAlpha = Math.min(1, (elapsed - 1.5) / 0.5);
         ctx.globalAlpha = fadeIn * msgAlpha;
         ctx.font = `11px ${this.uiFont}`;
-        ctx.fillStyle = '#E8D5A8';
-        ctx.fillText('Want to try on your new outfit now?', w / 2, bigY + bigSize + 62);
-        ctx.fillText("Maybe you'll get to DJ next time!", w / 2, bigY + bigSize + 80);
+        ctx.fillStyle = '#00BFFF';
+        ctx.fillText('Come back and YOU can be the DJ!', w / 2, bigY + bigSize + 62);
         ctx.globalAlpha = fadeIn;
       }
 
       if (elapsed > 2.5) {
-        const tapAlpha = 0.5 + 0.3 * Math.sin(now * 0.003);
-        ctx.font = `10px ${this.uiFont}`;
-        ctx.fillStyle = `rgba(196, 167, 125, ${tapAlpha})`;
-        ctx.fillText('Tap to continue', w / 2, bigY + bigSize + 105);
+        const btnAlpha = Math.min(1, (elapsed - 2.5) / 0.5);
+        ctx.globalAlpha = fadeIn * btnAlpha;
+        
+        const equipBtnW = 130;
+        const equipBtnH = 36;
+        const contBtnW = 130;
+        const contBtnH = 36;
+        const btnGap = 12;
+        const totalBtnsW = equipBtnW + btnGap + contBtnW;
+        const btnsStartX = (w - totalBtnsW) / 2;
+        const btnsY = bigY + bigSize + 80;
+        
+        ctx.fillStyle = '#E040FB';
+        ctx.beginPath();
+        ctx.roundRect(btnsStartX, btnsY, equipBtnW, equipBtnH, 8);
+        ctx.fill();
+        ctx.strokeStyle = '#B030C8';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.font = `bold 11px ${this.uiFont}`;
+        ctx.fillStyle = '#FFF';
+        ctx.textAlign = 'center';
+        ctx.fillText('EQUIP NOW', btnsStartX + equipBtnW / 2, btnsY + equipBtnH / 2 + 4);
+        
+        this.discoEquipBtn = { x: btnsStartX, y: btnsY, w: equipBtnW, h: equipBtnH };
+        
+        const contBtnX = btnsStartX + equipBtnW + btnGap;
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.beginPath();
+        ctx.roundRect(contBtnX, btnsY, contBtnW, contBtnH, 8);
+        ctx.fill();
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.font = `bold 11px ${this.uiFont}`;
+        ctx.fillStyle = '#C4A77D';
+        ctx.textAlign = 'center';
+        ctx.fillText('CONTINUE', contBtnX + contBtnW / 2, btnsY + contBtnH / 2 + 4);
+        
+        this.discoContinueBtn = { x: contBtnX, y: btnsY, w: contBtnW, h: contBtnH };
+        
+        ctx.globalAlpha = 1;
       }
     }
     
@@ -14845,13 +14917,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillRect(0, 0, w, h);
     
     const cardW = Math.min(520, w - 40);
-    const reflectionAnswer = localStorage.getItem('makingMoney_moneyAnswer');
-    const hasReflection = !!reflectionAnswer;
-    let baseCardH = 200;
-    if (hasReflection) baseCardH += 100;
-    const currentPlayCountForHeight = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
-    if (currentPlayCountForHeight === 1) baseCardH += 20;
-    if (this.discoAvatarJustUnlocked) baseCardH += 20;
+    let baseCardH = 180;
     const cardH = Math.min(baseCardH, h - 30);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
@@ -14872,114 +14938,12 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.font = `bold 18px ${this.uiFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFD700';
-    ctx.fillText('LESSON COMPLETE!', w / 2, cardY + 35);
+    ctx.fillText('GREAT JOB!', w / 2, cardY + 35);
     
     // Player name
     ctx.font = `12px ${this.uiFont}`;
     ctx.fillStyle = '#C4A77D';
     ctx.fillText(this.playerName, w / 2, cardY + 58);
-
-    const currentPlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
-    let msgY = cardY + 75;
-
-    if (currentPlayCount === 1) {
-      ctx.font = `bold 10px ${this.uiFont}`;
-      ctx.fillStyle = '#00BFFF';
-      ctx.textAlign = 'center';
-      ctx.fillText('Play again to be the DJ!', w / 2, msgY);
-      msgY += 18;
-    }
-
-    if (this.discoAvatarJustUnlocked) {
-      ctx.font = `bold 10px ${this.uiFont}`;
-      ctx.fillStyle = '#E040FB';
-      ctx.textAlign = 'center';
-      ctx.fillText('Disco Avatar unlocked! Enable in Settings.', w / 2, msgY);
-      msgY += 18;
-    }
-
-    const hintY = msgY + 10;
-
-    // Reflection comparison - "Your Journey"
-    if (hasReflection) {
-      const reflY = hintY + 18;
-      const reflBoxW = cardW - 40;
-      const reflBoxX = cardX + 20;
-      
-      // Divider line
-      ctx.strokeStyle = 'rgba(196, 167, 125, 0.3)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(reflBoxX, reflY);
-      ctx.lineTo(reflBoxX + reflBoxW, reflY);
-      ctx.stroke();
-      
-      // Label
-      ctx.font = `bold 10px ${this.uiFont}`;
-      ctx.fillStyle = '#FFD700';
-      ctx.textAlign = 'center';
-      ctx.fillText('YOUR JOURNEY', w / 2, reflY + 18);
-      
-      // "Before" section
-      ctx.font = `8px ${this.uiFont}`;
-      ctx.fillStyle = '#A89070';
-      ctx.textAlign = 'left';
-      ctx.fillText('Before playing, you said:', reflBoxX + 5, reflY + 35);
-      
-      ctx.font = `9px ${this.uiFont}`;
-      ctx.fillStyle = '#F5DEB3';
-      let displayAnswer = reflectionAnswer!;
-      if (displayAnswer.length > 80) {
-        displayAnswer = displayAnswer.substring(0, 77) + '...';
-      }
-      const answerMaxW = reflBoxW - 10;
-      const answerWords = displayAnswer.split(' ');
-      let answerLine = '';
-      let answerLineY = reflY + 50;
-      for (const word of answerWords) {
-        const testLine = answerLine + word + ' ';
-        if (ctx.measureText(testLine).width > answerMaxW && answerLine !== '') {
-          ctx.fillText(answerLine.trim(), reflBoxX + 5, answerLineY);
-          answerLine = word + ' ';
-          answerLineY += 13;
-        } else {
-          answerLine = testLine;
-        }
-      }
-      if (answerLine.trim()) {
-        ctx.fillText(answerLine.trim(), reflBoxX + 5, answerLineY);
-      }
-
-      const postReflection = localStorage.getItem('makingMoney_postReflection');
-      if (postReflection) {
-        answerLineY += 16;
-        ctx.font = `8px ${this.uiFont}`;
-        ctx.fillStyle = '#A89070';
-        ctx.fillText('After playing, you now think:', reflBoxX + 5, answerLineY);
-        answerLineY += 15;
-        ctx.font = `9px ${this.uiFont}`;
-        ctx.fillStyle = '#FFD700';
-        let displayPost = postReflection;
-        if (displayPost.length > 80) {
-          displayPost = displayPost.substring(0, 77) + '...';
-        }
-        const postWords = displayPost.split(' ');
-        let postLine = '';
-        for (const word of postWords) {
-          const testLine = postLine + word + ' ';
-          if (ctx.measureText(testLine).width > answerMaxW && postLine !== '') {
-            ctx.fillText(postLine.trim(), reflBoxX + 5, answerLineY);
-            postLine = word + ' ';
-            answerLineY += 13;
-          } else {
-            postLine = testLine;
-          }
-        }
-        if (postLine.trim()) {
-          ctx.fillText(postLine.trim(), reflBoxX + 5, answerLineY);
-        }
-      }
-    }
 
     // Play Again button
     const btnW = 180;

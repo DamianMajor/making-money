@@ -710,6 +710,22 @@ function PlayerSetupScreen({ onContinue }: { onContinue: (name: string, age: num
         >
           Before We Begin...
         </h2>
+        <p
+          style={{
+            fontFamily: 'Georgia, serif',
+            fontSize: 'clamp(9px, 1.5vw, 12px)',
+            color: '#9B8A6A',
+            textAlign: 'center',
+            marginBottom: '12px',
+            lineHeight: 1.5,
+          }}
+        >
+          Pick a name for your character in the game.
+          <br />
+          <span style={{ fontSize: 'clamp(8px, 1.2vw, 10px)', color: '#7A6A4A' }}>
+            (It doesn't have to be your real name!)
+          </span>
+        </p>
 
         <label
           className="w-full mb-2"
@@ -721,13 +737,13 @@ function PlayerSetupScreen({ onContinue }: { onContinue: (name: string, age: num
             textAlign: 'center'
           }}
         >
-          YOUR NAME
+          CHARACTER NAME
         </label>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Enter your name"
+          placeholder="Choose a name"
           maxLength={15}
           autoFocus
           className="w-full mb-6"
@@ -1108,8 +1124,6 @@ export default function Game() {
   const [smartPathPrompt, setSmartPathPrompt] = useState<string | null>(null);
   const smartPathCallbackRef = useRef<((text: string) => void) | null>(null);
   const [smartPathAnswer, setSmartPathAnswer] = useState('');
-  const [reflectionPrompt, setReflectionPrompt] = useState<{ originalAnswer: string; callback: (answer: string) => void } | null>(null);
-  const [reflectionAnswer, setReflectionAnswer] = useState('');
   const isPortrait = useIsPortrait();
 
   useEffect(() => {
@@ -1138,23 +1152,6 @@ export default function Game() {
     }
   }, [smartPathAnswer]);
 
-  const handleReflectionSubmit = useCallback(() => {
-    if (reflectionPrompt) {
-      const cb = reflectionPrompt.callback;
-      setReflectionPrompt(null);
-      setReflectionAnswer('');
-      cb(reflectionAnswer.trim());
-    }
-  }, [reflectionAnswer, reflectionPrompt]);
-
-  const handleReflectionSkip = useCallback(() => {
-    if (reflectionPrompt) {
-      const cb = reflectionPrompt.callback;
-      setReflectionPrompt(null);
-      setReflectionAnswer('');
-      cb('');
-    }
-  }, [reflectionPrompt]);
 
   const initGameEngine = useCallback(() => {
     const canvas = canvasRef.current;
@@ -1165,10 +1162,6 @@ export default function Game() {
       setSmartPathPrompt(prompt);
       smartPathCallbackRef.current = callback;
       setSmartPathAnswer('');
-    });
-    gameRef.current.setReflectionHandler((originalAnswer, callback) => {
-      setReflectionPrompt({ originalAnswer, callback });
-      setReflectionAnswer('');
     });
     gameRef.current.preloadAudio();
     gameRef.current.start(false);
@@ -1274,133 +1267,6 @@ export default function Game() {
           >
             THE BARTER SYSTEM
           </span>
-        </div>
-      )}
-      {reflectionPrompt && screen === 'game' && (
-        <div
-          className="fixed inset-0 flex items-center justify-center"
-          style={{ zIndex: 100, background: 'rgba(0,0,0,0.85)' }}
-          data-testid="reflection-overlay"
-        >
-          <div
-            className="flex flex-col items-center w-full max-w-md px-6 py-8"
-            style={{
-              background: 'linear-gradient(180deg, #4A3728 0%, #2D1B0E 100%)',
-              border: '3px solid #8B6914',
-              borderRadius: '16px',
-            }}
-          >
-            <h2
-              style={{
-                fontFamily: '"Press Start 2P", monospace',
-                fontSize: 'clamp(10px, 2vw, 14px)',
-                color: '#FFD700',
-                textAlign: 'center',
-                marginBottom: '16px',
-                lineHeight: 1.6,
-              }}
-            >
-              YOUR JOURNEY
-            </h2>
-            <p
-              style={{
-                fontFamily: 'Georgia, serif',
-                fontSize: 'clamp(10px, 2vw, 12px)',
-                color: '#A89070',
-                textAlign: 'center',
-                marginBottom: '8px',
-                lineHeight: 1.5,
-              }}
-            >
-              Before playing, you said money is:
-            </p>
-            <p
-              style={{
-                fontFamily: 'Georgia, serif',
-                fontSize: 'clamp(12px, 2.5vw, 15px)',
-                color: '#F5DEB3',
-                textAlign: 'center',
-                marginBottom: '20px',
-                lineHeight: 1.5,
-                fontStyle: 'italic',
-              }}
-              data-testid="text-original-answer"
-            >
-              &ldquo;{reflectionPrompt.originalAnswer.length > 100 ? reflectionPrompt.originalAnswer.substring(0, 97) + '...' : reflectionPrompt.originalAnswer}&rdquo;
-            </p>
-            <p
-              style={{
-                fontFamily: '"Press Start 2P", monospace',
-                fontSize: 'clamp(8px, 1.5vw, 10px)',
-                color: '#C4A77D',
-                textAlign: 'center',
-                marginBottom: '12px',
-                lineHeight: 1.6,
-              }}
-            >
-              Would you change your answer?
-            </p>
-            <textarea
-              value={reflectionAnswer}
-              onChange={(e) => setReflectionAnswer(e.target.value)}
-              placeholder="Type your new answer here..."
-              style={{
-                fontFamily: 'Georgia, serif',
-                fontSize: 'clamp(12px, 2vw, 15px)',
-                textAlign: 'center',
-                color: '#E8D5A8',
-                background: 'rgba(30, 22, 12, 0.9)',
-                border: '2px solid #5a4a32',
-                borderRadius: '8px',
-                padding: '12px 14px',
-                width: '100%',
-                minHeight: '60px',
-                resize: 'none',
-                outline: 'none',
-                marginBottom: '16px',
-              }}
-              data-testid="input-post-reflection"
-            />
-            <div className="flex gap-4 items-center">
-              <button
-                onClick={handleReflectionSubmit}
-                disabled={!reflectionAnswer.trim()}
-                className="cursor-pointer"
-                style={{
-                  fontFamily: '"Press Start 2P", monospace',
-                  fontSize: 'clamp(9px, 2vw, 12px)',
-                  color: !reflectionAnswer.trim() ? '#666' : '#1a1208',
-                  background: !reflectionAnswer.trim()
-                    ? 'linear-gradient(180deg, #555 0%, #444 100%)'
-                    : 'linear-gradient(180deg, #C9B896 0%, #a89478 100%)',
-                  border: `2px solid ${!reflectionAnswer.trim() ? '#444' : '#8B7355'}`,
-                  borderRadius: '8px',
-                  padding: '12px 24px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                  opacity: !reflectionAnswer.trim() ? 0.5 : 1,
-                }}
-                data-testid="button-submit-reflection"
-              >
-                SUBMIT
-              </button>
-              <button
-                onClick={handleReflectionSkip}
-                className="cursor-pointer"
-                style={{
-                  fontFamily: '"Press Start 2P", monospace',
-                  fontSize: 'clamp(8px, 1.5vw, 10px)',
-                  color: '#9B8A6A',
-                  background: 'none',
-                  border: 'none',
-                  padding: '8px',
-                  textDecoration: 'underline',
-                }}
-                data-testid="button-skip-reflection"
-              >
-                Skip
-              </button>
-            </div>
-          </div>
         </div>
       )}
       {smartPathPrompt && screen === 'game' && (

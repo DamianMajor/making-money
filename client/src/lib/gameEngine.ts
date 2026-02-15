@@ -511,6 +511,11 @@ export class VillageLedgerGame {
   private showGoldRecordHintArrow: boolean = false;
   private goldRecordHintArrowStartTime: number = 0;
 
+  private showRecordCrate: boolean = false;
+  private recordCrateStartTime: number = 0;
+  private recordCrateGenres: string[] = [];
+  private recordCrateDismissBtn: { x: number; y: number; w: number; h: number } | null = null;
+
   private pendingSuccessAfterPopups: boolean = false;
   private partyChampionStartTime: number = 0;
   private discoDestroyerShownStartTime: number = 0;
@@ -1111,6 +1116,12 @@ export class VillageLedgerGame {
       return;
     }
     
+    if (this.djSoundboardActive) {
+      this.touchActive = false;
+      this.moveDirection = 0;
+      return;
+    }
+    
     const holdDuration = performance.now() - this.touchStartTime;
     
     if (holdDuration < this.holdThreshold && this.touchActive) {
@@ -1267,6 +1278,24 @@ export class VillageLedgerGame {
         this.showDiscoAvatarCelebration = false;
         this.discoAvatarJustUnlocked = false;
         this.advanceEndGameSequence();
+      }
+      return;
+    }
+
+    if (this.showRecordCrate) {
+      const elapsed = Date.now() - this.recordCrateStartTime;
+      if (elapsed > 1500) {
+        this.showRecordCrate = false;
+        this.recordCrateDismissBtn = null;
+        this.queueDialogue([
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "Now let's get this party started!",
+            onComplete: () => {
+              this.startDiscoParty();
+            }
+          }
+        ]);
       }
       return;
     }
@@ -4293,9 +4322,9 @@ export class VillageLedgerGame {
     for (let i = 0; i < 50; i++) {
       this.state.slingshotBalloons.push({
         x: 80 + Math.random() * (this.worldWidth - 160),
-        y: 30 + Math.random() * (groundY * 0.55),
+        y: groundY + 20 + Math.random() * 200,
         vx: (Math.random() - 0.5) * 30,
-        vy: (Math.random() - 0.5) * 16,
+        vy: -(30 + Math.random() * 50),
         color: balloonColors[Math.floor(Math.random() * balloonColors.length)],
         radius: 16 + Math.random() * 6,
         popped: false,
@@ -6275,15 +6304,45 @@ export class VillageLedgerGame {
         }
       ]);
     } else {
-      this.queueDialogue([
-        {
-          speaker: 'VILLAGE ELDER',
-          text: "You know the drill — let's party!",
-          onComplete: () => {
-            this.startDiscoParty();
-          }
+      const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
+      const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
+      const unearned = allGenres.filter(g => !unlocked.includes(g));
+      
+      if (unearned.length > 0) {
+        for (const genre of unearned) {
+          unlocked.push(genre);
         }
-      ]);
+        localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
+        this.lastRecordUnlockTime = Date.now();
+        this.checkMusicScholarBadge();
+        
+        this.queueDialogue([
+          {
+            speaker: 'VILLAGE ELDER',
+            text: `You've proven yourself again, ${this.playerName}! I have something special for you...`
+          },
+          {
+            speaker: 'VILLAGE ELDER',
+            text: `Here — take my personal crate of records. I've been collecting these for years!`,
+            onComplete: () => {
+              this.showRecordCrate = true;
+              this.recordCrateStartTime = Date.now();
+              this.recordCrateGenres = [...unearned];
+              soundManager.play('celebration');
+            }
+          }
+        ]);
+      } else {
+        this.queueDialogue([
+          {
+            speaker: 'VILLAGE ELDER',
+            text: "You know the drill — let's party!",
+            onComplete: () => {
+              this.startDiscoParty();
+            }
+          }
+        ]);
+      }
     }
   }
 
@@ -6330,18 +6389,9 @@ export class VillageLedgerGame {
           }, 3000);
         }
       } else {
-        const unearned = allGenres.filter(g => !unlocked.includes(g));
-        let genreToPlay: string;
-        if (unearned.length > 0) {
-          const randomGenre = unearned[Math.floor(Math.random() * unearned.length)];
-          unlocked.push(randomGenre);
-          localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlocked));
-          this.lastRecordUnlockTime = Date.now();
-          this.showRecordRewardPopup(randomGenre);
-          genreToPlay = randomGenre;
-        } else {
-          genreToPlay = allGenres[Math.floor(Math.random() * allGenres.length)];
-        }
+        const genreToPlay = unlocked.length > 0 
+          ? unlocked[Math.floor(Math.random() * unlocked.length)]
+          : allGenres[Math.floor(Math.random() * allGenres.length)];
         this.state.selectedGenre = genreToPlay;
         const genreUrl = this.GENRE_AUDIO_MAP[genreToPlay];
         if (genreUrl) {
@@ -6377,9 +6427,9 @@ export class VillageLedgerGame {
     for (let i = 0; i < 50; i++) {
       this.state.slingshotBalloons.push({
         x: 80 + Math.random() * (this.worldWidth - 160),
-        y: 30 + Math.random() * (groundY * 0.55),
+        y: groundY + 20 + Math.random() * 200,
         vx: (Math.random() - 0.5) * 30,
-        vy: (Math.random() - 0.5) * 16,
+        vy: -(30 + Math.random() * 50),
         color: balloonColors[Math.floor(Math.random() * balloonColors.length)],
         radius: 16 + Math.random() * 6,
         popped: false,
@@ -7148,9 +7198,9 @@ export class VillageLedgerGame {
     if (this.djSoundboardActive && !this.djSwapInProgress) {
       const elderFlip = Math.sin(t * 1.5);
       this.villageElder.facingDirection = elderFlip > 0 ? 1 : -1;
-      const elderDanceBobDJ = Math.sin(t * 7) * 4;
+      const elderDanceBobDJ = Math.sin(t * 4) * 2;
       this.villageElder.bobOffset = elderDanceBobDJ;
-      this.villageElder.y = groundY - this.villageElder.height - 10 + elderDanceBobDJ;
+      this.villageElder.y = groundY - this.villageElder.height + elderDanceBobDJ;
     } else if (!this.djSwapInProgress) {
       const elderDanceBob = Math.sin(this.bobTimer * 2) * 3;
       this.villageElder.y = groundY - this.villageElder.height - 10 + elderDanceBob;
@@ -7666,6 +7716,7 @@ export class VillageLedgerGame {
     if (this.showRecordReward) {
       this.drawRecordRewardPopup(ctx);
     }
+    this.drawRecordCrate(ctx);
     this.drawDiscoAvatarCelebration(ctx);
 
     this.drawDebugSkipButton(ctx);
@@ -9778,9 +9829,6 @@ export class VillageLedgerGame {
 
   private showRecordRewardPopup(genre: string): void {
     this.recordRewardGenre = genre;
-    this.recordRewardStartTime = Date.now();
-    this.showRecordReward = true;
-    soundManager.playRandomDJTransition();
     this.checkMusicScholarBadge();
   }
 
@@ -10115,6 +10163,160 @@ export class VillageLedgerGame {
     ctx.fillStyle = 'rgba(50, 40, 30, 0.5)';
     ctx.fillText('Tap to close', cx, popupY + popupH - 10);
 
+    ctx.restore();
+  }
+
+  private drawRecordCrate(ctx: CanvasRenderingContext2D): void {
+    if (!this.showRecordCrate) return;
+    const elapsed = Date.now() - this.recordCrateStartTime;
+    const w = this.logicalWidth;
+    const h = this.logicalHeight;
+    const progress = Math.min(elapsed / 400, 1);
+    const scale = 0.5 + progress * 0.5;
+    const alpha = progress;
+    
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    
+    const popupW = 260;
+    const popupH = 240;
+    const playAreaH = h - this.dialogueBoxHeight;
+    const cx = w / 2;
+    const popupY = (playAreaH - popupH) / 2 - 10;
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(0, 0, w, h);
+    
+    ctx.translate(cx, popupY + popupH / 2);
+    ctx.scale(scale, scale);
+    ctx.translate(-cx, -(popupY + popupH / 2));
+    
+    const cardGrad = ctx.createLinearGradient(cx - popupW/2, popupY, cx - popupW/2, popupY + popupH);
+    cardGrad.addColorStop(0, '#4A3728');
+    cardGrad.addColorStop(1, '#2D1B0E');
+    ctx.fillStyle = cardGrad;
+    ctx.beginPath();
+    ctx.roundRect(cx - popupW/2, popupY, popupW, popupH, 16);
+    ctx.fill();
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    const crateW = 120;
+    const crateH = 70;
+    const crateX = cx - crateW / 2;
+    const crateY = popupY + 30;
+    
+    const crateGrad = ctx.createLinearGradient(crateX, crateY, crateX, crateY + crateH);
+    crateGrad.addColorStop(0, '#8B6914');
+    crateGrad.addColorStop(0.5, '#6B4F12');
+    crateGrad.addColorStop(1, '#4A3510');
+    ctx.fillStyle = crateGrad;
+    ctx.beginPath();
+    ctx.roundRect(crateX, crateY, crateW, crateH, 4);
+    ctx.fill();
+    ctx.strokeStyle = '#3D2914';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    for (let i = 1; i < 3; i++) {
+      const slatY = crateY + (crateH / 3) * i;
+      ctx.strokeStyle = '#3D2914';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(crateX + 4, slatY);
+      ctx.lineTo(crateX + crateW - 4, slatY);
+      ctx.stroke();
+    }
+    
+    const recordColors = ['#FF3366', '#3366FF', '#FFD700', '#9B59B6', '#2ECC71'];
+    const numRecords = Math.min(this.recordCrateGenres.length, 5);
+    for (let i = 0; i < numRecords; i++) {
+      const rx = crateX + 15 + i * 20;
+      const ry = crateY - 15 - i * 3;
+      const angle = -0.15 + i * 0.08;
+      
+      ctx.save();
+      ctx.translate(rx + 10, ry + 15);
+      ctx.rotate(angle);
+      
+      ctx.fillStyle = '#111';
+      ctx.beginPath();
+      ctx.arc(0, 0, 18, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+      
+      for (let r = 6; r < 16; r += 3) {
+        ctx.strokeStyle = 'rgba(80, 80, 80, 0.4)';
+        ctx.lineWidth = 0.3;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      
+      ctx.fillStyle = recordColors[i % recordColors.length];
+      ctx.beginPath();
+      ctx.arc(0, 0, 5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.fillStyle = '#1a1a1a';
+      ctx.beginPath();
+      ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.restore();
+    }
+    
+    const sparkleCount = 10;
+    for (let i = 0; i < sparkleCount; i++) {
+      const angle = (i / sparkleCount) * Math.PI * 2 + elapsed * 0.003;
+      const dist = 100 + Math.sin(elapsed * 0.005 + i) * 15;
+      const sx = cx + Math.cos(angle) * dist;
+      const sy = (popupY + popupH / 2) + Math.sin(angle) * dist * 0.6;
+      const sparkleSize = 2 + Math.sin(elapsed * 0.008 + i * 2) * 1.5;
+      ctx.fillStyle = `rgba(255, 215, 0, ${0.4 + Math.sin(elapsed * 0.006 + i) * 0.3})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, Math.max(0, sparkleSize), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    ctx.font = `bold 16px ${this.uiFont}`;
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.fillText("Elder's Record Crate!", cx, popupY + crateH + 55);
+    
+    ctx.font = `bold 14px ${this.uiFont}`;
+    ctx.fillStyle = '#2ECC71';
+    ctx.fillText(`${this.recordCrateGenres.length} new records!`, cx, popupY + crateH + 78);
+    
+    ctx.font = `10px ${this.uiFont}`;
+    ctx.fillStyle = '#C4A77D';
+    const cols = 2;
+    const colW = popupW / cols - 20;
+    for (let i = 0; i < this.recordCrateGenres.length; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const gx = (cx - popupW/2 + 20) + col * (colW + 20);
+      const gy = popupY + crateH + 94 + row * 14;
+      if (gy < popupY + popupH - 30) {
+        ctx.textAlign = 'left';
+        ctx.fillText(`• ${this.recordCrateGenres[i]}`, gx, gy);
+      }
+    }
+    
+    if (elapsed > 1500) {
+      const hintAlpha = Math.min(1, (elapsed - 1500) / 500);
+      ctx.globalAlpha = alpha * hintAlpha;
+      ctx.font = `10px ${this.uiFont}`;
+      ctx.fillStyle = 'rgba(200, 190, 170, 0.6)';
+      ctx.textAlign = 'center';
+      ctx.fillText('Tap to continue', cx, popupY + popupH - 10);
+    }
+    
+    this.recordCrateDismissBtn = { x: cx - popupW/2, y: popupY, w: popupW, h: popupH };
+    
     ctx.restore();
   }
 
@@ -11364,7 +11566,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       ctx.drawImage(processedSprite, Math.round(-spriteW / 2), Math.round(-spriteH), Math.round(spriteW), Math.round(spriteH));
     } else if (isElderDancing) {
       const danceT = this.state.celebrationTimer * 3.5;
-      const bounce = Math.abs(Math.sin(danceT)) * 10;
+      const bounce = Math.abs(Math.sin(danceT)) * 4;
       const sway = Math.sin(danceT * 0.6) * 0.08;
       const squash = 1 + Math.abs(Math.sin(danceT)) * 0.05;
       const stretch = 1 - Math.abs(Math.sin(danceT)) * 0.04;
@@ -12453,11 +12655,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     if (this.djSmokeActive) {
       ctx.save();
       const smokeElapsed = (now - this.djSmokeStartTime) / 1000;
-      const smokeHeight = Math.min(playAreaH * 0.4, smokeElapsed * 30);
+      const smokeHeight = Math.min(playAreaH * 0.55, smokeElapsed * 50);
       const grad = ctx.createLinearGradient(0, playAreaH, 0, playAreaH - smokeHeight);
-      const smokeAlpha = 0.15 + 0.05 * Math.sin(now * 0.002);
+      const smokeAlpha = 0.35 + 0.1 * Math.sin(now * 0.002);
       grad.addColorStop(0, `rgba(200, 200, 220, ${smokeAlpha})`);
-      grad.addColorStop(0.5, `rgba(180, 180, 200, ${smokeAlpha * 0.6})`);
+      grad.addColorStop(0.5, `rgba(180, 180, 200, ${smokeAlpha * 0.7})`);
       grad.addColorStop(1, 'transparent');
       ctx.fillStyle = grad;
       ctx.fillRect(0, playAreaH - smokeHeight, w, smokeHeight);
@@ -12525,22 +12727,22 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillStyle = '#FFD700';
     ctx.fillText('DJ SOUNDBOARD', w / 2, boxY + 16);
     
-    const closeBtnSize = 24;
+    const closeBtnSize = 36;
     const closeBtnX = w - closeBtnSize - 8;
     const closeBtnY = boxY + 4;
     this.djSoundboardCloseBtn = { x: closeBtnX, y: closeBtnY, w: closeBtnSize, h: closeBtnSize };
     
-    ctx.fillStyle = 'rgba(255, 100, 100, 0.3)';
+    ctx.fillStyle = 'rgba(200, 50, 50, 0.8)';
     ctx.beginPath();
-    ctx.roundRect(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize, 4);
+    ctx.roundRect(closeBtnX, closeBtnY, closeBtnSize, closeBtnSize, 6);
     ctx.fill();
-    ctx.strokeStyle = '#FF6666';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#FF9999';
+    ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.font = `bold 14px ${this.uiFont}`;
-    ctx.fillStyle = '#FF6666';
+    ctx.font = `bold 20px ${this.uiFont}`;
+    ctx.fillStyle = '#FFFFFF';
     ctx.textAlign = 'center';
-    ctx.fillText('X', closeBtnX + closeBtnSize / 2, closeBtnY + closeBtnSize / 2 + 5);
+    ctx.fillText('X', closeBtnX + closeBtnSize / 2, closeBtnY + closeBtnSize / 2 + 7);
     
     const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]') as string[];
     const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
@@ -14142,13 +14344,19 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         this.showQuizFeedback = true;
         soundManager.play('quizWrong');
       } else {
-        // All correct - show quiz review before success
         soundManager.play('quizCorrect');
         const applauseDuration = soundManager.getBufferDuration('crowdApplause');
         soundManager.playForDuration('crowdApplause', Math.max(1000, applauseDuration * 0.25));
         this.state.showQuiz = false;
-        this.state.showQuizReview = true;
-        this.quizReviewScrollOffset = 0;
+        this.state.showNightTransition = false;
+        const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+        localStorage.setItem('makingMoney_completionCount', String(count + 1));
+        if (count === 0) {
+          this.discoAvatarJustUnlocked = true;
+          this.discoSpriteUnlocked = true;
+        }
+        this.pendingSuccessAfterPopups = true;
+        this.advanceEndGameSequence();
       }
     }
   }
@@ -14575,16 +14783,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           }
           soundManager.fadeOut('ambientNight', 1000);
           soundManager.loadAndPlayGenre(this.GENRE_AUDIO_MAP[btn.genre]);
-          const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
-          const unlockedAll = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
-          const unearned = allGenres.filter(g => !unlockedAll.includes(g));
-          if (unearned.length > 0) {
-            for (const genre of unearned) {
-              unlockedAll.push(genre);
-            }
-            localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlockedAll));
-            this.lastRecordUnlockTime = Date.now();
-          }
           const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
           if (count === 0) {
             this.discoAvatarJustUnlocked = true;
@@ -14592,10 +14790,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
           }
           localStorage.setItem('makingMoney_completionCount', String(count + 1));
           this.state.showNightTransition = false;
-          if (unearned.length > 0) {
-            this.showRecordRewardPopup(unearned[0]);
-            this.checkMusicScholarBadge();
-          }
           this.pendingSuccessAfterPopups = true;
           this.advanceEndGameSequence();
         }
@@ -14612,16 +14806,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         this.state.showQuizReview = false;
         soundManager.fadeOut('ambientNight', 1000);
         soundManager.fadeOut('backgroundMusicNight', 1000);
-        const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
-        const unlockedAll = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
-        const unearned = allGenres.filter(g => !unlockedAll.includes(g));
-        if (unearned.length > 0) {
-          for (const genre of unearned) {
-            unlockedAll.push(genre);
-          }
-          localStorage.setItem('makingMoney_unlockedGenres', JSON.stringify(unlockedAll));
-          this.lastRecordUnlockTime = Date.now();
-        }
         const count = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
         if (count === 0) {
           this.discoAvatarJustUnlocked = true;
@@ -14629,10 +14813,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         }
         localStorage.setItem('makingMoney_completionCount', String(count + 1));
         this.state.showNightTransition = false;
-        if (unearned.length > 0) {
-          this.showRecordRewardPopup(unearned[0]);
-          this.checkMusicScholarBadge();
-        }
         this.pendingSuccessAfterPopups = true;
         this.advanceEndGameSequence();
         return;

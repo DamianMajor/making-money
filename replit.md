@@ -24,18 +24,17 @@
 - **Party Flow**: Time-based event with a storm countdown and progressive atmospheric effects, requiring player action (roof repair). Party graphics fade after repair.
 - **Audio System**: Web Audio API with `AudioContext` for dynamic soundscapes, including layered audio, dynamic background music, and independent volume controls persisted to localStorage.
 - **Visual Style**: Painted/illustrated backgrounds, pixel-art character sprites, earth tones, natural materials, and monospace/sans-serif fonts. Responsive canvas design.
-- **Music Strategy**: Dynamic music loading and playback. Funk genre uses money-yell-open.mp3 (the main party song). First playthrough: Funk plays as the opening party music. Subsequent playthroughs: the auto-unlocked random genre's remix plays as the opening party music instead.
+- **Music Strategy**: Dynamic music loading and playback. Funk genre uses money-yell-open.mp3 (the main party song). First playthrough: Funk plays as the opening party music. Subsequent playthroughs: a random already-unlocked genre plays as the opening party music.
 - **Song Choice Mechanic**: Players select from 11 celebration genres after passing the DJ Quiz, each with a dedicated remix audio file, lazy-loaded on selection. Mid-party song change allowed once.
 - **Music Collection HUD**: Vinyl record icon shows progress (X/11), expands to a panel to view and select unlocked genres. Persistence across sessions via localStorage.
 - **2-Playthrough Gold Record Path**: Designed for collecting all 11 genres in two playthroughs, utilizing various in-game actions and bonus questions.
 - **Record Rewards**: Slingshot score, disco ball hit, and NPC bonus knowledge checks award random uncollected genre records.
 - **DJ Soundboard Mode**: Unlocked after first playthrough completion. On 2nd+ playthroughs during the party, a pulsing "DJ" button appears in the top-right corner. Tapping it opens a soundboard in the dialogue box area with a 2-column grid of unlocked genres (tap to switch songs instantly with scratch transition) and 8 SFX buttons (Scratch, Air Horn, Laser, Horns, DJ Scratch, Horn 2, Disco Hit 1 & 2) and 4 visual effect buttons (STROBE, LIGHTS, SMOKE, LASERS) with canvas-based effects. Unlimited song switching when DJ mode is active. Close button (X) exits the soundboard. Party educational hints are suppressed while soundboard is open.
 - **DJ Teaser**: First playthrough success screen shows "Come back and YOU can be the DJ!" message to encourage replay.
-- **2nd Playthrough Auto-Unlock**: At end of 2nd playthrough, ALL remaining uncollected genres are unlocked at once, triggering the Gold Record badge and award if applicable.
+- **Elder's Record Crate**: On 2nd playthrough, after debt settlement (before party), the Elder gifts his personal "crate of records" containing all remaining uncollected genres in a single visual presentation. This replaces the old auto-unlock system.
 - **Player Customization**: Player name and age input on setup screen for dialogue, ledger entries, and quiz difficulty. Disco avatar sprite unlocks after first playthrough completion (decoupled from genre collection). Gold Records badge still requires all genres collected.
 - **Settings Menu**: Provides access to sound settings, game instructions, credits, fullscreen toggle, and game restart/reset options.
-- **End-of-Game Reflection**: Players can provide and revise their definition of money, which is displayed on the success screen.
-- **Screen Flow**: Loading screen → Title screen ("MAKING MONEY" with Play button) → Player setup (name + age) → Gameplay. Reflection question is end-of-game only.
+- **Screen Flow**: Loading screen → Title screen ("MAKING MONEY" with Play button) → Player setup (name + age) → Gameplay.
 
 ### Backend
 - **Server**: Express.js with TypeScript for API routes and static asset serving.

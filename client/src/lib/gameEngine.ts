@@ -493,6 +493,8 @@ export class VillageLedgerGame {
   private djPlayerAtBooth: boolean = false;
   private djElderOnFloor: boolean = false;
 
+  private showDiscoDestroyer: boolean = false;
+  private discoDestroyerStartTime: number = 0;
   private showGoldRecordAward: boolean = false;
   private goldRecordAwardStartTime: number = 0;
   private goldRecordPlaqueArea: { x: number; y: number; w: number; h: number } | null = null;
@@ -1244,6 +1246,7 @@ export class VillageLedgerGame {
 
     if (this.showRecordReward) {
       this.showRecordReward = false;
+      this.showDiscoDestroyer = false;
       return;
     }
 
@@ -6490,6 +6493,8 @@ export class VillageLedgerGame {
           if (!this.state.slingshotDiscoBallRecordAwarded) {
             this.state.slingshotDiscoBallRecordAwarded = true;
             this.awardRandomRecord(800);
+            this.showDiscoDestroyer = true;
+            this.discoDestroyerStartTime = Date.now();
           }
           if (this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE && !this.state.slingshotScoreRecordAwarded) {
             this.state.slingshotScoreRecordAwarded = true;
@@ -6876,16 +6881,30 @@ export class VillageLedgerGame {
         ctx.font = `bold 16px ${this.uiFont}`;
         ctx.fillStyle = '#2ECC71';
         ctx.fillText('Record earned!', w - 20, groundY - 14);
-        ctx.textAlign = 'center';
-        const champT = this.state.celebrationTimer;
-        const champHue = (champT * 60) % 360;
-        const champPulse = Math.sin(champT * 5) * 8;
-        ctx.font = `24px ${this.retroFont}`;
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 3;
-        ctx.fillStyle = `hsl(${champHue}, 100%, 70%)`;
-        ctx.strokeText('PARTY CHAMPION!', w / 2, groundY - 50 + champPulse);
-        ctx.fillText('PARTY CHAMPION!', w / 2, groundY - 50 + champPulse);
+        if (this.showRecordReward) {
+          ctx.textAlign = 'center';
+          const champT = this.state.celebrationTimer;
+          const champHue = (champT * 60) % 360;
+          const champPulse = Math.sin(champT * 5) * 8;
+          ctx.font = `24px ${this.retroFont}`;
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 3;
+          ctx.fillStyle = `hsl(${champHue}, 100%, 70%)`;
+          ctx.strokeText('PARTY CHAMPION!', w / 2, groundY - 225 + champPulse);
+          ctx.fillText('PARTY CHAMPION!', w / 2, groundY - 225 + champPulse);
+        }
+        if (this.showDiscoDestroyer && this.showRecordReward) {
+          ctx.textAlign = 'center';
+          const ddT = this.state.celebrationTimer;
+          const ddHue = (ddT * 80 + 180) % 360;
+          const ddPulse = Math.sin(ddT * 5) * 8;
+          ctx.font = `24px ${this.retroFont}`;
+          ctx.strokeStyle = '#000';
+          ctx.lineWidth = 3;
+          ctx.fillStyle = `hsl(${ddHue}, 100%, 70%)`;
+          ctx.strokeText('DISCO DESTROYER!', w / 2, groundY - 260 + ddPulse);
+          ctx.fillText('DISCO DESTROYER!', w / 2, groundY - 260 + ddPulse);
+        }
       }
       
       ctx.restore();
@@ -8397,12 +8416,11 @@ export class VillageLedgerGame {
         ctx.fill();
       }
 
-      const laserOffset = 340;
       const worldXPositions = [
-        this.villageCenterX - laserOffset,
-        this.villageCenterX + laserOffset,
-        this.villageCenterX - laserOffset,
-        this.villageCenterX + laserOffset
+        this.villageCenterX - 520,
+        this.villageCenterX + 520,
+        this.villageCenterX - 440,
+        this.villageCenterX + 440
       ];
       for (let i = 0; i < 4; i++) {
         const isRight = (i % 2 === 1);
@@ -8690,10 +8708,10 @@ export class VillageLedgerGame {
     }
     
     const worldXPositions = [
-      this.villageCenterX - 300,
-      this.villageCenterX + 300,
-      this.villageCenterX - 200,
-      this.villageCenterX + 200
+      this.villageCenterX - 520,
+      this.villageCenterX + 520,
+      this.villageCenterX - 440,
+      this.villageCenterX + 440
     ];
     for (let i = 0; i < 4; i++) {
       const isRight = (i % 2 === 1);
@@ -9031,7 +9049,7 @@ export class VillageLedgerGame {
     
     // Continue rain effect during night transition (fading out more slowly)
     if (this.state.showRainfall) {
-      const rainFade = Math.max(0, 1 - t / 4);
+      const rainFade = Math.max(0, 1 - t / 3);
       
       ctx.strokeStyle = `rgba(180, 200, 255, ${0.4 * rainFade})`;
       ctx.lineWidth = 1.5;
@@ -9051,7 +9069,7 @@ export class VillageLedgerGame {
       }
     }
 
-    if (this.state.showRainfall && t >= 4) {
+    if (this.state.showRainfall && t >= 3) {
       this.state.showRainfall = false;
     }
     
@@ -9251,7 +9269,7 @@ export class VillageLedgerGame {
   }
 
   private drawBadgeTrayIcon(ctx: CanvasRenderingContext2D): void {
-    if (this.state.showDJQuiz || this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview || this.state.showMusicCollection) return;
+    if (this.state.showDJQuiz || this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview || this.state.showMusicCollection || this.state.showSuccess) return;
 
     const x = this.inventoryPanelLeftX - 44;
     const y = 16;
@@ -9735,89 +9753,15 @@ export class VillageLedgerGame {
     ctx.fillText('GOLD RECORD', w / 2, h * 0.15);
     ctx.restore();
 
-    const discoSprite = this.processedSprites['player-disco'];
-    const avatarCenterX = w / 2;
-    const avatarCenterY = h * 0.42;
-
-    if (discoSprite) {
-      const scale = 3;
-      const spriteW = discoSprite.width * scale * 0.5;
-      const spriteH = discoSprite.height * scale * 0.5;
-
-      ctx.save();
-      ctx.shadowColor = '#FFD700';
-      ctx.shadowBlur = 30 + Math.sin(elapsed * 3) * 10;
-      ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
-      ctx.beginPath();
-      ctx.arc(avatarCenterX, avatarCenterY, spriteH * 0.55, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      const sparkleColors = ['#FFD700', '#FFA500', '#FFFFFF'];
-      const ringRadius = spriteH * 0.6;
-      const sparkleCount = 12;
-      for (let i = 0; i < sparkleCount; i++) {
-        const angle = (i / sparkleCount) * Math.PI * 2 + elapsed * 0.5;
-        const dist = ringRadius + Math.sin(elapsed * 2 + i) * 5;
-        const sx = avatarCenterX + Math.cos(angle) * dist;
-        const sy = avatarCenterY + Math.sin(angle) * dist;
-        const size = 2 + Math.sin(elapsed * 3 + i * 0.5) * 1.5;
-        const color = sparkleColors[i % 3];
-
-        ctx.fillStyle = color;
-        ctx.globalAlpha = contentAlpha * (0.5 + Math.sin(elapsed * 4 + i) * 0.5);
-        ctx.beginPath();
-        ctx.arc(sx, sy, size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      const floatingCount = 20;
-      ctx.globalAlpha = contentAlpha;
-      for (let i = 0; i < floatingCount; i++) {
-        const seed = i * 137.5;
-        const fx = avatarCenterX + Math.sin(seed + elapsed * 0.7) * (ringRadius + 15 + (i % 5) * 8);
-        const fy = avatarCenterY + Math.cos(seed * 0.7 + elapsed * 0.5) * (ringRadius + 10 + (i % 4) * 6);
-        const fsize = 1 + Math.sin(elapsed * 5 + seed) * 1;
-        const alpha = 0.3 + Math.sin(elapsed * 3 + seed * 0.3) * 0.3;
-
-        ctx.globalAlpha = contentAlpha * alpha;
-        ctx.fillStyle = '#FFD700';
-
-        ctx.save();
-        ctx.translate(fx, fy);
-        ctx.rotate(elapsed + seed);
-        ctx.beginPath();
-        for (let j = 0; j < 4; j++) {
-          const a = (j / 4) * Math.PI * 2;
-          const a2 = ((j + 0.5) / 4) * Math.PI * 2;
-          ctx.lineTo(Math.cos(a) * (fsize * 2), Math.sin(a) * (fsize * 2));
-          ctx.lineTo(Math.cos(a2) * (fsize * 0.5), Math.sin(a2) * (fsize * 0.5));
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      }
-
-      ctx.globalAlpha = contentAlpha;
-
-      ctx.drawImage(
-        discoSprite,
-        avatarCenterX - spriteW / 2,
-        avatarCenterY - spriteH / 2,
-        spriteW,
-        spriteH
-      );
-    }
-
     ctx.globalAlpha = contentAlpha;
     ctx.font = `bold 11px ${this.uiFont}`;
     ctx.fillStyle = '#FFD700';
     ctx.textAlign = 'center';
-    ctx.fillText("You've earned the Gold Record!", w / 2, h * 0.68);
+    ctx.fillText("You've earned the Gold Record!", w / 2, h * 0.45);
 
     ctx.font = `9px ${this.uiFont}`;
     ctx.fillStyle = '#D4A574';
-    ctx.fillText(`All ${Object.keys(this.GENRE_AUDIO_MAP).length} genres collected!`, w / 2, h * 0.73);
+    ctx.fillText(`All ${Object.keys(this.GENRE_AUDIO_MAP).length} genres collected!`, w / 2, h * 0.52);
 
     ctx.font = `8px ${this.uiFont}`;
     ctx.fillStyle = '#A89070';
@@ -10029,8 +9973,9 @@ export class VillageLedgerGame {
 
     const popupW = 220;
     const popupH = 200;
+    const playAreaH = h - this.dialogueBoxHeight;
     const popupX = (w - popupW) / 2;
-    const popupY = (h - popupH) / 2;
+    const popupY = (playAreaH - popupH) / 2;
 
     const genreColor = this.GENRE_COLORS[this.recordRewardGenre] || '#FF6B6B';
     const r = parseInt(genreColor.slice(1, 3), 16);
@@ -10116,7 +10061,7 @@ export class VillageLedgerGame {
     const unlocked = JSON.parse(localStorage.getItem('makingMoney_unlockedGenres') || '[]');
     if (unlocked.length === 0) return;
 
-    if (this.state.showDJQuiz || this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview || this.state.showBadgeTray || this.state.showMusicCollection) return;
+    if (this.state.showDJQuiz || this.state.showQuiz || this.state.showFail || this.state.showBrawl || this.state.showQuizReview || this.state.showBadgeTray || this.state.showMusicCollection || this.state.showSuccess) return;
 
     const iconSize = 32;
     const iconX = this.inventoryPanelLeftX - 44 - iconSize - 8;
@@ -10143,9 +10088,9 @@ export class VillageLedgerGame {
         ctx.fillStyle = '#FFD700';
         ctx.textAlign = 'center';
         const hintX = iconX + iconSize / 2;
-        const hintY = iconY + iconSize + 14;
+        const hintY = iconY + iconSize + 28;
         ctx.fillText('Tap to change music!', hintX, hintY);
-        const arrowY = iconY + iconSize + 2;
+        const arrowY = iconY + iconSize + 16;
         ctx.fillText('\u25B2', hintX, arrowY);
         ctx.restore();
       }
@@ -12223,7 +12168,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     
     const elderScreenX = this.villageElder.x - this.cameraX;
     const groundY = this.logicalHeight - this.groundHeight - this.dialogueBoxHeight;
-    const bubbleY = groundY - 135;
+    const bubbleY = groundY - 155;
     
     const pulse = 1 + 0.05 * Math.sin(Date.now() / 300);
     
@@ -14285,13 +14230,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
               localStorage.setItem('makingMoney_postReflection', newAnswer.trim());
             }
             this.state.showNightTransition = false;
-            if (this.discoAvatarJustUnlocked && !this.showDiscoAvatarCelebration) {
-              this.showDiscoAvatarCelebration = true;
-              this.discoAvatarCelebrationStartTime = Date.now();
-              soundManager.play('djTransAirhorn1');
-              this.state.phase = 'complete';
-              return;
-            }
             this.state.showSuccess = true;
             this.state.phase = 'complete';
           });
@@ -14334,13 +14272,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
             localStorage.setItem('makingMoney_postReflection', newAnswer.trim());
           }
           this.state.showNightTransition = false;
-          if (this.discoAvatarJustUnlocked && !this.showDiscoAvatarCelebration) {
-            this.showDiscoAvatarCelebration = true;
-            this.discoAvatarCelebrationStartTime = Date.now();
-            soundManager.play('djTransAirhorn1');
-            this.state.phase = 'complete';
-            return;
-          }
           this.state.showSuccess = true;
           this.state.phase = 'complete';
         });
@@ -14653,10 +14584,11 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const hasChampion = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE;
     const reflectionAnswer = localStorage.getItem('makingMoney_moneyAnswer');
     const hasReflection = !!reflectionAnswer;
-    let baseCardH = hasChampion ? 560 : 530;
-    if (hasReflection) baseCardH += 140;
+    let baseCardH = hasChampion ? 440 : 420;
+    if (hasReflection) baseCardH += 100;
     const currentPlayCountForHeight = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
-    if (currentPlayCountForHeight === 1) baseCardH += 50;
+    if (currentPlayCountForHeight === 1) baseCardH += 20;
+    if (this.discoAvatarJustUnlocked) baseCardH += 30;
     const cardH = Math.min(baseCardH, h - 30);
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
@@ -14696,10 +14628,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     }
 
     // Badge grid - row of 3 + centered row of 2 (matching badge tray panel layout)
-    const badgeSize = 70;
-    const gapX = 20;
-    const gapY = 20;
-    const rowHeight = badgeSize + gapY + 40;
+    const badgeSize = 55;
+    const gapX = 16;
+    const gapY = 14;
+    const rowHeight = badgeSize + gapY + 32;
     const hasPartyChampion = this.state.slingshotScore >= this.SLINGSHOT_TARGET_SCORE;
     const startY = cardY + (hasPartyChampion ? 98 : 75);
     
@@ -14743,8 +14675,8 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         ctx.beginPath();
         for (let j = 0; j < 5; j++) {
           const angle = (j * 4 * Math.PI / 5) - Math.PI / 2;
-          const px = cx + Math.cos(angle) * 18;
-          const py = cy + Math.sin(angle) * 18;
+          const px = cx + Math.cos(angle) * 14;
+          const py = cy + Math.sin(angle) * 14;
           if (j === 0) ctx.moveTo(px, py);
           else ctx.lineTo(px, py);
         }
@@ -14753,7 +14685,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       } else {
         // Lock icon
         ctx.fillStyle = '#555';
-        ctx.font = `bold 24px ${this.uiFont}`;
+        ctx.font = `bold 18px ${this.uiFont}`;
         ctx.textAlign = 'center';
         ctx.fillText('?', bx + badgeSize / 2, by + badgeSize / 2 + 8);
       }
@@ -14805,21 +14737,21 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
 
     const currentPlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
     if (currentPlayCount === 1) {
-      ctx.font = `bold 11px ${this.uiFont}`;
+      ctx.font = `bold 10px ${this.uiFont}`;
       ctx.fillStyle = '#00BFFF';
       ctx.textAlign = 'center';
-      ctx.fillText('Come back and YOU can be the DJ!', w / 2, msgY + 38);
-      ctx.font = `9px ${this.uiFont}`;
-      ctx.fillStyle = '#87CEEB';
-      ctx.fillText('Next time, you control the music at the party!', w / 2, msgY + 54);
+      ctx.fillText('Play again to be the DJ!', w / 2, msgY + 32);
     }
 
-    // Learn More hint
-    const hintY = startY + 2 * rowHeight + 47;
-    ctx.font = `9px ${this.uiFont}`;
-    ctx.fillStyle = '#A89070';
-    ctx.textAlign = 'center';
-    ctx.fillText('Tap the badge icon to learn more about each concept', w / 2, hintY);
+    if (this.discoAvatarJustUnlocked) {
+      const avatarMsgY = currentPlayCount === 1 ? msgY + 48 : msgY + 32;
+      ctx.font = `bold 10px ${this.uiFont}`;
+      ctx.fillStyle = '#E040FB';
+      ctx.textAlign = 'center';
+      ctx.fillText('Disco Avatar unlocked! Enable in Settings.', w / 2, avatarMsgY);
+    }
+
+    const hintY = msgY + 55;
 
     // Reflection comparison - "Your Journey"
     if (hasReflection) {

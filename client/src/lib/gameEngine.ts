@@ -9407,9 +9407,8 @@ export class VillageLedgerGame {
     const w = this.logicalWidth;
     const h = this.logicalHeight;
 
-    // Fail card (no full-screen overlay - just the bordered card)
-    const cardW = Math.min(550, w - 60);
-    const cardH = 380;
+    const cardW = Math.min(420, w - 60);
+    const cardH = 200;
     const cardX = (w - cardW) / 2;
     const cardY = (h - cardH) / 2;
 
@@ -9421,33 +9420,19 @@ export class VillageLedgerGame {
     ctx.lineWidth = 4;
     ctx.stroke();
 
-    // Title
     ctx.font = `20px ${this.retroFont}`;
     ctx.textAlign = 'center';
     ctx.fillStyle = '#DC2626';
-    ctx.fillText('COMMUNITY IN CHAOS!', w / 2, cardY + 50);
+    ctx.fillText('VILLAGE IN CHAOS!', w / 2, cardY + 55);
 
-    // Message
     ctx.font = `10px ${this.retroFont}`;
     ctx.fillStyle = '#F5F5F5';
-    const lines = [
-      "Memory cannot be trusted.",
-      "Without a written record,",
-      "everyone remembered the deals",
-      "differently.",
-      "",
-      "Try again, but this time,",
-      "find a way to RECORD your debts!"
-    ];
-    lines.forEach((line, i) => {
-      ctx.fillText(line, w / 2, cardY + 100 + i * 28);
-    });
+    ctx.fillText('Promises weren\'t enough...', w / 2, cardY + 90);
 
-    // Try Again button
     const btnW = 220;
     const btnH = 50;
     const btnX = (w - btnW) / 2;
-    const btnY = cardY + cardH - 80;
+    const btnY = cardY + cardH - 70;
 
     ctx.fillStyle = '#22C55E';
     ctx.beginPath();

@@ -6267,7 +6267,10 @@ export class VillageLedgerGame {
     this.presentFirstRecordAndStartParty();
   }
 
+  private readonly SKIP_TO_PARTY_ENABLED = false;
+
   private drawDebugSkipButton(ctx: CanvasRenderingContext2D): void {
+    if (!this.SKIP_TO_PARTY_ENABLED) { this.debugSkipBtn = null; return; }
     if (this.state.showCelebration || this.state.showSuccess || this.state.showFail || this.state.showBrawl) {
       this.debugSkipBtn = null;
       return;

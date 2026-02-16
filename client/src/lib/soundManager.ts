@@ -689,17 +689,7 @@ export class SoundManager {
 
   public async loadAndPlayGenre(url: string): Promise<void> {
     if (!this.audioContext || !this.masterGain) return;
-    const existing = this.activeSources.get('genreRemix');
-    if (existing) {
-      try { existing.source.stop(); } catch {}
-      this.activeSources.delete('genreRemix');
-    }
-    const existingParty = this.activeSources.get('partySong');
-    if (existingParty) {
-      try { existingParty.source.stop(); } catch {}
-      this.activeSources.delete('partySong');
-    }
-
+    this.stopAllMusic();
     const thisGeneration = ++this.genreLoadGeneration;
 
     try {

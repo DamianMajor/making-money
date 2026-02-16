@@ -160,6 +160,10 @@ interface GameState {
   slingshotDiscoBallRecordAwarded: boolean;
   fishermanBonusQuestionAsked: boolean;
   woodcutterBonusQuestionAsked: boolean;
+  woodcutterDiscoComplimentDone: boolean;
+  stoneWorkerDiscoComplimentDone: boolean;
+  fishermanDiscoComplimentDone: boolean;
+  elderDiscoComplimentDone: boolean;
   slingshotCombo: number;
   slingshotMaxCombo: number;
   slingshotBalloons: Array<{
@@ -574,7 +578,7 @@ export class VillageLedgerGame {
   private shuffleQueue: string[] = [];
   private shuffleQueueIndex: number = 0;
   private slingshotPlatformActive: boolean = false;
-  private readonly SLINGSHOT_TARGET_SCORE = 50;
+  private readonly SLINGSHOT_TARGET_SCORE = 100;
   private inventoryPanelLeftX: number = 0;
   private djHintShown: boolean = false;
   private djHintStartTime: number = 0;
@@ -952,6 +956,10 @@ export class VillageLedgerGame {
       slingshotDiscoBallRecordAwarded: false,
       fishermanBonusQuestionAsked: false,
       woodcutterBonusQuestionAsked: false,
+      woodcutterDiscoComplimentDone: false,
+      stoneWorkerDiscoComplimentDone: false,
+      fishermanDiscoComplimentDone: false,
+      elderDiscoComplimentDone: false,
       slingshotCombo: 0,
       slingshotMaxCombo: 0,
       slingshotBalloons: [],
@@ -1500,6 +1508,7 @@ export class VillageLedgerGame {
       if (this.slingshotEnterButton && !this.state.slingshotLocked) {
         const btn = this.slingshotEnterButton;
         if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+          this.slingshotWalkingToPlay = true;
           const platformWorldX = this.villageCenterX + 400;
           this.autoWalkTarget = { x: platformWorldX, type: 'location' };
           this.player.facingDirection = platformWorldX > this.player.x ? 1 : -1;
@@ -1509,6 +1518,7 @@ export class VillageLedgerGame {
               this.player.x = platformWorldX;
               this.autoWalkTarget = null;
               this.state.slingshotLocked = true;
+              this.slingshotWalkingToPlay = false;
               this.state.playerBlockedForCarving = true;
               this.state.slingshotTutorialTimer = 4;
             } else {
@@ -1523,6 +1533,7 @@ export class VillageLedgerGame {
         const btn = this.slingshotExitButton;
         if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
           this.state.slingshotLocked = false;
+          this.slingshotWalkingToPlay = false;
           this.state.playerBlockedForCarving = false;
           this.state.slingshotAiming = false;
           this.slingshotExitButton = null;
@@ -2293,6 +2304,19 @@ export class VillageLedgerGame {
       this.queueDialogue([{
         speaker: 'WOODCUTTER',
         text: "That storm looks nasty! You better get home before it hits!"
+      }]);
+      return;
+    }
+    
+    const wcCompCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    if (wcCompCount >= 1 && this.useDiscoSprite && !this.state.woodcutterDiscoComplimentDone) {
+      this.state.woodcutterDiscoComplimentDone = true;
+      this.queueDialogue([{
+        speaker: 'WOODCUTTER',
+        text: "Whoa, that outfit is straight fire! You look like you belong on stage, not in a village!",
+        onComplete: () => {
+          this.handleWoodcutterInteraction();
+        }
       }]);
       return;
     }
@@ -3320,6 +3344,19 @@ export class VillageLedgerGame {
       return;
     }
     
+    const swCompCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    if (swCompCount >= 1 && this.useDiscoSprite && !this.state.stoneWorkerDiscoComplimentDone) {
+      this.state.stoneWorkerDiscoComplimentDone = true;
+      this.queueDialogue([{
+        speaker: 'STONE-WORKER',
+        text: "No cap, that fit is absolutely bussin'! Did you raid a treasure chest or something?",
+        onComplete: () => {
+          this.handleStoneWorkerInteraction();
+        }
+      }]);
+      return;
+    }
+    
     // LOOP 1: Double coincidence of wants - player offers to trade
     if (phase === 'got_wood_need_stone') {
       this.queueDialogue([
@@ -3965,6 +4002,19 @@ export class VillageLedgerGame {
       return;
     }
     
+    const fmCompCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    if (fmCompCount >= 1 && this.useDiscoSprite && !this.state.fishermanDiscoComplimentDone) {
+      this.state.fishermanDiscoComplimentDone = true;
+      this.queueDialogue([{
+        speaker: 'FISHERMAN',
+        text: "Bro, that drip is lowkey legendary! The fish are probably jealous of those sparkles!",
+        onComplete: () => {
+          this.handleFishermanInteraction();
+        }
+      }]);
+      return;
+    }
+    
     // Check if resources are depleted (after paying first inflated demand)
     if (this.state.resourcesDepleted) {
       this.queueDialogue([
@@ -4423,6 +4473,19 @@ export class VillageLedgerGame {
 
   private handleElderInteraction(): void {
     const phase = this.state.phase;
+
+    const elCompCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
+    if (elCompCount >= 1 && this.useDiscoSprite && !this.state.elderDiscoComplimentDone && !this.state.showCelebration) {
+      this.state.elderDiscoComplimentDone = true;
+      this.queueDialogue([{
+        speaker: 'VILLAGE ELDER',
+        text: "Well well, look who's serving looks today! That outfit is giving main character energy!",
+        onComplete: () => {
+          this.handleElderInteraction();
+        }
+      }]);
+      return;
+    }
 
     if (this.state.showCelebration) {
       if (this.state.djQuizPassed) {
@@ -5941,7 +6004,7 @@ export class VillageLedgerGame {
         this.state.partyHintSpeaker = "VILLAGE ELDER";
         this.state.partyHintTimer = 0;
       }
-      if (this.state.partyHintTimer > 5 && !this.djSoundboardActive) {
+      if (this.state.partyHintTimer > 10 && !this.djSoundboardActive) {
         if (this.partyHintPaused && Date.now() < this.partyHintPauseUntil) {
           // Don't rotate hints while paused
         } else {
@@ -6577,7 +6640,7 @@ export class VillageLedgerGame {
         x: 80 + Math.random() * (this.worldWidth - 160),
         y: -20 - Math.random() * 50,
         vx: (Math.random() - 0.5) * 30,
-        vy: 20 + Math.random() * 30,
+        vy: 40 + Math.random() * 60,
         color: balloonColors[Math.floor(Math.random() * balloonColors.length)],
         radius: 16 + Math.random() * 6,
         popped: false,
@@ -6592,8 +6655,8 @@ export class VillageLedgerGame {
         b.y += b.vy * dt + Math.sin(t * 1.5 + b.bobPhase) * 0.5;
         if (b.x < -40) b.x = this.worldWidth + 30;
         if (b.x > this.worldWidth + 40) b.x = -30;
-        if (b.y < 10) b.vy = Math.abs(b.vy) * 0.5 + 2;
-        if (b.y > groundY * 0.6) b.vy = -Math.abs(b.vy) * 0.5 - 2;
+        if (b.y < 10) b.vy = Math.abs(b.vy) * 0.5 + 4;
+        if (b.y > groundY * 0.33) b.vy = -Math.abs(b.vy) * 0.5 - 4;
       } else {
         b.popAnim += dt;
       }
@@ -6860,7 +6923,7 @@ export class VillageLedgerGame {
     }
 
     if (this.state.showCelebration) {
-      if (!this.state.slingshotLocked) {
+      if (!this.state.slingshotLocked && !this.slingshotWalkingToPlay) {
         const enterBtnW = 70;
         const enterBtnH = 24;
         const enterBtnX = platformScreenX - enterBtnW / 2;
@@ -7074,23 +7137,23 @@ export class VillageLedgerGame {
 
     if (this.state.slingshotLocked) {
       ctx.save();
-      ctx.textAlign = 'right';
+      ctx.textAlign = 'left';
       
       if (!this.state.slingshotScoreRecordAwarded) {
         const pointsLeft = Math.max(0, this.SLINGSHOT_TARGET_SCORE - this.state.slingshotScore);
         ctx.font = `bold 18px ${this.uiFont}`;
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(`Score: ${this.state.slingshotScore}`, w - 20, groundY - 30);
+        ctx.fillText(`Score: ${this.state.slingshotScore}`, 15, 22);
         ctx.font = `bold 16px ${this.uiFont}`;
         ctx.fillStyle = '#FFD700';
-        ctx.fillText(`${pointsLeft} pts to record!`, w - 20, groundY - 14);
+        ctx.fillText(`${pointsLeft} pts to record!`, 15, 40);
       } else {
         ctx.font = `bold 18px ${this.uiFont}`;
         ctx.fillStyle = '#FFD700';
-        ctx.fillText(`Score: ${this.state.slingshotScore}`, w - 20, groundY - 30);
+        ctx.fillText(`Score: ${this.state.slingshotScore}`, 15, 22);
         ctx.font = `bold 16px ${this.uiFont}`;
         ctx.fillStyle = '#2ECC71';
-        ctx.fillText('Record earned!', w - 20, groundY - 14);
+        ctx.fillText('Record earned!', 15, 40);
         if (this.partyChampionStartTime > 0) {
           const champElapsed = (Date.now() - this.partyChampionStartTime) / 1000;
           if (champElapsed < 2.5) {
@@ -10545,7 +10608,7 @@ export class VillageLedgerGame {
     const panelW = Math.min(500, w - 40);
     const allGenres = Object.keys(this.GENRE_AUDIO_MAP);
     const uncollectedGenres = allGenres.filter(g => !unlocked.includes(g));
-    const hintsExtraHeight = uncollectedGenres.length > 0 ? 36 + uncollectedGenres.length * 16 + 10 : 0;
+    const hintsExtraHeight = 0;
     const panelH = Math.min(600 + hintsExtraHeight, h - 40);
     const panelX = (w - panelW) / 2;
     const panelY = (h - panelH) / 2;
@@ -10726,7 +10789,7 @@ export class VillageLedgerGame {
       ctx.lineTo(panelX + panelW - 25, dividerY);
       ctx.stroke();
 
-      const labelY = dividerY + 18;
+      const labelY = dividerY + 20;
       ctx.font = `10px ${this.retroFont}`;
       ctx.textAlign = 'left';
       ctx.fillStyle = '#E8D44D';
@@ -10736,8 +10799,8 @@ export class VillageLedgerGame {
       const totalDiscoLabelW = discoBallSize * 2 + 6 + discoTextWidth;
       const discoLabelStartX = w / 2 - totalDiscoLabelW / 2;
       const discoBallX = discoLabelStartX + discoBallSize;
-      const discoBallY = labelY - 3;
-      ctx.fillText(discoLabelText, discoBallX + discoBallSize + 6, labelY);
+      const discoBallY = labelY;
+      ctx.fillText(discoLabelText, discoBallX + discoBallSize + 6, labelY + 4);
       ctx.textAlign = 'center';
       const dbGrad = ctx.createRadialGradient(discoBallX - 2, discoBallY - 2, 1, discoBallX, discoBallY, discoBallSize);
       dbGrad.addColorStop(0, '#FFFFFF');
@@ -10793,10 +10856,10 @@ export class VillageLedgerGame {
 
       const btnW = 70;
       const btnH = 28;
-      const btnGap = 8;
+      const btnGap = 12;
       const totalW = btnW * 2 + btnGap;
       const startX = (w - totalW) / 2;
-      const btnY = labelY + 10;
+      const btnY = labelY + 18;
 
       const classicActive = !this.useDiscoSprite;
       ctx.fillStyle = classicActive ? 'rgba(196, 167, 125, 0.5)' : 'rgba(255,255,255,0.08)';
@@ -10830,35 +10893,10 @@ export class VillageLedgerGame {
       discoSectionEndY = btnY + btnH;
     }
 
-    if (uncollectedGenres.length > 0) {
-      const hintSectionY = discoSectionEndY + 18;
-      ctx.strokeStyle = '#555';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(panelX + 20, hintSectionY);
-      ctx.lineTo(panelX + panelW - 20, hintSectionY);
-      ctx.stroke();
-      
-      ctx.font = `bold 10px ${this.uiFont}`;
-      ctx.fillStyle = '#E8D44D';
-      ctx.textAlign = 'center';
-      ctx.fillText('HOW TO FIND MORE RECORDS', panelX + panelW / 2, hintSectionY + 16);
-      
-      let hintY = hintSectionY + 32;
-      ctx.font = `9px ${this.uiFont}`;
-      ctx.textAlign = 'left';
-      uncollectedGenres.forEach(genre => {
-        const hint = this.RECORD_HINTS[genre] || 'Keep exploring!';
-        ctx.fillStyle = '#999';
-        ctx.fillText(`${genre}: ${hint}`, panelX + 25, hintY);
-        hintY += 16;
-      });
-    }
-
     const closeBtnW = 90;
     const closeBtnH = 28;
     const closeBtnX = (w - closeBtnW) / 2;
-    const closeBtnY = panelY + panelH - 40;
+    const closeBtnY = panelY + panelH - 45;
     ctx.strokeStyle = '#888';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -10866,6 +10904,7 @@ export class VillageLedgerGame {
     ctx.stroke();
     ctx.font = `10px ${this.retroFont}`;
     ctx.fillStyle = '#999';
+    ctx.textAlign = 'center';
     ctx.fillText('CLOSE', closeBtnX + closeBtnW / 2, closeBtnY + closeBtnH / 2 + 4);
     this.musicCollectionCloseBtn = { x: closeBtnX, y: closeBtnY, w: closeBtnW, h: closeBtnH };
   }
@@ -13194,7 +13233,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const t = this.state.partyHintTimer;
     let alpha = 1;
     if (t < 0.5) alpha = t / 0.5;
-    else if (t > 4) alpha = (5 - t);
+    else if (t > 8) alpha = (10 - t) / 2;
     alpha = Math.max(0, Math.min(1, alpha)) * 0.85;
     
     ctx.save();
@@ -15281,6 +15320,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
   private playAgainButton: { x: number; y: number; w: number; h: number } | null = null;
   private slingshotEnterButton: { x: number; y: number; w: number; h: number } | null = null;
   private slingshotExitButton: { x: number; y: number; w: number; h: number } | null = null;
+  private slingshotWalkingToPlay: boolean = false;
 
   private handleSuccessTouch(x: number, y: number): void {
     if (this.state.showBadgeTray) {
@@ -15403,6 +15443,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       slingshotDiscoBallRecordAwarded: false,
       fishermanBonusQuestionAsked: false,
       woodcutterBonusQuestionAsked: false,
+      woodcutterDiscoComplimentDone: false,
+      stoneWorkerDiscoComplimentDone: false,
+      fishermanDiscoComplimentDone: false,
+      elderDiscoComplimentDone: false,
       slingshotCombo: 0,
       slingshotMaxCombo: 0,
       slingshotBalloons: [],
@@ -15581,6 +15625,10 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
       slingshotDiscoBallRecordAwarded: false,
       fishermanBonusQuestionAsked: false,
       woodcutterBonusQuestionAsked: false,
+      woodcutterDiscoComplimentDone: false,
+      stoneWorkerDiscoComplimentDone: false,
+      fishermanDiscoComplimentDone: false,
+      elderDiscoComplimentDone: false,
       slingshotCombo: 0,
       slingshotMaxCombo: 0,
       slingshotBalloons: [],

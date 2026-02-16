@@ -385,8 +385,20 @@ export class SoundManager {
       'partySong', 'genreRemix', 'moneySong'
     ];
     for (const name of musicNames) {
-      this.stop(name);
-      this.stopLoop(name);
+      const activeSound = this.activeSources.get(name);
+      if (activeSound) {
+        activeSound.source.onended = null;
+        try { activeSound.source.stop(); } catch {}
+        this.activeSources.delete(name);
+      }
+      const prefix = name + '_';
+      Array.from(this.activeSources.entries()).forEach(([key, sound]) => {
+        if (key.startsWith(prefix)) {
+          sound.source.onended = null;
+          try { sound.source.stop(); } catch {}
+          this.activeSources.delete(key);
+        }
+      });
     }
     this.daytimeMusicActive = false;
   }
@@ -718,7 +730,10 @@ export class SoundManager {
       this.activeSources.set('genreRemix', activeSound);
 
       source.onended = () => {
-        this.activeSources.delete('genreRemix');
+        const current = this.activeSources.get('genreRemix');
+        if (current && current.source === source) {
+          this.activeSources.delete('genreRemix');
+        }
       };
 
       source.start(0);

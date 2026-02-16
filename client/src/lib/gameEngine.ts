@@ -296,6 +296,11 @@ export class VillageLedgerGame {
   private continueArrowBlink: number = 0;
   private inventoryPopup: { text: string; timer: number; y: number } | null = null;
   private hudGlow: number = 0;
+  private woodGlowTimer: number = 0;
+  private stoneGlowTimer: number = 0;
+  private fishGlowTimer: number = 0;
+  private berriesGlowTimer: number = 0;
+  private slingshotGlowTimer: number = 0;
   private interactButtonOpacity: number = 0;
   private faceImages: Record<string, HTMLImageElement> = {};
   private moodTimer: number = 0;
@@ -478,6 +483,8 @@ export class VillageLedgerGame {
   private discoAvatarToggleBtn: { x: number; y: number; w: number; h: number } | null = null;
   private discoClassicBtn: { x: number; y: number; w: number; h: number } | null = null;
   private discoDiscoBtn: { x: number; y: number; w: number; h: number } | null = null;
+  private discoRevealOutfitChosen: boolean = false;
+  private discoRevealPlayAgainBtn: { x: number; y: number; w: number; h: number } | null = null;
 
   private debugSkipBtn: { x: number; y: number; w: number; h: number } | null = null;
 
@@ -1330,18 +1337,29 @@ export class VillageLedgerGame {
       if (celebElapsed > 2.5) {
         if (this.discoEquipBtn && x >= this.discoEquipBtn.x && x <= this.discoEquipBtn.x + this.discoEquipBtn.w &&
             y >= this.discoEquipBtn.y && y <= this.discoEquipBtn.y + this.discoEquipBtn.h) {
+          this.useDiscoSprite = false;
+          localStorage.setItem('makingMoney_useDiscoSprite', 'false');
+          soundManager.play('buttonClick');
+          this.discoRevealOutfitChosen = true;
+          return;
+        }
+        if (this.discoContinueBtn && x >= this.discoContinueBtn.x && x <= this.discoContinueBtn.x + this.discoContinueBtn.w &&
+            y >= this.discoContinueBtn.y && y <= this.discoContinueBtn.y + this.discoContinueBtn.h) {
           this.useDiscoSprite = true;
           localStorage.setItem('makingMoney_useDiscoSprite', 'true');
           soundManager.play('buttonClick');
-          this.showDiscoAvatarCelebration = false;
-          this.discoAvatarJustUnlocked = false;
-          this.advanceEndGameSequence();
-        } else if (this.discoContinueBtn && x >= this.discoContinueBtn.x && x <= this.discoContinueBtn.x + this.discoContinueBtn.w &&
-            y >= this.discoContinueBtn.y && y <= this.discoContinueBtn.y + this.discoContinueBtn.h) {
+          this.discoRevealOutfitChosen = true;
+          return;
+        }
+        if (this.discoRevealOutfitChosen && this.discoRevealPlayAgainBtn &&
+            x >= this.discoRevealPlayAgainBtn.x && x <= this.discoRevealPlayAgainBtn.x + this.discoRevealPlayAgainBtn.w &&
+            y >= this.discoRevealPlayAgainBtn.y && y <= this.discoRevealPlayAgainBtn.y + this.discoRevealPlayAgainBtn.h) {
           soundManager.play('buttonClick');
           this.showDiscoAvatarCelebration = false;
           this.discoAvatarJustUnlocked = false;
-          this.advanceEndGameSequence();
+          this.discoRevealPlayAgainBtn = null;
+          this.resetGame();
+          return;
         }
       }
       return;
@@ -2311,14 +2329,65 @@ export class VillageLedgerGame {
     const wcCompCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
     if (wcCompCount >= 1 && this.useDiscoSprite && !this.state.woodcutterDiscoComplimentDone) {
       this.state.woodcutterDiscoComplimentDone = true;
-      this.queueDialogue([{
-        speaker: 'WOODCUTTER',
-        text: "Whoa, that outfit is straight fire! You look like you belong on stage, not in a village!",
-        onComplete: () => {
-          this.handleWoodcutterInteraction();
+      this.queueDialogue([
+        {
+          speaker: 'WOODCUTTER',
+          text: "Whoa, that outfit is straight fire! You look like you belong on stage, not in a village!"
+        },
+        {
+          speaker: 'YOU',
+          text: "Thanks! I've got another hole in my roof though. Can you help me with some wood?",
+          onComplete: () => {
+            this.handleWoodcutterInteraction();
+          }
         }
-      }]);
+      ]);
       return;
+    }
+    
+    if (wcCompCount >= 1 && !this.state.woodcutterBonusQuestionAsked) {
+      this.state.woodcutterBonusQuestionAsked = true;
+      const bonusQ = getNPCBonusQuestion('woodcutter');
+      if (bonusQ) {
+        this.queueDialogue([
+          {
+            speaker: 'WOODCUTTER',
+            text: "I remember you! You helped us figure out the ledger last time. Quick question for an old friend...",
+            onComplete: () => {
+              this.showCheckpointQuiz(
+                "WOODCUTTER'S BONUS!",
+                bonusQ.question,
+                bonusQ.options,
+                bonusQ.correct,
+                bonusQ.explanation,
+                () => {
+                  if (this.state.checkpointQuizCorrect) {
+                    this.queueDialogue([{
+                      speaker: 'WOODCUTTER',
+                      text: "You really do know your stuff! Take this record as thanks!",
+                      onComplete: () => {
+                        this.awardRandomRecord(300);
+                        setTimeout(() => {
+                          this.handleWoodcutterInteraction();
+                        }, 500);
+                      }
+                    }]);
+                  } else {
+                    this.queueDialogue([{
+                      speaker: 'WOODCUTTER',
+                      text: "Hmm, not quite right. Maybe you'll remember next time!",
+                      onComplete: () => {
+                        this.handleWoodcutterInteraction();
+                      }
+                    }]);
+                  }
+                }
+              );
+            }
+          }
+        ]);
+        return;
+      }
     }
     
     // LOOP 1: Double coincidence of wants dialogue - verbal promise
@@ -2470,7 +2539,7 @@ export class VillageLedgerGame {
                       onComplete: () => {
                         // Unblock player movement after receiving item
                         this.state.playerBlockedForCarving = false;
-                        this.state.inventory.wood = 1;
+                        this.state.inventory.wood = 1; this.woodGlowTimer = 1;
                         this.state.obtainedWood = true;
                         this.state.woodIntroduced = true;
                         this.state.stoneIntroduced = true;
@@ -2484,46 +2553,6 @@ export class VillageLedgerGame {
                         this.state.phase = 'loop2_got_wood';
                         this.state.escortingNPC = null;
                         this.woodcutter.targetX = this.villageCenterX - 160;
-                        const wcPlayCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
-                        if (wcPlayCount >= 1 && !this.state.woodcutterBonusQuestionAsked) {
-                          this.state.woodcutterBonusQuestionAsked = true;
-                          const bonusQ = getNPCBonusQuestion('woodcutter');
-                          if (bonusQ) {
-                            setTimeout(() => {
-                              this.queueDialogue([
-                                {
-                                  speaker: 'WOODCUTTER',
-                                  text: "I remember you! You helped us figure out the ledger last time. Quick question for an old friend...",
-                                  onComplete: () => {
-                                    this.showCheckpointQuiz(
-                                      "WOODCUTTER'S BONUS!",
-                                      bonusQ.question,
-                                      bonusQ.options,
-                                      bonusQ.correct,
-                                      bonusQ.explanation,
-                                      () => {
-                                        if (this.state.checkpointQuizCorrect) {
-                                          this.queueDialogue([{
-                                            speaker: 'WOODCUTTER',
-                                            text: "You really do know your stuff! Take this record as thanks!",
-                                            onComplete: () => {
-                                              this.awardRandomRecord(300);
-                                            }
-                                          }]);
-                                        } else {
-                                          this.queueDialogue([{
-                                            speaker: 'WOODCUTTER',
-                                            text: "Hmm, not quite right. Maybe you'll remember next time!"
-                                          }]);
-                                        }
-                                      }
-                                    );
-                                  }
-                                }
-                              ]);
-                            }, 1500);
-                          }
-                        }
                       }
                     }
                   ]);
@@ -2539,7 +2568,7 @@ export class VillageLedgerGame {
               speaker: 'WOODCUTTER',
               text: "We're at the center. Here's your Wood. Remember, you owe me a Sharp Stone and 1 Fish!",
               onComplete: () => {
-                this.state.inventory.wood = 1;
+                this.state.inventory.wood = 1; this.woodGlowTimer = 1;
                 this.state.obtainedWood = true;
                 this.state.woodIntroduced = true;
                 this.state.stoneIntroduced = true;
@@ -2553,46 +2582,6 @@ export class VillageLedgerGame {
                 this.state.phase = 'loop2_got_wood';
                 this.state.escortingNPC = null;
                 this.woodcutter.targetX = this.villageCenterX - 160;
-                const wcPlayCount2 = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
-                if (wcPlayCount2 >= 1 && !this.state.woodcutterBonusQuestionAsked) {
-                  this.state.woodcutterBonusQuestionAsked = true;
-                  const bonusQ2 = getNPCBonusQuestion('woodcutter');
-                  if (bonusQ2) {
-                    setTimeout(() => {
-                      this.queueDialogue([
-                        {
-                          speaker: 'WOODCUTTER',
-                          text: "I remember you! You helped us figure out the ledger last time. Quick question for an old friend...",
-                          onComplete: () => {
-                            this.showCheckpointQuiz(
-                              "WOODCUTTER'S BONUS!",
-                              bonusQ2.question,
-                              bonusQ2.options,
-                              bonusQ2.correct,
-                              bonusQ2.explanation,
-                              () => {
-                                if (this.state.checkpointQuizCorrect) {
-                                  this.queueDialogue([{
-                                    speaker: 'WOODCUTTER',
-                                    text: "You really do know your stuff! Take this record as thanks!",
-                                    onComplete: () => {
-                                      this.awardRandomRecord(300);
-                                    }
-                                  }]);
-                                } else {
-                                  this.queueDialogue([{
-                                    speaker: 'WOODCUTTER',
-                                    text: "Hmm, not quite right. Maybe you'll remember next time!"
-                                  }]);
-                                }
-                              }
-                            );
-                          }
-                        }
-                      ]);
-                    }, 1500);
-                  }
-                }
               }
             }
           ]);
@@ -2951,7 +2940,7 @@ export class VillageLedgerGame {
                         'Debt',
                         'You took on a debt - a promise to pay someone back later. But can promises always be trusted?',
                         () => {
-                          this.state.inventory.wood = 1;
+                          this.state.inventory.wood = 1; this.woodGlowTimer = 1;
                           this.state.obtainedWood = true;
                           this.state.woodIntroduced = true;
                           this.state.stoneIntroduced = true;
@@ -3005,7 +2994,7 @@ export class VillageLedgerGame {
                         'Debt',
                         'You took on a debt - a promise to pay someone back later. But can promises always be trusted?',
                         () => {
-                          this.state.inventory.wood = 1;
+                          this.state.inventory.wood = 1; this.woodGlowTimer = 1;
                           this.state.obtainedWood = true;
                           this.state.woodIntroduced = true;
                           this.state.stoneIntroduced = true;
@@ -3059,7 +3048,7 @@ export class VillageLedgerGame {
                         'Debt',
                         'You took on a debt - a promise to pay someone back later. But can promises always be trusted?',
                         () => {
-                          this.state.inventory.wood = 1;
+                          this.state.inventory.wood = 1; this.woodGlowTimer = 1;
                           this.state.obtainedWood = true;
                           this.state.woodIntroduced = true;
                           this.state.stoneIntroduced = true;
@@ -3122,7 +3111,7 @@ export class VillageLedgerGame {
                         text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
                         onComplete: () => {
                           this.awardBadge('Debt', 'You took on a debt - a promise to pay someone back later. But can promises always be trusted?', () => {
-                            this.state.inventory.wood = 1;
+                            this.state.inventory.wood = 1; this.woodGlowTimer = 1;
                             this.state.obtainedWood = true;
                             this.state.woodIntroduced = true;
                             this.state.stoneIntroduced = true;
@@ -3164,7 +3153,7 @@ export class VillageLedgerGame {
                     this.state.loop = 2;
                     this.state.smartPathTaken = true;
                     
-                    this.state.inventory.wood = 1;
+                    this.state.inventory.wood = 1; this.woodGlowTimer = 1;
                     this.state.obtainedWood = true;
                     this.state.woodIntroduced = true;
                     this.state.stoneIntroduced = true;
@@ -3199,7 +3188,7 @@ export class VillageLedgerGame {
                         text: "Tell you what - I'll give you the wood, but you'll owe me a debt. Bring me a Sharp Stone and 1 Fish later, and we'll call it even. I'll meet you at the Great Stone.",
                         onComplete: () => {
                           this.awardBadge('Debt', 'You took on a debt - a promise to pay someone back later. But can promises always be trusted?', () => {
-                            this.state.inventory.wood = 1;
+                            this.state.inventory.wood = 1; this.woodGlowTimer = 1;
                             this.state.obtainedWood = true;
                             this.state.woodIntroduced = true;
                             this.state.stoneIntroduced = true;
@@ -3347,13 +3336,19 @@ export class VillageLedgerGame {
     const swCompCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
     if (swCompCount >= 1 && this.useDiscoSprite && !this.state.stoneWorkerDiscoComplimentDone) {
       this.state.stoneWorkerDiscoComplimentDone = true;
-      this.queueDialogue([{
-        speaker: 'STONE-WORKER',
-        text: "No cap, that fit is absolutely bussin'! Did you raid a treasure chest or something?",
-        onComplete: () => {
-          this.handleStoneWorkerInteraction();
+      this.queueDialogue([
+        {
+          speaker: 'STONE-WORKER',
+          text: "No cap, that fit is absolutely bussin'! Did you raid a treasure chest or something?"
+        },
+        {
+          speaker: 'YOU',
+          text: "Ha, thanks! Listen, I still need a sharp stone for my roof. Same deal as last time?",
+          onComplete: () => {
+            this.handleStoneWorkerInteraction();
+          }
         }
-      }]);
+      ]);
       return;
     }
     
@@ -3494,7 +3489,7 @@ export class VillageLedgerGame {
                       onComplete: () => {
                         // Unblock player movement after receiving item
                         this.state.playerBlockedForCarving = false;
-                        this.state.inventory.stone = 1;
+                        this.state.inventory.stone = 1; this.stoneGlowTimer = 1;
                         this.state.obtainedStone = true;
                         this.state.stoneIntroduced = true;
                         this.state.fishIntroduced = true;
@@ -3521,7 +3516,7 @@ export class VillageLedgerGame {
               speaker: 'STONE-WORKER',
               text: "We're at the center. Here's your Sharp Stone. Remember, you owe me 2 Fish!",
               onComplete: () => {
-                this.state.inventory.stone = 1;
+                this.state.inventory.stone = 1; this.stoneGlowTimer = 1;
                 this.state.obtainedStone = true;
                 this.state.stoneIntroduced = true;
                 this.state.fishIntroduced = true;
@@ -3804,7 +3799,7 @@ export class VillageLedgerGame {
   // Loop 1: Continue stone worker dialogue after trade offer - awards badge
   private continueStoneWorkerTradeDialogue(offeredItem: string | null): void {
     const finishGetStone = () => {
-      this.state.inventory.stone = 1;
+      this.state.inventory.stone = 1; this.stoneGlowTimer = 1;
       this.state.obtainedStone = true;
       this.state.stoneIntroduced = true;
       this.state.fishIntroduced = true;
@@ -4005,13 +4000,19 @@ export class VillageLedgerGame {
     const fmCompCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
     if (fmCompCount >= 1 && this.useDiscoSprite && !this.state.fishermanDiscoComplimentDone) {
       this.state.fishermanDiscoComplimentDone = true;
-      this.queueDialogue([{
-        speaker: 'FISHERMAN',
-        text: "Bro, that drip is lowkey legendary! The fish are probably jealous of those sparkles!",
-        onComplete: () => {
-          this.handleFishermanInteraction();
+      this.queueDialogue([
+        {
+          speaker: 'FISHERMAN',
+          text: "Bro, that drip is lowkey legendary! The fish are probably jealous of those sparkles!"
+        },
+        {
+          speaker: 'YOU',
+          text: "Haha, appreciate it! Got any fish to spare? My roof needs fixing again!",
+          onComplete: () => {
+            this.handleFishermanInteraction();
+          }
         }
-      }]);
+      ]);
       return;
     }
     
@@ -4036,7 +4037,7 @@ export class VillageLedgerGame {
     // Loop 2: Extra fish available after giving in to Stone-worker - CHECK THIS FIRST
     if (this.state.extraFishAvailable && this.state.inventory.berries >= 1) {
       this.state.inventory.berries -= 1;
-      this.state.inventory.fish += 1;
+      this.state.inventory.fish += 1; this.fishGlowTimer = 1;
       this.state.extraFishAvailable = false; // Only one extra fish
       this.showInventoryPopup('+1 FISH (-1 BERRY)');
       this.setMood('happy');
@@ -4097,7 +4098,7 @@ export class VillageLedgerGame {
                         action: () => {
                           this.state.showChoice = false;
                           this.state.inventory.berries -= 1;
-                          this.state.inventory.fish += 1;
+                          this.state.inventory.fish += 1; this.fishGlowTimer = 1;
                           this.state.fishIntroduced = true;
                           this.showInventoryPopup('+1 FISH (-1 BERRY)');
                           this.setMood('happy');
@@ -4112,7 +4113,7 @@ export class VillageLedgerGame {
                         action: () => {
                           this.state.showChoice = false;
                           this.state.inventory.berries -= 2;
-                          this.state.inventory.fish += 2;
+                          this.state.inventory.fish += 2; this.fishGlowTimer = 1;
                           this.state.fishIntroduced = true;
                           this.showInventoryPopup('+2 FISH (-2 BERRIES)');
                           this.setMood('happy');
@@ -4127,7 +4128,7 @@ export class VillageLedgerGame {
                         action: () => {
                           this.state.showChoice = false;
                           this.state.inventory.berries -= 3;
-                          this.state.inventory.fish += 3;
+                          this.state.inventory.fish += 3; this.fishGlowTimer = 1;
                           this.state.fishIntroduced = true;
                           this.showInventoryPopup('+3 FISH (-3 BERRIES)');
                           this.setMood('happy');
@@ -4244,7 +4245,7 @@ export class VillageLedgerGame {
         soundManager.playBushSequence();
         this.state.bushCurrentlyEmpty = false;
         this.state.resourcesDepleted = false;
-        this.state.inventory.berries = 1;
+        this.state.inventory.berries = 1; this.berriesGlowTimer = 1;
         this.showInventoryPopup(`+1 BERRY!`, true);
         this.setMood('happy');
         this.queueDialogue([
@@ -4288,7 +4289,7 @@ export class VillageLedgerGame {
       if (this.state.inventory.berries > 0) {
         soundManager.playBushSequence();
         const added = Math.min(3, 3 - this.state.inventory.berries);
-        this.state.inventory.berries += added;
+        this.state.inventory.berries += added; this.berriesGlowTimer = 1;
         this.state.bushCurrentlyEmpty = false;
         this.state.berryRestockUsed = true;
         this.showInventoryPopup(`+${added} BERRIES!`, true);
@@ -4340,7 +4341,7 @@ export class VillageLedgerGame {
     
     if (this.state.inventory.berries < 3) {
       soundManager.playBushSequence();
-      this.state.inventory.berries++;
+      this.state.inventory.berries++; this.berriesGlowTimer = 1;
       this.state.berriesIntroduced = true;
       this.showInventoryPopup(`+1 BERRY (${this.state.inventory.berries}/3)`, true);
       this.setMood('happy');
@@ -4477,13 +4478,19 @@ export class VillageLedgerGame {
     const elCompCount = parseInt(localStorage.getItem('makingMoney_completionCount') || '0');
     if (elCompCount >= 1 && this.useDiscoSprite && !this.state.elderDiscoComplimentDone && !this.state.showCelebration) {
       this.state.elderDiscoComplimentDone = true;
-      this.queueDialogue([{
-        speaker: 'VILLAGE ELDER',
-        text: "Well well, look who's serving looks today! That outfit is giving main character energy!",
-        onComplete: () => {
-          this.handleElderInteraction();
+      this.queueDialogue([
+        {
+          speaker: 'VILLAGE ELDER',
+          text: "Well well, look who's serving looks today! That outfit is giving main character energy!"
+        },
+        {
+          speaker: 'YOU',
+          text: "Why thank you, Elder! Now, about that storm coming in...",
+          onComplete: () => {
+            this.handleElderInteraction();
+          }
         }
-      }]);
+      ]);
       return;
     }
 
@@ -5723,7 +5730,7 @@ export class VillageLedgerGame {
     // Update dialogue typing
     if (this.state.currentDialogue && !this.state.dialogueComplete) {
       this.dialogueTimer += dt;
-      if (this.dialogueTimer > 0.055) {
+      if (this.dialogueTimer > 0.0275) {
         this.dialogueTimer = 0;
         const prevIdx = this.dialogueCharIndex;
         this.dialogueCharIndex++;
@@ -5757,6 +5764,21 @@ export class VillageLedgerGame {
     // Update HUD glow
     if (this.hudGlow > 0) {
       this.hudGlow = Math.max(0, this.hudGlow - dt * 0.5);
+    }
+    if (this.woodGlowTimer > 0) {
+      this.woodGlowTimer = Math.max(0, this.woodGlowTimer - dt * 0.5);
+    }
+    if (this.stoneGlowTimer > 0) {
+      this.stoneGlowTimer = Math.max(0, this.stoneGlowTimer - dt * 0.5);
+    }
+    if (this.fishGlowTimer > 0) {
+      this.fishGlowTimer = Math.max(0, this.fishGlowTimer - dt * 0.5);
+    }
+    if (this.berriesGlowTimer > 0) {
+      this.berriesGlowTimer = Math.max(0, this.berriesGlowTimer - dt * 0.5);
+    }
+    if (this.slingshotGlowTimer > 0) {
+      this.slingshotGlowTimer = Math.max(0, this.slingshotGlowTimer - dt * 0.5);
     }
 
     // Update interact button opacity with 200ms fade
@@ -6032,15 +6054,7 @@ export class VillageLedgerGame {
       }
     }
     
-    // Auto-dismiss disco avatar celebration after 8 seconds (fallback timeout)
-    if (this.showDiscoAvatarCelebration) {
-      const celebElapsed = (Date.now() - this.discoAvatarCelebrationStartTime) / 1000;
-      if (celebElapsed > 8) {
-        this.showDiscoAvatarCelebration = false;
-        this.discoAvatarJustUnlocked = false;
-        this.advanceEndGameSequence();
-      }
-    }
+    // Disco avatar celebration stays on screen until player makes outfit choice and clicks Play Again
     
     if (this.state.showThunderstorm) {
       this.state.thunderstormTimer += dt;
@@ -6634,7 +6648,7 @@ export class VillageLedgerGame {
         });
       }
       this.state.slingshotLastSpawnTime = t;
-    } else if (t - this.state.slingshotLastSpawnTime > 1.5 && activeBalloons.length < 38) {
+    } else if (t - this.state.slingshotLastSpawnTime > 0.5 && activeBalloons.length < 38) {
       this.state.slingshotLastSpawnTime = t;
       this.state.slingshotBalloons.push({
         x: 80 + Math.random() * (this.worldWidth - 160),
@@ -7137,23 +7151,22 @@ export class VillageLedgerGame {
 
     if (this.state.slingshotLocked) {
       ctx.save();
-      ctx.textAlign = 'left';
-      
+      ctx.textAlign = 'right';
       if (!this.state.slingshotScoreRecordAwarded) {
         const pointsLeft = Math.max(0, this.SLINGSHOT_TARGET_SCORE - this.state.slingshotScore);
         ctx.font = `bold 18px ${this.uiFont}`;
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(`Score: ${this.state.slingshotScore}`, 15, 22);
+        ctx.fillText(`Score: ${this.state.slingshotScore}`, w - 15, 22);
         ctx.font = `bold 16px ${this.uiFont}`;
         ctx.fillStyle = '#FFD700';
-        ctx.fillText(`${pointsLeft} pts to record!`, 15, 40);
+        ctx.fillText(`${pointsLeft} pts to record!`, w - 15, 40);
       } else {
         ctx.font = `bold 18px ${this.uiFont}`;
         ctx.fillStyle = '#FFD700';
-        ctx.fillText(`Score: ${this.state.slingshotScore}`, 15, 22);
+        ctx.fillText(`Score: ${this.state.slingshotScore}`, w - 15, 22);
         ctx.font = `bold 16px ${this.uiFont}`;
         ctx.fillStyle = '#2ECC71';
-        ctx.fillText('Record earned!', 15, 40);
+        ctx.fillText('Record earned!', w - 15, 40);
         if (this.partyChampionStartTime > 0) {
           const champElapsed = (Date.now() - this.partyChampionStartTime) / 1000;
           if (champElapsed < 2.5) {
@@ -8099,8 +8112,44 @@ export class VillageLedgerGame {
     ctx.scale(scale, scale);
     ctx.translate(-w / 2, -h / 2);
     
-    if (animElapsed >= 0.4) {
-    const popupAlpha = Math.min(1, (animElapsed - 0.4) / 0.3);
+    // Draw sparkle effects FIRST (behind badge card)
+    ctx.globalAlpha = 1;
+    const now = Date.now() / 1000;
+    const sparkleColors = ['#FFD700', '#FFA500', '#FFFFFF'];
+    // Outer ring (10% larger)
+    for (let i = 0; i < 40; i++) {
+      const angle = (i / 40) * Math.PI * 2 + now;
+      const dist = (120 + Math.sin(now * 3 + i) * 60) * 1.1;
+      const sparkleX = w / 2 + Math.cos(angle) * dist;
+      const sparkleY = h / 2 + Math.sin(angle) * dist;
+      const size = (4 + Math.sin(now * 5 + i * 0.5) * 3) * 1.1;
+      const color = sparkleColors[i % 3];
+      
+      ctx.globalAlpha = eased;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Inner ring of smaller sparkles (10% larger)
+    for (let i = 0; i < 15; i++) {
+      const angle = (i / 15) * Math.PI * 2 - now * 1.5;
+      const dist = (60 + Math.sin(now * 4 + i) * 20) * 1.1;
+      const sparkleX = w / 2 + Math.cos(angle) * dist;
+      const sparkleY = h / 2 + Math.sin(angle) * dist;
+      const size = (2 + Math.sin(now * 6 + i * 0.7) * 2) * 1.1;
+      const color = sparkleColors[i % 3];
+      
+      ctx.globalAlpha = eased;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Draw badge card ON TOP (with 0.25s additional delay)
+    if (animElapsed >= 0.65) {
+    const popupAlpha = Math.min(1, (animElapsed - 0.65) / 0.3);
     
     ctx.globalAlpha = popupAlpha;
     
@@ -8212,41 +8261,6 @@ export class VillageLedgerGame {
     ctx.fillText('Continue', btnX + btnWidth / 2, btnY + 23);
     
     this.badgePopupButtonArea = { x: btnX, y: btnY, w: btnWidth, h: btnHeight };
-    }
-    
-    ctx.globalAlpha = 1;
-    const now = Date.now() / 1000;
-    const sparkleColors = ['#FFD700', '#FFA500', '#FFFFFF'];
-    const sparkleFade = animElapsed > 1 ? Math.max(0, 1 - (animElapsed - 1) / 0.75) : 1;
-    // Outer ring
-    for (let i = 0; i < 40; i++) {
-      const angle = (i / 40) * Math.PI * 2 + now;
-      const dist = 120 + Math.sin(now * 3 + i) * 60;
-      const sparkleX = w / 2 + Math.cos(angle) * dist;
-      const sparkleY = h / 2 + Math.sin(angle) * dist;
-      const size = 4 + Math.sin(now * 5 + i * 0.5) * 3;
-      const color = sparkleColors[i % 3];
-      
-      ctx.globalAlpha = eased * sparkleFade;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // Inner ring of smaller sparkles
-    for (let i = 0; i < 15; i++) {
-      const angle = (i / 15) * Math.PI * 2 - now * 1.5;
-      const dist = 60 + Math.sin(now * 4 + i) * 20;
-      const sparkleX = w / 2 + Math.cos(angle) * dist;
-      const sparkleY = h / 2 + Math.sin(angle) * dist;
-      const size = 2 + Math.sin(now * 6 + i * 0.7) * 2;
-      const color = sparkleColors[i % 3];
-      
-      ctx.globalAlpha = eased * sparkleFade;
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(sparkleX, sparkleY, size, 0, Math.PI * 2);
-      ctx.fill();
     }
     
     ctx.restore();
@@ -9974,6 +9988,7 @@ export class VillageLedgerGame {
     this.recordRewardGenre = genre;
     this.showRecordReward = true;
     this.recordRewardStartTime = Date.now();
+    soundManager.playRandomDJTransition();
     this.checkMusicScholarBadge();
   }
 
@@ -11953,20 +11968,6 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     ctx.fillText('TABLET', x + iconW / 2, y + iconH - 4);
 
     this.stoneTabletHudArea = { x, y, w: iconW, h: iconH };
-
-    if (this.state.ledgerIconPulseTimer > 0) {
-      const ta = this.stoneTabletHudArea;
-      const pulseAlpha = 0.4 + 0.4 * Math.sin(this.state.ledgerIconPulseTimer * 6);
-      ctx.save();
-      ctx.shadowColor = '#FFD700';
-      ctx.shadowBlur = 15 + 5 * Math.sin(this.state.ledgerIconPulseTimer * 6);
-      ctx.globalAlpha = pulseAlpha;
-      ctx.fillStyle = '#FFD700';
-      ctx.beginPath();
-      ctx.roundRect(ta.x - 4, ta.y - 4, ta.w + 8, ta.h + 8, 4);
-      ctx.fill();
-      ctx.restore();
-    }
   }
 
   // Large popup view of Stone Tablet - shown when clicking the HUD or in-world tablet
@@ -12158,6 +12159,18 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     const iconOffsetX = 4; // Move icons slightly right
     const iconOffsetY = 4; // Move icons slightly down
     items.forEach((item) => {
+      const glowTimerMap: Record<string, number> = {
+        wood: this.woodGlowTimer,
+        stone: this.stoneGlowTimer,
+        fish: this.fishGlowTimer,
+        berries: this.berriesGlowTimer,
+        slingshot: this.slingshotGlowTimer
+      };
+      const glowTimer = glowTimerMap[item.iconKey] || 0;
+      if (glowTimer > 0) {
+        ctx.shadowColor = '#FFD700';
+        ctx.shadowBlur = 15 * glowTimer;
+      }
       const iconImg = this.itemIcons[item.iconKey];
       if (iconImg && iconImg.complete) {
         ctx.drawImage(iconImg, xPos + iconOffsetX, yPos + iconOffsetY, iconSize, iconSize);
@@ -12166,6 +12179,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         ctx.beginPath();
         ctx.arc(xPos + iconSize / 2 + iconOffsetX, yPos + iconSize / 2 + iconOffsetY, iconSize / 2 - 2, 0, Math.PI * 2);
         ctx.fill();
+      }
+      if (glowTimer > 0) {
+        ctx.shadowBlur = 0;
       }
       ctx.strokeStyle = '#5D4837';
       ctx.lineWidth = 2;
@@ -15136,10 +15152,37 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     {
       const discoSprite = this.processedSprites['player-disco'];
       const bigSize = Math.min(h / 3, w / 3);
-      const bigX = (w - bigSize) / 2;
-      const bigY = (h - bigSize) / 2 - 20;
+      const bigY = (h - bigSize) / 2 - 40;
       const cx = w / 2;
       const cy = bigY + bigSize / 2;
+      
+      const rayCount = 18;
+      const rayRotation = now * 0.0004;
+      const rayMaxLen = Math.max(w, h) * 0.9;
+      const rayInnerRadius = bigSize * 0.25;
+      
+      ctx.save();
+      for (let r = 0; r < rayCount; r++) {
+        const angle = rayRotation + (r / rayCount) * Math.PI * 2;
+        const halfWidth = (Math.PI / rayCount) * 0.55;
+        const pulseAlpha = 0.12 + 0.1 * Math.sin(now * 0.003 + r * 1.7);
+        const rayLen = rayMaxLen * (0.7 + 0.3 * Math.sin(now * 0.002 + r * 0.8));
+        
+        const grad = ctx.createRadialGradient(cx, cy, rayInnerRadius, cx, cy, rayLen);
+        grad.addColorStop(0, `rgba(255, 215, 0, ${pulseAlpha * 0.9})`);
+        grad.addColorStop(0.3, `rgba(255, 200, 0, ${pulseAlpha * 0.6})`);
+        grad.addColorStop(0.6, `rgba(255, 180, 0, ${pulseAlpha * 0.3})`);
+        grad.addColorStop(1, 'rgba(255, 165, 0, 0)');
+        
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(angle - halfWidth) * rayLen, cy + Math.sin(angle - halfWidth) * rayLen);
+        ctx.lineTo(cx + Math.cos(angle + halfWidth) * rayLen, cy + Math.sin(angle + halfWidth) * rayLen);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
       
       const glowPulse = 0.5 + 0.5 * Math.sin(now * 0.004);
       const glowSize = bigSize * 0.6 + glowPulse * 10;
@@ -15197,7 +15240,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         const scaleIn = Math.min(1, elapsed / 0.8);
         const drawSize = bigSize * scaleIn;
         const drawX = (w - drawSize) / 2;
-        const drawY = (h - drawSize) / 2 - 20;
+        const drawY = (h - drawSize) / 2 - 40;
         ctx.drawImage(discoSprite, drawX, drawY, drawSize, drawSize);
       }
       
@@ -15207,7 +15250,7 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         ctx.font = `bold 18px ${this.uiFont}`;
         ctx.textAlign = 'center';
         ctx.fillStyle = '#FFD700';
-        ctx.fillText('NEW AVATAR UNLOCKED!', w / 2, bigY + bigSize + 40);
+        ctx.fillText('NEW AVATAR UNLOCKED!', w / 2, bigY + bigSize + 30);
         ctx.globalAlpha = fadeIn;
       }
 
@@ -15216,51 +15259,79 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
         ctx.globalAlpha = fadeIn * msgAlpha;
         ctx.font = `11px ${this.uiFont}`;
         ctx.fillStyle = '#00BFFF';
-        ctx.fillText('Come back and YOU can be the DJ!', w / 2, bigY + bigSize + 62);
+        ctx.fillText('Come back and YOU can be the DJ!', w / 2, bigY + bigSize + 50);
         ctx.globalAlpha = fadeIn;
       }
 
       if (elapsed > 2.5) {
         const btnAlpha = Math.min(1, (elapsed - 2.5) / 0.5);
         ctx.globalAlpha = fadeIn * btnAlpha;
-        
-        const equipBtnW = 130;
-        const equipBtnH = 36;
-        const contBtnW = 130;
-        const contBtnH = 36;
-        const btnGap = 12;
-        const totalBtnsW = equipBtnW + btnGap + contBtnW;
-        const btnsStartX = (w - totalBtnsW) / 2;
-        const btnsY = bigY + bigSize + 80;
-        
-        ctx.fillStyle = '#E040FB';
-        ctx.beginPath();
-        ctx.roundRect(btnsStartX, btnsY, equipBtnW, equipBtnH, 8);
-        ctx.fill();
-        ctx.strokeStyle = '#B030C8';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.font = `bold 11px ${this.uiFont}`;
-        ctx.fillStyle = '#FFF';
-        ctx.textAlign = 'center';
-        ctx.fillText('EQUIP NOW', btnsStartX + equipBtnW / 2, btnsY + equipBtnH / 2 + 4);
-        
-        this.discoEquipBtn = { x: btnsStartX, y: btnsY, w: equipBtnW, h: equipBtnH };
-        
-        const contBtnX = btnsStartX + equipBtnW + btnGap;
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.beginPath();
-        ctx.roundRect(contBtnX, btnsY, contBtnW, contBtnH, 8);
-        ctx.fill();
-        ctx.strokeStyle = '#666';
-        ctx.lineWidth = 1;
-        ctx.stroke();
+
         ctx.font = `bold 11px ${this.uiFont}`;
         ctx.fillStyle = '#C4A77D';
         ctx.textAlign = 'center';
-        ctx.fillText('CONTINUE', contBtnX + contBtnW / 2, btnsY + contBtnH / 2 + 4);
-        
-        this.discoContinueBtn = { x: contBtnX, y: btnsY, w: contBtnW, h: contBtnH };
+        ctx.fillText('CHOOSE YOUR OUTFIT:', w / 2, bigY + bigSize + 70);
+
+        const outfitBtnW = 100;
+        const outfitBtnH = 34;
+        const outfitGap = 14;
+        const totalOutfitW = outfitBtnW * 2 + outfitGap;
+        const outfitStartX = (w - totalOutfitW) / 2;
+        const outfitY = bigY + bigSize + 80;
+
+        const classicActive = this.discoRevealOutfitChosen && !this.useDiscoSprite;
+        ctx.fillStyle = classicActive ? 'rgba(245, 222, 179, 0.3)' : 'rgba(255,255,255,0.08)';
+        ctx.beginPath();
+        ctx.roundRect(outfitStartX, outfitY, outfitBtnW, outfitBtnH, 8);
+        ctx.fill();
+        ctx.strokeStyle = classicActive ? '#F5DEB3' : '#555';
+        ctx.lineWidth = classicActive ? 2 : 1;
+        ctx.stroke();
+        ctx.font = `${classicActive ? 'bold ' : ''}11px ${this.uiFont}`;
+        ctx.fillStyle = classicActive ? '#F5DEB3' : '#999';
+        ctx.textAlign = 'center';
+        ctx.fillText('Classic', outfitStartX + outfitBtnW / 2, outfitY + outfitBtnH / 2 + 4);
+
+        this.discoEquipBtn = { x: outfitStartX, y: outfitY, w: outfitBtnW, h: outfitBtnH };
+
+        const discoActive = this.discoRevealOutfitChosen && this.useDiscoSprite;
+        const discoBtnX = outfitStartX + outfitBtnW + outfitGap;
+        ctx.fillStyle = discoActive ? 'rgba(224, 64, 251, 0.4)' : 'rgba(255,255,255,0.08)';
+        ctx.beginPath();
+        ctx.roundRect(discoBtnX, outfitY, outfitBtnW, outfitBtnH, 8);
+        ctx.fill();
+        ctx.strokeStyle = discoActive ? '#E040FB' : '#555';
+        ctx.lineWidth = discoActive ? 2 : 1;
+        ctx.stroke();
+        ctx.font = `${discoActive ? 'bold ' : ''}11px ${this.uiFont}`;
+        ctx.fillStyle = discoActive ? '#E040FB' : '#999';
+        ctx.textAlign = 'center';
+        ctx.fillText('Disco', discoBtnX + outfitBtnW / 2, outfitY + outfitBtnH / 2 + 4);
+
+        this.discoContinueBtn = { x: discoBtnX, y: outfitY, w: outfitBtnW, h: outfitBtnH };
+
+        if (this.discoRevealOutfitChosen) {
+          const playBtnW = 150;
+          const playBtnH = 38;
+          const playBtnX = (w - playBtnW) / 2;
+          const playBtnY = outfitY + outfitBtnH + 16;
+
+          ctx.fillStyle = '#22C55E';
+          ctx.beginPath();
+          ctx.roundRect(playBtnX, playBtnY, playBtnW, playBtnH, 8);
+          ctx.fill();
+          ctx.strokeStyle = '#15803D';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.font = `bold 12px ${this.uiFont}`;
+          ctx.fillStyle = '#FFF';
+          ctx.textAlign = 'center';
+          ctx.fillText('PLAY AGAIN', playBtnX + playBtnW / 2, playBtnY + playBtnH / 2 + 4);
+
+          this.discoRevealPlayAgainBtn = { x: playBtnX, y: playBtnY, w: playBtnW, h: playBtnH };
+        } else {
+          this.discoRevealPlayAgainBtn = null;
+        }
         
         ctx.globalAlpha = 1;
       }
@@ -15275,7 +15346,9 @@ private drawCharacter(ctx: CanvasRenderingContext2D, char: Character): void {
     if (this.discoAvatarJustUnlocked && !this.showDiscoAvatarCelebration) {
       this.showDiscoAvatarCelebration = true;
       this.discoAvatarCelebrationStartTime = Date.now();
-      soundManager.play('djTransAirhorn1');
+      soundManager.play('djTransHorns');
+      this.discoRevealOutfitChosen = false;
+      this.discoRevealPlayAgainBtn = null;
       return;
     }
     if (this.showDiscoAvatarCelebration) return;

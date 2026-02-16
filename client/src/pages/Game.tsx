@@ -103,6 +103,9 @@ interface FallingItem {
   opacity: number;
 }
 
+const TITLE_SCREEN_MATRIX_ENABLED = false;
+const TITLE_SCREEN_STOCK_LINE_ENABLED = false;
+
 function MoneyRainCanvas({ preloadedImages }: { preloadedImages: HTMLImageElement[] }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imagesRef = useRef<HTMLImageElement[]>([]);
@@ -200,6 +203,7 @@ function MoneyRainCanvas({ preloadedImages }: { preloadedImages: HTMLImageElemen
       const h = canvas!.height;
       ctx!.clearRect(0, 0, w, h);
 
+      if (TITLE_SCREEN_STOCK_LINE_ENABLED) {
       stockScrollX += STOCK_SPEED * dt;
       if (stockScrollX >= STOCK_STEP) {
         stockScrollX -= STOCK_STEP;
@@ -275,7 +279,9 @@ function MoneyRainCanvas({ preloadedImages }: { preloadedImages: HTMLImageElemen
         ctx!.fill();
       }
       ctx!.restore();
+      }
 
+      if (TITLE_SCREEN_MATRIX_ENABLED) {
       matrixScrollOffset += dt * 60;
       if (matrixScrollOffset >= matrixCharSize) {
         matrixScrollOffset -= matrixCharSize;
@@ -316,6 +322,7 @@ function MoneyRainCanvas({ preloadedImages }: { preloadedImages: HTMLImageElemen
         }
       }
       ctx!.restore();
+      }
 
       const items = itemsRef.current;
       for (let i = 0; i < items.length; i++) {

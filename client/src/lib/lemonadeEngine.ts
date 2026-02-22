@@ -1,4 +1,4 @@
-export type ScreenType = 'TITLE' | 'NAME_INPUT' | 'INTRO' | 'MAP' | 'VISITING' | 'NOTEBOOK' | 'CELEBRATION' | 'QUIZ' | 'BADGE' | 'COMPLETE';
+export type ScreenType = 'TITLE' | 'NAME_INPUT' | 'INTRO' | 'MAP' | 'VISITING' | 'NOTEBOOK' | 'HAMSTER_CATCH' | 'CELEBRATION' | 'QUIZ' | 'BADGE' | 'COMPLETE';
 
 export interface Discovery {
   has: string;
@@ -34,6 +34,16 @@ interface GameState {
   badgeSparkles: Array<{ x: number; y: number; size: number; alpha: number; speed: number }>;
   clouds: Array<{ x: number; y: number; w: number; h: number; speed: number }>;
   notebookSparkleTimer: number;
+  hamsterX: number;
+  hamsterY: number;
+  hamsterTargetX: number;
+  hamsterTargetY: number;
+  hamsterCatches: number;
+  hamsterState: 'idle' | 'running' | 'caught' | 'escaped';
+  hamsterTimer: number;
+  hamsterReaction: string;
+  hamsterReactionTimer: number;
+  hamsterBushes: Array<{ x: number; y: number; w: number; h: number }>;
 }
 
 interface DialogueLine {
@@ -216,11 +226,9 @@ const NEIGHBORS: Neighbor[] = [
     ],
     failDialogue: [],
     successDialogue: [
-      { speaker: 'You', text: "I'll help! Let's catch that hamster!" },
-      { speaker: 'Zoe', text: "THERE HE IS! Behind the bush!" },
-      { speaker: 'Max', text: "Quick! Use this box to trap him!" },
-      { speaker: 'You', text: "Got him! Sir Squeaks is safe!" },
-      { speaker: 'Zoe', text: "YAAAY! You're the BEST! Here, take all the lemons you want!" },
+      { speaker: 'Zoe', text: "YOU CAUGHT HIM! You're AMAZING!" },
+      { speaker: 'Max', text: "Sir Squeaks is back in his cage. Safe and sound!" },
+      { speaker: 'Zoe', text: "A deal's a deal! Here, take ALL the lemons you want!" },
       { speaker: 'Max', text: "Sir Squeaks says thank you too! ...I think. He's just squeaking." },
       { speaker: 'You', text: "LEMONS! Finally! My lemonade stand is going to be AMAZING!" },
     ],
@@ -263,6 +271,7 @@ export class LemonadeGame {
   private hiddenInput: HTMLInputElement | null = null;
   private onNameSubmit: ((name: string) => void) | null = null;
   private globalTime: number = 0;
+  private elapsed: number = 0;
   private boundHandleInput: (e: MouseEvent | TouchEvent) => void;
   private boundHandleResize: () => void;
   private playerMapX: number = 400;
@@ -312,6 +321,22 @@ export class LemonadeGame {
         { x: 700, y: 45, w: 80, h: 25, speed: 10 },
       ],
       notebookSparkleTimer: 0,
+      hamsterX: 400,
+      hamsterY: 250,
+      hamsterTargetX: 400,
+      hamsterTargetY: 250,
+      hamsterCatches: 0,
+      hamsterState: 'idle' as const,
+      hamsterTimer: 0,
+      hamsterReaction: '',
+      hamsterReactionTimer: 0,
+      hamsterBushes: [
+        { x: 80, y: 100, w: 70, h: 50 },
+        { x: 600, y: 80, w: 80, h: 55 },
+        { x: 150, y: 320, w: 75, h: 50 },
+        { x: 550, y: 300, w: 70, h: 45 },
+        { x: 350, y: 380, w: 65, h: 50 },
+      ],
     };
   }
 
@@ -435,6 +460,7 @@ export class LemonadeGame {
   }
 
   private update(dt: number): void {
+    this.elapsed += dt;
     if (this.state.fadeDirection === 'out') {
       this.state.fadeAlpha += dt * 3;
       if (this.state.fadeAlpha >= 1) {
@@ -506,6 +532,50 @@ export class LemonadeGame {
       if (this.state.notebookSparkleTimer < 0) this.state.notebookSparkleTimer = 0;
     }
 
+    if (this.state.screen === 'HAMSTER_CATCH') {
+      if (this.state.hamsterReactionTimer > 0) {
+        this.state.hamsterReactionTimer -= dt;
+        if (this.state.hamsterReactionTimer <= 0) {
+          this.state.hamsterReaction = '';
+          if (this.state.hamsterState === 'caught') {
+            if (this.state.hamsterCatches >= 3) {
+              this.state.dialogueIndex = 0;
+              this.state.dialogueCharIndex = 0;
+              this.state.currentNeighbor = 'twins';
+              this.currentDialogueMode = 'success';
+              this.transitionTo('VISITING');
+            } else {
+              this.state.hamsterState = 'running';
+              this.pickNewHamsterTarget();
+            }
+          }
+        }
+      }
+
+      if (this.state.hamsterState === 'running') {
+        this.state.hamsterTimer += dt;
+        const speed = 180 + this.state.hamsterCatches * 40;
+        const dx = this.state.hamsterTargetX - this.state.hamsterX;
+        const dy = this.state.hamsterTargetY - this.state.hamsterY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 5) {
+          this.state.hamsterState = 'idle';
+          this.state.hamsterTimer = 0;
+        } else {
+          this.state.hamsterX += (dx / dist) * speed * dt;
+          this.state.hamsterY += (dy / dist) * speed * dt;
+        }
+      }
+
+      if (this.state.hamsterState === 'idle') {
+        this.state.hamsterTimer += dt;
+        if (this.state.hamsterTimer > 0.5 + Math.random() * 0.8) {
+          this.state.hamsterState = 'running';
+          this.pickNewHamsterTarget();
+        }
+      }
+    }
+
     if (this.state.quizFeedback) {
       this.state.quizFeedbackTimer += dt;
       if (this.state.quizFeedback === 'correct' && this.state.quizFeedbackTimer > 1.2) {
@@ -546,6 +616,7 @@ export class LemonadeGame {
       case 'MAP': this.renderMap(ctx); break;
       case 'VISITING': this.renderMap(ctx); this.renderDialogue(ctx); break;
       case 'NOTEBOOK': this.renderNotebook(ctx); break;
+      case 'HAMSTER_CATCH': this.renderHamsterCatch(ctx); break;
       case 'CELEBRATION': this.renderCelebration(ctx); break;
       case 'QUIZ': this.renderQuiz(ctx); break;
       case 'BADGE': this.renderBadge(ctx); break;
@@ -1107,6 +1178,166 @@ export class LemonadeGame {
     this.hitAreas = [{ x: closeX - hitPad, y: closeY - hitPad, w: closeW + hitPad * 2, h: closeH + hitPad * 2, id: 'closeNotebook' }];
   }
 
+  private renderHamsterCatch(ctx: CanvasRenderingContext2D): void {
+    const grad = ctx.createLinearGradient(0, 0, 0, DESIGN_H);
+    grad.addColorStop(0, '#87CEEB');
+    grad.addColorStop(0.3, '#87CEEB');
+    grad.addColorStop(0.35, '#7BC950');
+    grad.addColorStop(1, '#5EA63B');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
+
+    ctx.strokeStyle = '#8B5A2B';
+    ctx.lineWidth = 4;
+    ctx.setLineDash([15, 10]);
+    ctx.strokeRect(30, 50, DESIGN_W - 60, DESIGN_H - 80);
+    ctx.setLineDash([]);
+
+    for (let i = 0; i < 6; i++) {
+      const fx = 50 + i * 140 + Math.sin(this.elapsed * 0.5 + i) * 5;
+      const fy = DESIGN_H - 30;
+      ctx.fillStyle = '#E8F5E9';
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.lineTo(fx - 4, fy - 12);
+      ctx.lineTo(fx + 4, fy - 12);
+      ctx.fill();
+      ctx.fillStyle = '#C8E6C9';
+      ctx.beginPath();
+      ctx.moveTo(fx + 8, fy);
+      ctx.lineTo(fx + 4, fy - 10);
+      ctx.lineTo(fx + 12, fy - 10);
+      ctx.fill();
+    }
+
+    for (const bush of this.state.hamsterBushes) {
+      ctx.fillStyle = '#388E3C';
+      ctx.beginPath();
+      ctx.ellipse(bush.x + bush.w / 2, bush.y + bush.h, bush.w / 2, bush.h / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#43A047';
+      ctx.beginPath();
+      ctx.ellipse(bush.x + bush.w / 2 - 10, bush.y + bush.h - 8, bush.w / 3, bush.h / 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#4CAF50';
+      ctx.beginPath();
+      ctx.ellipse(bush.x + bush.w / 2 + 12, bush.y + bush.h - 5, bush.w / 4, bush.h / 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.font = 'bold 20px Arial, sans-serif';
+    ctx.fillStyle = COLORS.text;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('Catch Sir Squeaks!', DESIGN_W / 2, 12);
+
+    const catchIndicatorY = 38;
+    for (let i = 0; i < 3; i++) {
+      const cx = DESIGN_W / 2 - 30 + i * 30;
+      ctx.beginPath();
+      ctx.arc(cx, catchIndicatorY, 8, 0, Math.PI * 2);
+      if (i < this.state.hamsterCatches) {
+        ctx.fillStyle = '#FF7043';
+        ctx.fill();
+        ctx.fillStyle = COLORS.white;
+        ctx.font = 'bold 10px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('\u2713', cx, catchIndicatorY);
+      } else {
+        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        ctx.fill();
+      }
+    }
+
+    const hx = this.state.hamsterX;
+    const hy = this.state.hamsterY;
+    const isMoving = this.state.hamsterState === 'running';
+    const bob = isMoving ? Math.sin(this.elapsed * 15) * 3 : Math.sin(this.elapsed * 3) * 1;
+
+    ctx.fillStyle = '#D4A373';
+    ctx.beginPath();
+    ctx.ellipse(hx, hy + bob, 18, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#C49265';
+    ctx.beginPath();
+    ctx.ellipse(hx, hy + bob, 14, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#D4A373';
+    ctx.beginPath();
+    ctx.ellipse(hx + 16, hy - 4 + bob, 6, 8, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#E8C9A0';
+    ctx.beginPath();
+    ctx.ellipse(hx + 16, hy - 4 + bob, 4, 5, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#D4A373';
+    ctx.beginPath();
+    ctx.ellipse(hx - 16, hy - 4 + bob, 6, 8, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#E8C9A0';
+    ctx.beginPath();
+    ctx.ellipse(hx - 16, hy - 4 + bob, 4, 5, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#1A1A1A';
+    ctx.beginPath();
+    ctx.arc(hx - 5, hy - 5 + bob, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(hx + 5, hy - 5 + bob, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#FF8A80';
+    ctx.beginPath();
+    ctx.ellipse(hx, hy - 2 + bob, 3, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#F5F5F5';
+    ctx.beginPath();
+    ctx.ellipse(hx, hy + 2 + bob, 8, 4, 0, 0, Math.PI);
+    ctx.fill();
+
+    if (isMoving) {
+      const tailWag = Math.sin(this.elapsed * 20) * 8;
+      ctx.strokeStyle = '#D4A373';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(hx - 15, hy + 5 + bob);
+      ctx.quadraticCurveTo(hx - 25, hy + bob + tailWag, hx - 30, hy - 5 + bob);
+      ctx.stroke();
+    }
+
+    if (this.state.hamsterReaction) {
+      const reactY = hy - 35 + bob;
+      ctx.font = 'bold 18px Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      const alpha = Math.min(1, this.state.hamsterReactionTimer * 2);
+      if (this.state.hamsterCatches >= 3 && this.state.hamsterState === 'caught') {
+        ctx.fillStyle = `rgba(76,175,80,${alpha})`;
+      } else if (this.state.hamsterState === 'caught') {
+        ctx.fillStyle = `rgba(255,112,67,${alpha})`;
+      } else {
+        ctx.fillStyle = `rgba(62,39,35,${alpha})`;
+      }
+      ctx.fillText(this.state.hamsterReaction, hx, reactY - this.state.hamsterReactionTimer * 15);
+    }
+
+    if (this.state.hamsterState !== 'caught') {
+      this.hitAreas = [{ x: hx - 30, y: hy - 25 + bob, w: 60, h: 50, id: 'hamster' }];
+    } else {
+      this.hitAreas = [];
+    }
+  }
+
   private renderCelebration(ctx: CanvasRenderingContext2D): void {
     const grad = ctx.createLinearGradient(0, 0, 0, DESIGN_H);
     grad.addColorStop(0, '#FFF9C4');
@@ -1478,6 +1709,22 @@ export class LemonadeGame {
         }
         break;
 
+      case 'HAMSTER_CATCH':
+        if (id === 'hamster' && this.state.hamsterState !== 'caught' && this.state.hamsterReactionTimer <= 0) {
+          this.state.hamsterCatches++;
+          this.state.hamsterState = 'caught';
+          const reactions = [
+            ['SQUEAK!', 'Almost had me!', 'Too quick for you!'],
+            ['EEK!', 'Not again!', 'So close!'],
+            ['GOTCHA! \uD83D\uDC39', 'Caught him!', 'Sir Squeaks is safe!'],
+          ];
+          const catchIndex = Math.min(this.state.hamsterCatches - 1, 2);
+          const reactionSet = reactions[catchIndex];
+          this.state.hamsterReaction = reactionSet[Math.floor(Math.random() * reactionSet.length)];
+          this.state.hamsterReactionTimer = this.state.hamsterCatches >= 3 ? 1.5 : 1.0;
+        }
+        break;
+
       case 'CELEBRATION':
         if (id === 'celebrationContinue') {
           this.transitionTo('QUIZ');
@@ -1584,10 +1831,22 @@ export class LemonadeGame {
     if (choice.action === 'success') {
       const disc = this.state.discoveries.get(neighbor.id);
       if (disc) disc.traded = true;
-      this.state.dialogueIndex = 0;
-      this.state.dialogueCharIndex = 0;
       this.state.choiceVisible = false;
-      this.currentDialogueMode = 'success';
+      if (neighbor.id === 'twins') {
+        this.state.hamsterCatches = 0;
+        this.state.hamsterState = 'running';
+        this.state.hamsterTimer = 0;
+        this.state.hamsterX = 400;
+        this.state.hamsterY = 250;
+        this.state.hamsterReaction = '';
+        this.state.hamsterReactionTimer = 0;
+        this.pickNewHamsterTarget();
+        this.transitionTo('HAMSTER_CATCH');
+      } else {
+        this.state.dialogueIndex = 0;
+        this.state.dialogueCharIndex = 0;
+        this.currentDialogueMode = 'success';
+      }
       return;
     }
 
@@ -1612,6 +1871,16 @@ export class LemonadeGame {
       case 'success': return neighbor.successDialogue;
       default: return neighbor.dialogue;
     }
+  }
+
+  private pickNewHamsterTarget(): void {
+    let tx: number, ty: number;
+    do {
+      tx = 60 + Math.random() * 680;
+      ty = 80 + Math.random() * 320;
+    } while (Math.abs(tx - this.state.hamsterX) < 100 && Math.abs(ty - this.state.hamsterY) < 80);
+    this.state.hamsterTargetX = tx;
+    this.state.hamsterTargetY = ty;
   }
 
   private getCurrentNeighbor(): Neighbor | undefined {

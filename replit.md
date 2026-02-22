@@ -2,47 +2,73 @@
 
 ## Overview
 
-"Making Money" is an educational game series designed to explore the fundamental question: "What is Money?" and its origins, necessity, and qualities. The initial lesson, "The Barter System," is a side-scrolling game set in an ancient village. Players experience a world without money, confronting disputes over promises that lead to the creation of a "Stone Tablet" ledger system. The game is optimized for touch-only input on iPad/tablet devices, aiming for a broad audience interested in interactive learning about economic concepts. The long-term vision includes a multi-chapter structure covering various aspects of money's evolution, face-capture for character customization, and pre/post reflection exercises to deepen player understanding.
+"Making Money" is an educational game series designed to explore the fundamental question: "What is Money?" through short, focused chapters. The educational arc follows Austrian economics principles (without explicitly naming them), guiding players from the basics of trade through to understanding the properties of sound money. Each chapter teaches one core concept through gameplay — the player learns by doing, not by being lectured.
+
+The current implementation is **Chapter 1: "The Trade"** — a top-down neighborhood game where a kid tries to start a lemonade stand and needs lemons. Through visiting neighbors and attempting trades, the player discovers the concept of **Double Coincidence of Wants**.
+
+## Chapter Framework (Planned)
+
+1. **Chapter 1: "The Trade"** — Double Coincidence of Wants (IMPLEMENTED)
+2. **Chapter 2: "The Chain"** — Indirect Exchange / Trade Chains
+3. **Chapter 3: "The Notebook"** — Record-Keeping / The Ledger
+4. **Chapter 4: "Everyone Likes Cookies"** — Emergence of a Medium of Exchange
+5. **Chapter 5: "The Cookie Problem"** — Properties of Sound Money (durable, divisible, portable, fungible, scarce)
+6. **Chapter 6: "The Best Money Wins"** — Convergence on Hard Money (optional/advanced)
+
+## Design Principles
+
+- **Fun first.** The game must be enjoyable. Educational content is taught through gameplay, never through lectures.
+- **No fail states.** Every interaction moves the player forward. Failed trades are funny and informative, not punishing.
+- **The character is frustrated, not the player.** The player should feel clever and in control.
+- **Short chapters.** Each chapter is 5-10 minutes, teaching one concept well.
+- **Modern, relatable setting.** Lemonade stand in a neighborhood — no "history lesson" feeling.
+- **Colorful and simple** visual style — bright, cheerful, like a children's book.
 
 ## User Preferences
 
 - Preferred communication style: Simple, everyday language.
 - No interpretation of changes beyond explicit requests — ask before making decisions.
-- Keyword highlighting: only "double coincidence of wants" and "ledger" (not debt/debts).
+- Education should feel organic, not like a classroom.
+- Fun and player agency are the top priorities.
+- Austrian economics foundation without explicitly naming it.
+- Not interested in teaching savings accounts or interest.
 
 ## System Architecture
 
 ### Frontend
 - **Technology Stack**: React SPA with TypeScript (Vite), Wouter for routing, TanStack Query for server state.
 - **UI Framework**: Shadcn/UI component library (Radix primitives, Tailwind CSS).
-- **Game Engine**: Custom HTML5 Canvas-based JavaScript engine (60fps, click-to-walk).
-- **Core Mechanics**: Dialogue system, NPC interaction, "Stone Tablet" HUD for debt tracking, item gifting on credit, brawl triggers, mood system, environmental transitions, "Double Coincidence of Wants" demonstration, and a badge system.
-- **Game Progression**: Features a two-loop system (Failure Path with verbal promises, Success Path with Stone Tablet for recording debts), including "NPC-First" and "Elder-First" settlement approaches and escort mechanics. A "Smart Path" allows players to suggest a recording system via keyword matching, skipping the initial failure loop.
-- **Badge System**: 5 collectible badges (Double Coincidence of Wants, Debt, The Ledger, Debt Settled, Gold Records) with persistent HUD and tap-to-expand panel.
-- **Quiz System**: Two types: DJ Quiz (1-2 questions, gated, leads to song choice) and Final Quiz (5 review questions, non-gated). Questions are sourced from a centralized `quizBank.ts`. Includes "Quick Check!" pop-ups. Quiz retry only repeats wrong questions. Options use dynamic A/B/C/D labels after randomization. Age-based difficulty: players under 10 get simpler wrong answers, players 10+ get longer/more plausible wrong answers to prevent guessing by length.
-- **Slingshot Balloon-Pop Mini-Game**: An "Angry Birds"-style physics-based mini-game during the party, with score tracking and collision detection for various world elements.
-- **Party Flow**: Time-based event with a storm countdown and progressive atmospheric effects, requiring player action (roof repair). Party graphics fade after repair.
-- **Audio System**: Web Audio API with `AudioContext` for dynamic soundscapes, including layered audio, dynamic background music, and independent volume controls persisted to localStorage.
-- **Visual Style**: Painted/illustrated backgrounds, pixel-art character sprites, earth tones, natural materials, and monospace/sans-serif fonts. Responsive canvas design.
-- **Music Strategy**: Dynamic music loading and playback. Funk genre uses money-yell-open.mp3 (the main party song). First playthrough: Funk plays as the opening party music. Subsequent playthroughs: a random already-unlocked genre plays as the opening party music.
-- **Song Choice Mechanic**: Players select from 11 celebration genres after passing the DJ Quiz, each with a dedicated remix audio file, lazy-loaded on selection. Mid-party song change allowed once.
-- **Music Collection HUD**: Vinyl record icon shows progress (X/11), expands to a panel to view and select unlocked genres. Persistence across sessions via localStorage.
-- **2-Playthrough Gold Record Path**: Designed for collecting all 11 genres in two playthroughs, utilizing various in-game actions and bonus questions.
-- **Record Rewards**: Slingshot score, disco ball hit, and NPC bonus knowledge checks award random uncollected genre records.
-- **DJ Soundboard Mode**: Unlocked after first playthrough completion. On 2nd+ playthroughs during the party, a pulsing "DJ" button appears in the top-right corner. Tapping it opens a soundboard in the dialogue box area with a 2-column grid of unlocked genres (tap to switch songs instantly with scratch transition) and 8 SFX buttons (Scratch, Air Horn, Laser, Horns, DJ Scratch, Horn 2, Disco Hit 1 & 2) and 4 visual effect buttons (STROBE, LIGHTS, SMOKE, LASERS) with canvas-based effects. Unlimited song switching when DJ mode is active. Close button (X) exits the soundboard. Party educational hints are suppressed while soundboard is open.
-- **DJ Teaser**: First playthrough success screen shows "Come back and YOU can be the DJ!" message to encourage replay.
-- **Elder's Record Crate**: On 2nd playthrough, after debt settlement (before party), the Elder gifts his personal "crate of records" containing all remaining uncollected genres in a single visual presentation. This replaces the old auto-unlock system.
-- **Player Customization**: Player name and age input on setup screen for dialogue, ledger entries, and quiz difficulty. Disco avatar sprite unlocks after first playthrough completion (decoupled from genre collection). Gold Records badge still requires all genres collected.
-- **Settings Menu**: Provides access to sound settings, game instructions, credits, fullscreen toggle, and game restart/reset options.
-- **Screen Flow**: Loading screen → Title screen ("MAKING MONEY" with Play button) → Player setup (name + age) → Gameplay.
+- **Game Engine**: Custom HTML5 Canvas-based engine (`lemonadeEngine.ts`) — 60fps, tap-to-interact, top-down neighborhood map.
+- **Design Resolution**: 800x500, scaled to fit viewport with aspect ratio preservation.
+- **Core Mechanics**: Tap-to-visit houses, dialogue system with typewriter effect, trading mechanic, trade board (notebook), quiz system, badge rewards.
+- **Visual Style**: Bright, colorful canvas-drawn art. Green grass, cheerful houses with distinct colors, drifting clouds, decorative elements (trees, flowers, mailbox, fire hydrant). Simple character sprites with bobbing animation.
+- **Screen Flow**: Title → Name Input → Intro (3 screens) → Map → Visiting (dialogue) → Celebration → Quiz → Badge → Complete.
+- **Chapter 1 Neighbors**:
+  - Mrs. Garcia (yellow house) — has lemons, wants flowers watered. Player can't help → funny rejection.
+  - Mr. Thompson (blue-gray house) — wants leaf raking (player can do), but has no lemons → half-match demonstration.
+  - Zoe & Max / The Twins (purple house) — has lemons, wants hamster caught. Player can help → MATCH!
+- **Trade Board**: Notebook icon on map. Tap to open lined-paper overlay showing discovered neighbor has/wants/can-help info. Fills in as player explores.
+- **Quiz**: 2 questions about Double Coincidence of Wants. Non-punitive — wrong answers get "Try again" with no penalty.
+- **Badge**: "Double Coincidence of Wants" badge awarded after quiz.
 
 ### Backend
 - **Server**: Express.js with TypeScript for API routes and static asset serving.
 - **Data Storage**: In-memory storage with an interface for future database integration.
 
+### Legacy Game (Preserved)
+- The original "Barter System" side-scrolling village game files are preserved in `client/src/lib/gameEngine.ts` and `client/src/pages/Game.tsx` but are not currently routed to. They can be accessed by updating `App.tsx` routing.
+
 ### Build System
 - **Bundling**: Vite for frontend, esbuild for server-side TypeScript.
 - **Optimization**: Custom build script for optimized dependencies.
+
+## Key Files
+
+- `client/src/lib/lemonadeEngine.ts` — Main game engine (Chapter 1)
+- `client/src/pages/LemonadeStand.tsx` — React wrapper for the game canvas
+- `client/src/App.tsx` — Routing (currently points to LemonadeStand)
+- `client/src/lib/gameEngine.ts` — Legacy village game engine (preserved)
+- `client/src/pages/Game.tsx` — Legacy game wrapper (preserved)
 
 ## External Dependencies
 

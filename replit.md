@@ -40,8 +40,11 @@ The current implementation is **Chapter 1: "The Trade"** — a top-down neighbor
 - **UI Framework**: Shadcn/UI component library (Radix primitives, Tailwind CSS).
 - **Game Engine**: Custom HTML5 Canvas-based engine (`lemonadeEngine.ts`) — 60fps, tap-to-interact, top-down neighborhood map.
 - **Design Resolution**: 800x500, scaled to fit viewport with aspect ratio preservation.
-- **Core Mechanics**: Tap-to-visit houses, dialogue system with typewriter effect, trading mechanic, trade board (notebook), quiz system, badge rewards.
-- **Visual Style**: Bright, colorful canvas-drawn art. Green grass, cheerful houses with distinct colors, drifting clouds, decorative elements (trees, flowers, mailbox, fire hydrant). Simple character sprites with bobbing animation.
+- **Core Mechanics**: Tap-to-visit houses, character walks to house before dialogue, dialogue system with typewriter effect, trading mechanic, trade board (notebook), quiz system, badge rewards.
+- **Visual Style**: Bright, colorful canvas-drawn art. Green grass, cheerful houses with distinct colors, drifting clouds, birds flying across screen, blowing leaves near Thompson's yard, cat on fence, decorative elements (trees, flowers, mailbox, fire hydrant). Houses have visual storytelling: Garcia's wilted flowers & broken watering pot, Thompson's leaf piles, Twins' hamster cage with spinning wheel.
+- **Sound**: Web Audio API synth sounds — doorbell chime, dialogue blips, button taps, hamster boing, success jingle, fail trombone, celebration fanfare, hamster catch. Mute toggle on map screen.
+- **Character Reactions**: Thought bubbles appear over player after visiting neighbors — question mark for failed trades, exclamation for success. Neighbors peek from windows as player approaches.
+- **Progress Indicator**: Small lemon/house tracker in bottom-left corner of map showing visited houses and trade completion.
 - **Orientation**: Supports both portrait and landscape. Canvas letterboxes with black bars to maintain 800x500 aspect ratio.
 - **Screen Flow**: Title → Name Input → Intro (3 screens) → Map → Visiting (dialogue) → Hamster Mini-game → Celebration → Quiz → Badge → Complete.
 - **Neighbor Visit Gating**: Player must visit both Mrs. Garcia and Mr. Thompson before the Twins will have lemons available. Early visit to Twins shows "mom's at the store" dialogue.

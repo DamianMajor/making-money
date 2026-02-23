@@ -1,5 +1,159 @@
 export type ScreenType = 'TITLE' | 'NAME_INPUT' | 'INTRO' | 'MAP' | 'VISITING' | 'NOTEBOOK' | 'HAMSTER_CATCH' | 'CELEBRATION' | 'QUIZ' | 'BADGE' | 'COMPLETE';
 
+class SoundManager {
+  private ctx: AudioContext | null = null;
+  private muted: boolean = false;
+
+  private getCtx(): AudioContext | null {
+    if (!this.ctx) {
+      try { this.ctx = new AudioContext(); } catch { return null; }
+    }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  }
+
+  get isMuted(): boolean { return this.muted; }
+  toggleMute(): void { this.muted = !this.muted; }
+
+  private play(fn: (ctx: AudioContext) => void): void {
+    if (this.muted) return;
+    const ctx = this.getCtx();
+    if (!ctx) return;
+    try { fn(ctx); } catch {}
+  }
+
+  doorbell(): void {
+    this.play(ctx => {
+      const now = ctx.currentTime;
+      [523, 659, 784].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, now + i * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.15 + 0.3);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + i * 0.15);
+        osc.stop(now + i * 0.15 + 0.3);
+      });
+    });
+  }
+
+  dialogueBlip(): void {
+    this.play(ctx => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 600 + Math.random() * 200;
+      gain.gain.setValueAtTime(0.03, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.05);
+    });
+  }
+
+  buttonTap(): void {
+    this.play(ctx => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 800;
+      osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.05);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
+    });
+  }
+
+  hamsterBoing(): void {
+    this.play(ctx => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(300, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.1);
+      osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    });
+  }
+
+  hamsterCatch(): void {
+    this.play(ctx => {
+      const now = ctx.currentTime;
+      [440, 554, 659, 880].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.12, now + i * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.15);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + i * 0.08);
+        osc.stop(now + i * 0.08 + 0.15);
+      });
+    });
+  }
+
+  successJingle(): void {
+    this.play(ctx => {
+      const now = ctx.currentTime;
+      [523, 587, 659, 784, 880, 1047].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.12, now + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.25);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + i * 0.12);
+        osc.stop(now + i * 0.12 + 0.25);
+      });
+    });
+  }
+
+  failSound(): void {
+    this.play(ctx => {
+      const now = ctx.currentTime;
+      [400, 350, 300, 200].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.1, now + i * 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.2 + 0.3);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + i * 0.2);
+        osc.stop(now + i * 0.2 + 0.3);
+      });
+    });
+  }
+
+  celebrationFanfare(): void {
+    this.play(ctx => {
+      const now = ctx.currentTime;
+      [523, 659, 784, 1047, 784, 1047].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = i < 4 ? 'sine' : 'triangle';
+        osc.frequency.value = freq;
+        const t = i < 4 ? i * 0.1 : 0.4 + (i - 4) * 0.15;
+        gain.gain.setValueAtTime(0.12, now + t);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + t + 0.3);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now + t);
+        osc.stop(now + t + 0.3);
+      });
+    });
+  }
+}
+
 export interface Discovery {
   has: string;
   wants: string;
@@ -44,6 +198,19 @@ interface GameState {
   hamsterReaction: string;
   hamsterReactionTimer: number;
   hamsterBushes: Array<{ x: number; y: number; w: number; h: number }>;
+  walkTargetX: number;
+  walkTargetY: number;
+  walkTargetNeighbor: string | null;
+  isWalking: boolean;
+  walkProgress: number;
+  walkStartX: number;
+  walkStartY: number;
+  birds: Array<{ x: number; y: number; speed: number; wingPhase: number; size: number }>;
+  blowingLeaves: Array<{ x: number; y: number; vx: number; vy: number; rot: number; rotSpeed: number; color: string; life: number }>;
+  catTailPhase: number;
+  reactionBubble: { type: 'question' | 'happy' | null; timer: number };
+  celebrationParticles: Array<{ x: number; y: number; vx: number; vy: number; color: string; size: number; life: number; maxLife: number }>;
+  lastDialogueCharFloor: number;
 }
 
 interface DialogueLine {
@@ -284,6 +451,8 @@ export class LemonadeGame {
   private boundHandleResize: () => void;
   private playerMapX: number = 400;
   private playerMapY: number = 400;
+  private sound: SoundManager = new SoundManager();
+  private dialogueBlipAccum: number = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -345,6 +514,22 @@ export class LemonadeGame {
         { x: 550, y: 300, w: 70, h: 45 },
         { x: 350, y: 380, w: 65, h: 50 },
       ],
+      walkTargetX: 400,
+      walkTargetY: 400,
+      walkTargetNeighbor: null,
+      isWalking: false,
+      walkProgress: 0,
+      walkStartX: 400,
+      walkStartY: 400,
+      birds: [
+        { x: -50, y: 60, speed: 45 + Math.random() * 20, wingPhase: 0, size: 4 },
+        { x: -200, y: 35, speed: 35 + Math.random() * 15, wingPhase: Math.PI, size: 3 },
+      ],
+      blowingLeaves: [],
+      catTailPhase: 0,
+      reactionBubble: { type: null, timer: 0 },
+      celebrationParticles: [],
+      lastDialogueCharFloor: 0,
     };
   }
 
@@ -447,9 +632,11 @@ export class LemonadeGame {
         this.state.introPage = 0;
       } else if (target === 'CELEBRATION') {
         this.spawnCelebrationLemons();
+        this.sound.successJingle();
       } else if (target === 'BADGE') {
         this.state.badgeScale = 0;
         this.spawnBadgeSparkles();
+        this.sound.celebrationFanfare();
       } else if (target === 'QUIZ') {
         this.state.currentQuizQuestion = 0;
         this.state.quizAnswers = [];
@@ -535,6 +722,89 @@ export class LemonadeGame {
       }
     }
 
+    if (this.state.screen === 'MAP' && this.state.isWalking) {
+      this.state.walkProgress += dt * 1.2;
+      if (this.state.walkProgress >= 1) {
+        this.state.walkProgress = 1;
+        this.state.isWalking = false;
+        this.playerMapX = this.state.walkTargetX;
+        this.playerMapY = this.state.walkTargetY;
+        if (this.state.walkTargetNeighbor) {
+          this.sound.doorbell();
+          this.startVisit(this.state.walkTargetNeighbor);
+          this.state.walkTargetNeighbor = null;
+        }
+      } else {
+        const t = this.state.walkProgress;
+        const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        this.playerMapX = this.state.walkStartX + (this.state.walkTargetX - this.state.walkStartX) * ease;
+        this.playerMapY = this.state.walkStartY + (this.state.walkTargetY - this.state.walkStartY) * ease;
+      }
+    }
+
+    for (const bird of this.state.birds) {
+      bird.x += bird.speed * dt;
+      bird.wingPhase += dt * 8;
+      if (bird.x > DESIGN_W + 60) {
+        bird.x = -40 - Math.random() * 100;
+        bird.y = 25 + Math.random() * 60;
+        bird.speed = 35 + Math.random() * 25;
+      }
+    }
+
+    if (this.state.screen === 'MAP') {
+      if (Math.random() < dt * 1.5) {
+        const thompsonX = 560;
+        const thompsonY = 160;
+        this.state.blowingLeaves.push({
+          x: thompsonX + Math.random() * 140,
+          y: thompsonY + 100 + Math.random() * 30,
+          vx: 20 + Math.random() * 30,
+          vy: -10 + Math.random() * 20,
+          rot: Math.random() * Math.PI * 2,
+          rotSpeed: 2 + Math.random() * 3,
+          color: ['#A1887F', '#8D6E63', '#D7CCC8', '#BCAAA4'][Math.floor(Math.random() * 4)],
+          life: 2 + Math.random() * 1.5,
+        });
+      }
+    }
+    for (const leaf of this.state.blowingLeaves) {
+      leaf.x += leaf.vx * dt;
+      leaf.y += leaf.vy * dt;
+      leaf.vy += 15 * dt;
+      leaf.rot += leaf.rotSpeed * dt;
+      leaf.life -= dt;
+    }
+    this.state.blowingLeaves = this.state.blowingLeaves.filter(l => l.life > 0);
+
+    this.state.catTailPhase += dt * 2;
+
+    if (this.state.reactionBubble.type) {
+      this.state.reactionBubble.timer -= dt;
+      if (this.state.reactionBubble.timer <= 0) {
+        this.state.reactionBubble.type = null;
+      }
+    }
+
+    for (const p of this.state.celebrationParticles) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 250 * dt;
+      p.life -= dt;
+    }
+    this.state.celebrationParticles = this.state.celebrationParticles.filter(p => p.life > 0);
+
+    if (this.state.screen === 'VISITING' && !this.state.dialogueComplete && !this.state.choiceVisible) {
+      const charFloor = Math.floor(this.state.dialogueCharIndex);
+      if (charFloor > this.state.lastDialogueCharFloor && charFloor % 2 === 0) {
+        this.dialogueBlipAccum++;
+        if (this.dialogueBlipAccum % 3 === 0) {
+          this.sound.dialogueBlip();
+        }
+      }
+      this.state.lastDialogueCharFloor = charFloor;
+    }
+
     if (this.state.notebookSparkleTimer > 0) {
       this.state.notebookSparkleTimer -= dt;
       if (this.state.notebookSparkleTimer < 0) this.state.notebookSparkleTimer = 0;
@@ -583,6 +853,7 @@ export class LemonadeGame {
         if (this.state.hamsterTimer > 0.15 + Math.random() * 0.35) {
           this.state.hamsterState = 'running';
           this.pickNewHamsterTarget();
+          this.sound.hamsterBoing();
         }
       }
     }
@@ -903,6 +1174,35 @@ export class LemonadeGame {
     this.drawPaths(ctx);
     this.drawDecorations(ctx);
 
+    for (const bird of this.state.birds) {
+      ctx.save();
+      ctx.strokeStyle = '#5D4037';
+      ctx.lineWidth = 1.5;
+      const wingY = Math.sin(bird.wingPhase) * bird.size;
+      ctx.beginPath();
+      ctx.moveTo(bird.x - bird.size * 2, bird.y + wingY);
+      ctx.quadraticCurveTo(bird.x - bird.size, bird.y - bird.size, bird.x, bird.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(bird.x + bird.size * 2, bird.y + wingY);
+      ctx.quadraticCurveTo(bird.x + bird.size, bird.y - bird.size, bird.x, bird.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    for (const leaf of this.state.blowingLeaves) {
+      ctx.save();
+      ctx.translate(leaf.x, leaf.y);
+      ctx.rotate(leaf.rot);
+      ctx.globalAlpha = Math.min(1, leaf.life);
+      ctx.fillStyle = leaf.color;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 5, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
     for (const n of NEIGHBORS) {
       ctx.save();
       ctx.fillStyle = 'rgba(0,0,0,0.15)';
@@ -911,7 +1211,10 @@ export class LemonadeGame {
       ctx.fill();
       ctx.restore();
       this.drawHouse(ctx, n);
+      this.drawNeighborPreview(ctx, n);
     }
+
+    this.drawCat(ctx, 710, 240);
 
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
@@ -920,8 +1223,25 @@ export class LemonadeGame {
     ctx.fill();
     ctx.restore();
     this.drawPlayerHouse(ctx);
-    const playerBob = Math.sin(this.globalTime * 2.5) * 2.5;
-    this.drawPlayerCharacter(ctx, this.playerMapX, this.playerMapY + playerBob);
+    const playerBob = this.state.isWalking ? Math.sin(this.globalTime * 10) * 3 : Math.sin(this.globalTime * 2.5) * 2.5;
+    this.drawPlayerCharacter(ctx, this.playerMapX, this.playerMapY + playerBob, this.state.isWalking);
+
+    if (this.state.reactionBubble.type && !this.state.isWalking) {
+      this.drawReactionBubble(ctx, this.playerMapX, this.playerMapY - 35);
+    }
+
+    for (const p of this.state.celebrationParticles) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, p.life / (p.maxLife * 0.3));
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
+    this.drawProgressIndicator(ctx);
 
     ctx.save();
     ctx.textAlign = 'right';
@@ -965,18 +1285,36 @@ export class LemonadeGame {
     }
     ctx.restore();
 
+    const muteX = 20;
+    const muteY = 20;
+    const muteS = 36;
+    this.drawRoundedRect(ctx, muteX, muteY, muteS, muteS, 6);
+    ctx.fillStyle = 'rgba(255,248,225,0.85)';
+    ctx.fill();
+    ctx.strokeStyle = '#F57F17';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.font = '18px Arial, sans-serif';
+    ctx.fillStyle = COLORS.text;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.sound.isMuted ? '🔇' : '🔊', muteX + muteS / 2, muteY + muteS / 2);
+
     this.hitAreas = [];
-    for (const n of NEIGHBORS) {
-      const pad = 15;
-      this.hitAreas.push({
-        x: n.houseX - pad,
-        y: n.houseY - pad - 30,
-        w: n.houseW + pad * 2,
-        h: n.houseH + pad * 2 + 30,
-        id: 'house_' + n.id,
-      });
+    if (!this.state.isWalking) {
+      for (const n of NEIGHBORS) {
+        const pad = 15;
+        this.hitAreas.push({
+          x: n.houseX - pad,
+          y: n.houseY - pad - 30,
+          w: n.houseW + pad * 2,
+          h: n.houseH + pad * 2 + 30,
+          id: 'house_' + n.id,
+        });
+      }
     }
     this.hitAreas.push({ x: nbX - nbW, y: nbY, w: nbW, h: nbH, id: 'notebook' });
+    this.hitAreas.push({ x: muteX, y: muteY, w: muteS, h: muteS, id: 'toggleMute' });
   }
 
   private renderDialogue(ctx: CanvasRenderingContext2D): void {
@@ -1346,6 +1684,17 @@ export class LemonadeGame {
       ctx.fillText(this.state.hamsterReaction, hx, reactY - this.state.hamsterReactionTimer * 15);
     }
 
+    for (const p of this.state.celebrationParticles) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, p.life / (p.maxLife * 0.3));
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+
     if (this.state.hamsterState !== 'caught') {
       this.hitAreas = [{ x: hx - 20, y: hy - 18 + bob, w: 40, h: 36, id: 'hamster' }];
     } else {
@@ -1675,7 +2024,7 @@ export class LemonadeGame {
   private handleHit(id: string): void {
     switch (this.state.screen) {
       case 'TITLE':
-        if (id === 'play') this.transitionTo('NAME_INPUT');
+        if (id === 'play') { this.sound.buttonTap(); this.transitionTo('NAME_INPUT'); }
         break;
 
       case 'NAME_INPUT':
@@ -1696,11 +2045,25 @@ export class LemonadeGame {
         break;
 
       case 'MAP':
-        if (id === 'notebook') {
+        if (id === 'toggleMute') {
+          this.sound.toggleMute();
+        } else if (id === 'notebook') {
+          this.sound.buttonTap();
           this.state.screen = 'NOTEBOOK';
         } else if (id.startsWith('house_')) {
           const neighborId = id.replace('house_', '');
-          this.startVisit(neighborId);
+          const neighbor = NEIGHBORS.find(n => n.id === neighborId);
+          if (neighbor) {
+            this.sound.buttonTap();
+            this.state.walkStartX = this.playerMapX;
+            this.state.walkStartY = this.playerMapY;
+            this.state.walkTargetX = neighbor.houseX + neighbor.houseW / 2;
+            this.state.walkTargetY = neighbor.houseY + neighbor.houseH + 15;
+            this.state.walkTargetNeighbor = neighborId;
+            this.state.walkProgress = 0;
+            this.state.isWalking = true;
+            this.state.reactionBubble.type = null;
+          }
         }
         break;
 
@@ -1708,13 +2071,23 @@ export class LemonadeGame {
         if (id === 'dialogueAdvance') {
           this.advanceDialogue();
         } else if (id.startsWith('choice_')) {
+          this.sound.buttonTap();
           const choiceIndex = parseInt(id.replace('choice_', ''));
           this.handleChoice(choiceIndex);
         } else if (id === 'backToMap') {
+          this.sound.buttonTap();
+          const wasFail = this.currentDialogueMode === 'fail';
+          const wasSuccess = this.currentDialogueMode === 'success';
           this.state.screen = 'MAP';
           this.state.currentNeighbor = null;
           this.state.dialogueComplete = false;
           this.currentDialogueMode = 'main';
+          if (wasFail) {
+            this.state.reactionBubble = { type: 'question', timer: 2.5 };
+            this.sound.failSound();
+          } else if (wasSuccess) {
+            this.state.reactionBubble = { type: 'happy', timer: 2.5 };
+          }
         }
         break;
 
@@ -1728,6 +2101,8 @@ export class LemonadeGame {
         if (id === 'hamster' && this.state.hamsterState !== 'caught' && this.state.hamsterReactionTimer <= 0) {
           this.state.hamsterCatches++;
           this.state.hamsterState = 'caught';
+          this.sound.hamsterCatch();
+          this.spawnCelebrationParticlesAt(this.state.hamsterX, this.state.hamsterY, this.state.hamsterCatches >= 3 ? 30 : 15);
           const reactions = [
             ['SQUEAK!', 'Almost had me!', 'Too quick for you!'],
             ['EEK!', 'Not again!', 'So close!'],
@@ -1742,6 +2117,7 @@ export class LemonadeGame {
 
       case 'CELEBRATION':
         if (id === 'celebrationContinue') {
+          this.sound.buttonTap();
           this.transitionTo('QUIZ');
         }
         break;
@@ -1755,6 +2131,7 @@ export class LemonadeGame {
             this.state.quizFeedback = 'correct';
             this.state.quizFeedbackTimer = 0;
             this.spawnConfetti();
+            this.sound.hamsterCatch();
             this.state.quizAnswers.push(true);
           } else {
             this.state.quizFeedback = 'wrong';
@@ -2059,16 +2436,40 @@ export class LemonadeGame {
 
     if (n.id === 'garcia') {
       this.drawLemonTree(ctx, x + w + 15, y + 20);
-      this.drawFlowerPatch(ctx, x + 20, y + h + 10, 6);
+      this.drawWiltedFlowers(ctx, x + 20, y + h + 10, 6);
+      ctx.fillStyle = '#8D6E63';
+      ctx.fillRect(x - 18, y + h - 5, 8, 18);
+      ctx.fillStyle = '#A1887F';
+      ctx.beginPath();
+      ctx.arc(x - 14, y + h - 5, 6, Math.PI, 0);
+      ctx.fill();
+      ctx.strokeStyle = '#795548';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x - 18, y + h - 2);
+      ctx.lineTo(x - 22, y + h - 8);
+      ctx.stroke();
     }
 
     if (n.id === 'thompson') {
-      for (let i = 0; i < 12; i++) {
-        const lx = x + Math.random() * (w + 40) - 20;
-        const ly = y + h + Math.random() * 30;
-        ctx.fillStyle = ['#A1887F', '#8D6E63', '#795548'][Math.floor(Math.random() * 3)];
+      for (let i = 0; i < 18; i++) {
+        const lx = x + ((i * 37 + 13) % (w + 50)) - 25;
+        const ly = y + h + ((i * 23 + 7) % 35);
+        ctx.fillStyle = ['#A1887F', '#8D6E63', '#795548', '#D7CCC8'][i % 4];
         ctx.beginPath();
-        ctx.ellipse(lx, ly, 5 + Math.random() * 3, 3 + Math.random() * 2, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.ellipse(lx, ly, 5 + (i % 3) * 2, 3 + (i % 2) * 2, (i * 0.7), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      for (let p = 0; p < 3; p++) {
+        const px = x + 20 + p * 45;
+        const py = y + h + 15;
+        ctx.fillStyle = '#8D6E63';
+        ctx.beginPath();
+        ctx.ellipse(px, py, 14, 7, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#A1887F';
+        ctx.beginPath();
+        ctx.ellipse(px, py - 2, 12, 5, 0, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -2080,14 +2481,21 @@ export class LemonadeGame {
       ctx.fill();
       ctx.fillStyle = '#2196F3';
       ctx.fillRect(x + w - 5, y + h + 5, 10, 10);
-      ctx.strokeStyle = '#FFC107';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#90A4AE';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + w + 12, y + h - 20, 22, 18);
+      ctx.strokeRect(x + w + 14, y + h - 18, 18, 14);
       ctx.beginPath();
-      ctx.arc(x + w + 20, y + h - 10, 10, 0, Math.PI * 2);
+      ctx.moveTo(x + w + 14, y + h - 11);
+      ctx.lineTo(x + w + 32, y + h - 11);
+      ctx.stroke();
+      const wheelAngle = this.globalTime * 3;
+      ctx.beginPath();
+      ctx.arc(x + w + 23, y + h - 14, 5, 0, Math.PI * 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(x + w + 14, y + h - 10);
-      ctx.lineTo(x + w + 26, y + h - 10);
+      ctx.moveTo(x + w + 23 + Math.cos(wheelAngle) * 4, y + h - 14 + Math.sin(wheelAngle) * 4);
+      ctx.lineTo(x + w + 23 - Math.cos(wheelAngle) * 4, y + h - 14 - Math.sin(wheelAngle) * 4);
       ctx.stroke();
     }
 
@@ -2141,8 +2549,10 @@ export class LemonadeGame {
     ctx.fillText('Your House', x + w / 2, y - 32);
   }
 
-  private drawPlayerCharacter(ctx: CanvasRenderingContext2D, x: number, y: number): void {
-    const bob = Math.sin(this.globalTime * 3) * 2;
+  private drawPlayerCharacter(ctx: CanvasRenderingContext2D, x: number, y: number, walking: boolean = false): void {
+    const bob = walking ? 0 : Math.sin(this.globalTime * 3) * 2;
+    const legSwing = walking ? Math.sin(this.globalTime * 12) * 6 : 0;
+    const armSwing = walking ? Math.sin(this.globalTime * 12) * 4 : 0;
 
     ctx.fillStyle = '#FFCC80';
     ctx.beginPath();
@@ -2157,12 +2567,36 @@ export class LemonadeGame {
     ctx.arc(x, y - 26 + bob, 10, Math.PI, 0);
     ctx.fill();
 
+    if (walking) {
+      ctx.save();
+      ctx.fillStyle = '#FFCC80';
+      ctx.translate(x - 9, y - 4 + bob);
+      ctx.rotate(-armSwing * 0.08);
+      ctx.fillRect(-2, 0, 4, 10);
+      ctx.restore();
+      ctx.save();
+      ctx.fillStyle = '#FFCC80';
+      ctx.translate(x + 9, y - 4 + bob);
+      ctx.rotate(armSwing * 0.08);
+      ctx.fillRect(-2, 0, 4, 10);
+      ctx.restore();
+    }
+
     ctx.fillStyle = '#42A5F5';
     ctx.fillRect(x - 7, y - 10 + bob, 14, 18);
 
+    ctx.save();
     ctx.fillStyle = '#1565C0';
-    ctx.fillRect(x - 6, y + 8 + bob, 5, 10);
-    ctx.fillRect(x + 1, y + 8 + bob, 5, 10);
+    ctx.translate(x - 3, y + 8 + bob);
+    ctx.rotate(legSwing * 0.04);
+    ctx.fillRect(-3, 0, 5, 10);
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle = '#1565C0';
+    ctx.translate(x + 3, y + 8 + bob);
+    ctx.rotate(-legSwing * 0.04);
+    ctx.fillRect(-2, 0, 5, 10);
+    ctx.restore();
 
     ctx.fillStyle = '#3E2723';
     ctx.beginPath();
@@ -2375,6 +2809,41 @@ export class LemonadeGame {
     }
   }
 
+  private drawWiltedFlowers(ctx: CanvasRenderingContext2D, x: number, y: number, count: number): void {
+    const colors = ['#E57373', '#FFB74D', '#E0E0E0', '#CE93D8', '#90CAF9'];
+    for (let i = 0; i < count; i++) {
+      const fx = x + (i - count / 2) * 10;
+      const fy = y + Math.sin(i * 1.5) * 5;
+      const droop = 0.3 + Math.sin(i * 2) * 0.15;
+      ctx.save();
+      ctx.strokeStyle = '#8BC34A';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy + 8);
+      ctx.quadraticCurveTo(fx - 3, fy + 2, fx - 4, fy - 1);
+      ctx.stroke();
+      ctx.restore();
+      const color = colors[i % colors.length];
+      ctx.save();
+      ctx.translate(fx - 4, fy - 1);
+      ctx.rotate(droop);
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.6;
+      for (let p = 0; p < 5; p++) {
+        const angle = (p / 5) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.arc(Math.cos(angle) * 2.5, Math.sin(angle) * 2.5, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#BCAAA4';
+      ctx.beginPath();
+      ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+
   private drawBush(ctx: CanvasRenderingContext2D, x: number, y: number): void {
     ctx.fillStyle = '#388E3C';
     ctx.beginPath();
@@ -2468,6 +2937,164 @@ export class LemonadeGame {
         color: COLORS.confettiColors[Math.floor(Math.random() * COLORS.confettiColors.length)],
         size: 4 + Math.random() * 6,
         rot: Math.random() * Math.PI * 2,
+      });
+    }
+  }
+
+  private drawNeighborPreview(ctx: CanvasRenderingContext2D, n: Neighbor): void {
+    const dist = Math.sqrt(
+      Math.pow(this.playerMapX - (n.houseX + n.houseW / 2), 2) +
+      Math.pow(this.playerMapY - (n.houseY + n.houseH / 2), 2)
+    );
+    if (dist > 180) return;
+
+    const alpha = Math.max(0, 1 - dist / 180) * 0.8;
+    const winX = n.houseX + 15;
+    const winY = n.houseY + 20;
+    const winSize = 18;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = n.skinColor;
+    ctx.beginPath();
+    ctx.arc(winX + winSize / 2, winY + winSize / 2 + 2, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = n.hairColor;
+    ctx.beginPath();
+    ctx.arc(winX + winSize / 2, winY + winSize / 2 - 2, 5, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = '#3E2723';
+    ctx.beginPath();
+    ctx.arc(winX + winSize / 2 - 2, winY + winSize / 2 + 1, 1, 0, Math.PI * 2);
+    ctx.arc(winX + winSize / 2 + 2, winY + winSize / 2 + 1, 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  private drawCat(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+    ctx.save();
+    ctx.fillStyle = '#FF8F00';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 5, 8, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x - 8, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x - 12, y - 4);
+    ctx.lineTo(x - 10, y - 9);
+    ctx.lineTo(x - 8, y - 4);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x - 6, y - 4);
+    ctx.lineTo(x - 4, y - 9);
+    ctx.lineTo(x - 3, y - 3);
+    ctx.fill();
+    ctx.fillStyle = '#3E2723';
+    ctx.beginPath();
+    ctx.arc(x - 10, y - 1, 1, 0, Math.PI * 2);
+    ctx.arc(x - 6, y - 1, 1, 0, Math.PI * 2);
+    ctx.fill();
+    const tailWave = Math.sin(this.state.catTailPhase) * 0.4;
+    ctx.strokeStyle = '#FF8F00';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(x + 8, y + 4);
+    ctx.quadraticCurveTo(x + 16, y - 5 + tailWave * 15, x + 20, y - 3 + tailWave * 10);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  private drawReactionBubble(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+    if (!this.state.reactionBubble.type) return;
+    const alpha = Math.min(1, this.state.reactionBubble.timer);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = COLORS.white;
+    ctx.strokeStyle = '#5D4037';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = COLORS.white;
+    ctx.beginPath();
+    ctx.arc(x + 5, y + 12, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x + 8, y + 18, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.font = 'bold 16px Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (this.state.reactionBubble.type === 'question') {
+      ctx.fillStyle = '#E53935';
+      ctx.fillText('?', x, y);
+    } else {
+      ctx.fillStyle = '#43A047';
+      ctx.fillText('!', x, y);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  private drawProgressIndicator(ctx: CanvasRenderingContext2D): void {
+    const x = 20;
+    const y = DESIGN_H - 45;
+    const visited = this.state.visitedNeighbors;
+    const traded = this.state.discoveries.get('twins')?.traded || false;
+    const steps = [
+      { done: visited.has('garcia'), label: '🏠' },
+      { done: visited.has('thompson'), label: '🏠' },
+      { done: visited.has('twins') && traded, label: '🍋' },
+    ];
+
+    ctx.save();
+    this.drawRoundedRect(ctx, x, y, 110, 32, 6);
+    ctx.fillStyle = 'rgba(255,248,225,0.85)';
+    ctx.fill();
+    ctx.strokeStyle = '#F57F17';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    for (let i = 0; i < steps.length; i++) {
+      const sx = x + 18 + i * 32;
+      const sy = y + 16;
+      if (steps[i].done) {
+        ctx.font = '16px Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(steps[i].label, sx, sy);
+      } else {
+        ctx.fillStyle = '#D7CCC8';
+        ctx.beginPath();
+        ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#BCAAA4';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  private spawnCelebrationParticlesAt(x: number, y: number, count: number): void {
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const speed = 80 + Math.random() * 120;
+      const life = 0.8 + Math.random() * 0.6;
+      this.state.celebrationParticles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 50,
+        color: COLORS.confettiColors[Math.floor(Math.random() * COLORS.confettiColors.length)],
+        size: 2 + Math.random() * 4,
+        life,
+        maxLife: life,
       });
     }
   }

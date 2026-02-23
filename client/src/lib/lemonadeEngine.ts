@@ -72,6 +72,7 @@ interface Neighbor {
   skinColor: string;
   hairColor: string;
   accessory: string;
+  earlyDialogue?: DialogueLine[];
 }
 
 interface HitArea {
@@ -208,6 +209,13 @@ const NEIGHBORS: Neighbor[] = [
     skinColor: '#FFCC80',
     hairColor: '#FF8F00',
     accessory: 'cap',
+    earlyDialogue: [
+      { speaker: 'Zoe', text: "Oh hi! Are you looking for lemons too?" },
+      { speaker: 'Max', text: "Our mom went to the store. She's bringing back lemons from Grandma's tree!" },
+      { speaker: 'Zoe', text: "She'll be back soon! Maybe go check with the other neighbors first?" },
+      { speaker: 'Max', text: "Yeah! Mrs. Garcia has a lemon tree and Mr. Thompson is really nice!" },
+      { speaker: 'You', text: "Okay, I'll go talk to them and come back later!" },
+    ],
     dialogue: [
       { speaker: 'Zoe', text: "HELP! HELP! HELP! This is a DISASTER!" },
       { speaker: 'Max', text: "Sir Squeaks got out of his cage AGAIN!" },
@@ -554,7 +562,7 @@ export class LemonadeGame {
 
       if (this.state.hamsterState === 'running') {
         this.state.hamsterTimer += dt;
-        const speed = 180 + this.state.hamsterCatches * 40;
+        const speed = 280 + this.state.hamsterCatches * 60;
         const dx = this.state.hamsterTargetX - this.state.hamsterX;
         const dy = this.state.hamsterTargetY - this.state.hamsterY;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -564,12 +572,15 @@ export class LemonadeGame {
         } else {
           this.state.hamsterX += (dx / dist) * speed * dt;
           this.state.hamsterY += (dy / dist) * speed * dt;
+          if (Math.random() < 0.02) {
+            this.pickNewHamsterTarget();
+          }
         }
       }
 
       if (this.state.hamsterState === 'idle') {
         this.state.hamsterTimer += dt;
-        if (this.state.hamsterTimer > 0.5 + Math.random() * 0.8) {
+        if (this.state.hamsterTimer > 0.15 + Math.random() * 0.35) {
           this.state.hamsterState = 'running';
           this.pickNewHamsterTarget();
         }
@@ -1332,7 +1343,7 @@ export class LemonadeGame {
     }
 
     if (this.state.hamsterState !== 'caught') {
-      this.hitAreas = [{ x: hx - 30, y: hy - 25 + bob, w: 60, h: 50, id: 'hamster' }];
+      this.hitAreas = [{ x: hx - 20, y: hy - 18 + bob, w: 40, h: 36, id: 'hamster' }];
     } else {
       this.hitAreas = [];
     }
@@ -1766,6 +1777,22 @@ export class LemonadeGame {
     const neighbor = NEIGHBORS.find(n => n.id === neighborId);
     if (!neighbor) return;
 
+    if (neighborId === 'twins' && neighbor.earlyDialogue) {
+      const visitedGarcia = this.state.visitedNeighbors.has('garcia');
+      const visitedThompson = this.state.visitedNeighbors.has('thompson');
+      if (!visitedGarcia || !visitedThompson) {
+        this.state.screen = 'VISITING';
+        this.state.currentNeighbor = neighborId;
+        this.state.dialogueIndex = 0;
+        this.state.dialogueCharIndex = 0;
+        this.state.dialogueComplete = false;
+        this.currentDialogueMode = 'early';
+        this.state.choiceVisible = false;
+        this.state.visitedNeighbors.add(neighborId);
+        return;
+      }
+    }
+
     this.state.screen = 'VISITING';
     this.state.currentNeighbor = neighborId;
     this.state.dialogueIndex = 0;
@@ -1799,6 +1826,13 @@ export class LemonadeGame {
     this.state.dialogueCharIndex = 0;
 
     if (this.state.dialogueIndex >= lines.length) {
+      if (this.currentDialogueMode === 'early') {
+        this.state.currentNeighbor = null;
+        this.state.dialogueComplete = false;
+        this.currentDialogueMode = 'main';
+        this.transitionTo('MAP');
+        return;
+      }
       if (this.currentDialogueMode === 'success' && this.state.currentNeighbor === 'twins') {
         this.state.currentNeighbor = null;
         this.state.dialogueComplete = false;
@@ -1859,7 +1893,7 @@ export class LemonadeGame {
     }
   }
 
-  private currentDialogueMode: 'main' | 'trade' | 'fail' | 'success' = 'main';
+  private currentDialogueMode: 'main' | 'trade' | 'fail' | 'success' | 'early' = 'main';
 
   private getCurrentDialogueLines(): DialogueLine[] {
     const neighbor = this.getCurrentNeighbor();
@@ -1869,6 +1903,7 @@ export class LemonadeGame {
       case 'main': return [...neighbor.dialogue, ...neighbor.tradeDialogue];
       case 'fail': return neighbor.failDialogue;
       case 'success': return neighbor.successDialogue;
+      case 'early': return neighbor.earlyDialogue || [];
       default: return neighbor.dialogue;
     }
   }

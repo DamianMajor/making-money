@@ -42,11 +42,14 @@ The current implementation is **Chapter 1: "The Trade"** — a top-down neighbor
 - **Design Resolution**: 800x500, scaled to fit viewport with aspect ratio preservation.
 - **Core Mechanics**: Tap-to-visit houses, dialogue system with typewriter effect, trading mechanic, trade board (notebook), quiz system, badge rewards.
 - **Visual Style**: Bright, colorful canvas-drawn art. Green grass, cheerful houses with distinct colors, drifting clouds, decorative elements (trees, flowers, mailbox, fire hydrant). Simple character sprites with bobbing animation.
-- **Screen Flow**: Title → Name Input → Intro (3 screens) → Map → Visiting (dialogue) → Celebration → Quiz → Badge → Complete.
+- **Orientation**: Supports both portrait and landscape. Canvas letterboxes with black bars to maintain 800x500 aspect ratio.
+- **Screen Flow**: Title → Name Input → Intro (3 screens) → Map → Visiting (dialogue) → Hamster Mini-game → Celebration → Quiz → Badge → Complete.
+- **Neighbor Visit Gating**: Player must visit both Mrs. Garcia and Mr. Thompson before the Twins will have lemons available. Early visit to Twins shows "mom's at the store" dialogue.
+- **Hamster Mini-game**: Backyard scene where player taps Sir Squeaks 3 times to catch him. Hamster moves erratically with increasing speed. Triggered during Twins' successful trade.
 - **Chapter 1 Neighbors**:
   - Mrs. Garcia (yellow house) — has lemons, wants flowers watered. Player can't help → funny rejection.
   - Mr. Thompson (blue-gray house) — wants leaf raking (player can do), but has no lemons → half-match demonstration.
-  - Zoe & Max / The Twins (purple house) — has lemons, wants hamster caught. Player can help → MATCH!
+  - Zoe & Max / The Twins (purple house) — has lemons, wants hamster caught. Player can help → MATCH! (gated behind visiting other two neighbors first)
 - **Trade Board**: Notebook icon on map. Tap to open lined-paper overlay showing discovered neighbor has/wants/can-help info. Fills in as player explores.
 - **Quiz**: 2 questions about Double Coincidence of Wants. Non-punitive — wrong answers get "Try again" with no penalty.
 - **Badge**: "Double Coincidence of Wants" badge awarded after quiz.

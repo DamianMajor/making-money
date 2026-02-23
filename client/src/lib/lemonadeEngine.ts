@@ -140,9 +140,9 @@ const NEIGHBORS: Neighbor[] = [
       { speaker: 'Mrs. Garcia', text: "Oh hello dear! I have the BIGGEST lemon tree on the whole block!" },
       { speaker: 'You', text: "That's amazing! Could I have some? I can rake your leaves in exchange!" },
       { speaker: 'Mrs. Garcia', text: "Oh sweetie, I don't need raking! Look at my yard - not a leaf in sight!" },
-      { speaker: 'Mrs. Garcia', text: "My poor flowers are dying of thirst though... I hurt my wrist and can't water them." },
-      { speaker: 'You', text: "Hmm... I only know how to rake leaves. I don't have a watering can..." },
-      { speaker: 'Mrs. Garcia', text: "That's okay, dear. If you find someone who can water flowers, send them my way!" },
+      { speaker: 'Mrs. Garcia', text: "But my poor flowers are SO thirsty... My garden hose sprung a leak and I can't water them!" },
+      { speaker: 'You', text: "I'd totally water them for you, but I don't have a hose or a watering can..." },
+      { speaker: 'Mrs. Garcia', text: "That's okay, dear. If you find someone with a spare hose, send them my way!" },
     ],
     tradeDialogue: [
       { speaker: '', text: '', isChoice: true, choices: [
@@ -152,8 +152,8 @@ const NEIGHBORS: Neighbor[] = [
     ],
     failDialogue: [
       { speaker: 'Mrs. Garcia', text: "That's so kind, but I really don't need raking, sweetie!" },
-      { speaker: 'Mrs. Garcia', text: "What I REALLY need is someone to water my flowers..." },
-      { speaker: 'You', text: "(She has lemons but doesn't need what I can do. Bummer!)" },
+      { speaker: 'Mrs. Garcia', text: "What I REALLY need is someone with a hose or watering can for my flowers..." },
+      { speaker: 'You', text: "(She has lemons but I don't have the right tools to help. Bummer!)" },
     ],
     successDialogue: [],
   },
@@ -996,13 +996,16 @@ export class LemonadeGame {
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    const portraitX = 40;
-    const portraitY = panelY + 30;
-    const portraitR = 35;
+    const textLeft = 120;
+    const textTop = panelY + 18;
+    const textRight = DESIGN_W - 30;
+    const textWidth = textRight - textLeft;
+
+    const portraitX = 30;
+    const portraitY = panelY + 28;
+    const portraitR = 36;
     this.drawPortrait(ctx, portraitX + portraitR, portraitY + portraitR, portraitR, neighbor);
 
-    ctx.font = 'bold 16px Arial, sans-serif';
-    ctx.fillStyle = COLORS.text;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
 
@@ -1011,48 +1014,49 @@ export class LemonadeGame {
       const line = lines[this.state.dialogueIndex];
 
       if (line.isChoice && line.choices) {
-        ctx.font = 'bold 16px Arial, sans-serif';
+        ctx.font = 'bold 18px Arial, sans-serif';
         ctx.fillStyle = COLORS.textMuted;
-        ctx.fillText('What do you want to do?', 120, panelY + 25);
+        ctx.fillText('What do you want to do?', textLeft, textTop);
 
-        const btnW = 260;
-        const btnH = 44;
-        const btnX = 120;
+        const btnW = 280;
+        const btnH = 48;
+        const btnX = textLeft;
         this.hitAreas = [];
         line.choices.forEach((choice, i) => {
-          const btnY = panelY + 60 + i * 55;
+          const btnY = panelY + 55 + i * 58;
           this.drawRoundedRect(ctx, btnX, btnY, btnW, btnH, 8);
           ctx.fillStyle = i === 0 ? COLORS.btnPrimary : '#BDBDBD';
           ctx.fill();
           ctx.strokeStyle = i === 0 ? '#E64A19' : '#9E9E9E';
           ctx.lineWidth = 2;
           ctx.stroke();
-          ctx.font = 'bold 15px Arial, sans-serif';
+          ctx.font = 'bold 17px Arial, sans-serif';
           ctx.fillStyle = COLORS.white;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(choice.text, btnX + btnW / 2, btnY + btnH / 2);
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
           this.hitAreas.push({ x: btnX, y: btnY, w: btnW, h: btnH, id: 'choice_' + i });
         });
       } else {
         const speakerName = line.speaker;
-        ctx.font = 'bold 15px Arial, sans-serif';
+        ctx.font = 'bold 18px Arial, sans-serif';
         ctx.fillStyle = speakerName === 'You' ? '#1565C0' : COLORS.text;
-        ctx.textAlign = 'left';
-        ctx.fillText(speakerName, 120, panelY + 20);
+        ctx.fillText(speakerName, textLeft, textTop);
 
         const maxChars = Math.floor(this.state.dialogueCharIndex);
         const visibleText = line.text.substring(0, maxChars);
-        ctx.font = '15px Arial, sans-serif';
+        ctx.font = '17px Arial, sans-serif';
         ctx.fillStyle = COLORS.textLight;
-        this.wrapText(ctx, visibleText, 120, panelY + 45, DESIGN_W - 160, 20);
+        this.wrapText(ctx, visibleText, textLeft, textTop + 26, textWidth, 22);
 
         if (maxChars >= line.text.length) {
           const arrowAlpha = (Math.sin(this.globalTime * 4) + 1) / 2;
           ctx.fillStyle = `rgba(62,39,35,${arrowAlpha})`;
-          ctx.font = '14px Arial, sans-serif';
+          ctx.font = '15px Arial, sans-serif';
           ctx.textAlign = 'right';
-          ctx.fillText('Tap to continue \u25BC', DESIGN_W - 40, panelY + panelH - 25);
+          ctx.fillText('Tap to continue \u25BC', textRight, panelY + panelH - 25);
         }
 
         this.hitAreas = [{ x: 0, y: 0, w: DESIGN_W, h: DESIGN_H, id: 'dialogueAdvance' }];
@@ -1060,17 +1064,17 @@ export class LemonadeGame {
     }
 
     if (this.state.dialogueComplete) {
-      const btnW = 180;
-      const btnH = 40;
+      const btnW = 190;
+      const btnH = 44;
       const btnX = DESIGN_W - btnW - 30;
-      const btnY = panelY + panelH - 55;
+      const btnY = panelY + panelH - 58;
       this.drawRoundedRect(ctx, btnX, btnY, btnW, btnH, 8);
       ctx.fillStyle = COLORS.btnPrimary;
       ctx.fill();
       ctx.strokeStyle = '#E64A19';
       ctx.lineWidth = 2;
       ctx.stroke();
-      ctx.font = 'bold 15px Arial, sans-serif';
+      ctx.font = 'bold 17px Arial, sans-serif';
       ctx.fillStyle = COLORS.white;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
